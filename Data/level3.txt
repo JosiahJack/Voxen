@@ -3690,11 +3690,11 @@ constIndex:614|lP.x:72.74001|lP.y:-14.677|lP.z:-15.4|lR.x:-0.5|lR.y:0.5|lR.z:0.5
 constIndex:614|lP.x:65.35001|lP.y:-14.677|lP.z:7.66|lR.x:-0.5|lR.y:0.5|lR.z:-0.5|lR.w:0.5|lS.x:2|lS.y:2|lS.z:2|open:1|installed:1|lP.x:65.35001|lP.y:-14.677|lP.z:7.66|lR.x:-.70711|lR.y:.70711|lR.w:0|lS.x:2|lS.y:2|lS.z:2
 constIndex:614|lP.x:61.37|lP.y:-14.677|lP.z:8.77|lR.x:-0.70711|lR.y:0.70711|lR.z:0|lR.w:0|lS.x:2|lS.y:2|lS.z:2|targetname:panelRelay428|lP.x:61.37|lP.y:-14.677|lP.z:8.77|lR.x:-.5|lR.y:.5|lR.z:.5|lR.w:-.5|lS.x:2|lS.y:2|lS.z:2|missionBitOn:1
 constIndex:690|lP.x:-3.86187|lP.y:-15.44|lP.z:19.57525|lR.y:.70711|lR.z:.70711|lR.w:0|lS.x:.0398|lS.y:.0398|lS.z:.0398|securityThreshhold:7|target:lev3maintenanceofficedoor|messageIndex:-1|changeMatOnActive:1|lockedMessageLingdex:193|doorOpen:1|doorUnlock:1
-constIndex:598|lP.x:3.74313|lP.y:-15.43937|lP.z:-3.86075|target:lev3elevatorpadunlock|testQuestBitIsOn:1
+constIndex:598|lP.x:3.74313|lP.y:-15.43937|lP.z:-3.86075|target:lev3elevatorpadunlock|testQuestBitIsOn:1|size.x:5.12|size.y:2.56|size.z:35.84
 constIndex:608|lP.x:25.55713|lP.y:-14.59995|lP.z:-24.31375|lR.x:-.49991|lR.y:.50009|lR.z:.49991|lR.w:.50009|lS.x:.0398|lS.y:.0398|lS.z:.0398|securityThreshhold:100|keycode:428|locked:1|target:lev3relayreason|lockedTarget:lev3relaysareok|successMessageLingdex:-1|lockedMessageLingdex:607|targetname:lev3relayfaultytest|playSoundOnce:1
-constIndex:598|lP.x:10.16313|lP.y:-15.26|lP.z:-3.89075|target:lev3relayfaultytest|testQuestBitIsOn:1|unlockKeycodePad:1
+constIndex:598|lP.x:10.16313|lP.y:-15.26|lP.z:-3.89075|target:lev3relayfaultytest|testQuestBitIsOn:1|unlockKeycodePad:1|size.x:17.92|size.y:2.56|size.z:30.72
 constIndex:688|lP.x:-15.42387|lP.y:-14.847|lP.z:21.67025|lR.y:.70711|lR.z:.70711|lR.w:0|securityThreshhold:100|target:lev3ghiranscloset|messageIndex:-1|lockedMessageLingdex:193|doorOpen:1|doorUnlock:1
-constIndex:598|lP.x:3.74313|lP.y:-15.324|lP.z:-3.86075|target:lev3selfdestructtest|testQuestBitIsOn:1
+constIndex:598|lP.x:3.74313|lP.y:-15.324|lP.z:-3.86075|target:lev3selfdestructtest|testQuestBitIsOn:1|size.x:5.12|size.y:2.56|size.z:35.84
 constIndex:699|lP.x:61.75113|lP.y:-15.25608|lP.z:8.33725|target:lev3fixtherelaynoise|targetname:lev3fixtherelay|playSoundOnce:1
 constIndex:699|lP.x:62.191|lP.y:-15.25608|lP.z:8.33725|target:lev3fixtherelayamb|targetname:lev3fixtherelay|GOSetActive:1
 constIndex:551|lP.x:2.494|lP.y:-15.27037|lP.z:16.594|lS.x:1|lS.y:1.00390625|lS.z:0.390625|lR.x:0.707106769|lR.y:0|lR.z:0|lR.w:-0.707106769|codeScreen:1|resourceFolder:ScreenCodeRandom

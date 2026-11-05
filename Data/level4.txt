@@ -4150,7 +4150,7 @@ constIndex:596|lP.x:-21.822|lP.y:-7.689|lP.z:7.6628|active:1|size.x:1.28|size.y:
 constIndex:594|lP.x:-12.95|lP.y:-2.258|lP.z:-17.8162|countToTrigger:4|targetname:lev4count1
 constIndex:699|lP.x:-12.478|lP.y:-1.979|lP.z:-18.208|target:lev4chargeclosetvox|targetname:lev4chargeclosetrelay|playSoundOnce:1
 constIndex:594|lP.x:-12.582|lP.y:-2.258|lP.z:-17.8162|countToTrigger:2|target:lev4chargeclosetrelay|targetname:lev4count1|doorOpen:1|doorUnlock:1
-constIndex:600|lP.x:22.968|lP.y:-3.84|lP.z:-47.6472|onlyOnce:1|target:lev4nicejump|doorOpen:1|enemyAlert:1|playSoundOnce:1
+constIndex:600|lP.x:22.968|lP.y:-3.84|lP.z:-47.6472|onlyOnce:1|target:lev4nicejump|doorOpen:1|enemyAlert:1|playSoundOnce:1|size.x:10.24|size.y:5.12|size.z:5.12
 constIndex:694|lP.x:-7.596|lP.y:-10.68604|lP.z:-30.93051|lR.y:1|lR.w:0|securityThreshhold:100|target:lev4storageforcebridgeovertrough|messageIndex:-1|animateModel:1|lockedMessageLingdex:193|asi.normalizedTime:61.4375|forceBridgeToggle:1
 constIndex:688|lP.x:43.905|lP.y:.45|lP.z:-8.9352|lR.x:.70711|lR.w:-.70711|securityThreshhold:100|target:lev4storage2door|messageIndex:-1|lockedMessageLingdex:193|doorOpen:1|doorUnlock:1
 constIndex:596|lP.x:39.746|lP.y:-1.247|lP.z:15.34912|targetname:lev4gravlift3|size.x:1.92|size.y:3.84|size.z:1.92
@@ -4158,7 +4158,7 @@ constIndex:694|lP.x:33.302|lP.y:-.682|lP.z:17.8928|lR.y:1|lR.w:0|securityThreshh
 constIndex:690|lP.x:35.771|lP.y:.961|lP.z:30.5888|lR.x:.70711|lR.w:-.70711|lS.x:.0398|lS.y:.0398|lS.z:.0398|securityThreshhold:2|target:lev4specialdoor|messageIndex:-1|changeMatOnActive:1|lockedMessageLingdex:193|doorOpen:1|doorUnlock:1
 constIndex:596|lP.x:37.351|lP.y:-6.21|lP.z:-20.5172|active:1|size.x:2|size.y:10.56|size.z:1.28
 constIndex:694|lP.x:37.534|lP.y:.482|lP.z:-44.721|lR.y:.70711|lR.w:.70711|securityThreshhold:100|target:lev4storage4door|messageIndex:-1|animateModel:1|lockedMessageLingdex:193|asi.normalizedTime:61.4375|doorOpen:1|doorUnlock:1
-constIndex:600|lP.x:39.666|lP.y:-4.75|lP.z:-28.2022|lS.y:12.8|onlyOnce:1|target:lev4jumpingblastdoors|doorOpen:1
+constIndex:600|lP.x:39.666|lP.y:-4.75|lP.z:-28.2022|lS.y:12.8|onlyOnce:1|target:lev4jumpingblastdoors|doorOpen:1|size.x:2.56|size.y:1|size.z:2.56
 constIndex:689|lP.x:39.689|lP.y:-11.517|lP.z:-35.7882|lR.z:-.70711|lR.w:.70711|lS.x:.0398|lS.y:.0398|lS.z:.0398|securityThreshhold:100|target:lev4jumpingforcebridges|messageIndex:-1|blinkWhenActive:1|changeMatOnActive:1|lockedMessageLingdex:193|forceBridgeToggle:1
 constIndex:596|lP.x:19.14603|lP.y:-3.82|lP.z:35.8728|active:1|size.x:1.28|size.y:7|size.z:1.28
 constIndex:596|lP.x:16.588|lP.y:-7.675|lP.z:33.3128|targetname:lev4gravliftpuzzle1|size.x:1.28|size.y:2.56|size.z:1.28

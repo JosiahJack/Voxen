@@ -1507,7 +1507,7 @@ constIndex:565|lP.x:-4.2802|lP.y:167.4821|lP.z:-17.38044|lR.y:-.34007|lR.w:.9404
 constIndex:593|lR.y:0.92388|lR.w:-0.38268|lS.x:0.05|lS.y:0.05|text:BETA|lingdex:636|texIndex:1225|lP.x:9.21|lP.y:170.06112|lP.z:-21.16|tAl:1|tLs:0.8
 constIndex:710|lP.x:29.05217|lP.y:167.843|lP.z:.30356|lR.x:-.70711|lR.w:.70711|GroveBetaJettisonEnabled:1|targetname:levg2jettisonenable
 constIndex:712|lP.x:29.43045|lP.y:167.8871|lP.z:.54959|SFXClip:230|playEverywhere:1|burstemittcnt1:15|burstemittcnt2:30|targetname:levg2jettisonenable|AudioSource.enabled:1|clip.name:vox_safetyinterlockdisabled
-constIndex:601|lP.x:11.0728|lP.y:169.5311|lP.z:-3.92944|radiationAmount:128|intervalTime:1
+constIndex:601|lP.x:11.0728|lP.y:169.5311|lP.z:-3.92944|radiationAmount:128|intervalTime:1|size.x:74.24|size.y:12.8|size.z:46.08
 constIndex:566|lP.x:-16.59|lP.y:163.055|lP.z:-10.87|lR.x:-.70711|lR.w:.70711
 constIndex:566|lP.x:-17.78|lP.y:163.055|lP.z:-15.66|lR.x:-.70711|lR.w:.70711
 constIndex:566|lP.x:-19.529|lP.y:163.055|lP.z:-15.881|lR.x:-.66864|lR.y:-.23003|lR.z:-.23003|lR.w:.66864
@@ -2096,7 +2096,7 @@ lP.x:-22.5002|lP.y:169.0221|lP.z:7.43356|intensity:1.22|range:1.5|color.g:0|colo
 lP.x:-14.80883|lP.y:163.869|lP.z:-15.69404|intensity:1.5|range:3|color.r:.87736|color.g:.06208|color.b:.18263
 lP.x:-14.80879|lP.y:164.665|lP.z:-15.69413|intensity:1.5|range:3|color.r:.87736|color.g:.06208|color.b:.18263
 constIndex:604|lP.x:9.909|lP.y:168.943|lP.z:-23.22|lR.x:.50009|lR.y:-.49991|lR.z:-.50009|lR.w:-.49991
-constIndex:596|lP.x:24.0508|lP.y:166.9411|lP.z:10.05056|active:1|size.x:2|size.y:5.44|size.z:2
+constIndex:596|lP.x:24.0508|lP.y:166.9411|lP.z:10.05056|active:1|size.x:1.28|size.y:7.2|size.z:1.28
 constIndex:525|lP.x:-17.392|lP.y:170.3467|lP.z:6.83023|health:200|cyberHealth:-1|gibObjects.Length:2|lP.x:-17.78709|lP.y:171.0751|lP.z:6.73853|subGO.activeSelf:1|lP.x:-17.14918|lP.y:171.8687|lP.z:6.77232|lR.x:-.70538|lR.y:-.04933|lR.z:-.04933|lR.w:.70538|lS.x:.04|lS.y:.0398|lS.z:.04|subGO.activeSelf:1
 constIndex:112|lP.x:24.0228|lP.y:164.6011|lP.z:10.06056|lR.x:1|lR.w:0
 constIndex:112|lP.x:24.0228|lP.y:172.2611|lP.z:10.06056

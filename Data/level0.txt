@@ -4951,7 +4951,7 @@ lP.x:29.1653|lP.y:-55.26389|lP.z:-19.1583|intensity:.01|lightOn:0|lerpTime:.1666
 lP.x:30.8813|lP.y:-55.26389|lP.z:-13.0803|intensity:.01|lightOn:0|lerpTime:.16667|stepTime:.5|lerpStartTime:-.33333|light.enabled:1|intervalSteps.Length:15|intervalSteps[0]:.5|intervalSteps[1]:.7|intervalSteps[2]:.5|intervalSteps[3]:1|intervalSteps[4]:1|intervalSteps[5]:.5|intervalSteps[6]:.8|intervalSteps[7]:.5|intervalSteps[8]:.5|intervalSteps[9]:1|intervalSteps[10]:.5|intervalSteps[11]:.3|intervalSteps[12]:.5|intervalSteps[13]:.8|intervalSteps[14]:.8|minIntensity:.01|maxIntensity:2.11|targetname:levRdeathmachinelights2|lightOn:0
 constIndex:604|lP.x:9.9683|lP.y:-55.07889|lP.z:39.4027|lR.x:.50009|lR.y:-.49991|lR.z:-.50009|lR.w:-.49991
 constIndex:546|lP.x:-1.4557|lP.y:-56.57889|lP.z:-24.2643|lR.x:-.70711|lR.w:.70711|lS.x:.0398|lS.y:.0398|lS.z:.0398|nextthink:-.33333|amount:170|resetTime:150|requireReset:1|minSecurityLevel:100|rechargeMsgLingdex:1
-constIndex:601|lP.x:34.259|lP.y:-55.169|lP.z:41.9211|radiationAmount:127|intervalTime:1
+constIndex:601|lP.x:34.259|lP.y:-55.169|lP.z:41.9211|radiationAmount:127|intervalTime:1|size.x:7.04|size.y:1.92|size.z:7.04
 constIndex:611|lP.x:32.975|lP.y:-55.291|lP.z:27.1721|lR.y:.70723|lR.z:.70698|lR.w:0|currentPositionsLeft[1]:1|currentPositionsLeft[2]:2|currentPositionsRight[1]:3|currentPositionsRight[2]:2|doorOpen:1|doorUnlock:1
 constIndex:613|lP.x:-4.491|lP.y:-54.663|lP.z:30.3431|lR.x:-.49991|lR.y:.50009|lR.z:.49991|lR.w:.50009|grid[5]:1|grid[7]:1|grid[8]:1|grid[9]:1|grid[11]:1|grid[13]:1|grid[16]:1|grid[17]:1|grid[20]:1|grid[21]:1|grid[22]:1|grid[23]:1|grid[25]:1|grid[27]:1|grid[33]:1|doorOpen:1|doorUnlock:1
 constIndex:694|lP.x:-25.6837|lP.y:-55.171|lP.z:31.6451|lR.y:1|lR.w:0|securityThreshhold:100|target:levRcybconversion|messageIndex:-1|animateModel:1|lockedMessageLingdex:193|asi.normalizedTime:49.61789|cyborgConversionToggle:1
@@ -4961,7 +4961,7 @@ constIndex:602|lP.x:35.7773|lP.y:-55.088|lP.z:26.6011|lR.x:0|lR.y:0.70711|lR.z:0
 constIndex:691|lP.x:38.22406|lP.y:-54.693|lP.z:29.8651|lR.y:1|lR.w:0|securityThreshhold:100|target:levRisotopepanel|messageIndex:-1|animateModel:1|lockedMessageLingdex:193|asi.normalizedTime:49.61789|testQuestBitIsOn:1
 constIndex:596|lP.x:39.4883|lP.y:-57.827|lP.z:-9.3033|active:1|size.x:2.24|size.y:2.56|size.z:2.24
 constIndex:596|lP.x:34.31|lP.y:-57.827|lP.z:-9.2279|active:1|targetname:levRradtunnelgravlift1|size.x:1.28|size.y:2.56|size.z:1.28
-constIndex:600|lP.x:29.209|lP.y:-55.301|lP.z:-18.6289|onlyOnce:1|target:levRdeathmachine|playSoundOnce:1
+constIndex:600|lP.x:29.209|lP.y:-55.301|lP.z:-18.6289|onlyOnce:1|target:levRdeathmachine|playSoundOnce:1|size.x:7.68|size.y:1.92|size.z:7.68
 constIndex:689|lP.x:34.324|lP.y:-54.902|lP.z:-10.46|lR.x:-.49991|lR.y:.50009|lR.z:.49991|lR.w:.50009|lS.x:.0398|lS.y:.0398|lS.z:.0398|securityThreshhold:100|target:levRradtunnelgravlift1|messageIndex:-1|blinkWhenActive:1|changeMatOnActive:1|lockedMessageLingdex:193|gravityLiftToggle:1|textureChangeToggle:1
 constIndex:699|lP.x:28.99683|lP.y:-55.901|lP.z:-22.1489|target:levRdeathmachinelights|targetname:levRdeathmachine|lightOff:1
 constIndex:699|lP.x:29.527|lP.y:-55.901|lP.z:-22.1489|target:levRdeathmachinedoors|targetname:levRdeathmachine|doorOpen:1|doorUnlock:1
@@ -4999,8 +4999,8 @@ constIndex:695|lP.x:11.179|lP.y:-58.736|lP.z:-2.7793|lR.x:-.49991|lR.y:.50009|lR
 constIndex:695|lP.x:11.179|lP.y:-52.659|lP.z:-2.7763|lR.x:-.49991|lR.y:.50009|lR.z:.49991|lR.w:.50009|lS.x:.0398|lS.y:.0398|lS.z:.0398|securityThreshhold:100|target:levRcenterliftpad|messageIndex:-1|changeMatOnActive:1|lockedMessageLingdex:193|gravityLiftToggle:1|textureChangeToggle:1
 constIndex:699|lP.x:12.07206|lP.y:-53.04091|lP.z:-1.7053|target:levRselfdestructemail|targetname:levRselfdestructsequence|sendEmail:1|playSoundOnce:1|screenShake:1
 constIndex:692|lP.x:10.0683|lP.y:-52.494|lP.z:-1.0349|lR.y:.70711|lR.w:.70711|securityThreshhold:100|target:levRselfdestructsequence|messageIndex:-1|animateModel:1|locked:1|lockedMessageLingdex:193|asi.normalizedTime:49.61789|targetname:levRdestructswitch
-constIndex:598|lP.x:11.237|lP.y:-55.323|lP.z:39.4201|target:levRcentralblockergratestest|testQuestBitIsOn:1
-constIndex:598|lP.x:11.237|lP.y:-55.28389|lP.z:39.4201|target:levRsec2afterlaserspawnstest|testQuestBitIsOn:1
+constIndex:598|lP.x:11.237|lP.y:-55.323|lP.z:39.4201|target:levRcentralblockergratestest|testQuestBitIsOn:1|size.x:2.56|size.y:2.56|size.z:2.56
+constIndex:598|lP.x:11.237|lP.y:-55.28389|lP.z:39.4201|target:levRsec2afterlaserspawnstest|testQuestBitIsOn:1|size.x:2.56|size.y:2.56|size.z:2.56
 constIndex:699|lP.x:24.891|lP.y:-55.297|lP.z:27.83179|target:levRradtreatmentcomplete|targetname:levRradtreatment|playSoundOnce:1
 constIndex:700|lP.x:58.308|lP.y:-51.83921|lP.z:-1.28543|lR.x:.49991|lR.y:.50009|lR.z:.49991|lR.w:-.50009|lS.x:.0398|lS.y:.0398|lS.z:.0398|target:levRswitchnotaccess|target2:levRoverridebranch|targetname:levRoverridetoggle|playSoundOnce:1|sendSprintMessage:1
 constIndex:699|lP.x:58.228|lP.y:-52.70089|lP.z:-1.6943|target:levRoverridebranch|targetname:levRoverrideon|missionBitOn:1|branchFlipOnly:1
@@ -5034,11 +5034,11 @@ constIndex:688|lP.x:-15.552|lP.y:-51.84241|lP.z:-15.743|lR.y:.70711|lR.z:.70711|
 constIndex:692|lP.x:9.4633|lP.y:-52.494|lP.z:-1.0353|lR.y:.70711|lR.w:.70711|securityThreshhold:100|target:levRselfdestructsequence|messageIndex:-1|animateModel:1|lockedMessageLingdex:193|asi.normalizedTime:49.61789
 constIndex:596|lP.x:1.061|lP.y:-58.98|lP.z:-1.604|active:1|size.x:1.28|size.y:5.12|size.z:1.28
 constIndex:702|lP.x:12.1023|lP.y:-54.82389|lP.z:33.9417|SpawnManager.active:1|numberActive:8|targetname:levRrobotspawncancelled|index:433|numberToSpawn:8|countOnlySameIndex:1|minDelayBetweenSpawns:15|maxDelayBetweenSpawns:60|allSpawnedResetDelay:180
-constIndex:601|lP.x:53.6583|lP.y:-55.169|lP.z:9.8817|radiationAmount:127|intervalTime:1
-constIndex:601|lP.x:4.8983|lP.y:-56.54389|lP.z:2.3117|radiationAmount:127|intervalTime:1
-constIndex:601|lP.x:19.0083|lP.y:-55.33389|lP.z:14.9017|radiationAmount:127|intervalTime:1
-constIndex:601|lP.x:27.9183|lP.y:-55.33389|lP.z:7.4417|radiationAmount:127|intervalTime:1
-constIndex:601|lP.x:3.5683|lP.y:-55.33389|lP.z:-13.1083|radiationAmount:127|intervalTime:1
-constIndex:601|lP.x:8.7283|lP.y:-56.54389|lP.z:-9.2183|radiationAmount:127|intervalTime:1
-constIndex:601|lP.x:34.31443|lP.y:-60.417|lP.z:7.4511|radiationAmount:11|intervalTime:1
+constIndex:601|lP.x:53.6583|lP.y:-55.169|lP.z:9.8817|radiationAmount:127|intervalTime:1|size.x:4.48|size.y:1.92|size.z:4.48
+constIndex:601|lP.x:4.8983|lP.y:-56.54389|lP.z:2.3117|radiationAmount:127|intervalTime:1|size.x:30.48|size.y:10|size.z:20.24
+constIndex:601|lP.x:19.0083|lP.y:-55.33389|lP.z:14.9017|radiationAmount:127|intervalTime:1|size.x:17.68|size.y:2.32|size.z:4.88
+constIndex:601|lP.x:27.9183|lP.y:-55.33389|lP.z:7.4417|radiationAmount:127|intervalTime:1|size.x:10|size.y:2.32|size.z:10
+constIndex:601|lP.x:3.5683|lP.y:-55.33389|lP.z:-13.1083|radiationAmount:127|intervalTime:1|size.x:12.56|size.y:2.32|size.z:4.88
+constIndex:601|lP.x:8.7283|lP.y:-56.54389|lP.z:-9.2183|radiationAmount:127|intervalTime:1|size.x:22.8|size.y:10|size.z:2.56
+constIndex:601|lP.x:34.31443|lP.y:-60.417|lP.z:7.4511|radiationAmount:11|intervalTime:1|size.x:2.56|size.y:2.56|size.z:8.96
 constIndex:517|saveableType:FuncWall|SaveID:1004021|instantiated:1|go.activeSelf:1|lP.x:0000.00000|lP.y:0000.00000|lP.z:0000.00000|lR.x:0000.00000|lR.y:0000.00000|lR.z:0000.00000|lR.w:0001.00000|lS.x:0001.00000|lS.y:0001.00000|lS.z:0001.00000|isKinematic:1|FuncWall.currentState:2|startState:2|startPosition.x:0024.04430|startPosition.y:-0057.76289|startPosition.z:-0040.13730|speed:0000.96000|percentAjar:0000.25000|lP.x:0021.68600|lP.y:-0053.39900|lP.z:-0040.04900|lR.x:0000.00000|lR.y:0000.00000|lR.z:0000.00000|lR.w:0001.00000|lS.x:0001.00000|lS.y:0001.00000|lS.z:0001.00000|lP.x:0000.00000|lP.y:-0002.56000|lP.z:0000.00000|lR.x:0000.00000|lR.y:0000.00000|lR.z:0000.00000|lR.w:0001.00000|lS.x:0001.00000|lS.y:0001.00000|lS.z:0001.00000|AudioSource.enabled:1|clip.name:none|chunkIDs.Length:2|chunkIDs[0]:90|lP.x:0000.03570|lP.y:0002.47756|lP.z:0000.17730|lR.x:0000.70711|lR.y:0000.00000|lR.z:-0000.70711|lR.w:0000.00000|lS.x:0001.00000|lS.y:0001.00000|lS.z:0001.00000|isKinematic:0|subGO.activeSelf:1|chunkIDs[1]:144|lP.x:-0002.52430|lP.y:-0000.09084|lP.z:0000.17730|lR.x:0000.50000|lR.y:0000.50000|lR.z:0000.50000|lR.w:-0000.50000|lS.x:0001.00000|lS.y:0001.00000|lS.z:0001.00660|isKinematic:0|subGO.activeSelf:1|targetname:levRmaintwall1|lightOn:0
