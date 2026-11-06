@@ -67,13 +67,25 @@ vec4 getTextureColor(uint texIdx, ivec2 texCoord, ivec2 texSize) {
     if (texCoord.x < 0) texCoord.x += texSize.x;
     if (texCoord.y < 0) texCoord.y += texSize.y;
     uint pixelOffset = textureOffsets[texIdx] + uint(texCoord.y) * uint(texSize.x) + uint(texCoord.x);
-    uint slotIndex   = pixelOffset >> 2u;
-    uint packedIdx   = colors[slotIndex];
-    uint shift       = (pixelOffset & 3u) << 3u;
-    uint palIndex    = (packedIdx >> shift) & 0xFFu;
+    uint slotIndex = pixelOffset >> 2u;
+    uint packedIdx = colors[slotIndex];
+    uint shift     = (pixelOffset & 3u) << 3u;
+    uint palIndex  = (packedIdx >> shift) & 0xFFu;
     return unpackUnorm4x8(texturePalettes[texturePaletteOffsets[texIdx] + palIndex]);
 }
-vec4 getTextureColorBilinear(uint texIdx, vec2 uvF, ivec2 texSize) { vec2 tc = uvF * vec2(texSize) - 0.5; vec2 base = floor(tc); vec2 st = tc - base; st = smoothstep(0.0, 1.0, st); ivec2 c00 = ivec2(mod(base, vec2(texSize))); ivec2 c11 = ivec2(mod(base + 1.0, vec2(texSize))); vec4 s00 = getTextureColor(texIdx, c00, texSize); vec4 s10 = getTextureColor(texIdx, ivec2(c11.x, c00.y), texSize); vec4 s01 = getTextureColor(texIdx, ivec2(c00.x, c11.y), texSize); vec4 s11 = getTextureColor(texIdx, c11, texSize); return mix(mix(s00, s10, st.x), mix(s01, s11, st.x), st.y); }
+
+vec4 getTextureColorGaussian(uint texIdx, vec2 uvF, ivec2 texSize) {
+    vec2 tc   = uvF * vec2(texSize) - 0.5;
+    vec2 base = floor(tc);
+    vec2 f    = tc - base;
+    ivec2 p   = ivec2(base);
+    vec4 wx = mix(vec4(0.25, 0.50, 0.25, 0.00),vec4(0.00, 0.25, 0.50, 0.25), f.x);
+    vec4 wy = mix(vec4(0.25, 0.50, 0.25, 0.00),vec4(0.00, 0.25, 0.50, 0.25), f.y);
+    vec4 c = vec4(0.0);
+    for (int j = 0; j < 4; ++j) { for (int i = 0; i < 4; ++i) { c += wx[i] * wy[j] * getTextureColor(texIdx, p + ivec2(i - 1, j - 1), texSize); } }
+    return c;
+}
+
 vec2 EncodeOctahedral(vec3 n) { n = normalize(n); vec2 p = n.xy / (abs(n.x) + abs(n.y) + abs(n.z)); return n.z >= 0.0 ? p : (1.0 - abs(p.yx)) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.y >= 0.0 ? 1.0 : -1.0); }
 void GetCubemapSampleCoord(vec3 toLight, uint shadowIndex, out uint faceOff, out vec2 tc) {
     vec3 a = abs(toLight); float mx = step(a.y,a.x) * step(a.z,a.x); float my = step(a.x,a.y) * step(a.z,a.y); float oneInv_mxy = 1.0 - mx - my; vec3 mxyz = vec3(mx,my,oneInv_mxy); vec3 sxyz = vec3(step(0.0,-toLight.x),step(0.0,-toLight.y),step(0.0,-toLight.z)); vec3 fxyz = vec3(mix(1.0,0.0,sxyz.x), mix(3.0,2.0,sxyz.y), mix(5.0,4.0,sxyz.z));
@@ -108,7 +120,7 @@ void main() {
             normalColor.g = -normalColor.g; vec3 transformed=mat3(t,b,adjustedNormal)*normalColor; transformed *= inversesqrt(dot(transformed,transformed)); if(dot(transformed,Normal) < 0.0)transformed=Normal; adjustedNormal=mix(Normal,transformed,blend);
         }
     }
-    vec4 glowColor=vec4(0.0); if (glowIndex != 0 && glowIndex < 0xFFFF) { ivec2 texSizeGlow=textureSizes[glowIndex]; glowColor=getTextureColorBilinear(glowIndex,fract(uv),texSizeGlow);} vec4 specColor=vec4(0.0); if(specIndex != 0 && specIndex < 0xFFFF){ivec2 texSizeSpec=textureSizes[specIndex]; specColor=getTextureColor(specIndex,ivec2(fract(uv)*vec2(texSizeSpec)),texSizeSpec);}
+    vec4 glowColor=vec4(0.0); if (glowIndex != 0 && glowIndex < 0xFFFF) { ivec2 texSizeGlow=textureSizes[glowIndex]; glowColor = (getTextureColorGaussian(glowIndex,fract(uv),texSizeGlow) * 0.65/*Downplay the blurred version so it's not too soft*/) + (getTextureColor(glowIndex,ivec2(fract(uv)*vec2(texSizeGlow)),texSizeGlow) * 0.18 /*Subtly favor the crisp pixely glow*/);} vec4 specColor=vec4(0.0); if(specIndex != 0 && specIndex < 0xFFFF){ivec2 texSizeSpec=textureSizes[specIndex]; specColor=getTextureColor(specIndex,ivec2(fract(uv)*vec2(texSizeSpec)),texSizeSpec);}
     float dotNV=dot(adjustedNormal,viewDir); float absDot=abs(dotNV); float boostBlend=clamp((0.2588-absDot)/0.2588,0.0,1.0); float reduceBlend=1.0-smoothstep(-1.0,-0.9659,dotNV); vec4 specBlend=mix(mix(specColor,min(specColor+vec4(0.5),vec4(1.0)),boostBlend),max(specColor-vec4(0.25),vec4(0.05)),reduceBlend);
     if(reflectionsEnabled > 0){outSpecular=specBlend; outNormal=EncodeOctahedral(adjustedNormal)*0.5 + 0.5;}/*Map to [0,1]*/ uint voxelIdx=GetVoxelIndex(worldPos); uint count=voxelLightListCounts[voxelIdx]; if(unlit>0 || useCamView>0)count=0; vec3 lighting=vec3(0.0);
     float iTot=0.0; float strength=(useStrengthMod>0) ? 1.0 : max(specColor.r,max(specColor.g,specColor.b))*4.51; float shadSizeMaxUV=shadowMapSizeF-1.0;
