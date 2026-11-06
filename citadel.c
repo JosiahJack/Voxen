@@ -630,9 +630,14 @@ static void Death(u16 self,bool energyVaporized) {
             else if (World.curLev < 13) { spot=ressurectionLocations[World.curLev]; spot.y -= (1.0f - PLYR_CAM_OFS_Y); World.position[PLAYER1] = spot; }
             PlayTrack(TT_Revive, MT_Override);
             World.invP1.ressurectingFinished = World.pauseRelativeTime + 3.0;
-        }
+            World.instances[PLAYER1].health = 211.0f;
+            World.ressurections++;
+            World.invP1.fatigue = 0.0f;
+            World.instances[PLAYER1].radiation = 0.0f;
+            World.invP1.radiationArea = false;
+        } else { e->health = 211.0f; GameDeathSequence(); }
     }
-    flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
+    if (self != PLAYER1) flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
 }
 
 float TakeDamage(u16 self,DamageData dd) {
@@ -729,6 +734,18 @@ static void QuestBitNoteSideEffects(u8 qb, bool isOn) {
         }
     }
 }
+
+void RessurectionTextUpdate(void) {
+    static int lastStage = -1;
+    double fin = World.invP1.ressurectingFinished;
+    if (fin <= World.pauseRelativeTime) { lastStage = -1; return; }
+    double el = World.pauseRelativeTime - (fin - 3.0);
+    int stage = (int)(el * 8.0 / 3.0);
+    if (stage < 0) stage = 0;
+    if (stage > 7) stage = 7;
+    if (stage != lastStage) { lastStage = stage; CenterStatusPrint("%s", Sys_Text.stringTable[860 + stage]); }
+}
+
 // Doors
 static bool DoorInventoryHasAccessCard(AccCardType card) { return card == ACC_None || (World.invP1.accessCardOwned & (1u << card)); }
 static void DoorOpen(u16 self) { Entity* e = &World.instances[self]; ChangeAnim(e,A_OPENING); e->doorOpen = e->doorState = DoorState_Opening; e->waitBefClose = World.pauseRelativeTime + e->delay; if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex], AppliedFXVol(1.0f), World.position[self], true); }

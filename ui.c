@@ -192,14 +192,15 @@ bool UI_Slider(u32 id, i16 x, i16 y, i16 w, i16 h, i16 sliderPos, i16 xPosForLab
 u8 UI_MenuButton(u32 id, i16 bX, i16 bY, u8 menuItem, i16 bW, i16 bH, i16 tX, i16 tY, const char* text, i16 pX, i16 pY){bool over=false; u8 retvalue=0u; retvalue=UI_Button(id,bX,bY,bW,bH,&over,menuItem); if(!retvalue)retvalue=(MenuEnter()&&currentMenuItem==menuItem); over=over||currentMenuItem==menuItem; RenderTextL(tX,tY,over ? T_STOPD_RED : T_RED_MENU,FONT_STOPD,1.5f,text); RenderUIImage(pX,pY,40,40,over ? 1029 : 1028);/*Menu pad*/ return retvalue;}
 bool UI_Checkbox(u32 id, i16 x, i16 y, i8 mitem, u16 textIdx, bool currentlyOn){RenderUIImage(x,y,16,16,910);/*Checkbox background*/ bool over=false; bool changed=(UI_Button(id,x,y+16,210,16,&over,mitem)||(MenuEnter()&&currentMenuItem==mitem)); over=over||currentMenuItem==mitem; if(currentlyOn)RenderUIImage(x+2,y+2,12,12,912);/*Checkbox check*/ RenderTextL(x+20,y,over ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,Sys_Text.stringTable[textIdx]); return changed;}
 __attribute__((noinline)) void UI_HeaderText(i16 x, const char* text) { RenderTextL(x,50,T_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,text); RenderTextL(x,46,T_GREEN_MENU_GLOW,FONT_STOPD,1.75f,text); RenderTextL(x,48,T_GREEN_MENU,FONT_STOPD,1.75f,text); }
-void PlayMenuMusic(),mp3_clear(),PlayVideoPageMusic(bool),StopVideoPageMusic();
+void PlayMenuMusic(),mp3_clear(),PlayVideoPageMusic(bool),PlayDeathVideoMusic(),StopVideoPageMusic();
 __attribute__((noinline)) void MenuGoBack() {
     if (enteringSaveName) { SaveSlotCancelTyping(); return; }
     
-    bool leavingClipPage = (currentMenuPage==MPG_INTRO||currentMenuPage==MPG_CREDS), toPause=returnToPause;
+    bool leavingClipPage = (currentMenuPage==MPG_INTRO||currentMenuPage==MPG_CREDS||currentMenuPage==MPG_DEATH), toPause=returnToPause;
     if (toPause) { returnToPause = World.menuActive = false; World.paused = true; mp3_clear(); }
     if (currentMenuPage == MPG_SINGPLYR || currentMenuPage == MPG_MULTPLYR || currentMenuPage == MPG_OPTS) { currentMenuPage = MPG_FRONT; }
     else if (currentMenuPage == MPG_LOAD || currentMenuPage == MPG_NEWGM || currentMenuPage == MPG_INTRO || currentMenuPage == MPG_CREDS) { currentMenuPage = MPG_SINGPLYR; }
+    else if (currentMenuPage == MPG_DEATH) { currentMenuPage = MPG_FRONT; }
 
     if (leavingClipPage) {
         currentMenuItem = currentMenuTab = 0;
@@ -210,20 +211,35 @@ __attribute__((noinline)) void MenuGoBack() {
 
 static void CreateShadowBuffers() { shadowMapSSBO = MakeSSBO(&shadowMapSSBO, 5, (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32), NULL, GL_STATIC_DRAW); shadowMapsIndirectionID = MakeSSBO(&shadowMapsIndirectionID, 6, LIGHT_COUNT * sizeof(u32), NULL, GL_STATIC_DRAW);  shadowBuffersCreated = true; }
 // Menu Video Playback
-static double introVidStart = 0.0, creditsVidStart = 0.0;
+static double introVidStart = 0.0, creditsVidStart = 0.0, deathVidStart = 0.0;
 static const float introTextAt[15] = {0.0f,6.7f,9.9f,19.2f,30.7f,37.9f,43.7f,48.1f,59.3f,69.1f,74.5f,81.2f,89.2f,98.4f,105.0f};
 static const float outroTextAt[3] = {0.0f,7.0f,11.0f};/*CreditsScroll swaps to card 2 at 7s, card 3 at 11s, then hides all cards at 14s*/
-void ChangeMenuPage(u8 pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; resDropdownOpen = false; resHoverIdx = -1; if (pg==MPG_SAVE||pg==MPG_LOAD) { SaveSlotCancelTyping(); RefreshSaveSlots(); } if (pg==MPG_INTRO) { introVidStart=World.absoluteTime; PlayVideoPageMusic(true); } if (pg==MPG_CREDS) { creditsVidStart=World.absoluteTime; PlayVideoPageMusic(false); } }
+static const float deathTextAt[2] = {0.0f,5.53f};
+static bool vidSkipArmedMouse[MAX_MOUSE_BUTTONS], vidSkipArmedEsc, vidSkipArmedEnter, vidSkipArmedSpace, vidMenuKeyArmed;
+void VidSkipArm(void) { for (int b=0;b<MAX_MOUSE_BUTTONS;++b) vidSkipArmedMouse[b] = !Sys_Input.mouseButtons[b].down; vidSkipArmedEsc = !Sys_Input.keyStates[KEY_ESCAPE].down; vidSkipArmedEnter = !Sys_Input.keyStates[KEY_ENTER].down && !Sys_Input.keyStates[KEY_KP_ENTER].down; vidSkipArmedSpace = !Sys_Input.keyStates[KEY_SPACE].down; vidMenuKeyArmed = !GetKey(25); }
+bool VidMenuKeyArmed(void) { if (currentMenuPage != MPG_INTRO && currentMenuPage != MPG_CREDS && currentMenuPage != MPG_DEATH) return true; return vidMenuKeyArmed; }
+static bool VidSkipPressed(void) {
+    bool press = false;
+    for (int b=0;b<MAX_MOUSE_BUTTONS;++b) { if (!Sys_Input.mouseButtons[b].down) vidSkipArmedMouse[b] = true; else if (Sys_Input.mouseButtons[b].pressed && vidSkipArmedMouse[b]) press = true; }
+    if (!Sys_Input.keyStates[KEY_ESCAPE].down) vidSkipArmedEsc = true; else if (Sys_Input.keyStates[KEY_ESCAPE].pressed && vidSkipArmedEsc) press = true;
+    if (!Sys_Input.keyStates[KEY_ENTER].down && !Sys_Input.keyStates[KEY_KP_ENTER].down) vidSkipArmedEnter = true; else if ((Sys_Input.keyStates[KEY_ENTER].pressed || Sys_Input.keyStates[KEY_KP_ENTER].pressed) && vidSkipArmedEnter) press = true;
+    if (!Sys_Input.keyStates[KEY_SPACE].down) vidSkipArmedSpace = true; else if (Sys_Input.keyStates[KEY_SPACE].pressed && vidSkipArmedSpace) press = true;
+    if (!GetKey(25)) vidMenuKeyArmed = true;
+    return press;
+}
+void ChangeMenuPage(u8 pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; resDropdownOpen = false; resHoverIdx = -1; if (pg==MPG_SAVE||pg==MPG_LOAD) { SaveSlotCancelTyping(); RefreshSaveSlots(); } if (pg==MPG_INTRO) { introVidStart=World.absoluteTime; PlayVideoPageMusic(true); } if (pg==MPG_CREDS) { creditsVidStart=World.absoluteTime; PlayVideoPageMusic(false); } if (pg==MPG_DEATH) { deathVidStart=World.absoluteTime; PlayDeathVideoMusic(); } if (pg==MPG_INTRO||pg==MPG_CREDS||pg==MPG_DEATH) VidSkipArm(); }
 void GameEndSequence() { World.gameFinished = true; World.paused = true; World.menuActive = true; ChangeMenuPage(MPG_CREDS); }
+void GameDeathSequence() { World.paused = true; World.menuActive = true; returnToPause = false; ChangeMenuPage(MPG_DEATH); }
 static void RenderVideoPage(u8 page) {
     bool isIntro = (page==MPG_INTRO);
-    double start = isIntro ? introVidStart : creditsVidStart;
-    if (start <= 0.0) { start=World.absoluteTime; if (isIntro) introVidStart=start; else creditsVidStart=start; }
+    bool isDeath = (page==MPG_DEATH);
+    double start = isIntro ? introVidStart : (isDeath ? deathVidStart : creditsVidStart);
+    if (start <= 0.0) { start=World.absoluteTime; if (isIntro) introVidStart=start; else if (isDeath) deathVidStart=start; else creditsVidStart=start; }
     double elapsed = World.absoluteTime - start;
-    const float* at = isIntro ? introTextAt : outroTextAt;
-    int cardCount = isIntro ? 15 : 3;
-    double vidLen = isIntro ? 117.141f : 54.144f; double cardsEnd = isIntro ? vidLen : 14.0;
-    int frames = isIntro ? 735 : 408; u32 frameBase = isIntro ? 2166u : 2901u;
+    const float* at = isIntro ? introTextAt : (isDeath ? deathTextAt : outroTextAt);
+    int cardCount = isIntro ? 15 : (isDeath ? 2 : 3);
+    double vidLen = isIntro ? 117.141f : (isDeath ? 16.8f : 54.144f); double cardsEnd = isIntro ? vidLen : (isDeath ? 16.8f : 14.0);
+    int frames = isIntro ? 735 : (isDeath ? 506 : 408); u32 frameBase = isIntro ? 2166u : (isDeath ? 3454u : 2901u);
     if (frameBase+(u32)frames > (u32)texCnt) frames = 0;/*frames missing from textures.txt: leave the black ground rather than sample past the array*/
     i32 frame = frames>0 ? (i32)(elapsed*(double)frames/vidLen) : 0; if (frame<0) frame = 0; else if (frame>=frames) frame = frames-1;
     static u32 heldRt = 0xFFFFFFFFu, heldBase = 0xFFFFFFFFu; /*zero order hold: a ring slot that is still decoding must keep the last frame on screen, not punch a hole to the background*/
@@ -231,20 +247,18 @@ static void RenderVideoPage(u8 page) {
     if (frames>0) { u32 want = frameBase+(u32)frame; u32 nxt = VideoPeekFrame(want); VideoRequestFrame(want); if (nxt != 0xFFFFFFFFu) VideoPrefetchFrame(nxt); u32 rt = VideoFrameTexIndex(want); if (rt != 0xFFFFFFFFu) heldRt = rt; if (heldRt != 0xFFFFFFFFu) RenderUIImage(43,isIntro ? 39 : 0,1280,isIntro ? 600 : 720,heldRt); }    
     int card = -1;
     if (elapsed < cardsEnd) { for (int i=cardCount-1;i>=0;--i) { if (elapsed >= at[i]) { card = i; break; } } }
-    if (card >= 0) { RenderTextC(546,544,T_VIDEOTEXT,FONT_NORMAL,1.25f,"%s",Sys_Text.stringTable[(isIntro?613:610)+card]); }
-    bool mouseClick = !uiClickBlocked && (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed);
-    bool click = mouseClick || MenuEnter(), anyKey = Sys_Input.keyStates[KEY_ESCAPE].pressed;
-    for(int k=0;!anyKey&&k<MAX_KEYS;++k){if (Sys_Input.keyStates[k].pressed) anyKey=true;}
+    if (card >= 0) { RenderTextC(546,544,T_VIDEOTEXT,FONT_NORMAL,1.25f,"%s",Sys_Text.stringTable[(isIntro?613:(isDeath?628:610))+card]); }
+    bool click = VidSkipPressed();
     if (click) { uiClickBlocked = uiClickLock = true; }/*UI_CLICK_CONSUMED: latch every skip input, Enter included, so the press that leaves the clip cannot also land on the menu underneath*/
-    bool skip = isIntro ? (elapsed>1.5 && (click||anyKey)) : (click || Sys_Input.keyStates[KEY_ESCAPE].pressed);
-    if(skip || elapsed >= vidLen){if (isIntro) MenuGoBack();/*intro over: back to the Singleplayer page*/ else { World.creditsActive=true; World.creditsPageIndex=0; /*outro skipped or over: the credit pages take over*/ }}
+    bool skip = (isIntro || isDeath) ? (elapsed>1.5 && click) : click;
+    if(skip || elapsed >= vidLen){if (isIntro || isDeath) MenuGoBack(); else { World.creditsActive=true; World.creditsPageIndex=0; /*outro skipped or over: the credit pages take over*/ }}
 }
 static void MenuBackButton(i16 bgX, i16 bgY, i16 tX, i16 tY, i8 item) { RenderUIImage(bgX,bgY,84,36,1252);/*Back Button background*/ bool over=false; if (UI_Button(UI_ID_MENU_BACK,bgX,bgY+34,84,32,&over,item) || (MenuEnter() && currentMenuItem==item && !rebindCaptureActive)) MenuGoBack(); over=over||currentMenuItem==item; RenderTextL(tX,tY,over ? T_STOPD_RED_HIGHLIGHT : T_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]); }
 static void DiffDigits(i16 tx, i16 ty, u8 cur) { static const i16 dx4[4]={0,71,145,217}; for (u8 i=0;i<4;++i) RenderTextL(tx+dx4[i],ty,cur==i ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"%u",i); }
 void RenderMenu() {
     if (currentMenuPage != MPG_OPTS || currentMenuTab != 1) { rebindRow = -1; rebindCaptureActive = false; }
-    if (currentMenuPage != MPG_INTRO && currentMenuPage != MPG_CREDS && currentMenuPage != MPG_OPTS) RenderUIImage(-417,-384, 2200,1536, 1026);/*Menu background*/
-    if (currentMenuPage == MPG_INTRO || currentMenuPage == MPG_CREDS) RenderUIImage(-417,-384, 2200,1536, 0);/*Video blackground*/
+    if (currentMenuPage != MPG_INTRO && currentMenuPage != MPG_CREDS && currentMenuPage != MPG_DEATH && currentMenuPage != MPG_OPTS) RenderUIImage(-417,-384, 2200,1536, 1026);/*Menu background*/
+    if (currentMenuPage == MPG_INTRO || currentMenuPage == MPG_CREDS || currentMenuPage == MPG_DEATH) RenderUIImage(-417,-384, 2200,1536, 0);/*Video blackground*/
     if (currentMenuPage == MPG_OPTS) RenderUIImage(-417,-384, 2200,1536, 1032);/*Menu background*/
     if (currentMenuPage == MPG_FRONT) {
         menuItemCount = 4; menuTabCount = 1; RenderUIImage(282,46, 800,128, 1031);/*Title CITADEL with strikethrough effect*/
@@ -412,7 +426,7 @@ void RenderMenu() {
         {static const i16 dcx[4]={221,330,439,547}; for (u8 c=0;c<4;++c) for (u8 i=0;i<4;++i) { if (!UI_Button(UI_ID_MENU_DIFF_CELL_0+c*4+i,(i16)(dcx[i]+(c>=2?527:0)),(c&1)?651:460,82,79,NULL,(i8)(c+1))) continue; switch(c){case 0:World.diffCbt=i;break; case 1:World.diffPuz=i;break; case 2:World.diffMis=i;break; default:World.diffCyb=i;break;} currentMenuItem=(i8)(c+1); }}
         bool overStart = false; if (UI_Button(UI_ID_MENU_START,544,747, 282,68, &overStart, 5) || (MenuEnter() && currentMenuItem == 5)) GoIntoGame();
         overStart = overStart || currentMenuItem == 5; RenderTextL(400,464,overStart ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,/*"START"*/Sys_Text.stringTable[886]); MenuBackButton(1060,724,1076,732,6);
-    } else if (currentMenuPage == MPG_INTRO || currentMenuPage == MPG_CREDS) { menuItemCount = menuTabCount = 1; RenderVideoPage(currentMenuPage); }
+    } else if (currentMenuPage == MPG_INTRO || currentMenuPage == MPG_CREDS || currentMenuPage == MPG_DEATH) { menuItemCount = menuTabCount = 1; RenderVideoPage(currentMenuPage); }
     if (menuTabCount <= currentMenuTab) currentMenuTab = 0;
     if (menuItemCount <= currentMenuItem) currentMenuItem = 0;
     static const i8 ngSwap[7] = {0,3,4,1,2,6,5};

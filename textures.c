@@ -403,7 +403,7 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
 
 void SetWindowIcon(const WinSysIcon*);
 
-static bool is_vid_path(const char* p){ return sFindSub(p,"AAIntro")||sFindSub(p,"AAOutro")||sFindSub(p,"VMail"); }
+static bool is_vid_path(const char* p){ return sFindSub(p,"AAIntro")||sFindSub(p,"AAOutro")||sFindSub(p,"AADeath")||sFindSub(p,"VMail"); }
 void LoadTextures() {
     double start_time = get_time();
     texCnt = totalPixels = totalPaletteColors = 0u;

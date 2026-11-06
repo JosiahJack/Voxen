@@ -797,7 +797,7 @@ void InputProcessing() {
         
         if (GetKeyPressed(41)/*Console`~*/ && !rebindCaptureActive) ToggleConsole();
         if (Menu() && !World.menuActive && !editFieldEditing) { World.paused = !World.paused; return; }
-        if (Menu() && World.menuActive && !rebindCaptureActive) { MenuGoBack(); return; }
+        if (Menu() && World.menuActive && !rebindCaptureActive && VidMenuKeyArmed()) { MenuGoBack(); return; }
         if (World.paused || World.menuActive || Cheats.consoleActive) return; // Pause/Menu barrier <<<<<<<
 
         if (Sys_Input.keyStates[KEY_1].pressed) { debugWepOffset.x += 0.05f; } else if (Sys_Input.keyStates[KEY_2].pressed) { debugWepOffset.x -= 0.05f; } // Debug weapon offset adjustment hooks TEMP TODO DELETE ME ONCE PIPE AND RAPIER OFFSETS ARE FIXED!!
@@ -2754,7 +2754,7 @@ i32 main() {
         InputProcessing();/*Before anims and physics to allow them to respond immediately.*/ UpdateAnims();/*Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.*/
         prePhys = get_time() - input_start;
         if (!World.paused && !World.menuActive) { double ps = get_time(); float dt = (float)vclamp((World.pauseRelativeTime - World.last_physics_time), 0.0005, 0.1); World.last_physics_time = World.pauseRelativeTime; World.dt = dt; Physics(dt); physTime = get_time() - ps; } else physTime=0.0;
-        double gameT_start = get_time(); ModUpdate();/*After physics so mod/gamecode can modify velocities before next frame.*/ BioMonitorUpdate(); if (!World.paused && !World.menuActive){ PSys_Update(World.dt); }/*Particles*/ UpdateAudio();/*Updates states, music triggers, ambients, etc.*/ gameTime = get_time() - gameT_start;
+        double gameT_start = get_time(); ModUpdate();/*After physics so mod/gamecode can modify velocities before next frame.*/ BioMonitorUpdate(); RessurectionTextUpdate(); if (!World.paused && !World.menuActive){ PSys_Update(World.dt); }/*Particles*/ UpdateAudio();/*Updates states, music triggers, ambients, etc.*/ gameTime = get_time() - gameT_start;
         if (likely((!World.paused && !World.menuActive) || Cheats.editMode)) { UpdateInstanceMatrix4x4s(); /*Before camviews so camview shadows render same as main pass*/ }
         drawCalls = uiDrawCalls = shadDrawCalls = vertsRendered = 0;
         UpdateSensaroundCamViews(); RenderCameraViews();/*Before main Render() so that tv screens are up to date*/ if(likely(!World.paused && !World.menuActive)) { CullCore(); } /*Before automap and audio update due to audio occlusion and automap FoW discovery*/ AudioUpdateMix();/*Actually mixes all the audio for output.*/ AutomapTick();

@@ -1377,6 +1377,19 @@ void LoadLevelMod(u8 lev) {
         TextureSequenceInit(parent,texAnimFolders[par->texAnimResourceFolderIdx < texAnimFolderCount ? par->texAnimResourceFolderIdx : 0]);
         if (entIdx == 551 && par->codeScreen) { par->texAnimRandom = true; par->texAnimStopsAtDie = false; }
     }
+    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
+        u16 cidx=World.instances[i].index; if (cidx != 197 && cidx != 198) continue;
+        V3 tp=V3Add(World.position[i],quat_rot_v3(World.rotation[i],(V3){0.0f,0.96f,0.0f}));
+        bool dup=false;
+        for (u16 j=INSTS_1ST_IDX;j<World.instCount;++j) {
+            if (World.instances[j].index != 601) continue;
+            V3 d=V3_AsubB(World.position[j],tp);
+            if (vabs(d.x) < 0.01f && vabs(d.y) < 0.01f && vabs(d.z) < 0.01f) { dup=true; break; }
+        }
+        if (dup) continue;
+        u16 g=AddInstance(601,tp); if (g == 0) continue;
+        World.instances[g].radiation=11.0f; World.colliderSize[g]=(V3){2.24f,0.64f,2.24f}; World.colliderCenter[g]=(V3){0.0f,0.0f,0.0f};
+    }
     for (int i=0;i<=lightsIdx;++i) { if (lanimsFromFile[i].numIntervalSteps >= 1) { lanimsFromFile[i].currentStep = 0; lanimsFromFile[i].lerpUp = true; if (lightsFromFile[i].minIntensity < 0.01f) lightsFromFile[i].minIntensity = 0.01f; }/*Unity LightAnimation.Start() init parity: animations always begin at step 0, lerping up, with a nonzero floor*/ i32 wi=AddLight(&lightsFromFile[i],&lanimsFromFile[i]); if(wi>=0&&wi<LIGHT_COUNT){World.levelLightTargetnames[World.curLev][wi]=lightTargetnameFile[i];} }
     if(curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7){/*Shield generators*/
         static const V3 pos[]={{-51.30664f,-47.42f,56.42651f},{71.5f,-47.42f,-66.6f},{-51.306650f,-47.42f,-66.66652f},{71.78664f,-47.42f,56.42651f}};
