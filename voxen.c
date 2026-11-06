@@ -787,7 +787,7 @@ void InputProcessing() {
         if (GetKeyPressed(41)/*Console`~*/ && !rebindCaptureActive) ToggleConsole();
         if (Menu() && !World.menuActive && !editFieldEditing) { World.paused = !World.paused; return; }
         if (Menu() && World.menuActive && !rebindCaptureActive && VidMenuKeyArmed()) { MenuGoBack(); return; }
-        if (World.paused || World.menuActive || Cheats.consoleActive) return; // Pause/Menu barrier <<<<<<<
+        if (World.paused || World.menuActive || Cheats.consoleActive || World.invP1.ressurectingFinished > World.pauseRelativeTime) return; // Pause/Menu barrier <<<<<<<
 
         if (Sys_Input.keyStates[KEY_1].pressed) { debugWepOffset.x += 0.05f; } else if (Sys_Input.keyStates[KEY_2].pressed) { debugWepOffset.x -= 0.05f; } // Debug weapon offset adjustment hooks TEMP TODO DELETE ME ONCE PIPE AND RAPIER OFFSETS ARE FIXED!!
         if (Sys_Input.keyStates[KEY_3].pressed) { debugWepOffset.y += 0.05f; } else if (Sys_Input.keyStates[KEY_4].pressed) { debugWepOffset.y -= 0.05f; }

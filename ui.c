@@ -1586,6 +1586,7 @@ static void RenderUI() {
     if (!Cheats.noHUD && Cheats.showLocation) RenderTextL(16,debugTextStartY + (lineSpacing * 5),T_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",World.cursorPos_x,World.cursorPos_y,World.currentMouse_dx,World.currentMouse_dy);
     if (Cheats.consoleActive) RenderTextL(16,0,T_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (World.statusTextDecayFinished > World.current_time) RenderTextC(683,164,T_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
+    if (World.invP1.ressurectingFinished > World.pauseRelativeTime) { double el = World.pauseRelativeTime - (World.invP1.ressurectingFinished - 3.0); int stage = (int)(el * 8.0 / 3.0); if (stage < 0) stage = 0; if (stage > 7) stage = 7; RenderTextC(683,544,T_GREEN,FONT_NORMAL,1.25f,"%s",Sys_Text.stringTable[860 + stage]); }
     double time_now = get_time();
     if (Cheats.showFPS) {
         World.thisFrameTime = (time_now - World.last_time) * 1000.0; World.last_time = time_now; World.cpuFrameTime = World.cpuTime * 1000.0;

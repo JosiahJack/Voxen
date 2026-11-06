@@ -1294,10 +1294,10 @@ void SecurityCameraRotateUpdate(u16 self) { /*Sweeps the camera back and forth b
 static bool PanelTetherBroken(u16 i) { return i<World.instCount && (World.instances[i].entflags&EF_ACTIVE) && V3_SqDist(World.position[PLAYER1],World.position[i]) > 64.0f; }
 void ModUpdate() {
     if (World.paused || World.menuActive) return;
-    
-    UpdateSearchTether(); WeaponsUpdate(); InventoryUpdate(); PlayerEnergyUpdate(); PatchUpdate(); HardwareUpdate(); MissionTimerUpdate();
+    bool resurrecting = World.invP1.ressurectingFinished > World.pauseRelativeTime;
+    UpdateSearchTether(); if (!resurrecting) WeaponsUpdate(); if (!resurrecting) InventoryUpdate(); PlayerEnergyUpdate(); PatchUpdate(); HardwareUpdate(); MissionTimerUpdate();
     if (World.curLev == LEVEL_CYBERSPACE) CyberTimerUpdate(PLAYER1); /*the loop below starts at INSTS_1ST_IDX, so the player's own countdown would never tick*/
-    if (Use()) { Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right); }
+    if (!resurrecting && Use()) { Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right); }
     if (World.pauseRelativeTime < World.debugLineFinished && (World.lineVertCnt + 6) < MAX_LINEVRTS) { DrawLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f}); }
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
         u16 constdex = World.instances[i].index;
