@@ -1323,5 +1323,4 @@ void ModUpdate() {
     if (PanelTetherBroken(World.Sys_UI.tetheredKeypadKeycode)) UI_KeycodeClose(false);
     if (PanelTetherBroken(World.Sys_UI.tetheredKeypadElevator)) UI_ElevClose(false);
     if (PanelTetherBroken(World.Sys_UI.tetheredPWP)) UI_WireClose(false);
-
 }
