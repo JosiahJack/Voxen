@@ -1513,6 +1513,7 @@ void LoadLevelData(u8 curlevel) {
             case 515: func_forcebridge(i); break;
             case 716: World.layer[i] = L_Trigger; break; // fx_reverbzone
             case 697: World.layer[i] = L_NPCClip; break; // clip_npc
+            case 698: World.layer[i] = L_InterDebris; break; // clip_objects
             case 517: FuncWallInitAfterLoad(i); break;
             case 596: World.instances[i].strength=UsableOrDef(World.instances[i].strength,12.0f); World.instances[i].offStrengthFactor=UsableOrDef(World.instances[i].offStrengthFactor,3.0f); World.instances[i].distancePaddingToTopPoint=UsableOrDef(World.instances[i].distancePaddingToTopPoint,0.32f); break; /*trigger_gravitylift*/
             case 701: LogicTimerInitBeforeLoad(i); break;
