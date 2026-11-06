@@ -26,7 +26,7 @@ layout(location = 26) uniform int SSR_RES;
 layout(location = 27) uniform sampler2D tex;
 layout(location = 28) uniform float staticIntensity;
 layout(location = 29) uniform uint grayscaleEnabled;
-layout(location = 30) uniform float skyRotateSpeed;
+layout(location = 30) uniform float sunYaw; /*CPU-computed sun yaw phase (rotates smoothly with the same shared clock the chunk sun shadow direction uses); replaces timeVal*skyRotateSpeed so the sky sun and the shadow angle stay bit-exact and rotate without any quantization mismatch*/
 layout(location = 31) uniform sampler2D uiImage;
 layout(location=32) uniform sampler2D inputDepthID;
 layout(location=33) uniform mat4 invViewProj; /*
@@ -90,7 +90,7 @@ void main() {
     if (skyVisible > 0) {
         isSky = (color.a < 0.21);/*Sky hack alpha (alpha of 0 for when noclipping) (the extra color.a < 0.001 check for noclip has no discernible quality impact, leaving)*/ float mappedLat=0.0;
         if (isSky) {
-            vec2 ndc = texCoordUsed * 2.0 - 1.0; float fovRad = fov * PI / 180.0; /*Convert FOV to radians*/ float tanHalfFov = tan(fovRad * 0.5); vec3 viewDir = normalize(vec3(ndc.x * tanHalfFov * aspect, ndc.y * tanHalfFov, -1.0)); float cy = cos(camRot.x + timeVal * skyRotateSpeed);/*Yaw + time-based rotation*/ float sy = sin(camRot.x + timeVal * skyRotateSpeed);
+            vec2 ndc = texCoordUsed * 2.0 - 1.0; float fovRad = fov * PI / 180.0; /*Convert FOV to radians*/ float tanHalfFov = tan(fovRad * 0.5); vec3 viewDir = normalize(vec3(ndc.x * tanHalfFov * aspect, ndc.y * tanHalfFov, -1.0)); float yawX = camRot.x + sunYaw;/*Yaw + shared CPU sun yaw phase (single float per frame, same one the sun shadow direction uses, so the sky's procedural sun and the world shadow angle rotate smoothly and in perfect lockstep)*/ float cy = cos(yawX); float sy = sin(yawX);
             float cp = cos(camRot.y);/*Pitch*/ float sp = sin(camRot.y); mat3 yawMatrix = mat3(cy, 0.0, sy, 0.0, 1.0, 0.0, -sy, 0.0, cy); mat3 pitchMatrix = mat3(1.0, 0.0, 0.0, 0.0, cp, -sp, 0.0, sp, cp); mat3 skyRotMatrix = yawMatrix * pitchMatrix;/*Combine yaw and pitch*/ vec3 skyDir = skyRotMatrix * viewDir;/*Yaw and pitch for sky*/
             vec3 microwaveBackground = vec3(0.034, 0.02, 0.05);/*Not really the mbr but sounds cool.*/ vec3 shieldColor = vec3(0.0, 0.0, 0.0); vec3 saturnCenterWorld = vec3(0.0, -6.0, 456.0); vec3 saturnCenter = normalize(vec3(0.0, -0.1, sqrt(1.0 - 0.1*0.1)));/*Lower position for below horizon*/
             if (stationShieldVisible > 0 || groveShieldVisible > 0) {

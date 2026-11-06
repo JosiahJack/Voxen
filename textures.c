@@ -239,9 +239,8 @@ static u8* LoadPng(const u8* buffer, int len, int* x, int* y, PngArena* arena, u
         } PngGet32be(&s);
     } Label_parsesuccess: *x = z.s->img_x; *y = z.s->img_y; return z.out;
 }
-u8* PngLoad(const u8* buffer, int len, int* x, int* y, PngArena* arena) { return LoadPng(buffer,len,x,y,arena,NULL,NULL); }
 
- 
+u8* PngLoad(const u8* buffer, int len, int* x, int* y, PngArena* arena) { return LoadPng(buffer,len,x,y,arena,NULL,NULL); }
 static void* TextureParsingWorker(void* arg) {
     TextureParseTask* t = (TextureParseTask*)arg;
     u32 i;
@@ -254,9 +253,7 @@ static void* TextureParsingWorker(void* arg) {
         if (g_vidFrameMap[i]) continue; /*Video frames are read by the decoder on demand.*/
         FHandle dummy_fd;
         int sz = 0;
-        const char* d = (const char*)OS_OpenAndAllocateFileBufferReadonly(t->parser->entries[i].path, &dummy_fd, &sz);
-        if(unlikely(!d || sz <= 0)) continue;
-
+        const char* d = (const char*)OS_OpenAndAllocateFileBufferReadonly(t->parser->entries[i].path, &dummy_fd, &sz); if(unlikely(!d || sz <= 0)) continue;
 
         int w = 0, h = 0;
         u32 pngPal[256],pSz; u8* pix=LoadPng((const u8*)d,sz,&w,&h,&thread_png_arenas[t->tid],pngPal,&pSz);
@@ -264,51 +261,51 @@ static void* TextureParsingWorker(void* arg) {
         
         u32 nP = (u32)w*h; u8 *idx = (u8*)OS_Alloc(nP); u32 *pal = (u32*)OS_Alloc(256*sizeof(u32));
         if (pSz) { mcpy(idx,pix,nP); mcpy(pal,pngPal,pSz*sizeof(u32)); } else {
-        u32* exact_hash = (u32*)OS_Alloc(TEXHASH_SZ*sizeof(u32));
-        mset(exact_hash, 0xFF, TEXHASH_SZ*sizeof(u32)); /*Fast Exact Match Hash Map, 0xFFFFFFFF U32_MAX = empty*/
-        u8* exact_idx = (u8*)OS_Alloc(TEXHASH_SZ);
-        u8* nearest_cache = (u8*)OS_Alloc(32768); /*15-bit Color Space Cache for fast nearest-neighbor fallback*/ mset(nearest_cache, 0xFF, 32768);
-        bool nearclear = false;
-        for (u32 p = 0; p < nP; ++p) {
-            u32 c = ((u32*)pix)[p];
-            u32 h_val = (c * 0x9E3779B9u);/*Murmur-style avalanche hash*/
-            h_val ^= h_val >> 16;
-            u32 slot = h_val & (TEXHASH_SZ - 1);
-            for (u32 probe=0;probe<TEXHASH_SZ;++probe) {
-                if (exact_hash[slot] == U32_MAX) { break; }
-                if (exact_hash[slot] == c) { idx[p] = exact_idx[slot]; goto found; }
-                
-                slot = (slot + 1) & (TEXHASH_SZ - 1);
-            }
-            
-            if (pSz < 256) {
-                pal[pSz] = c;
-                idx[p] = (u8)pSz;
-                exact_hash[slot] = c;
-                exact_idx[slot] = (u8)pSz;
-                pSz++;
-            } else { /*Fallback: Check Nearest Neighbor Cache first (R5 G5 B5)*/
-                if (!nearclear) { mset(nearest_cache, 0xFF, sizeof(nearest_cache)); nearclear = true; }
-                u32 cache_key = ((c & 0xF8) >> 3) | ((c & 0xF800) >> 6) | ((c & 0xF80000) >> 9);
-                if (nearest_cache[cache_key] != 0xFF) { idx[p] = nearest_cache[cache_key]; goto found; }
-                u32 best = 0, bestDist = ~0u; /*Cache Miss: Full Search*/
-                i32 r1 = c & 255, g1 = (c>>8) & 255, b1 = (c>>16) & 255, a1 = c>>24; 
-                for (u32 k = 0; k < 256; ++k) {
-                    u32 pc = pal[k];
-                    i32 dr = (pc&255)-r1, dg = ((pc>>8)&255)-g1, db = ((pc>>16)&255)-b1, da = (pc>>24)-a1;
-                    u32 dist = dr*dr + dg*dg + db*db + da*da;
-                    if (dist < bestDist) { bestDist = dist; best = k; }
+            u32* exact_hash = (u32*)OS_Alloc(TEXHASH_SZ*sizeof(u32));
+            mset(exact_hash, 0xFF, TEXHASH_SZ*sizeof(u32)); /*Fast Exact Match Hash Map, 0xFFFFFFFF U32_MAX = empty*/
+            u8* exact_idx = (u8*)OS_Alloc(TEXHASH_SZ);
+            u8* nearest_cache = (u8*)OS_Alloc(32768); /*15-bit Color Space Cache for fast nearest-neighbor fallback*/ mset(nearest_cache, 0xFF, 32768);
+            bool nearclear = false;
+            for (u32 p = 0; p < nP; ++p) {
+                u32 c = ((u32*)pix)[p];
+                u32 h_val = (c * 0x9E3779B9u);/*Murmur-style avalanche hash*/
+                h_val ^= h_val >> 16;
+                u32 slot = h_val & (TEXHASH_SZ - 1);
+                for (u32 probe=0;probe<TEXHASH_SZ;++probe) {
+                    if (exact_hash[slot] == U32_MAX) { break; }
+                    if (exact_hash[slot] == c) { idx[p] = exact_idx[slot]; goto found; }
+                    
+                    slot = (slot + 1) & (TEXHASH_SZ - 1);
                 }
                 
-                idx[p] = (u8)best;
-                nearest_cache[cache_key] = (u8)best; // Update Cache
+                if (pSz < 256) {
+                    pal[pSz] = c;
+                    idx[p] = (u8)pSz;
+                    exact_hash[slot] = c;
+                    exact_idx[slot] = (u8)pSz;
+                    pSz++;
+                } else { /*Fallback: Check Nearest Neighbor Cache first (R5 G5 B5)*/
+                    if (!nearclear) { mset(nearest_cache, 0xFF, sizeof(nearest_cache)); nearclear = true; }
+                    u32 cache_key = ((c & 0xF8) >> 3) | ((c & 0xF800) >> 6) | ((c & 0xF80000) >> 9);
+                    if (nearest_cache[cache_key] != 0xFF) { idx[p] = nearest_cache[cache_key]; goto found; }
+                    u32 best = 0, bestDist = ~0u; /*Cache Miss: Full Search*/
+                    i32 r1 = c & 255, g1 = (c>>8) & 255, b1 = (c>>16) & 255, a1 = c>>24; 
+                    for (u32 k = 0; k < 256; ++k) {
+                        u32 pc = pal[k];
+                        i32 dr = (pc&255)-r1, dg = ((pc>>8)&255)-g1, db = ((pc>>16)&255)-b1, da = (pc>>24)-a1;
+                        u32 dist = dr*dr + dg*dg + db*db + da*da;
+                        if (dist < bestDist) { bestDist = dist; best = k; }
+                    }
+                    
+                    idx[p] = (u8)best;
+                    nearest_cache[cache_key] = (u8)best; // Update Cache
+                }
+                
+                found:;
             }
-            
-            found:;
-        }
-        OS_Free(exact_hash, TEXHASH_SZ*sizeof(u32));
-        OS_Free(exact_idx, TEXHASH_SZ);
-        OS_Free(nearest_cache, 32768);
+            OS_Free(exact_hash, TEXHASH_SZ*sizeof(u32));
+            OS_Free(exact_idx, TEXHASH_SZ);
+            OS_Free(nearest_cache, 32768);
         }
         t->results[i] = (TexResult){.indices = idx, .palette = pal, .palSize = pSz, .w = w, .h = h};
         OS_Free((void*)d,(size_t)sz);
@@ -320,45 +317,24 @@ static void* TextureParsingWorker(void* arg) {
 static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
     FHandle fd; int sz; char *data = OS_OpenAndAllocateFileBufferReadonly(fn, &fd, &sz), *cur = data, *end = data + sz; u32 line = 0, m_idx = 0;
     while (cur < end) {
-        char *s = cur;
-        while (cur < end && *cur != '\n' && *cur != '\r') { cur++; }
-        size_t len = cur - s;
-        line++;
-        if (len <= 0) { cur++; continue; }
+        char *s = cur; while (cur < end && *cur != '\n' && *cur != '\r') { cur++; } size_t len = cur - s; line++; if (len <= 0) { cur++; continue; }
         
         while (cEmpty(*s)) { s++; }
         char *le = s + (cur - s) - 1;
         while (le > s && cEmpty(*le)) { le--; }
-        if (*s == '\0' || (s[0] == '/' && s[1] == '/') || s[0] == '#') {
-            if (cur < end && (*cur == '\r' || *cur == '\n')) { cur++; }
-            continue;
-        }
+        if (*s == '\0' || (s[0] == '/' && s[1] == '/') || s[0] == '#') { if (cur < end && (*cur == '\r' || *cur == '\n')) { cur++; } continue; }
         
         char *col = StringFindFirstCharWithin(s, ':');
-        if (col && sCompUpToLen(s, "index", col - s) == 0) {
-            char *v = col + 1;
-            while (cEmpty(*v)) { v++; }
-            u32 idx = parse_numberu32(v, s, line);
-            if (idx > m_idx) { m_idx = idx; }
-        }
-        
+        if (col && sCompUpToLen(s, "index", col - s) == 0) { char *v = col + 1; while (cEmpty(*v)) { v++; } u32 idx = parse_numberu32(v, s, line); if (idx > m_idx) { m_idx = idx; } }
         if (cur < end && (*cur == '\r' || *cur == '\n')) { cur++; }
     }
-    
-    if (!m_idx || m_idx >= maxS) {
-        if (!m_idx) { DualLogWarn("No entries in %s\n", fn); }
-        else { DualLogWarn("Index %u too large in %s\n",m_idx,fn); OS_Free(data,sz); return false; }
-    }
+    if (!m_idx || m_idx >= maxS) { if (!m_idx) { DualLogWarn("No entries in %s\n", fn); } else { DualLogWarn("Index %u too large in %s\n",m_idx,fn); OS_Free(data,sz); return false; } }
 
     p->entries = OS_AllocScratch((p->count = p->capacity = m_idx + 1) * sizeof(TextureData));
     for (u32 i = 0; i < p->count; ++i) { p->entries[i] = (TextureData){.index = U16_MAX}; }
     TextureData e = {.index = U16_MAX}; line = 0; cur = data;
     while (cur < end) {
-        char *s = cur;
-        while (cur < end && *cur != '\n' && *cur != '\r') { cur++; }
-        size_t len = cur - s;
-        line++;
-        if (len < 3) { cur++; continue; }
+        char *s = cur; while (cur < end && *cur != '\n' && *cur != '\r') { cur++; } line++; if ((cur - s) < 3) { cur++; continue; }
         
         while (cEmpty(*s)) { s++; }
         char *le = s + (cur - s) - 1;
@@ -384,7 +360,6 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
                     char *ke = tk + slen(tk) - 1, *ve = tv + slen(tv) - 1;
                     while(ke>tk&&cEmpty(*ke)) {*ke-- = 0; }
                     while(ve>tv&&cEmpty(*ve)) {*ve-- = 0; }
-                    
                          if (sEqual(tk, "index"))       { e.index       = parse_numberu16(tv,s,line); }
                     else if (sEqual(tk, "transparent")) { e.transparent = parse_bool(tv,s,line); }
                     else if (sEqual(tk, "doublesided")) { e.doublesided = parse_bool(tv,s,line); }
@@ -392,17 +367,14 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
                 }
             }
         }
-        
         if (cur < end && (*cur == '\r' || *cur == '\n')) { cur++; }
     }
-    
     if (e.path[0] && e.index < p->capacity) { p->entries[e.index] = e; }
-    OS_Free(data, sz);
+    OS_Free(data,sz);
     return true;
 }
 
 void SetWindowIcon(const WinSysIcon*);
-
 static bool is_vid_path(const char* p){ return sFindSub(p,"AAIntro")||sFindSub(p,"AAOutro")||sFindSub(p,"AADeath")||sFindSub(p,"VMail"); }
 void LoadTextures() {
     double start_time = get_time();
@@ -606,21 +578,16 @@ void TextureSequenceStart(u16 self, u8 clipIndex) {
 
 void TextureSequenceUpdate(u16 self) {
     Entity* e = &World.instances[self];
-    u16 tClip = e->texAnimClip;
-    if (tClip >= NUM_TEXTURE_CLIPS) {
-        e->textureAnimating = false;
-    } else {
-        const TextureAnimClip* clip = &textureAnimClips[tClip];
+    if (e->texAnimClip >= NUM_TEXTURE_CLIPS) { e->textureAnimating = false; }
+    else {
+        const TextureAnimClip* clip = &textureAnimClips[e->texAnimClip];
         bool stopAtDie = e->texAnimStopsAtDie && e->health <= 0.0f;
         e->tickFinished = World.pauseRelativeTime+clip->period;
         if (e->texAnimRandom && (!stopAtDie)) {
             e->texFrame = random_range_u32(0,clip->length-1);
             if (clip->glowLength) { e->texGlowFrame=random_range_u32(0,clip->glowLength-1); }
         } else if (e->texAnimInReverse) {
-            if (stopAtDie) {
-                if (e->texFrame > 0) e->texFrame--;
-            } else e->texFrame = (e->texFrame == 0) ? clip->length-1 : e->texFrame-1;
-            
+            if (stopAtDie) { if (e->texFrame > 0) e->texFrame--; } else e->texFrame = (e->texFrame == 0) ? clip->length-1 : e->texFrame-1;
             if (clip->glowLength) { e->texGlowFrame = (e->texGlowFrame == 0) ? clip->glowLength - 1 : e->texGlowFrame - 1;}
         } else {
             if (stopAtDie) {

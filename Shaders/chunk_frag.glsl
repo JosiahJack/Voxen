@@ -59,6 +59,7 @@ float getBlueNoise(ivec2 p) {uint n = (uint(p.x) * 73856093u) ^ (uint(p.y) * 193
 const float VOXEL_SIZE = 0.32; const uint SHADON = 2u;
 uint GetVoxelIndex(vec3 worldPos) { float offsetX = worldPos.x - worldMin.x; float offsetZ = worldPos.z - worldMin.y; uint voxelX = uint(offsetX / VOXEL_SIZE); uint voxelZ = uint(offsetZ / VOXEL_SIZE); return (voxelZ * 512) + voxelX; }
 const int PCF_SAMPLES = 12; const float invSamples = 1.0 / float(PCF_SAMPLES); const vec2 poissonDisk[PCF_SAMPLES] = vec2[](vec2(0.2085,0.0000),vec2(-0.2663,0.2440),vec2(0.0408,-0.4645),vec2(0.3357,0.4378),vec2(-0.6160,-0.1090),vec2(0.5835,-0.3712),vec2(-0.1952,0.7260),vec2(-0.3722,-0.7167),vec2(0.8076,0.2949),vec2(-0.8401,0.3468),vec2(0.4050,-0.8655),vec2(0.2993,0.9542)); // Golden-angle spiral, 12 taps, wider spread for smoother penumbra without reintroducing center-step issues
+const float SUN_PCF_SCALE = 2.5; /*Sun texels are ~0.03 units (4096^2 over 128 units), so widen the same Poisson scheme a bit to put the sun penumbra in the same world-scale softness family as the point-light taps above. Widen enough to smooth the shadow edge across several light texels, not so wide as to leak light past thin geometry.*/
 vec4 getTextureColor(uint texIdx, ivec2 texCoord, ivec2 texSize) {
     texCoord = ivec2(mod(vec2(texCoord), vec2(texSize)));
     if (texCoord.x < 0) texCoord.x += texSize.x;
@@ -141,10 +142,11 @@ void main() {
         vec2 sunUV   = sunProj.xy * 0.5 + 0.5;
         float sunZ   = sunProj.z  * 0.5 + 0.5;
         if (all(lessThan(abs(sunProj.xy), vec2(1.0))) && abs(sunProj.z) < 1.0) {
-            const int SUN_DILATE = 1;
             float sunBias = 0.0006 / clamp(dot(adjustedNormal, sunDirection), 0.5, 1.0);
             vec2 sunTexel = 1.0 / vec2(textureSize(sunShadowMap, 0));
-            for (int sx = -SUN_DILATE; sx <= SUN_DILATE; ++sx) { for (int sy = -SUN_DILATE; sy <= SUN_DILATE; ++sy) { sunShadow = min(sunShadow, texture(sunShadowMap, vec3(sunUV + vec2(float(sx), float(sy)) * sunTexel, sunZ - sunBias))); } }
+            float sunSum = 0.0;
+            for (int si=0;si<PCF_SAMPLES;++si) sunSum += texture(sunShadowMap, vec3(sunUV + poissonDisk[si]*(SUN_PCF_SCALE*sunTexel), sunZ - sunBias)); // Same 12-tap golden-angle Poisson scheme as the point-light shadows above, each tap a hardware 2x2 PCF compare on the sampler2DShadow
+            sunShadow = sunSum * invSamples; /*Average like the point lights do: the penumbra is a continuous gradient across the rotating sun angle instead of the old 3x3 min() dilation's hard single-texel edges that made the shadow angle read as stepped*/
         }
         lighting += albedoColor.rgb * sunCol * (clamp(dot(adjustedNormal, sunDirection), 0.0, 1.0) * sunShadow);
     }

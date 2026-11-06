@@ -4,30 +4,22 @@
 #include "Shaders/shaders.h"
 GlobalContext World = {0}; // Full game state
 // Rendering
-static u32 globalframesPerLastSecond, inputImageID, inputUIID, inputDepthID, inputSpecID, inputNormalID, outputImageID, gBufferFBO, uiSP, depthPrepassSP, chunkSP, chunkVAO, matricesBufferID, ssrSP, rtSP, rtCopySP, imageBlitSP, quadVAO, quadVBO;
-u32 globalframe, threadCnt = 1, *physVertCounts, *rtSrcVertCounts, uiFBO, vbos[MAX_MDLS], tbos[MAX_MDLS], textDecalVBO[MAX_LEVELS][INSTANCE_COUNT], textSP, textVAO, textVBO, textDecalVertexCount[MAX_LEVELS][INSTANCE_COUNT];
-float rasterPerspectiveProjection[16], modelMatrices[INSTANCE_COUNT*16], *world_from_mdl = modelMatrices, modelBounds[MAX_MDLS], **physPos, lightView[LIGHT_COUNT][6][4][4], lightViewProj[LIGHT_COUNT][6][16], shadowmapsPerspectiveProjection[16], sunShadowMatrix[16], berserkSeedTime;
-typedef struct { u32 nodeBase,triBase,vtxBase,uvBase; } ModelRTInfo; typedef struct { u32 geom[4]; u32 info[4]; float iscl2[4]; } InstanceRTInfo; static InstanceRTInfo rtInstanceInfo[INSTANCE_COUNT]; static InstanceRTInfo rtPrevInfo[INSTANCE_COUNT]; static ModelRTInfo rtModelInfo[MAX_MDLS];
-INLINE u32 F2U(float f) { union { float f; u32 u; } c; c.f = f; return c.u; }
-static u32 rtInstanceInfoID,rtCellCountsID,rtCellListsID,rtGeomID;
-bool doubleSidedTexture[MAXTEX], transparentTexture[MAXTEX], shadowBuffersCreated, resDropdownOpen;
+float rasterPerspectiveProjection[16],modelMatrices[INSTANCE_COUNT*16],*world_from_mdl = modelMatrices,modelBounds[MAX_MDLS],**physPos,lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16],shadowmapsPerspectiveProjection[16],sunShadowMatrix[16],berserkSeedTime;
+static u32 globalframesPerLastSecond,inputImageID,inputUIID,inputDepthID,inputSpecID,inputNormalID,outputImageID,gBufferFBO,uiSP,depthPrepassSP,chunkSP,chunkVAO,matricesBufferID,ssrSP,rtSP,rtCopySP,imageBlitSP,quadVAO,quadVBO,rtInstanceInfoID,rtCellCountsID,rtCellListsID,rtGeomID;
+u32 globalframe,threadCnt = 1,*physVertCounts,*rtSrcVertCounts,uiFBO,vbos[MAX_MDLS],tbos[MAX_MDLS],textDecalVBO[MAX_LEVELS][INSTANCE_COUNT],textSP,textVAO,textVBO,textDecalVertexCount[MAX_LEVELS][INSTANCE_COUNT],lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,cellVisibleDataID,shadowmapsSP,shadowMapSSBO,shadowMapsIndirectionID,sunShadowFBO,sunShadowTex,shadowmapIndirectionList[LIGHT_COUNT],colorBufferID,
+    texPalID,texPalOfsID,textureOffsetsID,textureSizesID,psysInstancesID,psysTrailsID,psysquadVAO,psysquadVBO,particleSP,trailSP,camViewTextures[64],levelCamViewTextures[14][64],drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal,biomTexId,biomFBO,raycastCalls;
 u16 **modelTriangles, modelTriangleCounts[MAX_MDLS], mdlsCnt, **physTris, texCnt, decalStyleCount, decalInlineTextLevel[DECAL_INLINE_TEXT_MAX], decalInlineTextInst[DECAL_INLINE_TEXT_MAX], decalInlineTextCount;
-V3 modelMin[MAX_MDLS], modelMax[MAX_MDLS];
-u32 lightsID, voxListCntsID, voxelLightListsID, voxelUpdateSP, cellVisibleDataID, shadowmapsSP, shadowMapSSBO, shadowMapsIndirectionID, sunShadowFBO, sunShadowTex, shadowmapIndirectionList[LIGHT_COUNT];
-FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6], playerFrustumPlanes[6];
-FrustumPlane sunShadowFrustum[6];
-V3 sunDirection={0.0f, 1.0f, 0.0f};
-u32 colorBufferID, texPalID, texPalOfsID, textureOffsetsID, textureSizesID, psysInstancesID, psysTrailsID, psysquadVAO, psysquadVBO, particleSP, trailSP, camViewTextures[64], levelCamViewTextures[14][64], drawCalls, uiDrawCalls, shadDrawCalls, vertsRendered, drawCallsNormal, biomTexId, biomFBO;
-u8 particleBlendTexture[MAXTEX], camViewCount, levelCamViewCount[14];
+static u8 currentPlayerNameLength,currentMenuPage,resDropdownCount,resSelectedIdx,resHoverIdx = -1;
+u8 particleBlendTexture[MAXTEX],camViewCount,levelCamViewCount[14];
 char decalInlineText[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN];
+bool doubleSidedTexture[MAXTEX],transparentTexture[MAXTEX],shadowBuffersCreated,resDropdownOpen,mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause,fovSliderActive,gammaSliderActive,masterVolumeSliderActive,musicVolumeSliderActive,messageVolumeSliderActive,sfxVolumeSliderActive,enteringPlayerName;
+typedef struct { u32 nodeBase,triBase,vtxBase,uvBase; } ModelRTInfo; typedef struct { u32 geom[4]; u32 info[4]; float iscl2[4]; } InstanceRTInfo; static InstanceRTInfo rtInstanceInfo[INSTANCE_COUNT]; static InstanceRTInfo rtPrevInfo[INSTANCE_COUNT]; static ModelRTInfo rtModelInfo[MAX_MDLS];
+V3 modelMin[MAX_MDLS], modelMax[MAX_MDLS],sunDirection={0.0f,1.0f,0.0f};
+FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6],sunShadowFrustum[6];
 DecalStyle decalStyles[DECAL_STYLE_MAX];
 CamView camViews[64], levelCamViews[14][64];
-// Main Menu
-static u8 currentPlayerNameLength, currentMenuPage, resDropdownCount, resSelectedIdx, resHoverIdx = -1;
 static i8 currentMenuItem,currentMenuTab, menuItemCount = 4, menuTabCount = 1;
 typedef struct {int w,h;} ResMode; ResMode resModes[16];
-// Input
-bool mouseMovementThisFrame, window_has_focus, ignore_next_mouse_delta, returnToPause, fovSliderActive, gammaSliderActive, masterVolumeSliderActive, musicVolumeSliderActive, messageVolumeSliderActive, sfxVolumeSliderActive, enteringPlayerName;
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
     .InputCodeSettings = {5,/*Forward=F*/        0,/*Strafe Left=A*/    18,/*Backpedal=S*/   3,/*Strafe Right=D*/ 100,/*Jump=SPACE*/    2,/*Crouch=C*/  23,/*Prone=X*/  16,/*Lean Left=Q*/       4,/*Lean Right=E*/    45,/*Sprint=LSHIFT*/ 38,/*Turn Left=LARROW*/ 39,/*Turn Right=RARROW*/
                           36,/*Look Up=UARROW*/ 37,/*Look Down=DARROW*/ 20,/*Recent Log=U*/ 26,/*Biomonitor=1*/    27,/*Sensaround=2*/ 28,/*Lantern=3*/
@@ -38,11 +30,8 @@ SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on f
     .Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u, 
     .InvCybLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=4u};/*Ratio is (1 / SSR_RES) * res*/
 InputSystem Sys_Input; TextSystem Sys_Text; CheatsSystem Cheats = {.god=false, .noclip=false, .showLocation=false, .showFPS=true, .editMode=false, .showPhys=false};
-// In-Game Editor
 u16 editModeSelection = U16_MAX, editModeLightSelection = U16_MAX, editModeTestEntityDefinition = 343, lastSpawned = U16_MAX;
-// Diagnostics
 double game_start_time, game_actual_start_time, shadowTime, physTime, renderTime, prePhys, gameTime, raycastMs;
-u32 raycastCalls;
 static u32 gpuQ[5][5];
 static u8 gpuQFrame=0; /* [frame][shad,pre,main,ssr,comp] */
 Color textColors[] = {{1.000000000f,1.000000000f,1.000000000f,1.0f}, /* 0 White T_WHITE*/                                {0.890196078f,0.874509804f,0.000000000f,1.0f}, /* 1 Yellow T_YELLOW*/                              {0.623529412f,0.611764706f,0.000000000f,1.0f}, /* 2 Dark Yellow (Yellow * 0.7f) T_DARK_YELLOW*/
@@ -1027,8 +1016,7 @@ static void cmd_showlocation() { Cheats.showLocation = !Cheats.showLocation; }
 static void cmd_god() { Cheats.god = !Cheats.god; CenterStatusPrint("god mode: %s", Cheats.god ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
 static void cmd_energy() { Cheats.redbull = !Cheats.redbull; if (Cheats.redbull) {CenterStatusPrint("%s", Sys_Text.stringTable[1006]);/*"I feel the power! 0 energy consumption!"*/} else {CenterStatusPrint("%s", Sys_Text.stringTable[1005]);/*Energy usage normal*/} }
 static const float skyRotateSpeeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f };
-static void SetSkyRotateSpeed() { glUseProgram(imageBlitSP); glUniform1f(30,skyRotateSpeeds[Cheats.dizzyLevel]); }
-static void cmd_dizzy() { Cheats.dizzyLevel = (Cheats.dizzyLevel >= 3) ? 0 : Cheats.dizzyLevel + 1; SetSkyRotateSpeed(); }
+static void cmd_dizzy() { Cheats.dizzyLevel = (Cheats.dizzyLevel >= 3) ? 0 : Cheats.dizzyLevel + 1; }
 static void cmd_bottomless() { Cheats.bottomless = !Cheats.bottomless; if (Cheats.bottomless) {CenterStatusPrint("bottomlessclip! %s",Sys_Text.stringTable[1002]);/*"Bring it!"*/} else {CenterStatusPrint("%s",Sys_Text.stringTable[1003]);/*"Hose disconnected from interdimensional wormhole. Normal ammo operation restored."*/} }
 static void cmd_animtest() { Cheats.animTest++; if (Cheats.animTest > 2) {Cheats.animTest = 0;} if (Cheats.animTest == 1) {CenterStatusPrint("animation test looping enabled!");} else if (Cheats.animTest == 2) {CenterStatusPrint("animation test step enabled! Press 1");} else {CenterStatusPrint("animation test disabled");} }
 static void cmd_nohud() { Cheats.noHUD = !Cheats.noHUD; if (Cheats.noHUD) {CenterStatusPrint("%s",Sys_Text.stringTable[1004]);/*"No HUD! Enjoy the cinematic screenshot experience!"*/} else { CenterStatusPrint("HUD %s",Sys_Text.stringTable[1000]);/*"ACTIVATED"*/} }
@@ -1823,7 +1811,8 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     shadowTime = get_time() - shadowStartTime;
 }
 
-V3 SunDirection(void) { float yaw = (float)World.pauseRelativeTime * 0.1f * skyRotateSpeeds[Cheats.dizzyLevel]; float c = vcosf(yaw), s = vsinf(yaw); V3 b = {0.0f, 0.1f, 0.99498743f}; return V3_Normalize((V3){b.x*c - b.z*s, b.y, b.x*s + b.z*c}); }
+float sunYawCur = 0.0f; /*Single per-frame sun yaw phase, cached by SunDirection(): drives both the sun shadow direction and the composite skybox rotation so their apparent angles advance on the same bit-exact float each frame and can never drift apart (the composite used to re-derive it from timeVal*skyRotateSpeed with a different rounding path than this CPU yaw).*/
+V3 SunDirection(void) { sunYawCur = (float)World.pauseRelativeTime * 0.1f * skyRotateSpeeds[Cheats.dizzyLevel]; float c = vcosf(sunYawCur), s = vsinf(sunYawCur); V3 b = {0.0f, 0.1f, 0.99498743f}; return V3_Normalize((V3){b.x*c - b.z*s, b.y, b.x*s + b.z*c}); }
 void InitSunShadowmap(void) {
     i32 prevUnit=0; glGetIntegerv(GL_ACTIVE_TEXTURE,&prevUnit); glActiveTexture(GL_TEXTURE10);
     glGenTextures(1,&sunShadowTex); glBindTexture(GL_TEXTURE_2D,sunShadowTex);
@@ -1848,10 +1837,12 @@ void RenderSunShadowmap(void) {
     const float S=64.0f, eyeDist=S*2.0f;
     V3 eye={target.x+sunDir.x*eyeDist,target.y+sunDir.y*eyeDist,target.z+sunDir.z*eyeDist};
     float view[16]={right.x,up.x,sunDir.x,0.0f, right.y,up.y,sunDir.y,0.0f, right.z,up.z,sunDir.z,0.0f, -(right.x*eye.x+right.y*eye.y+right.z*eye.z),-(up.x*eye.x+up.y*eye.y+up.z*eye.z),-(sunDir.x*eye.x+sunDir.y*eye.y+sunDir.z*eye.z),1.0f};
-    const float texel=(2.0f*S)/(float)SUN_SHADOW_SIZE;
     float ex=right.x*eye.x+right.y*eye.y+right.z*eye.z, ey=up.x*eye.x+up.y*eye.y+up.z*eye.z;
-    float qx=ex/texel, qy=ey/texel;
-    view[12]=-((float)((int)(qx+(qx>=0.0f?0.5f:-0.5f))))*texel; view[13]=-((float)((int)(qy+(qy>=0.0f?0.5f:-0.5f))))*texel;
+    /*Continuous translation, NO texel snap. The light-space basis rotates every frame here, so the old
+    '(int)(q+0.5f)' rounding of ex/ey to the texel grid snapped the whole shadowmap by whole texels dozens
+    of times per second while the sun angle advanced (the stepping the sun shadow angle showed). Sub-texel
+    drift at 4096^2 across 128 units is invisible and the PCF penumbra in chunk_frag absorbs the rest.*/
+    view[12]=-ex; view[13]=-ey;
     const float znear=S*0.5f, zfar=S*4.0f;
     float ortho[16]={1.0f/S,0.0f,0.0f,0.0f, 0.0f,1.0f/S,0.0f,0.0f, 0.0f,0.0f,-2.0f/(zfar-znear),0.0f, 0.0f,0.0f,-(zfar+znear)/(zfar-znear),1.0f};
     mul_mat4(sunShadowMatrix,ortho,view); ExtractFrustumPlanes(sunShadowMatrix,sunShadowFrustum);
@@ -2167,6 +2158,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glUniform3f(12,deg2rad(World.cam_yaw), deg2rad(World.cam_pitch), deg2rad(World.cam_roll));
     glUniform3f(13,px,py,pz);
     glUniform1f(15,(float)World.pauseRelativeTime * 0.1f);
+    SunDirection(); glUniform1f(30,sunYawCur); /*Sky yaw phase from the SAME float the sun shadow direction uses, so the skybox sun and the chunk shadow rotation are locked together and smooth (SunDirection() is pure + cheap; also refreshes it when shadows are disabled and the shadow pass never ran this frame)*/
     glUniform1ui(17,(gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || World.curLev == LEVEL_CYBERSPACE);
     glUniform1ui(18,(gridCellStates[playerCellIdx] & CELL_SEES_SUN) && World.curLev != LEVEL_CYBERSPACE);
     glUniform1ui(19,((World.curLev >= 10 && World.curLev < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
@@ -2449,6 +2441,7 @@ void* OS_AllocScratch(size_t amount) {
 void OS_FreeInitPhase() { scratch_cur=scratch_base; mset(scratch_cur,0,scratch_peak); }
 static void* InitFontAtlasses_Thread(void* arg) { (void)arg; InitFontAtlasses(); return NULL; }
 static bool rtAccelBuilt = false;
+INLINE u32 F2U(float f) { union { float f; u32 u; } c; c.f = f; return c.u; }
 void EnsureReflectionResources(void) {
     if (Sys_Settings.Reflections >= 1u && outputImageID == 0) { GenerateAndBindTexture(&outputImageID,GL_RGBA8,Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES,Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL); glBindImageTexture(4,outputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); glActiveTexture(GL_TEXTURE4); glBindTexture(GL_TEXTURE_2D,outputImageID); }
     if (Sys_Settings.Reflections == 2u && !rtAccelBuilt) {
@@ -2682,7 +2675,6 @@ void InitalizeEnvironment() {
     for (int i=0;i<23;++i) { g_scf_long[0][i] = g_scf_long[2][i] = g_scf_long[4][i] = g_sfc_long_024[i]; }
     glGenFramebuffers(1,&gBufferFBO);
     ChangeFullScreenWindowed(false);
-    SetSkyRotateSpeed();
     window->context.swapInterval((i32)Sys_Settings.Vsync);
     DualLog("GL shaders and buffer setup.........................................................took %.6f secs\n",get_time() - initShadersStart);
     double initSSBOStart = get_time();
