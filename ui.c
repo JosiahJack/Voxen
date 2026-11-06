@@ -1210,7 +1210,7 @@ void SideMFD(bool isRH) { // 320x240
 
 static const i16 mediaColX[2]={458,681},mediaRowY[8]={570,591,612,633,654,675,696,717};
 static const char* noteText[12]={"Escape neurosurgery suite.  Keycode is 451.","Disengage laser safety override.","Activate the station energy shield.","Destroy the mining laser.","Enable master jettison.","Diagnose and repair broken relay: 428.","Jettison Beta Grove.","Destroy the four relay antennae.","Engage reactor self-destruct.","Escape on escape pod.","Access the bridge.","Destroy SHODAN."};
-static const char* swLabels[7]={"ICE DRILL","PULSER/DRILL","SHIELD","TURBO","DECOY","RECALL","GAMES"};
+static const char* swLabels[7]={"I.C.E. DRILL","PULSER","CYBER SHIELD","TURBO","DECOY","RECALL","GAMES"};
 void CenterMFD() { //640x240
     if (Cheats.noHUD) return;
     static const i16 centerX[4]={400,480,560,902};
