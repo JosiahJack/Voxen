@@ -2211,7 +2211,7 @@ void RenderCameraViews() { /*Render in-world camera views.  Pops player position
     World.position[PLAYER1] = tempPlayerPos; World.rotation[PLAYER1] = tempPlayerRot; // Restore player position.
 }
 
-static void SetRTInstance(u32 i, u32 model, u32 tex, u32 active, float sx, float sy, float sz) {
+static void SetRTInstance(u32 i, u32 model, u32 tex, u32 glow, u32 active, float sx, float sy, float sz) {
     bool ok = (active != 0u) && (model < mdlsCnt) && (rtModelInfo[model].nodeBase != 0xFFFFFFFFu) && (sx > 1e-4f) && (sy > 1e-4f) && (sz > 1e-4f);
     rtInstanceInfo[i].geom[0] = ok ? rtModelInfo[model].nodeBase : 0xFFFFFFFFu;
     rtInstanceInfo[i].geom[1] = ok ? rtModelInfo[model].triBase : 0u;
@@ -2220,7 +2220,7 @@ static void SetRTInstance(u32 i, u32 model, u32 tex, u32 active, float sx, float
     rtInstanceInfo[i].info[0] = tex;
     rtInstanceInfo[i].info[1] = ok ? 1u : 0u;
     rtInstanceInfo[i].info[2] = model;
-    rtInstanceInfo[i].info[3] = 0u;
+    rtInstanceInfo[i].info[3] = glow;
     rtInstanceInfo[i].iscl2[0] = ok ? 1.0f / (sx * sx) : 0.0f;
     rtInstanceInfo[i].iscl2[1] = ok ? 1.0f / (sy * sy) : 0.0f;
     rtInstanceInfo[i].iscl2[2] = ok ? 1.0f / (sz * sz) : 0.0f;
@@ -2253,7 +2253,7 @@ void UpdateInstanceMatrix4x4s() {
         for (u32 i=0; i<World.instCount; ++i) {
             u16 mi = World.instances[i].modelIndex;
             if ((instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && World.instances[i].lodIndex < mdlsCnt) mi = World.instances[i].lodIndex;
-            SetRTInstance(i, (mi < mdlsCnt) ? mi : 0xFFFFFFFFu, World.instances[i].texIndex, (World.instances[i].entflags & EF_ACTIVE) ? 1u : 0u, vabs(World.scale[i].x), vabs(World.scale[i].y), vabs(World.scale[i].z));
+            SetRTInstance(i, (mi < mdlsCnt) ? mi : 0xFFFFFFFFu, World.instances[i].texIndex, World.instances[i].glowIndex, (World.instances[i].entflags & EF_ACTIVE) ? 1u : 0u, vabs(World.scale[i].x), vabs(World.scale[i].y), vabs(World.scale[i].z));
             InstanceRTInfo* cur = &rtInstanceInfo[i], *prev = &rtPrevInfo[i];
             if (cur->geom[0]!=prev->geom[0] || cur->geom[1]!=prev->geom[1] || cur->geom[2]!=prev->geom[2] || cur->geom[3]!=prev->geom[3] || cur->info[0]!=prev->info[0] || cur->info[1]!=prev->info[1] || cur->info[2]!=prev->info[2] || cur->info[3]!=prev->info[3] || cur->iscl2[0]!=prev->iscl2[0] || cur->iscl2[1]!=prev->iscl2[1] || cur->iscl2[2]!=prev->iscl2[2] || cur->iscl2[3]!=prev->iscl2[3]) {
                 if (chFirst == INSTANCE_COUNT) chFirst = i; chLast = i; mcpy(prev, cur, sizeof(InstanceRTInfo));

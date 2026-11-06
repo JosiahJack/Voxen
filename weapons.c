@@ -299,7 +299,7 @@ void FireCyberBeachball(bool isPulser, float shoveForce, u16 prefabID) { // Same
     proj->damage = isPulser ? (1.0f + 0.25f * (float)World.invP1.softVersions[SW_PULSER]) : 10.0f * (float)World.invP1.softVersions[SW_DRILL];
     proj->strength = proj->speed = 0.0f;
     proj->attackType = isPulser ? Att_Ball/*ProjectileLaunched*/ : Att_Drill; proj->recentMostActivator = PLAYER1; ProjectileEffectImpactInitAfterLoad(ball);
-    World.position[ball] = World.position[PLAYER1]; World.velocity[ball] = (V3){0};
+    World.position[ball] = World.position[PLAYER1]; World.velocity[ball] = (V3){0}; World.rotation[ball] = QuatFromToRotation((V3){0.0f,0.0f,1.0f},proj->forward);
     AddForce(ball, V3_ScaleByF(proj->forward, shoveForce), true); flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);
 }
 

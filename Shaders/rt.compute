@@ -1,5 +1,5 @@
 // rt.compute - Compute shader for ray-traced reflections (BVH per model)
-// Optimized revision. Host-side contract (bindings / uniform locations / buffer layouts) unchanged.
+// Optimized revision. Host-side contract (bindings / uniform locations / buffer layouts) unchanged; InstanceRTInfo.info.w now carries the per-instance glow texture index so hit shading can sample emissive glow the same way chunk_frag.glsl does.
 layout(local_size_x = 8, local_size_y = 8) in;
 const uint RT_NONE = 0xFFFFFFFFu;
 const uint RT_MAX_INST = 9032u;
@@ -34,7 +34,8 @@ layout(std430,binding=8)  readonly buffer TexturePalettes { uint texturePalettes
 layout(std430,binding=9)  readonly buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; };
 vec3 DecodeOctahedral(vec2 enc) { vec2 e = enc * 2.0 - 1.0; vec3 n = vec3(e, 1.0 - abs(e.x) - abs(e.y)); n.xy -= max(-n.z, 0.0) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.y >= 0.0 ? 1.0 : -1.0); return normalize(n); }
 vec3 safeRcp(vec3 v) { return vec3(v.x >= 0.0 ? 1.0 : -1.0, v.y >= 0.0 ? 1.0 : -1.0, v.z >= 0.0 ? 1.0 : -1.0) / max(abs(v), vec3(1e-18)); }
-vec4 getTextureColor(uint texIdx, ivec2 texCoord, int texSizeX) { uint pixelOffset = textureOffsets[texIdx] + uint(texCoord.y) * uint(texSizeX) + uint(texCoord.x); uint packedIdx = colors[pixelOffset >> 2u]; return unpackUnorm4x8(texturePalettes[texturePaletteOffsets[texIdx] + ((packedIdx >> ((pixelOffset & 3u) << 3u)) & 0xFFu)]); }
+vec4 getTextureColor(uint texIdx, ivec2 texCoord, ivec2 texSize) { texCoord = ivec2(mod(vec2(texCoord), vec2(texSize))); if (texCoord.x < 0) texCoord.x += texSize.x; if (texCoord.y < 0) texCoord.y += texSize.y; uint pixelOffset = textureOffsets[texIdx] + uint(texCoord.y) * uint(texSize.x) + uint(texCoord.x); uint packedIdx = colors[pixelOffset >> 2u]; return unpackUnorm4x8(texturePalettes[texturePaletteOffsets[texIdx] + ((packedIdx >> ((pixelOffset & 3u) << 3u)) & 0xFFu)]); }/*Same wrap+fetch as chunk_frag.glsl*/
+vec4 getTextureColorGaussian(uint texIdx, vec2 uvF, ivec2 texSize) { vec2 tc = uvF * vec2(texSize) - 0.5; vec2 base = floor(tc); vec2 f = tc - base; ivec2 p = ivec2(base); vec4 wx = mix(vec4(0.25, 0.50, 0.25, 0.00),vec4(0.00, 0.25, 0.50, 0.25), f.x); vec4 wy = mix(vec4(0.25, 0.50, 0.25, 0.00),vec4(0.00, 0.25, 0.50, 0.25), f.y); vec4 c = vec4(0.0); for (int j = 0; j < 4; ++j) { for (int i = 0; i < 4; ++i) { c += wx[i] * wy[j] * getTextureColor(texIdx, p + ivec2(i - 1, j - 1), texSize); } } return c; }/*Identical to chunk_frag.glsl's blur*/
 uint GetVoxelIndex(vec3 worldPos) { vec2 o = (worldPos.xz - worldMin) * 3.125; uvec2 v = uvec2(clamp(o, vec2(0.0), vec2(511.0))); return v.y * 512u + v.x; }
 float rayAABB(vec3 origin, vec3 invDir, vec3 mn, vec3 mx, float maxDist) { vec3 t0 = (mn - origin) * invDir, t1 = (mx - origin) * invDir; vec3 tmin = min(t0, t1), tmax = max(t0, t1); float tNear = max(max(tmin.x, tmin.y), tmin.z), tFar = min(min(tmax.x, tmax.y), tmax.z); if (tFar < max(0.02, tNear) || tNear > maxDist) return -1.0; return max(tNear, 0.02); }
 uint  RtCellCount(uint cell) { uint w = rtCellCountsP[cell >> 1u]; return (cell & 1u) != 0u ? (w >> 16u) : (w & 0xFFFFu); }
@@ -190,7 +191,16 @@ void main() {
             if (ts.x > 0 && ts.y > 0) {
                 vec2 uvHit = RtUV(bestUVBase + bestIA) * (1.0 - bestBaryU - bestBaryV) + RtUV(bestUVBase + bestIB) * bestBaryU + RtUV(bestUVBase + bestIC) * bestBaryV;
                 ivec2 tcoord = clamp(ivec2(fract(vec2(uvHit.x, 1.0 - uvHit.y)) * vec2(ts)), ivec2(0), ts - 1);
-                vec3 albedo = getTextureColor(texIdx, tcoord, ts.x).rgb;
+                vec3 albedo = getTextureColor(texIdx, tcoord, ts).rgb;
+                vec3 glowAdd = vec3(0.0); // Emissive glow sampled exactly like chunk_frag.glsl: mostly blurred, lightly crisp
+                uint glowIdx = rtInstanceInfo[bestInst].info.w;
+                if (glowIdx != 0u && glowIdx < texCount) {
+                    ivec2 tsG = textureSizes[glowIdx];
+                    if (tsG.x > 0 && tsG.y > 0) {
+                        vec2 uvG = fract(vec2(uvHit.x, 1.0 - uvHit.y));
+                        glowAdd = ((getTextureColorGaussian(glowIdx, uvG, tsG) * 0.65/*Downplay the blurred version so it's not too soft*/) + (getTextureColor(glowIdx, ivec2(uvG * vec2(tsG)), tsG) * 0.18/*Subtly favor the crisp pixely glow*/)).rgb;
+                    }
+                }
                 mat4 Mb = modelMatrices[bestInst];
                 vec4 isc = rtInstanceInfo[bestInst].iscl2;
                 uint vb = rtInstanceInfo[bestInst].geom.z;
@@ -235,7 +245,7 @@ void main() {
                     if (ndh > 0.85) { float x2 = ndh * ndh, x4 = x2 * x2, x8 = x4 * x4, x16 = x8 * x8, x32 = x16 * x16; spec = x32 * x32 * x32 * x4; }
                     acc += lights[lidx].col * (k * att175) + vec3(0.5 * k * att * spec);
                 }
-                reflectionColor = albedo * acc;
+                reflectionColor = albedo * acc + glowAdd;
             }
         }
     }

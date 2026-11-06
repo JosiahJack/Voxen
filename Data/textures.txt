@@ -8234,3 +8234,15 @@ index: 3957
 index: 3958
 #Textures/AADeath/death_0505.png
 index: 3959
+#Textures/cyber_proj_red.png
+index: 3960
+#Textures/cyber_proj_red_glow.png
+index: 3961
+#Textures/cyber_proj_magenta.png
+index: 3962
+#Textures/cyber_proj_magenta_glow.png
+index: 3963
+#Textures/cyber_proj_green.png
+index: 3964
+#Textures/cyber_proj_green_glow.png
+index: 3965
