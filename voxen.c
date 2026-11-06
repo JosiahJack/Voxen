@@ -1812,7 +1812,19 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
 }
 
 float sunYawCur = 0.0f; /*Single per-frame sun yaw phase, cached by SunDirection(): drives both the sun shadow direction and the composite skybox rotation so their apparent angles advance on the same bit-exact float each frame and can never drift apart (the composite used to re-derive it from timeVal*skyRotateSpeed with a different rounding path than this CPU yaw).*/
-V3 SunDirection(void) { sunYawCur = (float)World.pauseRelativeTime * 0.1f * skyRotateSpeeds[Cheats.dizzyLevel]; float c = vcosf(sunYawCur), s = vsinf(sunYawCur); V3 b = {0.0f, 0.1f, 0.99498743f}; return V3_Normalize((V3){b.x*c - b.z*s, b.y, b.x*s + b.z*c}); }
+V3 SunDirection(void) {
+    /*pauseRelativeTime is an absolute monotonic clock (= full system uptime when the game first unpauses, millions of
+    seconds), so the sun's yaw phase grows without bound.  Evaluated as a float32 its mantissa step reaches ~4.9e-4 rad
+    at yaw ~9000, which is ~11x larger than the per-frame increment (~4.4e-5 rad at 60fps): the angle then holds still
+    for ~11 frames and jumps a whole step (~0.6px at 1080p/90deg FOV), stuttering identically for the sky sun and the
+    shadow angle no matter the frame rate (the "integer/pixel amount" stepping).  So keep the phase wrapped to [0,TAU)
+    in double precision - the float cast happens only after wrapping, where the float32 mantissa step (2.4e-7 rad) is
+    180x finer than the per-frame increment and cos/sin become periodic-free anyway (both cos(camRot.x + yaw) and the
+    cubemap axes are periodic).*/
+    double yawRaw = World.pauseRelativeTime * 0.1 * skyRotateSpeeds[Cheats.dizzyLevel];
+    sunYawCur = (float)(yawRaw - 6.283185307179586 * (double)((long long)(yawRaw * 0.15915494309189535))); /*1/TAU = 0.15915494309189535; trunc floor for the always-positive monotonic phase*/
+    float c = vcosf(sunYawCur), s = vsinf(sunYawCur); V3 b = {0.0f, 0.1f, 0.99498743f}; return V3_Normalize((V3){b.x*c - b.z*s, b.y, b.x*s + b.z*c});
+}
 void InitSunShadowmap(void) {
     i32 prevUnit=0; glGetIntegerv(GL_ACTIVE_TEXTURE,&prevUnit); glActiveTexture(GL_TEXTURE10);
     glGenTextures(1,&sunShadowTex); glBindTexture(GL_TEXTURE_2D,sunShadowTex);
@@ -2253,7 +2265,7 @@ void UpdateInstanceMatrix4x4s() {
 }
 
 static const Color fogLUT[MAX_LEVELS] = { {0.3207547f, 0.29200783f,0.29200783f,0.07f},/*0*/  {0.34509805f,0.38431373f,0.49019608f,0.055f},/*1*/  {0.47058824f,0.3882353f, 0.3928334f,0.05f},/*2*/  {0.32941177f,0.29411766f,0.2509804f,0.065f},/*3*/ {0.3882353f,0.452415f, 0.47058824f,0.075f},/*4*/ {0.3882353f, 0.4117647f, 0.47058824f,0.03f},/*5*/ {0.3f,0.24f,0.33f,0.070f},/*6*/ 
-                                          {0.38679248f,0.3471719f, 0.3302332f,0.07f},/*7*/  {0.44708973f,0.45681614f,0.4811321f,0.040f},/*8*/ {0.4056604f,0.3992963f,0.36930403f,0.050f},/*9*/ {0.48235294f,0.58431375f,0.5176471f, 0.04f},/*10*/ {0.52872473f,0.58431375f,0.48235294f,0.040f},/*11*/ {0.48235294f,0.58431375f,0.5176471f,0.05f},/*12*/ {0.0f,0.0f,0.0f,0.015f},/*13*/ };
+                                          {0.38679248f,0.3471719f, 0.3302332f,0.07f},/*7*/  {0.44708973f,0.45681614f,0.4811321f,0.040f},/*8*/ {0.4056604f,0.3992963f,0.36930403f,0.050f},/*9*/ {0.48235294f,0.58431375f,0.5176471f, 0.04f},/*10*/ {0.52872473f,0.58431375f,0.48235294f,0.040f},/*11*/ {0.48235294f,0.58431375f,0.5176471f,0.05f},/*12*/ {0.0f,0.0f,0.0f,0.5f},/*13*/ };
 static const V2 levMins[MAX_LEVELS]={{-37.3600f,-52.7600f},/*0*/  {-53.8000f,-64.0800f},/*1*/  {-46.12f,-56.34f},/*2*/  {-51.266f,-51.246f},/*3*/  {-29.462f, -53.7872f},/*4*/ {-47.3622f,-55.04f},/*5*/ {-65.94f,-71.6833f},/*6*/ {-66.8989f,-82.0144f},/*7*/ {-43.7456f,-43.9872f},/*8*/ {-51.5039f,-69.0306f},/*9*/ {-24.0994f,-39.7972f},/*10*/ {-27.1772f,-28.3394f},/*11*/ {-18.05f,-30.50f},/*12*/ {99.4200f,-60.120f}/*13*/};
 static const float lFars[MAX_LEVELS] = { 56.32f/*R*/, 56.32f/*1*/, 51.2f/*2*/, 51.2f/*3*/, 40.96f/*4*/, 58.88f/*5*/, 79.36f/*6*/, 56.32f/*7*/, 69.12f/*8*/, 53.76f/*9*/,  51.2f/*10*/,  51.2f/*11*/, 38.4f/*12*/, 1300.00f/*13*/};
 int EdgeCompare(const void* a, const void* b) { u32 ea = *(const u32*)a, eb = *(const u32*)b; return (ea > eb) - (ea < eb); }
