@@ -275,6 +275,7 @@ static const i32 numPackCodepoints=sizeof(packCodepoints)/sizeof(packCodepoints[
 static i32 CodepointToPackedIndex(i32 cp,int fontID) { return ((u32)cp<65536u) ? cpPackedIndex[fontID][cp] : 0; }
 void LoadFallbackFont(const char*path, int fii, int ci){
     FHandle fd; int fsz; fontData[fii]=OS_OpenAndAllocateFileBufferReadonly(path,&fd,&fsz);
+    if (!fontData[fii]) { DualLogError("Failed to load font: %s\n",path); OS_Exit(1); }
     int off = _font_offset((u8*)fontData[fii],ci); if (off<0) { DualLogError("Invalid collection index %d for font %s\n",ci,path); OS_Exit(1); }
     if (!font_InitFont_internal(&fontInfo[fii],fontData[fii],off)) { DualLogError("Failed to init font at index %d in %s\n",ci,path); OS_Exit(1); }
 }
@@ -323,6 +324,7 @@ void InitFontAtlasses() {
     FHandle fd1,fd2;int sz1,sz2;
     fontData[0]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[0],&fd1,&sz1);
     fontData[1]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[1],&fd2,&sz2);
+    if (!fontData[0] || !fontData[1]) { DualLogError("Failed to load font\n"); OS_Exit(1); }
     if(!font_InitFont_internal(&fontInfo[0],fontData[0],0)){DualLogError("%s font init failed\n",fontPaths[0]); OS_Exit(1);}
     if(!font_InitFont_internal(&fontInfo[1],fontData[1],0)){DualLogError("%s font init failed\n",fontPaths[1]); OS_Exit(1);}
     LoadFallbackFont(fallbackFontPaths[0],2,0);

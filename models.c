@@ -229,6 +229,7 @@ static int jsmn_parse(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, si
 
 static bool glb_resolve_raw(void* pslot, const void* base, size_t esz, size_t count) { void* v; mcpy(&v, pslot, sizeof(v)); size_t idx = (size_t)v; if (!idx) { return true; } if (idx > count) { return false; } void* re = (void*)((char*)base + (idx - 1) * esz); mcpy(pslot, &re, sizeof(re)); return true; }
 void glb_parse(i32 tid, const void* d, size_t sz, glb_data** out_data) {
+    if (!d || sz < 20) return;
     const u8* ptr=(const u8*)d; const u8* jc=ptr+12; u32 jl; mcpy(&jl,jc,4); jc += 8; const void* bin = NULL; size_t bsz = 0;
     if (8 <= sz - 20 - jl) { const u8* bc = jc + jl; u32 bl; mcpy(&bl,bc,4); bc += 8; bin = bc; bsz = bl; }
     jsmn_parser p = {0}; int tc = jsmn_parse(&p,(const char*)jc,jl,NULL,0);

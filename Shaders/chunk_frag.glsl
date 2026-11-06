@@ -34,9 +34,11 @@ layout(location=31) uniform sampler2D fontAtlas;
 layout(location=32) uniform uint useFontAtlas;
 layout(location=33) uniform vec2 hopperDeathEffect; // x: red tint, y: normalized magenta rim strength
 layout(location=34) uniform uint isCyberspace;
+layout(location=35) uniform float fogDensityScale;
 layout(location=36) uniform sampler2DShadow sunShadowMap;
 layout(location=37) uniform uint sunEnabled;
 layout(location=38) uniform vec3 sunDirection;
+layout(location=39) uniform float fogInvDist;
 layout(location=40) uniform mat4 sunShadowMatrix; /* sunlight ortho shadowmap matrix
 layout(location=41) some weird
 layout(location=42) padding apparently, so say some docs anyhow
@@ -94,6 +96,7 @@ void main() {
     else {
         albedoColor=getTextureColor(texIndex,ivec2(fract(uv)*vec2(texSize)),texSize);
         if (useFontAtlas != 0u) { if (albedoColor.a < 0.05) discard; }
+        else if (constIndex == 21u || constIndex == 22u) { if (albedoColor.a < 0.05) albedoColor.a = volume; }
         else if (albedoColor.a < 0.05 && volume < 0.05) discard;/*Text decals cutout on SDF alpha alone; volume uniform belongs to chunk geometry*/
     }
     vec3 adjustedNormal=Normal; if (useFontAtlas != 0u && dot(Normal, viewDir) < 0.0) adjustedNormal = -Normal;/*Text decals are double-sided; light whichever face the viewer sees*/
@@ -154,6 +157,6 @@ void main() {
     if (hopperDeathEffect.x > 0.0) lighting *= vec3(1.0 + hopperDeathEffect.x, 1.0, 1.0);
     if (hopperDeathEffect.y > 0.0) lighting += vec3(1.0, 0.0, 0.75) * hopperDeathEffect.y * rim * rim * rim;
     lighting.rgb += vec3((getBlueNoise(ivec2(gl_FragCoord.xy)) - 0.5) * 0.003921569); // Blue Noise Dither for banding (0.03ms performance cost, leaving in for quality)
-    if (unlit == 0) {/*Fog*/ float fogFac = clamp(distToPixel * 0.013950893, 0.0, 1.0);/*This is inverse of fog dist so * (1 / 71.68 far plane)*/ float lum = dot(lighting, vec3(0.299, 0.587, 0.114)); fogFac = clamp(fogFac*(1.0-lum),0.0,1.0); lighting=mix(fogColor,lighting,1.0-fogFac);}
+    if (unlit == 0) {/*Fog*/ float fogFac = clamp(distToPixel * (isCyberspace > 0u ? fogInvDist : 0.013950893), 0.0, 1.0);/*This is inverse of fog dist so * (1 / 71.68 far plane)*/ if (isCyberspace > 0u) { fogFac = clamp(fogFac * fogDensityScale, 0.0, 1.0); } else { float lum = dot(lighting, vec3(0.299, 0.587, 0.114)); fogFac = clamp(fogFac*(1.0-lum),0.0,1.0); } lighting=mix(fogColor,lighting,1.0-fogFac);}
     outAlbedo=vec4(lighting.rgb,albedoColor.a);
 }

@@ -1880,7 +1880,7 @@ void RenderSunShadowmap(void) {
 static DepthSort visibleInstances[INSTANCE_COUNT];
 __attribute__((pure)) i32 dsort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
 __attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (da > db) - (da < db); }
-void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT, u16* curG, u16* curS, u16* curM, bool grayscaleEnabled) {
+void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT, u16* curG, u16* curS, u16* curM, float* curV, bool grayscaleEnabled) {
     u16 glow = e->glowIndex, norm = e->normIndex, spec = e->specIndex;
     if (constIndex == 505 && e->doorState == DoorState_Closed) {
         if (V3_SqDist(World.position[i], World.position[PLAYER1]) <= 2500.0f) { /* ~50m */
@@ -1917,6 +1917,7 @@ void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT,
         float redTint = 0.0f, rimStrength = 0.0f; if (e->deathAnimationActive && e->index == 433) { float elapsed = vmax((float)(World.pauseRelativeTime - (double)e->deathAnimationStart),0.0f); u32 tick = (u32)(elapsed / 0.05f); redTint = elapsed < 0.35f ? 0.5f * vmin((float)tick, 6.0f) : 0.0f; rimStrength = vmax(0.0f, 1.0f - ((float)tick * 15.0f / 255.0f)); } glUniform2f(33, redTint, rimStrength); // Set Hopper death glow effect strength.
         glUniform1ui(17,tex==316?1u:0u);
         glUniform1ui(25,constIndex);
+        float vol = (constIndex == 21 || constIndex == 22) ? vmax(0.02f, cyberWallFade[i]) : 0.0f; if (*curV != vol) { *curV = vol; glUniform1f(27, vol); }
         glUniform1ui(13,(tex==36||tex==887) ? 1u : 0u);
         if (grayscaleEnabled) { float npcHeat = IdxIsNPC(constIndex) ? ((constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 || constIndex==431 || constIndex==433 || constIndex==437 || constIndex==438 || constIndex==441) ? 1.5f : 4.0f) : 0.0f; glUniform1f(9,npcHeat); }
         glUniform1ui(30,e->camView < camViewCount ? 1u : 0u);
@@ -1976,7 +1977,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glDisable(GL_BLEND);/*Opaques*/
     u16 currentTexIndex = U16_MAX, currentNormIndex = U16_MAX, currentGlowIndex = U16_MAX, currentSpecIndex = U16_MAX, currentModelType = U16_MAX, opaqueCount = 0;
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
-    DepthSort tmpTransparent[1024];
+    static DepthSort tmpTransparent[INSTANCE_COUNT];
     u16 tcnt = 0;
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { // Determine base visibility
         if (i == World.weaponVModelIndex || EntNotVisible(i,false)) { continue; }
@@ -1993,14 +1994,14 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
             if (!(gridCellStates[e->cellIndex] & CELL_OPEN) && distSqrd >= 943.7184f) { continue; /*30.72 * 30.72, 12 cells*/ }
         }
         if (World.instances[i].camView != 255) camViews[World.instances[i].camView].visible = true;
-        if (transparentTexture[World.instances[i].texIndex]) { if (tcnt <= 1023) { tmpTransparent[tcnt].index = i; tmpTransparent[tcnt].depth = distSqrd; tcnt++; } } else { visibleInstances[opaqueCount].index = i; visibleInstances[opaqueCount].depth = distSqrd; opaqueCount++; }
+        if (transparentTexture[World.instances[i].texIndex]) { if (tcnt < INSTANCE_COUNT) { tmpTransparent[tcnt].index = i; tmpTransparent[tcnt].depth = distSqrd; tcnt++; } } else { visibleInstances[opaqueCount].index = i; visibleInstances[opaqueCount].depth = distSqrd; opaqueCount++; }
     }
     if (World.shields[0] < U16_MAX && skyVisible && World.instCount < (INSTANCE_COUNT - 4)) { for (u8 k=0;k<4;++k) { visibleInstances[opaqueCount].index=World.shields[k]; visibleInstances[opaqueCount++].depth=300.0f; } }
     if (editModeSelection < U16_MAX && Cheats.editMode) {
         u16 selIdx=World.instances[editModeSelection].index;
         if (selIdx != 592 && selIdx != 593) { /* decals have no mesh: baked 3D text drawn in decal pass; force-draw would hit modelIndex U16_MAX */
             if (transparentTexture[World.instances[editModeSelection].texIndex]) {
-                if (tcnt <= 1023) { tmpTransparent[tcnt].index = editModeSelection;          tmpTransparent[tcnt].depth = 1.28f;        tcnt++; }
+                if (tcnt < INSTANCE_COUNT) { tmpTransparent[tcnt].index = editModeSelection;          tmpTransparent[tcnt].depth = 1.28f;        tcnt++; }
             } else {       visibleInstances[opaqueCount].index = editModeSelection; visibleInstances[opaqueCount].depth = 1.28f; opaqueCount++; }
         }
     }
@@ -2041,6 +2042,8 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glUniform1ui(26,(u32)grayscaleEnabled);
     float fogActual = World.fogColor[World.curLev].a + ((float)World.fogFac / 255.0f); /*Alpha is base density for level.*/
     glUniform3f(12, World.fogColor[World.curLev].r * fogActual,World.fogColor[World.curLev].g * fogActual, World.fogColor[World.curLev].b * fogActual); /*Fog Color(which is density)*/
+    glUniform1f(39, 1.0f / World.farPlane[World.curLev]);
+    glUniform1f(35, World.fogColor[World.curLev].a);
     glUniform1ui(14,Sys_Settings.Reflections);
     glUniform1ui(15,Sys_Settings.Shadows);
     glUniform2f(8, World.worldMin_x[World.curLev], World.worldMin_z[World.curLev]);
@@ -2050,7 +2053,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glDepthFunc(0x0203/*GL_LEQUAL*/); /*Opaque Pass*/
     currentTexIndex = currentNormIndex = currentGlowIndex = currentSpecIndex = currentModelType = U16_MAX;
     glUniform1f(9,0.0f); // Reset heat for infrared vision
-    glUniform1f(27,(float)(1.0f - (vclamp((float)(World.pauseRelativeTime - 0.0f) / 2.0f, 0.0f, 1.0f)))); /* cyber wall panel alpha with fade */
+    float currentVol = -1.0f;
     for (u16 visibleIndex=0;visibleIndex<opaqueCount+tcnt;++visibleIndex) {
         bool alpha=visibleIndex>=opaqueCount; if (visibleIndex==opaqueCount) glDepthMask(1);
         u16 i=visibleInstances[visibleIndex].index; Entity* e=&World.instances[i]; u16 tex=e->texIndex,constIndex=e->index;
@@ -2060,7 +2063,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         u8 state=twoSided ? 2 : alpha ? 1 : 0;
         if (cullBlendState!=state) { if (twoSided) glDisable(GL_CULL_FACE); else glEnable(GL_CULL_FACE); if (state) glEnable(GL_BLEND); else glDisable(GL_BLEND); cullBlendState=state; }
         if (alpha) glDepthFunc(((constIndex>=561 && constIndex<=565) || (constIndex>=568 && constIndex<=573)) ? 0x0202/*GL_EQUAL*/ : 0x0203/*GL_LEQUAL*/);
-        DrawEntity(e,i,constIndex,tex,&currentNormIndex,&currentTexIndex,&currentGlowIndex,&currentSpecIndex,&currentModelType,grayscaleEnabled);
+        DrawEntity(e,i,constIndex,tex,&currentNormIndex,&currentTexIndex,&currentGlowIndex,&currentSpecIndex,&currentModelType,&currentVol,grayscaleEnabled);
     }
     glDepthMask(1);
     glUniform1ui(32,1);
@@ -2100,8 +2103,8 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
             weaponViewOffset = V3Add(weaponViewOffset, debugWepOffset);
             World.position[wvi] = V3Add(World.position[PLAYER1], quat_rot_v3(World.rotation[PLAYER1], weaponViewOffset));
             World.rotation[wvi] = quat_multiply(World.rotation[PLAYER1], vWepRot[wep16]); // view orientation + per-model correction
-            u16 curN = U16_MAX, curT = U16_MAX, curG = U16_MAX, curS = U16_MAX, curM = U16_MAX;
-            DrawEntity(&World.instances[wvi], wvi, World.instances[wvi].index, World.instances[wvi].texIndex, &curN, &curT, &curG, &curS, &curM, false);
+            u16 curN = U16_MAX, curT = U16_MAX, curG = U16_MAX, curS = U16_MAX, curM = U16_MAX; float curV = -1.0f;
+            DrawEntity(&World.instances[wvi], wvi, World.instances[wvi].index, World.instances[wvi].texIndex, &curN, &curT, &curG, &curS, &curM, &curV, false);
         }
     }
     if(unlikely(camView)) { glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); i32 cw = vmin((i32)swidth,(i32)vmin(Sys_Settings.ScreenWidth,camViews[camViewIdx].width)),ch=vmin((i32)sheight,(i32)vmin(Sys_Settings.ScreenHeight,camViews[camViewIdx].height)); glCopyImageSubData(inputImageID,GL_TEXTURE_2D,0,0,0,0,camViewTextures[camViewIdx],GL_TEXTURE_2D,0,0,0,0,cw,ch,1); return; } // <<<<<<<<<<<<< CAM VIEW BARRIER
