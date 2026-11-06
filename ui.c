@@ -192,7 +192,7 @@ bool UI_Slider(u32 id, i16 x, i16 y, i16 w, i16 h, i16 sliderPos, i16 xPosForLab
 u8 UI_MenuButton(u32 id, i16 bX, i16 bY, u8 menuItem, i16 bW, i16 bH, i16 tX, i16 tY, const char* text, i16 pX, i16 pY){bool over=false; u8 retvalue=0u; retvalue=UI_Button(id,bX,bY,bW,bH,&over,menuItem); if(!retvalue)retvalue=(MenuEnter()&&currentMenuItem==menuItem); over=over||currentMenuItem==menuItem; RenderTextL(tX,tY,over ? T_STOPD_RED : T_RED_MENU,FONT_STOPD,1.5f,text); RenderUIImage(pX,pY,40,40,over ? 1029 : 1028);/*Menu pad*/ return retvalue;}
 bool UI_Checkbox(u32 id, i16 x, i16 y, i8 mitem, u16 textIdx, bool currentlyOn){RenderUIImage(x,y,16,16,910);/*Checkbox background*/ bool over=false; bool changed=(UI_Button(id,x,y+16,210,16,&over,mitem)||(MenuEnter()&&currentMenuItem==mitem)); over=over||currentMenuItem==mitem; if(currentlyOn)RenderUIImage(x+2,y+2,12,12,912);/*Checkbox check*/ RenderTextL(x+20,y,over ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,Sys_Text.stringTable[textIdx]); return changed;}
 __attribute__((noinline)) void UI_HeaderText(i16 x, const char* text) { RenderTextL(x,50,T_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,text); RenderTextL(x,46,T_GREEN_MENU_GLOW,FONT_STOPD,1.75f,text); RenderTextL(x,48,T_GREEN_MENU,FONT_STOPD,1.75f,text); }
-void PlayMenuMusic(),mp3_clear(),PlayVideoPageMusic(bool),PlayDeathVideoMusic(),StopVideoPageMusic();
+void PlayMenuMusic(),mp3_clear(),SndClearAll(),PlayVideoPageMusic(bool),PlayDeathVideoMusic(),StopVideoPageMusic();
 __attribute__((noinline)) void MenuGoBack() {
     if (enteringSaveName) { SaveSlotCancelTyping(); return; }
     
@@ -229,7 +229,7 @@ static bool VidSkipPressed(void) {
 }
 void ChangeMenuPage(u8 pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; resDropdownOpen = false; resHoverIdx = -1; if (pg==MPG_SAVE||pg==MPG_LOAD) { SaveSlotCancelTyping(); RefreshSaveSlots(); } if (pg==MPG_INTRO) { introVidStart=World.absoluteTime; PlayVideoPageMusic(true); } if (pg==MPG_CREDS) { creditsVidStart=World.absoluteTime; PlayVideoPageMusic(false); } if (pg==MPG_DEATH) { deathVidStart=World.absoluteTime; PlayDeathVideoMusic(); } if (pg==MPG_INTRO||pg==MPG_CREDS||pg==MPG_DEATH) VidSkipArm(); }
 void GameEndSequence() { World.gameFinished = true; World.paused = true; World.menuActive = true; ChangeMenuPage(MPG_CREDS); }
-void GameDeathSequence() { World.paused = true; World.menuActive = true; returnToPause = false; ChangeMenuPage(MPG_DEATH); }
+void GameDeathSequence() { World.paused = true; World.menuActive = true; returnToPause = false; SndClearAll(); ChangeMenuPage(MPG_DEATH); }
 static void RenderVideoPage(u8 page) {
     bool isIntro = (page==MPG_INTRO);
     bool isDeath = (page==MPG_DEATH);
