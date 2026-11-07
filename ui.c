@@ -686,6 +686,7 @@ void UI_WireNodeClick(bool rh,int node) { World.Sys_UI.mouseClickHeldOverGUI=tru
 
 void UI_WireSlide(bool rh,float f) { (void)rh; (void)f;  }
 void UI_WireClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredPWP=U16_MAX; World.Sys_UI.pw_solved=false; World.Sys_UI.pw_selectedWire=-1; SysUIDataClose(); }
+void UI_BlockedClose(void) { World.Sys_UI.mouseClickHeldOverGUI=true; SysUIDataClose(); }
 void UI_SysAnalyzerClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; MFD_CloseData(); }
 void UI_MinigameStart(bool rh,int game) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastMinigameSideRH=rh; if (game<0||game>8) return; if (!World.invP1.hasMinigame) return; World.Sys_UI.mg_current=(i8)game; World.Sys_UI.mg_running[rh?1:0]=true; CenterStatusPrint("%s %s",Sys_Text.stringTable[1021],mgName[game]); play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
 void UI_MinigameInput(bool rh,int x,int y) { (void)rh;(void)x;(void)y; /*The Funpack gameplay engines are not ported yet; a click inside the running view would land here and is only consumed.*/ World.Sys_UI.mouseClickHeldOverGUI=true; }

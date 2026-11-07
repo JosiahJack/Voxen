@@ -246,7 +246,7 @@ u16 PSysAddInternal(const PSysDef* pd, u16 meshInstance, u16 parentIdx) {
     } return U16_MAX;
 }
 
-void PSysAddLevelLoops(void) { for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { u16 type; switch (World.instances[i].index) { case 720: type = 7; break; case 733: type = 45; break; case 734: type = 47; break; default: continue; } const PSysDef *preset = PSysTypeGet(type); if (!preset) continue; PSysDef def = *preset; def.pos = World.position[i]; def.rotation = World.rotation[i]; PSysAddInternal(&def,U16_MAX,U16_MAX); } }
+void PSysAddLevelLoops() { for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { u16 type; switch (World.instances[i].index) { case 720: type = 7; break; case 733: type = 45; break; case 734: type = 47; break; default: continue; } const PSysDef *preset = PSysTypeGet(type); if (!preset) continue; PSysDef def = *preset; def.pos = World.position[i]; def.rotation = World.rotation[i]; PSysAddInternal(&def,U16_MAX,U16_MAX); } }
 INLINE int trail_cmp(const void* a, const void* b){TrlSegInst* ta=(TrlSegInst*)a; TrlSegInst* tb=(TrlSegInst*)b; float ax=(ta->p0x+ta->p1x)*0.5f-trailSortCam.x,ay=(ta->p0y+ta->p1y)*0.5f-trailSortCam.y,az=(ta->p0z+ta->p1z)*0.5f-trailSortCam.z,bx=(tb->p0x+tb->p1x)*0.5f-trailSortCam.x,by=(tb->p0y+tb->p1y)*0.5f-trailSortCam.y,bz=(tb->p0z+tb->p1z)*0.5f-trailSortCam.z; float da=ax*ax+ay*ay+az*az,db=bx*bx+by*by+bz*bz; return da>db?-1:(da<db?1:0);}
 void PSys_Render(float* viewProj, V3 camPos, V3 camRight, V3 camUp, V3 camForward, u32 depthTex, float near, float far, float viewW, float viewH) {
     if (psys.aliveCount > 0) {

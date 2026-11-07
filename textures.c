@@ -394,7 +394,7 @@ void LoadTextures() {
     g_vidFrames = OS_Alloc((vc ? vc : 1) * sizeof(VidFrameRec)); g_vidFrameCnt = 0;
     for (u32 k=0;k<texture_parser.count;++k) { u32 ti = texture_parser.entries[k].index; if (ti >= texCnt || !g_vidFrameMap[ti]) continue; VidFrameRec* r = &g_vidFrames[g_vidFrameCnt++]; r->texIdx = ti; g_vidFrameMap[ti]=(u16)g_vidFrameCnt; size_t pl = slen(texture_parser.entries[k].path); if (pl > sizeof(r->path)-1) pl = sizeof(r->path)-1; mcpy(r->path, texture_parser.entries[k].path, pl); r->path[pl] = 0; }
 
-    DualLog("Loading textures (%u) ... ", texture_parser.count);
+    DualLog("Loading textures (%u pngs) ", texture_parser.count);
     thread_png_arenas = (PngArena*)OS_AllocScratch((size_t)threadCnt*sizeof(PngArena));
     for (int t=0;t<(i32)threadCnt;++t) { thread_png_arenas[t].base = NULL; PngArenaInit(&thread_png_arenas[t]); }
     
@@ -445,7 +445,7 @@ void LoadTextures() {
         OS_Free(texResults[i].indices, numP);
         OS_Free(texResults[i].palette, palS * sizeof(u32));
     }
-    DualLog("total palette colors: %u, total pixels: %u...", totalPaletteColors, totalPixels);
+    DualLog("total palette colors: %u, total pixels: %u....", totalPaletteColors, totalPixels);
     i32 packed_size = ((i32)totalPixels + 3) / 4 * sizeof(u32);
     if (packed_size > (i32)MAX_TOTAL_PIXELS || indices_size + ringidx_size > MAX_TOTAL_PIXELS) { DualLogError("colorBufferID too small: need %zu B (textures %zu + video ring %zu), MAX_TOTAL_PIXELS is %u\n",packed_size,(size_t)indices_size,ringidx_size,MAX_TOTAL_PIXELS); OS_Exit(1); } /*colorBufferID is allocated at exactly MAX_TOTAL_PIXELS, an under-sized value makes glBufferSubData fail with GL_INVALID_VALUE and silently leaves every texture unwritten*/
     glBindBuffer(GL_SSBO, colorBufferID);
@@ -473,7 +473,7 @@ void LoadTextures() {
     png_arena_main.base = NULL;
     OS_FreeInitPhase();
 
-    DualLog("..took %.6f secs\n", get_time() - start_time);
+    DualLog("took %.6f secs\n", get_time() - start_time);
 }
 
 typedef struct { const u16 *frames;  u8 length; const u16 *glowFrames; u8 glowLength; const char* name; float period; } TextureAnimClip;

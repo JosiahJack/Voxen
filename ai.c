@@ -98,7 +98,7 @@ static const AIMuzzleOffsets aiMuzzleOffsets[NUM_AI_TYPES] = { [1]={{0.2034f,1.5
 typedef struct { u16 lights[24], count; double expires[24]; } AIEffectLightPool;
 static AIEffectLightPool aiEffectPools[MAX_LEVELS];
 static float ai_effect_marker(u16 slot) { return -100.0f-(float)slot; }
-static void ai_ensure_effect_pool(void) {    
+static void ai_ensure_effect_pool() {    
     AIEffectLightPool* p = &aiEffectPools[World.curLev];
     if (p->count) { for (u16 i=0;i<p->count;i++) if (p->lights[i] >= World.loadedLights || World.lights[p->lights[i]].spotAng != ai_effect_marker(i)) { p->count = 0; break; } }
     if (p->count) return;
@@ -106,7 +106,7 @@ static void ai_ensure_effect_pool(void) {
     while (p->count < 24u && World.loadedLights< LIGHT_COUNT-1) { u16 i=p->count; u16 li=AddLightSimple((V3){0},(Color3){1,1,1},1.0f,0.0f,0); p->lights[i]=li; p->expires[i]=0.0; World.lights[li].spotAng=ai_effect_marker(i); p->count++; }
 }
 
-static void ai_update_effect_lights(void) {
+static void ai_update_effect_lights() {
     static double aiEffectLightsUpdatedAt=-1.0;
     if (aiEffectLightsUpdatedAt==World.pauseRelativeTime) return; aiEffectLightsUpdatedAt=World.pauseRelativeTime; u16 lev=World.curLev; if (lev>=MAX_LEVELS) return; AIEffectLightPool* p=&aiEffectPools[lev];
     if (!p->count) return; for (u16 i=0;i<p->count;i++) if (p->lights[i]>=World.loadedLights || World.lights[p->lights[i]].spotAng!=ai_effect_marker(i)) { p->count=0; return; }
@@ -511,7 +511,7 @@ static void ProjectileRaycast(Entity* self, int n) {
     if (hi == selfIdx){return;}
     const NPCTable* npc=&npcTable[self->index-419]; if(npc->attack[n-1].hasLaser)SpawnBeamTrail(166,ai_sight_pos(self),hit.point,(Color){1,1,1,1});
     if (n == 3 && self->index == 427 && eidx) { if (Cheats.showNPC) { DrawLine(ai_sight_pos(self), V3Add(World.position[eidx],World.colliderCenter[eidx]),(Color){1.0f,0.15f,0.18f,0.85f}); } SpawnTargetingLaser(ai_sight_pos(self),V3Add(World.position[eidx],World.colliderCenter[eidx])); } // Targeting laser (Cyborg Elite, attack3)
-    DamageData dd = SetNPCData(self,n); dd.attackType=Att_HitS; // Citadel ProjectileRaycast always uses Projectile, even for Melee.
+    DamageData dd = SetNPCData(self,n); dd.attackType=Att_HitS;
     dd.hitpoint=hit.point; dd.attacknormal=dir; dd.impactVelocity=dd.damage; bool hitPlayer=(hi == PLAYER1); if(hitPlayer){dd.impactVelocity *= 0.5f;} dd.isOtherNPC=!hitPlayer && IdxIsNPC(World.instances[hi].index);
     if (hi){ai_apply_damage(dd,hi);} u16 impactCI = GetImpactType(hi); if(impactCI){SpawnImpactEffectParticle(impactCI,hit.point,hit.normal);}
 }
@@ -519,7 +519,7 @@ static void ProjectileRaycast(Entity* self, int n) {
 static void ProjectileLaunched(Entity* self, int n) {
     if (n < 1 || n > 3){n = 3;} ai_muzzle_particles(self,n);
     u16 sidx=(u16)(self - World.instances); const NPCTable* npc = &npcTable[self->index - 419]; int masterIdx=npc->attack[n-1].projectilePrefab; float launchSpd=npc->attack[n-1].projectileSpeed;
-    DamageData dd = SetNPCData(self,n); dd.attackType=Att_Ball; // Citadel ProjectileLaunched always uses ProjectileLaunched.
+    DamageData dd = SetNPCData(self,n); dd.attackType=Att_Ball;
     V3 spos=n==1?ai_sight_pos(self):ai_gun_pos(self,n); u16 eidx=self->enemy; V3 targ=eidx ? self->targettingPosition : (V3){spos.x + self->forward.x*20.0f,spos.y,spos.z + self->forward.z*20.0f}; V3 dir=V3_Normalize(V3_AsubB(targ,spos)); u16 bb = SpawnDynamicObject(masterIdx>0?masterIdx:370);
     if (!EntIdxIsValid(bb)) bb=SpawnDynamicObject(370); if (!EntIdxIsValid(bb)) return; Entity* proj=&World.instances[bb]; World.layer[bb]=L_NPCBullet; World.position[bb]=spos; proj->forward=dir; World.rotation[bb]=QuatFromToRotation((V3){0.0f,0.0f,1.0f},dir);
     proj->damage=dd.damage; proj->strength=dd.penetration; proj->speed=dd.offense; proj->attackType=dd.attackType; proj->recentMostActivator=sidx; ProjectileEffectImpactInitAfterLoad(bb);
@@ -529,16 +529,16 @@ static void ProjectileLaunched(Entity* self, int n) {
 static void AIExplodeAttack(Entity* self) {
     u16 selfIdx=(u16)(self - World.instances);
     float radius = npcTable[self->index - 419].attack3Radius; float force=npcTable[self->index - 419].attack3Force; V3 epos = ai_sight_pos(self); DamageData dd = SetNPCData(self, 3);
-    dd.damage = GetDamageTakeAmount(&dd);/*C# AIController.ExplodeAttack pre-scales with GetDamageTakeAmount before the sphere (random +/-10% only: SetNPCData leaves isOtherNPC false and offense 0, so no crits)*/
+    dd.damage = GetDamageTakeAmount(&dd);
     ApplyImpactForceSphere(&dd, epos, radius, force);
-    DamageData selfdd = SetNPCData(self, 3); TakeDamage(selfIdx, selfdd); // Self-destruct through real pipeline (Citadel healthManager.TakeDamage).
+    DamageData selfdd = SetNPCData(self, 3); TakeDamage(selfIdx, selfdd);
 }
 
 static void AIMakeAttack(Entity* self, AttType att, int ind) { if (ind < 1 || ind > 3){ind=1;/*Melee hitscan by default.*/} switch (att) { case Att_Melee:ProjectileRaycast(self,ind); break; case Att_HitS: case Att_PjBm:ProjectileRaycast(self,ind); World.fogFac += 1; break; case Att_Ball:ProjectileLaunched(self,ind); World.fogFac += 1; break; default: break; } }
 static void AIAttack(Entity* self, int slot) {
     if (self->entflags & EF_ASLEEP) { return; }
     u16 sidx = (u16)(self - World.instances); const NPCTable* npc = &npcTable[self->index - 419]; if (slot == 3 && npc->explodeOnAttack3) { World.fogFac += 5; AIExplodeAttack(self); return; } AIApplyAttackMovement(self, npc->attack[slot-1].speed);
-    if (self->gracePeriodFinished < World.pauseRelativeTime && !(self->entflags & EF_SHOT_FIRED)) { flag_set(&self->entflags,EF_SHOT_FIRED,true); int sat = aiSFX[slot + 1][self->index - 419]; float* s_time = slot == 1 ? &self->attack1SoundTime : (slot == 2 ? &self->attack2SoundTime : &self->attack3SoundTime); float tb = npc->attack[slot-1].timeBetween;/*float: sub-second cadences truncated to 0 and lost the debounce*/ AttType attack = npc->attack[slot-1].type;/*NPCTable holds TRANSLATED Voxen AttType values, not raw enemy_tables.csv ints: CSV 4 (Unity Projectile) -> Att_HitS (hitscan+fog), CSV 7 (Unity ProjectileLaunched) -> Att_Ball (launched+fog). AttType itself follows Unity AttackType declaration order, NOT Utils.GetAttackTypeFromInt.*/ if (*s_time < World.pauseRelativeTime && sat >= 0 && sat < (i16)SOUNDS_COUNT) { play_wav(sounds[sat],AppliedFXVol(1.0f),World.position[sidx],true); *s_time=World.pauseRelativeTime + tb; } AIMakeAttack(self,attack,slot); }
+    if (self->gracePeriodFinished < World.pauseRelativeTime && !(self->entflags & EF_SHOT_FIRED)) { flag_set(&self->entflags,EF_SHOT_FIRED,true); int sat = aiSFX[slot + 1][self->index - 419]; float* s_time = slot == 1 ? &self->attack1SoundTime : (slot == 2 ? &self->attack2SoundTime : &self->attack3SoundTime); float tb = npc->attack[slot-1].timeBetween; AttType attack = npc->attack[slot-1].type; if (*s_time < World.pauseRelativeTime && sat >= 0 && sat < (i16)SOUNDS_COUNT) { play_wav(sounds[sat],AppliedFXVol(1.0f),World.position[sidx],true); *s_time=World.pauseRelativeTime + tb; } AIMakeAttack(self,attack,slot); }
     if (Cheats.showNPC) { (slot == 3 && self->enemy) ? (self->index == 427 ? DrawLine(ai_sight_pos(self),World.position[self->enemy],(Color){1.0f, 0.15f, 0.18f, 0.85f}) : self->index == 433 ? DrawLine(ai_sight_pos(self),World.position[self->enemy],(Color){0.96f,1.0f,0.0f,0.88f}) : (void)0) : (void)0; } if (self->attackFinished < World.pauseRelativeTime) AITransitionAttackToRun(self,slot);
 }
 

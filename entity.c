@@ -14,86 +14,36 @@ u16 headmountedLanternLight;
 static bool alreadyReadLightOnOnce[LIGHT_COUNT] = {0};
 u8 sensaroundCamViewCenter = 255, sensaroundCamViewLeft = 255, sensaroundCamViewRight = 255; // HUD sensaround cam view indices, assigned during level load
 EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex,mass,animationNum,col,colCtr,colSz
-/*0 chunk_black*/[0]={178,0,0,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*1 chunk_blocker*/[1]={178,0,1230,MAXTEX,1230,160,0,MAXANIM,0,{0},{0}},
-/*2 chunk_bridg1_1*/[2]={661,0,44,MAXTEX,MAXTEX,43,0,MAXANIM,0,{0},{0}},
-/*3 chunk_bridg1_1flipx*/[3]={667,0,44,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*4 chunk_bridg1_2*/[4]={662,0,45,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*5 chunk_bridg1_3*/[5]={20,0,47,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*6 chunk_bridg1_3_slice45*/[6]={21,0,47,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
-/*7 chunk_bridg1_3flipx*/[7]={663,0,47,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*8 chunk_bridg1_4*/[8]={22,0,48,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*9 chunk_bridg1_4_slice32*/[9]={23,0,48,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
-/*10 chunk_bridg1_4_slice32flipx*/[10]={24,0,48,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
-/*11 chunk_bridg1_5*/[11]={25,0,50,49,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*12 chunk_bridg2_2*/[12]={26,0,53,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*13 chunk_bridg2_3*/[13]={27,0,56,54,MAXTEX,55,0,MAXANIM,0,{0},{0}},
-/*14 chunk_bridg2_4*/[14]={28,0,57,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*15 chunk_bridg2_5*/[15]={29,0,59,MAXTEX,MAXTEX,58,0,MAXANIM,0,{0},{0}},
-/*16 chunk_bridg2_6*/[16]={30,0,60,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*17 chunk_bridg2_7*/[17]={664,0,61,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*18 chunk_bridg2_8*/[18]={31,0,62,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*19 chunk_bridg2_9*/[19]={32,0,64,63,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*20 chunk_crate_impenetrable*/[20]={61,0,150,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_BOX,{0},{2.58746f,2.5872478f,2.56f}},
-/*21 chunk_cyberpanel*/[21]={178,0,151,151,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*22 chunk_cyberpanel_slice45*/[22]={7488,0,152,152,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}}, /*model 7488 (grove1_2_slice45.obj): the generic slice45 card 6875 is the 180deg-rotated variant; 7488 is the same single triangle in the orientation the Unity blend specifies*/
-/*23 chunk_eng1_1*/[23]={96,0,254,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*24 chunk_eng1_1d*/[24]={95,0,253,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*25 chunk_eng1_2*/[25]={98,0,256,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*26 chunk_eng1_2d*/[26]={97,0,255,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*27 chunk_eng1_3*/[27]={100,0,259,258,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*28 chunk_eng1_3d*/[28]={99,0,257,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*29 chunk_eng1_4*/[29]={101,0,260,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*30 chunk_eng1_5*/[30]={103,0,262,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*31 chunk_eng1_5_slice45lh*/[31]={104,0,262,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
-/*32 chunk_eng1_5_slice45rh*/[32]={105,0,262,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
-/*33 chunk_eng1_5d*/[33]={102,0,261,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*34 chunk_eng1_6*/[34]={107,0,266,265,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*35 chunk_eng1_6d*/[35]={106,0,264,263,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*36 chunk_eng1_7*/[36]={108,0,269,268,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*37 chunk_eng1_7d*/[37]={665,0,267,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*38 chunk_eng1_8*/[38]={109,0,271,270,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*39 chunk_eng1_9*/[39]={111,0,273,251,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*40 chunk_eng1_9d*/[40]={110,0,272,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*41 chunk_eng2_1*/[41]={113,0,276,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*42 chunk_eng2_1_slice45*/[42]={116,0,276,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
-/*43 chunk_eng2_1_slice384high*/[43]={114,0,276,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
-/*44 chunk_eng2_1_slice384highrh*/[44]={115,0,276,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
-/*45 chunk_eng2_1d*/[45]={112,0,275,274,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*46 chunk_eng2_2*/[46]={117,0,279,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*47 chunk_eng2_2d*/[47]={666,0,277,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*48 chunk_eng2_3*/[48]={119,0,282,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*49 chunk_eng2_3d*/[49]={118,0,281,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*50 chunk_eng2_4*/[50]={178,0,283,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}}/*generic LOD card on purpose*/,
-/*51 chunk_eng2_5*/[51]={120,0,285,MAXTEX,MAXTEX,284,0,MAXANIM,0,{0},{0}},
-/*52 chunk_eng2_5_slice45*/[52]={121,0,285,MAXTEX,MAXTEX,284,0,MAXANIM,CT_MSH,{0},{0}},
-/*53 chunk_eng2_6 (wall pump)*/[53]={0,0,141,142,MAXTEX,MAXTEX,0,21,0,{0},{0}}/*Looped static prop, anim overwrites, not a missing-model.*/,
-/*54 chunk_exec1_1*/[54]={124,0,287,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*55 chunk_exec1_1d*/[55]={123,0,286,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*56 chunk_exec1_2*/[56]={126,0,291,290,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*57 chunk_exec1_2d*/[57]={125,0,289,288,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*58 chunk_exec2_1*/[58]={127,0,292,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*59 chunk_exec2_2*/[59]={129,0,295,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*60 chunk_exec2_2d*/[60]={128,0,294,293,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*61 chunk_exec2_3*/[61]={130,0,296,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*62 chunk_exec2_4*/[62]={131,0,297,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*63 chunk_exec2_4_slice45*/[63]={132,0,297,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
-/*64 chunk_exec2_5*/[64]={133,0,298,MAXTEX,1257,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*65 chunk_exec2_6*/[65]={134,0,299,MAXTEX,1257,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*66 chunk_exec2_7*/[66]={133,0,300,MAXTEX,1257,MAXTEX,0,MAXANIM,0,{0},{0}}/*shares chunk_exec2_5's mesh*/,
-/*67 chunk_exec3_1*/[67]={127,0,303,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}}/*shares chunk_exec2_1's mesh*/,
-/*68 chunk_exec3_1d*/[68]={135,0,302,301,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*69 chunk_exec3_2*/[69]={129,0,304,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}}/*shares chunk_exec2_2's mesh*/,
-/*70 chunk_exec3_4*/[70]={178,0,305,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}}/*generic LOD card on purpose*/,
-/*71 chunk_exec4_1*/[71]={136,0,307,306,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*72 chunk_exec4_2*/[72]={137,0,308,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*73 chunk_exec4_3*/[73]={138,0,309,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*74 chunk_exec4_4*/[74]={139,0,311,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*0 chunk_black*/                   [0]={178,0,0,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                    /*1 chunk_blocker*/                 [1]={178,0,1230,MAXTEX,1230,160,0,MAXANIM,0,{0},{0}},                                      /*2 chunk_bridg1_1*/                [2]={661,0,44,MAXTEX,MAXTEX,43,0,MAXANIM,0,{0},{0}},
+/*3 chunk_bridg1_1flipx*/           [3]={667,0,44,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                   /*4 chunk_bridg1_2*/                [4]={662,0,45,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                   /*5 chunk_bridg1_3*/                [5]={20,0,47,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*6 chunk_bridg1_3_slice45*/        [6]={21,0,47,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},                               /*7 chunk_bridg1_3flipx*/           [7]={663,0,47,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                   /*8 chunk_bridg1_4*/                [8]={22,0,48,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*9 chunk_bridg1_4_slice32*/        [9]={23,0,48,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},                               /*10 chunk_bridg1_4_slice32flipx*/ [10]={24,0,48,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},                               /*11 chunk_bridg1_5*/              [11]={25,0,50,49,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*12 chunk_bridg2_2*/              [12]={26,0,53,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                    /*13 chunk_bridg2_3*/              [13]={27,0,56,54,MAXTEX,55,0,MAXANIM,0,{0},{0}},                                            /*14 chunk_bridg2_4*/              [14]={28,0,57,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*15 chunk_bridg2_5*/              [15]={29,0,59,MAXTEX,MAXTEX,58,0,MAXANIM,0,{0},{0}},                                        /*16 chunk_bridg2_6*/              [16]={30,0,60,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                    /*17 chunk_bridg2_7*/              [17]={664,0,61,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*18 chunk_bridg2_8*/              [18]={31,0,62,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                    /*19 chunk_bridg2_9*/              [19]={32,0,64,63,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                        /*20 chunk_crate_impenetrable*/    [20]={61,0,150,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_BOX,{0},{2.58746f,2.5872478f,2.56f}},
+/*21 chunk_cyberpanel*/            [21]={178,0,151,151,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                     /*22 chunk_cyberpanel_slice45*/    [22]={7488,0,152,152,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},                               /*23 chunk_eng1_1*/                [23]={96,0,254,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*24 chunk_eng1_1d*/               [24]={95,0,253,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                   /*25 chunk_eng1_2*/                [25]={98,0,256,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                   /*26 chunk_eng1_2d*/               [26]={97,0,255,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*27 chunk_eng1_3*/                [27]={100,0,259,258,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                     /*28 chunk_eng1_3d*/               [28]={99,0,257,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                   /*29 chunk_eng1_4*/                [29]={101,0,260,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*30 chunk_eng1_5*/                [30]={103,0,262,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                  /*31 chunk_eng1_5_slice45lh*/      [31]={104,0,262,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},                             /*32 chunk_eng1_5_slice45rh*/      [32]={105,0,262,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
+/*33 chunk_eng1_5d*/               [33]={102,0,261,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                  /*34 chunk_eng1_6*/                [34]={107,0,266,265,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                     /*35 chunk_eng1_6d*/               [35]={106,0,264,263,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*36 chunk_eng1_7*/                [36]={108,0,269,268,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                     /*37 chunk_eng1_7d*/               [37]={665,0,267,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                  /*38 chunk_eng1_8*/                [38]={109,0,271,270,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*39 chunk_eng1_9*/                [39]={111,0,273,251,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                     /*40 chunk_eng1_9d*/               [40]={110,0,272,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                  /*41 chunk_eng2_1*/                [41]={113,0,276,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*42 chunk_eng2_1_slice45*/        [42]={116,0,276,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},                             /*43 chunk_eng2_1_slice384high*/   [43]={114,0,276,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},                             /*44 chunk_eng2_1_slice384highrh*/ [44]={115,0,276,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
+/*45 chunk_eng2_1d*/               [45]={112,0,275,274,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                     /*46 chunk_eng2_2*/                [46]={117,0,279,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                  /*47 chunk_eng2_2d*/               [47]={666,0,277,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*48 chunk_eng2_3*/                [48]={119,0,282,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                  /*49 chunk_eng2_3d*/               [49]={118,0,281,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                  /*50 chunk_eng2_4*/                [50]={178,0,283,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}}/*generic LOD card on purpose*/,
+/*51 chunk_eng2_5*/                [51]={120,0,285,MAXTEX,MAXTEX,284,0,MAXANIM,0,{0},{0}},                                     /*52 chunk_eng2_5_slice45*/        [52]={121,0,285,MAXTEX,MAXTEX,284,0,MAXANIM,CT_MSH,{0},{0}},                                /*53 chunk_eng2_6 (wall pump)*/    [53]={0,0,141,142,MAXTEX,MAXTEX,0,21,0,{0},{0}}/*Looped anim overwrites, not a missing-model.*/,
+/*54 chunk_exec1_1*/               [54]={124,0,287,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                  /*55 chunk_exec1_1d*/              [55]={123,0,286,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                  /*56 chunk_exec1_2*/               [56]={126,0,291,290,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*57 chunk_exec1_2d*/              [57]={125,0,289,288,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                     /*58 chunk_exec2_1*/               [58]={127,0,292,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                  /*59 chunk_exec2_2*/               [59]={129,0,295,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*60 chunk_exec2_2d*/              [60]={128,0,294,293,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                     /*61 chunk_exec2_3*/               [61]={130,0,296,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                  /*62 chunk_exec2_4*/               [62]={131,0,297,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*63 chunk_exec2_4_slice45*/       [63]={132,0,297,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},                             /*64 chunk_exec2_5*/               [64]={133,0,298,MAXTEX,1257,MAXTEX,0,MAXANIM,0,{0},{0}},                                    /*65 chunk_exec2_6*/               [65]={134,0,299,MAXTEX,1257,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*66 chunk_exec2_7*/               [66]={133,0,300,MAXTEX,1257,MAXTEX,0,MAXANIM,0,{0},{0}}/*shares chunk_exec2_5's mesh*/,     /*67 chunk_exec3_1*/               [67]={127,0,303,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}}/*shares chunk_exec2_1's mesh*/,   /*68 chunk_exec3_1d*/              [68]={135,0,302,301,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*69 chunk_exec3_2*/               [69]={129,0,304,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}}/*shares chunk_exec2_2's mesh*/,   /*70 chunk_exec3_4*/               [70]={178,0,305,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}}/*generic LOD card on purpose*/,   /*71 chunk_exec4_1*/               [71]={136,0,307,306,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*72 chunk_exec4_2*/               [72]={137,0,308,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                  /*73 chunk_exec4_3*/               [73]={138,0,309,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                  /*74 chunk_exec4_4*/               [74]={139,0,311,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*75 chunk_exec4_5*/[75]={178,0,312,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}}/*generic LOD card on purpose*/,
 /*76 chunk_exec4_6*/[76]={141,0,313,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*77 chunk_exec6_1*/[77]={142,0,315,314,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*78 chunk_exteriorpanel1*/[78]={131,0,1223,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*79 chunk_fan1*/[79]={0,0,96,192,MAXTEX,MAXTEX,0,22,0,{0},{0}}/*Looped static prop, anim overwrites, not a missing-model.*/,
+/*79 chunk_fan1*/[79]={0,0,96,192,MAXTEX,MAXTEX,0,22,0,{0},{0}}/*Looped anim overwrites, not a missing-model.*/,
 /*80 chunk_flight1_1*/[80]={146,0,319,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*81 chunk_flight1_1b*/[81]={146,0,318,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}}/*shares chunk_flight1_1's mesh*/,
 /*82 chunk_flight1_2*/[82]={147,0,320,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
@@ -214,7 +164,7 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*197 chunk_rad1_1*/[197]={501,0,660,659,1231,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*198 chunk_rad1_2*/[198]={501,0,662,661,1231,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*199 chunk_reac1_1*/[199]={502,0,664,MAXTEX,1243,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*200 chunk_reac1_1_slice45*/[200]={339,0,664,MAXTEX,1243,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}}/*uses the existing reac1_1_slice45 mesh*/,
+/*200 chunk_reac1_1_slice45*/[200]={339,0,664,MAXTEX,1243,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
 /*201 chunk_reac1_2*/[201]={503,0,665,MAXTEX,1243,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*202 chunk_reac1_3*/[202]={504,0,666,MAXTEX,1243,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*203 chunk_reac1_4*/[203]={505,0,668,667,669,MAXTEX,0,MAXANIM,0,{0},{0}},
@@ -1420,115 +1370,108 @@ void LogicTimerInitBeforeLoad(u16 i) { Entity* e = &World.instances[i]; if (e->t
 u16 DoorFrameFromProgress(AnimationClip c, float t) { if(c.frameEnd <= c.frameStart){return c.frameStart;} u16 span = c.frameEnd - c.frameStart; return (u16)(c.frameStart + (u16)(vclamp(t,0.0f,1.0f) * (float)span + 0.5f)); }
 void ComputeConvexMeshInertiaTensor(u16), CyberMineInitBeforeLoad(u16);
 extern u16 npcCountInWorldPerType[NUM_AI_TYPES]; extern i16 targetIDText[INSTANCE_COUNT]; extern double targetIDTextFinished[INSTANCE_COUNT],targetIDAttachedFinished[INSTANCE_COUNT]; extern bool targetIDAttached[INSTANCE_COUNT];
-void LoadLevelData(u8 curlevel) {
-    if (!teleportDestinationsInitialized) { for (u8 l=0;l<MAX_LEVELS;++l) { for (u8 id=0;id<8;++id) { teleportDestinations[l][id] = U16_MAX; } } teleportDestinationsInitialized=true; }
-    if (curlevel < MAX_LEVELS) { for (u8 id=0;id<8;++id) { teleportDestinations[curlevel][id] = U16_MAX; } elevatorDestCounts[curlevel] = 0; }
-    World.curLev = curlevel;
-    mset(targetIDText,0,sizeof(targetIDText));
-    mset(targetIDTextFinished,0,sizeof(targetIDTextFinished));
-    mset(targetIDAttachedFinished,0,sizeof(targetIDAttachedFinished));
-    mset(targetIDAttached,0,sizeof(targetIDAttached));
-    mset(npcCountInWorldPerType,0,sizeof(npcCountInWorldPerType));
-    SetLevelPointers(curlevel);
-    World.invP1.makingNoise = World.decoyActive = false;
-    World.decoyInstance = U16_MAX;
-    mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity));
-    World.instCount = 3;
-    mset(World.lights,0,LIGHT_COUNT * sizeof(Light));
-    mset(World.lanims,0,LANIM_MAX * sizeof(LightAnimation));
-    mset(World.lanimLightIdx,0,LANIM_MAX * sizeof(u16));
-    World.lanimCount = 0;
-    World.loadedLights = 0;
-    mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
-    mset(camViews,0,64 * sizeof(CamView));
-    camViewCount=0;
-    char filename[20]; sFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel); FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename, &fh, &fsize); if (!fbuf) { OS_Exit(1); }
-    
-    mm_ptr = (const char*)fbuf;
-    mm_end = mm_ptr + fsize;
-    mset(fwParentOf,0,sizeof(fwParentOf));
-    LoadLevelMod(curlevel); // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< THE ACTUAL LOAD
-    GravityLiftSyncAllVisuals();
-    PSysAddLevelLoops();
-    if (curlevel < MAX_LEVELS) { mcpy(fwParentSnap[curlevel],fwParentOf,sizeof(fwParentOf)); fwSnapValid[curlevel] = true; }
-    OS_Free(fbuf,(size_t)fsize);
-    for (int i = 0; i < World.loadedLights; ++i) World.lightsNewPosition[i] = World.lights[i].pos;
-    for (int i = PLAYER1; i < World.instCount; ++i) {
-        i32 cellIdx = PosGetCellCoords(World.position[i].x, World.position[i].z);
-        World.instances[i].cellIndex = cellIdx;
-        World.instances[i].cellX = PosGetCellCoordX(World.position[i].x);
-        World.instances[i].cellZ = PosGetCellCoordZ(World.position[i].z);
-        u16 mi = World.instances[i].modelIndex;
-        World.radius[i] = ((mi < mdlsCnt && modelBounds[mi] > 0.0f) ? modelBounds[mi] : 2.56f) * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
-        World.instances[i].shadRadius = World.radius[i] * 2.00f;
-        ComputeConvexMeshInertiaTensor(i);
-        if (World.mass[i] < 0.001f && World.col[i] != CT_NONE && World.col[i] != CT_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) { World.mass[i]=0.2f;/*At least something for movables!*/ }
-    }
-    for (int i=PLAYER1;i<World.instCount;++i) {
-        u16 constIndex = World.instances[i].index;
-        if (i == PLAYER1 || IdxIsDynamicObject(constIndex) || (IdxIsNPC(constIndex) && constIndex < 443/*not cyber*/)){World.gravity[i] = 1.0f;}else{World.gravity[i] = 0.0f;}
-        if (IdxIsGeometry(constIndex)) World.layer[i] = L_Geometry;
-        else if (IdxIsUsableObject(constIndex)) {
-            if (World.diffPuz == 3 && World.instances[i].index == 361 && random_range(0.0f,1.0f) < 0.33f) DeleteInstance(i); // 33% chance of not spawning logic probes on Puzzle difficulty of 3
-        } else if (IdxIsDoor(World.instances[i].index)) {
-            World.layer[i] = L_Door;
-            if (World.instances[i].startOpen) World.instances[i].stayOpen = true;
-            if (World.instances[i].lockedMessageLingdex <= 0) World.instances[i].lockedMessageLingdex = 3; static const u16 doorSFXIndex[19]={75,75,71,72,73,75,71,73,71,70,70,75,75,72,75,75,75,75,75};
-            World.instances[i].SFXIndex = doorSFXIndex[World.instances[i].index-496];
-            if (World.instances[i].doorOpen > DoorState_Opening) World.instances[i].doorOpen = World.instances[i].startOpen ? DoorState_Open : DoorState_Closed;
-            World.instances[i].doorState = World.instances[i].doorOpen;
-            if (World.instances[i].ajar) {
-                AnimationClip c = mdlAnimClips[World.instances[i].animationNum][A_OPENING]; u16 f = DoorFrameFromProgress(c,World.instances[i].ajarPercentage);
-                World.instances[i].clip = A_OPENING; World.instances[i].frame = f; World.instances[i].modelIndex = c.frameStartModelIndex + (u16)(f - c.frameStart); World.instances[i].currentFrameFinished = 0.0; // Parked partway; UpdateAnims() holds ajar doors so it stays put.
-                World.instances[i].doorOpen = World.instances[i].doorState = DoorState_Opening;
-            } else { switch(World.instances[i].doorOpen){case DoorState_Open:ChangeAnim(&World.instances[i],A_IDLE_OPEN); break; case DoorState_Opening:ChangeAnim(&World.instances[i],A_OPENING); break; case DoorState_Closing:ChangeAnim(&World.instances[i],A_CLOSING); break; default:ChangeAnim(&World.instances[i],A_IDLE_CLOSED); break;} }
-            if (IdxIsPortalBlockingDoor(World.instances[i].index) && World.instances[i].doorState != DoorState_Closed) ForceDoorPortalOpen(World.instances[i].portalIndex); // Open/ajar doors start with their portal open. Bounds-checked in culling.c; guard keeps non-portal doors from touching portal 0.
-        } else if (IdxIsSearchable(constIndex) || IdxIsNPC(constIndex)) {
-            if (World.instances[i].generateContents && !World.instances[i].generationDone) {
-                int numRandomGeneratedItems = 0;
-                for(int j=0;j<7;j++) {
-                    if(numRandomGeneratedItems >= World.instances[i].maxRandomItems){break;} if(World.instances[i].randomItemDropChance[j] <= 0.0f){continue;} u8 tempInt = random_range_u8(0,100); if((float)tempInt <= World.instances[i].randomItemDropChance[j]){World.instances[i].contents[numRandomGeneratedItems] = World.instances[i].randomItem[j]; World.instances[i].custIdx[numRandomGeneratedItems] = World.instances[i].randomItemCustIdx[j]; numRandomGeneratedItems++;}
-                }
-                World.instances[i].generationDone = true;
-            }
-        } else switch (constIndex) {
-            case 21: case 22: World.instances[i].tickFinished = World.pauseRelativeTime + 2.0; World.instances[i].animSwapFinished = 0.0; break; // chunk_cyberpanel, chunk_cyberpanel_slice45
-            case 515: func_forcebridge(i); break;
-            case 716: World.layer[i] = L_Trigger; break; // fx_reverbzone
-            case 697: World.layer[i] = L_NPCClip; break; // clip_npc
-            case 698: World.layer[i] = L_InterDebris; break; // clip_objects
-            case 517: FuncWallInitAfterLoad(i); break;
-            case 596: World.instances[i].strength=UsableOrDef(World.instances[i].strength,12.0f); World.instances[i].offStrengthFactor=UsableOrDef(World.instances[i].offStrengthFactor,3.0f); World.instances[i].distancePaddingToTopPoint=UsableOrDef(World.instances[i].distancePaddingToTopPoint,0.32f); break; /*trigger_gravitylift*/
-            case 701: LogicTimerInitBeforeLoad(i); break;
-            case 703: World.layer[i]=L_Trigger;if(World.instances[i].teleportID < 8){teleportDestinations[curlevel][World.instances[i].teleportID]=i;World.TeleportTouch_allTeleportTouches[World.instances[i].teleportID]=i;} else {DeleteInstance(i);} break;/*info_teleport_destination*/
-            case 706: if(curlevel<MAX_LEVELS&&elevatorDestCounts[curlevel]<MAX_ELEV_DESTS_PER_LEVEL)elevatorDestinations[curlevel][elevatorDestCounts[curlevel]++]=i; break;
-            case 555: CyberSwitchInitAfterLoad(i); break; // prop_cyber_switch
-            case 480: CyberMineInitBeforeLoad(i); break;
-            case 402: World.layer[i] = L_NPC; GrenadeInit(i); break;
-            default: if (IdxIsButtonSwitch(constIndex)) ButtonSwitchInitAfterLoad(i); break;/*688..692, 694, 695: disjoint from every case above, so folding this into default preserves the old chain's order*/
-        }
-        if (World.instances[i].targetnameIdx != IO_NONE && (World.instances[i].ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE)){flag_set(&World.instances[i].entflags,EF_ACTIVE,false);}
-    }
-    for (int i=PLAYER1;i<World.instCount;++i){ u16 mi=World.instances[i].messageIndex; World.instances[i].messageIndex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; mi=World.instances[i].messageLingdex; World.instances[i].messageLingdex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; mi=World.instances[i].lockedMessageLingdex; World.instances[i].lockedMessageLingdex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; } // Using blank 427
-    World.levelLoadedLights[curlevel] = World.loadedLights; World.levelWepVModel[curlevel]=World.weaponVModelIndex; mcpy(levelCamViews[curlevel],camViews,64 * sizeof(CamView)); mcpy(levelCamViewTextures[curlevel],camViewTextures,64 * sizeof(u32)); levelCamViewCount[curlevel] = camViewCount; World.levelInstCount[curlevel] = World.instCount; World.levelLAnimCount[curlevel] = World.lanimCount; World.levelCurrentlyLoading = false;
-}
-
 void RenderLoading(const char* restrict); void ResetLevelAudio(); void CullInit(); void mp3_clear();
 void LoadAllLevels() {
     double start_time = get_time(); RenderLoading("Loading level data..."); World.levelCurrentlyLoading = true; ioNameCount=1; ioNames[0][0]='\0';
     size_t larsz = INSTANCE_COUNT*sizeof(Entity) + INSTANCE_COUNT*sizeof(V3) + INSTANCE_COUNT*sizeof(V3) + INSTANCE_COUNT*sizeof(Quaternion) + INSTANCE_COUNT*sizeof(V3) + INSTANCE_COUNT*sizeof(V3) + LIGHT_COUNT*sizeof(Light) + LIGHT_COUNT*sizeof(LightAnimation); entsFromFile = OS_Alloc(larsz);
-    posFromFile = (void*)entsFromFile + INSTANCE_COUNT*sizeof(Entity);
-    scaleFromFile = (void*)posFromFile + INSTANCE_COUNT*sizeof(V3);
-    rotationFromFile = (void*)scaleFromFile + INSTANCE_COUNT*sizeof(V3);
-    colCtrFromFile = (void*)rotationFromFile + INSTANCE_COUNT*sizeof(Quaternion);
-    colSzFromFile = (void*)colCtrFromFile + INSTANCE_COUNT*sizeof(V3);
-    lightsFromFile = (void*)colSzFromFile + INSTANCE_COUNT*sizeof(V3);
-    lanimsFromFile = (void*)lightsFromFile + LIGHT_COUNT*sizeof(Light);
+    posFromFile = (void*)entsFromFile + INSTANCE_COUNT*sizeof(Entity); scaleFromFile = (void*)posFromFile + INSTANCE_COUNT*sizeof(V3); rotationFromFile = (void*)scaleFromFile + INSTANCE_COUNT*sizeof(V3); colCtrFromFile = (void*)rotationFromFile + INSTANCE_COUNT*sizeof(Quaternion); colSzFromFile = (void*)colCtrFromFile + INSTANCE_COUNT*sizeof(V3); lightsFromFile = (void*)colSzFromFile + INSTANCE_COUNT*sizeof(V3); lanimsFromFile = (void*)lightsFromFile + LIGHT_COUNT*sizeof(Light);
     for (u8 i=0;i<8;++i) { World.TeleportTouch_allTeleportTouches[i] = U16_MAX; }
     fwPoolUsed = 0;
-    for(u8 lev=0;lev<MAX_LEVELS;++lev){ for (i32 i=0;i<INSTANCE_COUNT;++i) { colCtrFromFile[i]=(V3){-1,-1,-1}; colSzFromFile[i]=(V3){-1,-1,-1}; } LoadLevelData(lev); }
+    for(u8 lev=0;lev<MAX_LEVELS;++lev){
+        for (i32 i=0;i<INSTANCE_COUNT;++i) { colCtrFromFile[i]=(V3){-1,-1,-1}; colSzFromFile[i]=(V3){-1,-1,-1}; }
+        if (!teleportDestinationsInitialized) { for (u8 l=0;l<MAX_LEVELS;++l) { for (u8 id=0;id<8;++id) { teleportDestinations[l][id] = U16_MAX; } } teleportDestinationsInitialized=true; }
+        if (lev < MAX_LEVELS) { for (u8 id=0;id<8;++id) { teleportDestinations[lev][id] = U16_MAX; } elevatorDestCounts[lev] = 0; }
+        World.curLev = lev;
+        mset(targetIDText,0,sizeof(targetIDText));
+        mset(targetIDTextFinished,0,sizeof(targetIDTextFinished));
+        mset(targetIDAttachedFinished,0,sizeof(targetIDAttachedFinished));
+        mset(targetIDAttached,0,sizeof(targetIDAttached));
+        mset(npcCountInWorldPerType,0,sizeof(npcCountInWorldPerType));
+        SetLevelPointers(lev);
+        World.invP1.makingNoise = World.decoyActive = false;
+        World.decoyInstance = U16_MAX;
+        mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity));
+        World.instCount = 3;
+        mset(World.lights,0,LIGHT_COUNT * sizeof(Light));
+        mset(World.lanims,0,LANIM_MAX * sizeof(LightAnimation));
+        mset(World.lanimLightIdx,0,LANIM_MAX * sizeof(u16));
+        World.lanimCount = 0;
+        World.loadedLights = 0;
+        mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
+        mset(camViews,0,64 * sizeof(CamView));
+        camViewCount=0;
+        char filename[20]; sFormat(filename,sizeof(filename),"./Data/level%d.txt",lev); FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename,&fh,&fsize); if (!fbuf) { OS_Exit(1); }
+        
+        mm_ptr = (const char*)fbuf;
+        mm_end = mm_ptr + fsize;
+        mset(fwParentOf,0,sizeof(fwParentOf));
+        LoadLevelMod(lev); // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< THE ACTUAL LOAD
+        GravityLiftSyncAllVisuals();
+        PSysAddLevelLoops();
+        if (lev < MAX_LEVELS) { mcpy(fwParentSnap[lev],fwParentOf,sizeof(fwParentOf)); fwSnapValid[lev] = true; }
+        OS_Free(fbuf,(size_t)fsize);
+        for (int i = 0; i < World.loadedLights; ++i) World.lightsNewPosition[i] = World.lights[i].pos;
+        for (int i = PLAYER1; i < World.instCount; ++i) {
+            i32 cellIdx = PosGetCellCoords(World.position[i].x, World.position[i].z);
+            World.instances[i].cellIndex = cellIdx;
+            World.instances[i].cellX = PosGetCellCoordX(World.position[i].x);
+            World.instances[i].cellZ = PosGetCellCoordZ(World.position[i].z);
+            u16 mi = World.instances[i].modelIndex;
+            World.radius[i] = ((mi < mdlsCnt && modelBounds[mi] > 0.0f) ? modelBounds[mi] : 2.56f) * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
+            World.instances[i].shadRadius = World.radius[i] * 2.00f;
+            ComputeConvexMeshInertiaTensor(i);
+            if (World.mass[i] < 0.001f && World.col[i] != CT_NONE && World.col[i] != CT_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) { World.mass[i]=0.2f;/*At least something for movables!*/ }
+        }
+        for (int i=PLAYER1;i<World.instCount;++i) {
+            u16 constIndex = World.instances[i].index;
+            if (i == PLAYER1 || IdxIsDynamicObject(constIndex) || (IdxIsNPC(constIndex) && constIndex < 443/*not cyber*/)){World.gravity[i] = 1.0f;}else{World.gravity[i] = 0.0f;}
+            if (IdxIsGeometry(constIndex)) World.layer[i] = L_Geometry;
+            else if (IdxIsUsableObject(constIndex)) {
+                if (World.diffPuz == 3 && World.instances[i].index == 361 && random_range(0.0f,1.0f) < 0.33f) DeleteInstance(i); // 33% chance of not spawning logic probes on Puzzle difficulty of 3
+            } else if (IdxIsDoor(World.instances[i].index)) {
+                World.layer[i] = L_Door;
+                if (World.instances[i].startOpen) World.instances[i].stayOpen = true;
+                if (World.instances[i].lockedMessageLingdex <= 0) World.instances[i].lockedMessageLingdex = 3; static const u16 doorSFXIndex[19]={75,75,71,72,73,75,71,73,71,70,70,75,75,72,75,75,75,75,75};
+                World.instances[i].SFXIndex = doorSFXIndex[World.instances[i].index-496];
+                if (World.instances[i].doorOpen > DoorState_Opening) World.instances[i].doorOpen = World.instances[i].startOpen ? DoorState_Open : DoorState_Closed;
+                World.instances[i].doorState = World.instances[i].doorOpen;
+                if (World.instances[i].ajar) {
+                    AnimationClip c = mdlAnimClips[World.instances[i].animationNum][A_OPENING]; u16 f = DoorFrameFromProgress(c,World.instances[i].ajarPercentage);
+                    World.instances[i].clip = A_OPENING; World.instances[i].frame = f; World.instances[i].modelIndex = c.frameStartModelIndex + (u16)(f - c.frameStart); World.instances[i].currentFrameFinished = 0.0; // Parked partway; UpdateAnims() holds ajar doors so it stays put.
+                    World.instances[i].doorOpen = World.instances[i].doorState = DoorState_Opening;
+                } else { switch(World.instances[i].doorOpen){case DoorState_Open:ChangeAnim(&World.instances[i],A_IDLE_OPEN); break; case DoorState_Opening:ChangeAnim(&World.instances[i],A_OPENING); break; case DoorState_Closing:ChangeAnim(&World.instances[i],A_CLOSING); break; default:ChangeAnim(&World.instances[i],A_IDLE_CLOSED); break;} }
+                if (IdxIsPortalBlockingDoor(World.instances[i].index) && World.instances[i].doorState != DoorState_Closed) ForceDoorPortalOpen(World.instances[i].portalIndex); // Open/ajar doors start with their portal open. Bounds-checked in culling.c; guard keeps non-portal doors from touching portal 0.
+            } else if (IdxIsSearchable(constIndex) || IdxIsNPC(constIndex)) {
+                if (World.instances[i].generateContents && !World.instances[i].generationDone) {
+                    int numRandomGeneratedItems = 0;
+                    for(int j=0;j<7;j++) {
+                        if(numRandomGeneratedItems >= World.instances[i].maxRandomItems){break;} if(World.instances[i].randomItemDropChance[j] <= 0.0f){continue;} u8 tempInt = random_range_u8(0,100); if((float)tempInt <= World.instances[i].randomItemDropChance[j]){World.instances[i].contents[numRandomGeneratedItems] = World.instances[i].randomItem[j]; World.instances[i].custIdx[numRandomGeneratedItems] = World.instances[i].randomItemCustIdx[j]; numRandomGeneratedItems++;}
+                    }
+                    World.instances[i].generationDone = true;
+                }
+            } else switch (constIndex) {
+                case 21: case 22: World.instances[i].tickFinished = World.pauseRelativeTime + 2.0; World.instances[i].animSwapFinished = 0.0; break; // chunk_cyberpanel, chunk_cyberpanel_slice45
+                case 515: func_forcebridge(i); break;
+                case 716: World.layer[i] = L_Trigger; break; // fx_reverbzone
+                case 697: World.layer[i] = L_NPCClip; break; // clip_npc
+                case 698: World.layer[i] = L_InterDebris; break; // clip_objects
+                case 517: FuncWallInitAfterLoad(i); break;
+                case 596: World.instances[i].strength=UsableOrDef(World.instances[i].strength,12.0f); World.instances[i].offStrengthFactor=UsableOrDef(World.instances[i].offStrengthFactor,3.0f); World.instances[i].distancePaddingToTopPoint=UsableOrDef(World.instances[i].distancePaddingToTopPoint,0.32f); break; /*trigger_gravitylift*/
+                case 701: LogicTimerInitBeforeLoad(i); break;
+                case 703: World.layer[i] = L_Trigger; if (World.instances[i].teleportID < 8) { teleportDestinations[lev][World.instances[i].teleportID] = i;World.TeleportTouch_allTeleportTouches[World.instances[i].teleportID] = i; } else { DeleteInstance(i); } break; /*info_teleport_destination*/
+                case 706: if(lev < MAX_LEVELS && elevatorDestCounts[lev] < MAX_ELEV_DESTS_PER_LEVEL) elevatorDestinations[lev][elevatorDestCounts[lev]++] = i; break;
+                case 555: CyberSwitchInitAfterLoad(i); break; // prop_cyber_switch
+                case 480: CyberMineInitBeforeLoad(i); break;
+                case 402: World.layer[i] = L_NPC; GrenadeInit(i); break;
+                default: if (IdxIsButtonSwitch(constIndex)) ButtonSwitchInitAfterLoad(i); break;/*688..692, 694, 695: disjoint from every case above, so folding this into default preserves the old chain's order*/
+            }
+            if (World.instances[i].targetnameIdx != IO_NONE && (World.instances[i].ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE)){flag_set(&World.instances[i].entflags,EF_ACTIVE,false);}
+        }
+        for (int i=PLAYER1;i<World.instCount;++i){ u16 mi=World.instances[i].messageIndex; World.instances[i].messageIndex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; mi=World.instances[i].messageLingdex; World.instances[i].messageLingdex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; mi=World.instances[i].lockedMessageLingdex; World.instances[i].lockedMessageLingdex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; } // Using blank 427
+        World.levelLoadedLights[lev] = World.loadedLights; World.levelWepVModel[lev] = World.weaponVModelIndex; mcpy(levelCamViews[lev],camViews,64 * sizeof(CamView)); mcpy(levelCamViewTextures[lev],camViewTextures,64 * sizeof(u32)); levelCamViewCount[lev] = camViewCount; World.levelInstCount[lev] = World.instCount; World.levelLAnimCount[lev] = World.lanimCount; World.levelCurrentlyLoading = false;
+    }
     OS_Free(entsFromFile,larsz);
-    BuildTextDecalMeshes(); // Build world-baked 3D text decal meshes (Sys_Text.stringTable already populated for current language).
+    BuildTextDecalMeshes();
     DualLog("Load all levels.....................................................................took %.6f secs\n",get_time() - start_time);
 }
 
@@ -1540,15 +1483,8 @@ void LoadLevel(u8 curlevel, V3 pos) {
     World.Sys_UI.tetheredKeypadKeycode=World.Sys_UI.tetheredKeypadElevator=World.Sys_UI.tetheredPGP=World.Sys_UI.tetheredPWP=U16_MAX;/*panel tethers are per-level; the entity index they point at dies with the level, so don't sever against a stale one*/
     World.levelCurrentlyLoading = true;
     World.paused = World.menuActive = false;
-    if (World.curLev != curlevel) {
-        CopyPlayerState(World.curLev,curlevel);
-        PSysClearLevel(World.curLev);
-        World.curLev = curlevel;
-        SetLevelPointers(curlevel);
-    }
-    
+    if (World.curLev != curlevel) { CopyPlayerState(World.curLev,curlevel); PSysClearLevel(World.curLev); World.curLev = curlevel; SetLevelPointers(curlevel); }
     if (World.particles->count == 0) { PSysAddLevelLoops(); }
-    
     mcpy(camViews, levelCamViews[curlevel],64 * sizeof(CamView));
     mcpy(camViewTextures, levelCamViewTextures[curlevel], 64 * sizeof(u32));
     camViewCount = levelCamViewCount[curlevel];
@@ -1574,31 +1510,9 @@ void LoadLevel(u8 curlevel, V3 pos) {
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
         Entity* e = &World.instances[i];
         if (IdxIsNPC(e->index) && e->enemy == PLAYER1) { e->enemy = WORLD; /*level entry: NPCs drop the player, so nothing re-aggros from the level they came from*/ }
-        
-        if (World.diffCbt == 0 && IdxIsNPC(e->index)) { /*Combat difficulty 0 == one hit kill; corpse-only NPCs need to stay dead.*/
-            if (e->entflags & EF_ACT_AS_CORPSE_ONLY) {
-                e->health = 0.0f;
-                e->cyberHealth = 0.0f;
-            } else {
-                e->health = 1.0f;
-                if (npcTable[e->index - 419].type == NPCType_Cyber) { e->cyberHealth = 1.0f; }
-            }
-        }
+        if (World.diffCbt == 0 && IdxIsNPC(e->index)) { if (e->entflags & EF_ACT_AS_CORPSE_ONLY) { e->health = 0.0f; e->cyberHealth = 0.0f; } else { e->health = 1.0f; if (npcTable[e->index - 419].type == NPCType_Cyber) { e->cyberHealth = 1.0f; } } }
     }
-    
-    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
-        Entity* e = &World.instances[i];
-        if (e->index != 702) continue;
-        
-        u16 n = e->numberToSpawn;
-        if (World.diffCbt == 1) { n = (u16)(n / 2); }
-        else if (World.diffCbt == 3) { n = (u16)(n + n / 2); }
-        else if (World.diffCbt > 3) { n = (u16)(n * 5); }
-        
-        e->numberToSpawn = (n < 1) ? 1 : n;
-        e->delayFinished = World.pauseRelativeTime;
-    }
-    
+    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { Entity* e = &World.instances[i]; if (e->index != 702) continue; u16 n = e->numberToSpawn; if (World.diffCbt == 1) { n = (u16)(n / 2); } else if (World.diffCbt == 3) { n = (u16)(n + n / 2); } else if (World.diffCbt > 3) { n = (u16)(n * 5); } e->numberToSpawn = (n < 1) ? 1 : n; e->delayFinished = World.pauseRelativeTime; }
     World.levelCurrentlyLoading = false;
     World.position[PLAYER1] = pos;
     if (curlevel == LEVEL_CYBERSPACE) World.cyberspaceRecallPoint = World.position[PLAYER1];/*Recall returns to the cyberspace entry point*/
@@ -1609,11 +1523,7 @@ void LoadLevel(u8 curlevel, V3 pos) {
     World.invP1.noiseFinished=World.pauseRelativeTime - 1.0;
     if (curlevel == LEVEL_CYBERSPACE) {
         World.col[PLAYER1] = CT_SPH; World.colliderSize[PLAYER1] = (V3){PLYR_RAD,PLYR_RAD,PLYR_RAD}; World.colliderCenter[PLAYER1] = (V3){0.0f,0.0f,0.0f}; World.radius[PLAYER1] = PLYR_RAD; World.gravity[PLAYER1] = 0.0f;
-        if (prevLevel != LEVEL_CYBERSPACE) {
-            play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false);
-            CyberTimerReset(PLAYER1,World.diffCyb);
-            World.instances[PLAYER1].timerFinished = World.pauseRelativeTime + 1.0;
-        }
+        if (prevLevel != LEVEL_CYBERSPACE) { play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false); CyberTimerReset(PLAYER1,World.diffCyb); World.instances[PLAYER1].timerFinished = World.pauseRelativeTime + 1.0; }
     } else {
         World.col[PLAYER1] = CT_CAP;
         World.colliderSize[PLAYER1] = (V3){PLYR_RAD,PLYR_HT * World.invP1.currentCrouchRatio,1.0f};
