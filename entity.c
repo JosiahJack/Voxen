@@ -457,11 +457,11 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*440 npc_gorilla_tiger_mutant*/[440]={320,330,560,MAXTEX,MAXTEX,MAXTEX,2.00f,31,CT_CVX,{0},{0}},
 /*441 npc_repairbot*/[441]={331,331,572,MAXTEX,MAXTEX,MAXTEX,1.50f,37,CT_CVX,{0},{0}},
 /*442 npc_plant_mutant*/[442]={330,0,570,MAXTEX,MAXTEX,MAXTEX,0.80f,36,CT_CAP,{0,0.72f,0},{0.6f,1.44f,0}},
-/*443 npc_cyberdog*/[443]={302,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,1.50f,MAXANIM,CT_SPH,{0},{0.72f,0,0}},
-/*444 npc_cyberguard*/[444]={303,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,2.00f,MAXANIM,CT_SPH,{0},{1.0f,0,0}},
-/*445 npc_cyberram*/[445]={304,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,2.00f,MAXANIM,CT_SPH,{0},{1.0f,0,0}},
-/*446 npc_cyber_reaver*/[446]={305,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,2.20f,MAXANIM,CT_SPH,{0},{0.72f,0,0}},
-/*447 npc_cybershodan*/[447]={MAX_MDLS,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,4.51f,MAXANIM,CT_CAP,{0},{0.28f,2.0f,0}},
+/*443 npc_cyberdog*/[443]={302,0,579,579,MAXTEX,MAXTEX,1.50f,MAXANIM,CT_SPH,{0},{0.72f,0,0}},
+/*444 npc_cyberguard*/[444]={303,0,3960,3961,MAXTEX,MAXTEX,2.00f,MAXANIM,CT_SPH,{0},{1.0f,0,0}},
+/*445 npc_cyberram*/[445]={304,0,3966,0,MAXTEX,MAXTEX,2.00f,MAXANIM,CT_SPH,{0},{1.0f,0,0}},
+/*446 npc_cyber_reaver*/[446]={305,0,579,579,MAXTEX,MAXTEX,2.20f,MAXANIM,CT_SPH,{0},{0.72f,0,0}},
+/*447 npc_cybershodan*/[447]={305,0,579,579,MAXTEX,MAXTEX,4.51f,MAXANIM,CT_CAP,{0},{0.28f,2.0f,0}},
 /*448 item_cyber_data*/[448]={6076,0,3434,3434,MAXTEX,MAXTEX,0,53,0,{0},{1.5f,0,0}},
 /*449 item_cyber_decoy*/[449]={6076,0,3435,3435,MAXTEX,MAXTEX,0,53,0,{0},{1.5f,0,0}},
 /*450 item_cyber_drill*/[450]={6076,0,3436,3436,MAXTEX,MAXTEX,0,53,0,{0},{1.5f,0,0}},
@@ -912,22 +912,11 @@ void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light* lit, LightAni
     else if (sEqual(k,"targetname")) {lightTargetnameFile[lIdx] = IOInternName(v);}
 }
 
-u16 headmountedLanternLight;
-V3 lanternPos;
-#define CHGD(a,b) (vabs((a) - (b)) > 0.0001f)
+u16 headmountedLanternLight; V3 lanternPos;
 void UpdateLight(u16 i, V3 pos, Color3 col, float range, float intensity, float max, float min, float spotAng, Quaternion spotDir, bool on, bool shad) {
-    bool changed = ((!!(World.lights[i].lflags & SHADON) - shad) || (!!(World.lights[i].lflags & LIGHTON) -  on) || CHGD(World.lights[i].range,range) || CHGD(World.lights[i].pos.x,pos.x) || CHGD(World.lights[i].pos.y,pos.y) || CHGD(World.lights[i].pos.z,pos.z));
-    World.lights[i].intensity = intensity;
-    World.lights[i].minIntensity = min;
-    World.lights[i].maxIntensity = max;
-    World.lights[i].spotAng = spotAng;
-    World.lights[i].spotDir = spotDir;
-    World.lights[i].col = col;
-    World.lights[i].pos = World.lightsNewPosition[i]=pos;
-    World.lights[i].range = range;
-    World.lights[i].lflags = (World.lights[i].lflags & ~(LIGHTON | SHADON | LDIRTY)) | ((World.lights[i].lflags & LDIRTY) | (changed << 4) | on | (shad << 1));
+    bool changed = (!!(World.lights[i].lflags & SHADON) - shad) || (!!(World.lights[i].lflags & LIGHTON) -  on) || (vabs(World.lights[i].range - range) > 0.0001f) || (vabs(World.lights[i].pos.x - pos.x) > 0.0001f) || (vabs(World.lights[i].pos.y - pos.y) > 0.0001f) || (vabs(World.lights[i].pos.z - pos.z) > 0.0001f);
+    World.lights[i].intensity = intensity; World.lights[i].minIntensity = min; World.lights[i].maxIntensity = max; World.lights[i].spotAng = spotAng; World.lights[i].spotDir = spotDir; World.lights[i].col = col; World.lights[i].pos = World.lightsNewPosition[i] = pos; World.lights[i].range = range; World.lights[i].lflags = (World.lights[i].lflags & ~(LIGHTON | SHADON | LDIRTY)) | ((World.lights[i].lflags & LDIRTY) | (changed << 4) | on | (shad << 1));
 }
-#undef CHGD
 // Level Loading and Entity Management System
 void InitNPC(u16 i); bool IsLiveGrenade(u16);
 void CloseSearch(void);
@@ -947,13 +936,7 @@ static const PrefabConst prefabConsts[] = {
     {526, {0},                200.0f, BloodType_Robot},        /*prop_console02*/         {553, {0.5f,0.5f,0.5f},        0.0f, BloodType_None},         /*prop_cyber_decoy*/
 };
 
-/*Compile-time slot map: entity constIndex -> prefabConsts position+1 (0 = no prefab constants). Data-driven O(1) lookup replaces the per-instance linear scan; the designated initializers must mirror the order of prefabConsts above: 279,424,430,431,433,439,441,444,445,446,458,459,460,464,465,466,467,468,469,470,471,472,473,474,475,476,477,478,479,525,526,553. Callers only reach here with entIdx < MAX_ENTITIES (AddInstance's early-out guarantees it).*/
-static const PrefabConst* PrefabConstFor(u16 entIdx) {
-    static const u8 slot[MAX_ENTITIES] = {[279]=1, [424]=2, [430]=3, [431]=4, [433]=5, [439]=6, [441]=7, [444]=8, [445]=9, [446]=10, [458]=11, [459]=12, [460]=13, [464]=14, [465]=15, [466]=16, [467]=17, [468]=18, [469]=19, [470]=20, [471]=21, [472]=22, [473]=23, [474]=24, [475]=25, [476]=26, [477]=27, [478]=28, [479]=29, [525]=30, [526]=31, [553]=32};
-    u8 k = slot[entIdx];
-    return k ? &prefabConsts[k-1] : 0;
-}
-
+static const PrefabConst* PrefabConstFor(u16 entIdx) { static const u8 slot[MAX_ENTITIES] = {[279]=1,[424]=2,[430]=3,[431]=4,[433]=5,[439]=6,[441]=7,[444]=8,[445]=9,[446]=10,[458]=11,[459]=12,[460]=13,[464]=14,[465]=15,[466]=16,[467]=17,[468]=18,[469]=19,[470]=20,[471]=21,[472]=22,[473]=23,[474]=24,[475]=25,[476]=26,[477]=27,[478]=28,[479]=29,[525]=30,[526]=31,[553]=32}; u8 k = slot[entIdx]; return k ? &prefabConsts[k-1] : 0; }
 __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     if (entIdx >= MAX_ENTITIES) { DualLogWarn("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTITIES); return WORLD; }
     if (World.instCount >= INSTANCE_COUNT) { DualLogWarn("\nToo many instances while adding entity %u, max instance count is %u, skipped\n", entIdx, INSTANCE_COUNT); return WORLD; }
@@ -968,7 +951,7 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     World.physSleep[i] = 0;
     World.invTnsrValid[i] = false;
     World.rotation[i] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
-    World.scale[i].x = World.scale[i].y = World.scale[i].z = World.mass[i] = 1.0f; /*Scale 1.0 for all axes, Quat Identity needs 1.0 for w*/
+    World.scale[i].x = World.scale[i].y = World.scale[i].z = World.mass[i] = 1.0f;
     World.dynamicFriction[i] = 0.5f;
     World.staticFriction[i] = 0.6f;
     for (u8 slot=0;slot<4;++slot) { World.instances[i].contents[slot] = World.instances[i].custIdx[slot] = -1; }
@@ -1532,29 +1515,19 @@ void LoadLevelData(u8 curlevel) {
 
 void RenderLoading(const char* restrict); void ResetLevelAudio(); void CullInit(); void mp3_clear();
 void LoadAllLevels() {
-    double start_time = get_time();
-    RenderLoading("Loading level data...");
-    World.levelCurrentlyLoading = true;
-    entsFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(Entity));
-    posFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3));
-    scaleFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3));
-    rotationFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(Quaternion));
-    colCtrFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3));
-    colSzFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3));
-    ioNameCount=1; ioNames[0][0]='\0';
-    lightsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(Light));
-    lanimsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(LightAnimation));
+    double start_time = get_time(); RenderLoading("Loading level data..."); World.levelCurrentlyLoading = true; ioNameCount=1; ioNames[0][0]='\0';
+    size_t larsz = INSTANCE_COUNT*sizeof(Entity) + INSTANCE_COUNT*sizeof(V3) + INSTANCE_COUNT*sizeof(V3) + INSTANCE_COUNT*sizeof(Quaternion) + INSTANCE_COUNT*sizeof(V3) + INSTANCE_COUNT*sizeof(V3) + LIGHT_COUNT*sizeof(Light) + LIGHT_COUNT*sizeof(LightAnimation); entsFromFile = OS_Alloc(larsz);
+    posFromFile = (void*)entsFromFile + INSTANCE_COUNT*sizeof(Entity);
+    scaleFromFile = (void*)posFromFile + INSTANCE_COUNT*sizeof(V3);
+    rotationFromFile = (void*)scaleFromFile + INSTANCE_COUNT*sizeof(V3);
+    colCtrFromFile = (void*)rotationFromFile + INSTANCE_COUNT*sizeof(Quaternion);
+    colSzFromFile = (void*)colCtrFromFile + INSTANCE_COUNT*sizeof(V3);
+    lightsFromFile = (void*)colSzFromFile + INSTANCE_COUNT*sizeof(V3);
+    lanimsFromFile = (void*)lightsFromFile + LIGHT_COUNT*sizeof(Light);
     for (u8 i=0;i<8;++i) { World.TeleportTouch_allTeleportTouches[i] = U16_MAX; }
     fwPoolUsed = 0;
     for(u8 lev=0;lev<MAX_LEVELS;++lev){ for (i32 i=0;i<INSTANCE_COUNT;++i) { colCtrFromFile[i]=(V3){-1,-1,-1}; colSzFromFile[i]=(V3){-1,-1,-1}; } LoadLevelData(lev); }
-    OS_Free(entsFromFile,INSTANCE_COUNT*sizeof(Entity));
-    OS_Free(colCtrFromFile,INSTANCE_COUNT*sizeof(V3));
-    OS_Free(colSzFromFile,INSTANCE_COUNT*sizeof(V3));
-    OS_Free(posFromFile,INSTANCE_COUNT*sizeof(V3));
-    OS_Free(scaleFromFile,INSTANCE_COUNT*sizeof(V3));
-    OS_Free(rotationFromFile,INSTANCE_COUNT*sizeof(Quaternion));
-    OS_Free(lightsFromFile,LIGHT_COUNT*sizeof(Light));
-    OS_Free(lanimsFromFile,LIGHT_COUNT*sizeof(LightAnimation));
+    OS_Free(entsFromFile,larsz);
     BuildTextDecalMeshes(); // Build world-baked 3D text decal meshes (Sys_Text.stringTable already populated for current language).
     DualLog("Load all levels.....................................................................took %.6f secs\n",get_time() - start_time);
 }
@@ -1637,6 +1610,7 @@ void LoadLevel(u8 curlevel, V3 pos) {
     if (curlevel == LEVEL_CYBERSPACE) {
         World.col[PLAYER1] = CT_SPH; World.colliderSize[PLAYER1] = (V3){PLYR_RAD,PLYR_RAD,PLYR_RAD}; World.colliderCenter[PLAYER1] = (V3){0.0f,0.0f,0.0f}; World.radius[PLAYER1] = PLYR_RAD; World.gravity[PLAYER1] = 0.0f;
         if (prevLevel != LEVEL_CYBERSPACE) {
+            play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false);
             CyberTimerReset(PLAYER1,World.diffCyb);
             World.instances[PLAYER1].timerFinished = World.pauseRelativeTime + 1.0;
         }
@@ -1646,6 +1620,7 @@ void LoadLevel(u8 curlevel, V3 pos) {
         World.colliderCenter[PLAYER1].y = -PLYR_CAM_OFS_Y + (PLYR_HT - World.colliderSize[PLAYER1].y) * 0.5f;
         World.gravity[PLAYER1] = 1.0f;
         if (prevLevel == LEVEL_CYBERSPACE) {
+            play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false);
             V3 cyberFwd = quat_rot_v3(World.rotation[PLAYER1],(V3){0.0f,0.0f,1.0f});
             float yawDeg = __builtin_atan2f(cyberFwd.x,cyberFwd.z) * (180.0f / 3.14159265f);
             float halfYaw = deg2rad(yawDeg) * 0.5f;

@@ -757,7 +757,7 @@ static bool GetKeyPressed(int settingIndex) { return GetKeyRiseEdgeOrHeld(settin
 bool Forward() { return GetKey(0); }                bool StrafeLeft() { return GetKey(1); }             bool Backpedal() { return GetKey(2); }            bool StrafeRight() { return GetKey(3); }            bool Jump() { return GetKey(4); }                   bool JumpDown() { return GetKeyPressed(4); }
 bool Crouch() { return GetKeyPressed(5); }          bool Prone() { return GetKeyPressed(6); }           bool LeanLeft() { return GetKey(7); }             bool LeanRight() { return GetKey(8); }              bool Sprint() { return GetKey(9); }                 bool TurnLeft() { return GetKey(10); }
 bool TurnRight() { return GetKey(11); }             bool LookUp() { return GetKey(12); }                bool LookDown() { return GetKey(13); }            bool RecentLog() { return GetKeyPressed(14); }
-bool Attack() { return GetKeyPressed(23); }         bool Use() { return GetKeyPressed(24); }            bool Menu() { return GetKeyPressed(25); }         bool Reload() { return GetKeyPressed(27); }
+bool Attack() { return GetKey(23); }         bool Use() { return GetKeyPressed(24); }            bool Menu() { return GetKeyPressed(25); }         bool Reload() { return GetKeyPressed(27); }
 bool Grenade() { return GetKeyPressed(30); }        bool GrenCycUp() { return GetKeyPressed(31); }      bool GrenCycDn() { return GetKeyPressed(32); }    bool ChangeAmmoType() { return GetKeyPressed(33); } bool Patch() { return GetKeyPressed(34); }
 bool PatchCycUp() { return GetKeyPressed(35); }     bool PatchCycDown() { return GetKeyPressed(36); }   bool SwimUp() {return (Cheats.noclip || World.curLev == LEVEL_CYBERSPACE) && GetKey(38);}             bool SwimDn() {return (Cheats.noclip || World.curLev == LEVEL_CYBERSPACE) && GetKey(39);}
 bool DoubleTapLeanLeft(void)  { if(!GetKeyPressed(7)){ return false; } if (World.pauseRelativeTime < World.invP1.leanLTapFinished) { World.invP1.leanLTapFinished = 0.0; return true; } World.invP1.leanLTapFinished = World.pauseRelativeTime + 0.5; return false; }
@@ -2042,7 +2042,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glUniform1ui(26,(u32)grayscaleEnabled);
     float fogActual = World.fogColor[World.curLev].a + ((float)World.fogFac / 255.0f); /*Alpha is base density for level.*/
     glUniform3f(12, World.fogColor[World.curLev].r * fogActual,World.fogColor[World.curLev].g * fogActual, World.fogColor[World.curLev].b * fogActual); /*Fog Color(which is density)*/
-    glUniform1f(39, 1.0f / World.farPlane[World.curLev]);
+    glUniform1f(39, World.curLev == LEVEL_CYBERSPACE ? 1.0f / 190.0f : 1.0f / World.farPlane[World.curLev]);
     glUniform1f(35, World.fogColor[World.curLev].a);
     glUniform1ui(14,Sys_Settings.Reflections);
     glUniform1ui(15,Sys_Settings.Shadows);

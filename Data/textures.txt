@@ -8246,3 +8246,5 @@ index: 3963
 index: 3964
 #Textures/cyber_proj_green_glow.png
 index: 3965
+#Textures/cyber_ram_yellow.png
+index: 3966

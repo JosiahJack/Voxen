@@ -580,7 +580,8 @@ static void SpawnSecCpuNodeGibs(u16 self) {
         World.position[gib] = pos; World.rotation[gib] = rot; World.velocity[gib] = (V3){0.0f, World.velocity[self].y, 0.0f}; World.gravity[gib] = 1.0f; World.layer[gib] = L_Corpse;
     }
 }
-static void NPCDeath(u16 self) { if (World.instances[self].entflags & EF_DEAD_CHECKS_DONE) {return;} flag_set(&World.instances[self].entflags,EF_DEAD_CHECKS_DONE,true); CreateDeathEffects(self,World.instances[self].deathBurst); if (World.instances[self].index == 419) play_wav(sounds[64], AppliedFXVol(1.0f), World.position[self], true);/*npc_autobomb: explosion1*/ if (npcTable[World.instances[self].index - 419].type == NPCType_Cyber) DeleteInstance(self); }
+static void SpawnDeathEffectAt(u16 type,V3 pos);
+static void NPCDeath(u16 self) { if (World.instances[self].entflags & EF_DEAD_CHECKS_DONE) {return;} flag_set(&World.instances[self].entflags,EF_DEAD_CHECKS_DONE,true); CreateDeathEffects(self,World.instances[self].deathBurst); if (World.instances[self].index == 419) play_wav(sounds[64], AppliedFXVol(1.0f), World.position[self], true);/*npc_autobomb: explosion1*/ if (npcTable[World.instances[self].index - 419].type == NPCType_Cyber) { SpawnDeathEffectAt(190,World.position[self]); SpawnDeathEffectAt(191,World.position[self]); DeleteInstance(self); } }
 static void ObjectDeath(u16 self) {
     Entity* e = &World.instances[self]; if (World.instances[self].entflags & EF_DEAD_CHECKS_DONE) return;
     

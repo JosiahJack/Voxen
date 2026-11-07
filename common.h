@@ -507,7 +507,7 @@ INLINE int UseableFromConst(int c){return c>=307?c-307:c;}
 INLINE int ItemStringIdx(int c){return UseableFromConst(c)+326;}
 INLINE bool CurrentWeaponUsesEnergy(void) { int i = World.invP1.weaponIndex; return i==344 || i==347 || i==353 || i==357 || i==358; }
 INLINE u16 GetImpactType(u16 instanceIdx){ switch(World.instances[instanceIdx].bloodType){ case BloodType_None: return 729; case BloodType_Red: return 721; case BloodType_Yellow: return 723; case BloodType_Green: return 722; case BloodType_Robot: return 730; case BloodType_Leaf: return 756; case BloodType_Mutation: return 757; case BloodType_GrayMutation: return 758; } return 729; }
-INLINE void UIExitCyberspace() { CenterStatusPrint("%s",Sys_Text.stringTable[601]); }
+INLINE void UIExitCyberspace() {}
 INLINE void HealthManagerHealingBed(u16 playerIdx, float amount) { Entity* p = &World.instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
 INLINE void PlayerTakeDamage(u16 playerIdx, float damage) { Entity* p = &World.instances[playerIdx]; p->health -= damage; if (p->health < 0.0f) p->health = 0.0f; }
 void UI_PuzzleGridClose();
@@ -529,7 +529,7 @@ INLINE const char* AudioLogPath(i32 id) { return (id >= 0 && id < (i32)LOGCNT) ?
 typedef struct PSysDef { V3 pos; const u16* textures; u8 textureCount; float emitRate,duration,sizeMin,sizeMax,speedMin,speedMax,lifetimeMin,lifetimeMax,gravity,animWindow,softness,shapeRadius,shapeAngle; u8 shapeType; Color colStart,colEnd; const Color* rampColors; const float* rampTimes; u8 rampCount; const float *scaleKeys,*scaleTimes; u8 scaleCount; const float *velKeys,*velTimes; u8 velCount; const float *rotKeys,*rotTimes;
                          u8 rotCount; const float *emissKeys,*emissTimes; u8 emissCount; u8 trail; u32 trailTexture; Color trailColorStart,trailColorEnd; float trailLifetime,trailWidthStart,trailWidthEnd,trailVertexDistance; bool looping; u8 blendMode; bool blendModeOverride; u8 rotationMode,colorMode; u16 burstCount; Quaternion rotation; bool useMesh; } PSysDef;
 const PSysDef* PSysTypeGet(u16);
-u16 PSysAddInternal(const PSysDef* pd, u16 meshInstance, u16 parentIdx); void PSysAddLevelLoops(void),PSysClearLevel(u8); extern const PSysDef particleTypeDefs[190];
+u16 PSysAddInternal(const PSysDef* pd, u16 meshInstance, u16 parentIdx); void PSysAddLevelLoops(void),PSysClearLevel(u8); extern const PSysDef particleTypeDefs[192];
 typedef void(*FGL_AT)(u32),(*FGL_F)(),    (*FGL_FF)(u32),  (*FGL_AS)(u32,u32),  (*FGL_VAB)(u32,u32), (*FGL_GT)(i32,u32*),   (*FGL_DA)(u32,i32,i32),     (*FGL_CC)(float,float,float,float),(*FGL_BD)(u32,size_t,const void*,u32),   (*FGL_U4F)(i32,float,float,float,float),        (*FGL_BBB)(u32,u32,u32),  *(*FGL_MBR)(u32,intptr_t,size_t,u32);
 typedef void(*FGL_C)(u32),                (*FGL_EVAA)(u32),(*FGL_BB)(u32,u32),  (*FGL_BT)(u32,u32),  (*FGL_U1F)(i32,float), (*FGL_BFS)(u32,u32,u32,u32),(*FGL_DE)(u32,i32,u32,const void*),(*FGL_UM4FV)(i32,i32,bool,const float*), (*FGL_BSD)(u32,intptr_t,intptr_t,const void*),  (*FGL_DB)(i32,const u32*), (*FGL_CM)(bool,bool,bool,bool);
 typedef void(*FGL_CS)(u32),(*FGL_BVA)(u32), (*FGL_GVA)(i32,u32*),(*FGL_U1I)(i32,i32), (*FGL_DC)(u32,u32,u32),(*FGL_CPIV)(u32,u32,i32*),  (*FGL_BVB)(u32,u32,intptr_t,i32),  (*FGL_RP)(i32,i32,i32,i32,u32,u32,void*),(*FGL_SS)(u32,i32,const char*const*,const i32*),(*FGL_U2UI)(i32,u32,u32);

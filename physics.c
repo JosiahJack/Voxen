@@ -79,13 +79,13 @@ void CyberItemOnTriggerEnter(u16 self, u16 other) {
         case 453/*item_cyber_keycard*/: { int vers=World.instances[self].version; if(vers<0||vers>110){vers=81;} AddAccessCardToInventory(vers); success=true; break; }
         default: break;
     }
-    if(success){DeleteInstance(self);}
+    if(success){ const PSysDef* d0=PSysTypeGet(190); if(d0){PSysDef d=*d0; d.pos=World.position[self]; PSysAddInternal(&d,U16_MAX,U16_MAX);} const PSysDef* d1=PSysTypeGet(191); if(d1){PSysDef d=*d1; d.pos=World.position[self]; PSysAddInternal(&d,U16_MAX,U16_MAX);} DeleteInstance(self); }
 }
 void CyberIceOnTriggerEnter(u16 self, u16 other) { (void)self; Entity* e = &World.instances[other]; if (!(e->entflags & EF_RIGIDBODY)) return; World.layer[other] = L_NPCBullet;/*L_NPCBullet, not a bare 24: the enums are bit flags, so only L_NPCBullet happens to equal 1<<24.  An adjacent enum insertion would have silently turned this into a different collision layer.*/ World.velocity[other] = V3_ScaleByF(World.velocity[other],-1.0f); }
 void CyberMineInitBeforeLoad(u16 self) { Entity* e=&World.instances[self]; e->damage=55.0f; if(World.diffCyb<3){if(random_range(0.0f,1.0f)<0.2f)flag_set(&e->entflags,EF_ACTIVE,false); e->damage=33.0f;} if(World.diffCyb<2){if(random_range(0.0f,1.0f)<0.33f)flag_set(&e->entflags,EF_ACTIVE,false); e->damage=22.0f;} if(World.diffCyb<1){if(random_range(0.0f,1.0f)<0.50f)flag_set(&e->entflags,EF_ACTIVE,false); e->damage=11.0f;} }
 float TakeDamage(u16 self,DamageData dd);
 void BiomonitorEnergyPulse(float);
-void CyberMineOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (other != PLAYER1) return; PlayerTakeDamage(PLAYER1,e->damage); play_wav(sounds[67], AppliedFXVol(1.0f), World.position[self], false); flag_set(&e->entflags,EF_ACTIVE,false); }
+void CyberMineOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (other != PLAYER1) return; DamageData dd={0}; dd.damage=e->damage; dd.owner=self; TakeDamage(PLAYER1,dd); play_wav(sounds[67], AppliedFXVol(1.0f), World.position[self], false); flag_set(&e->entflags,EF_ACTIVE,false); }
 void CyberSwitchInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; if (e->iceActive) {flag_set(&e->entflags,EF_ACTIVE,true);} } // visual subobject parity handled by hierarchy
 void CyberSwitchOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (e->active || other != PLAYER1) {return;} CenterStatusPrint("%s",Sys_Text.stringTable[(u16)e->textIndex]); e->active = true; UseTargets(self,e->targetIdx); }
 // TeleportTouch
