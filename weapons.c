@@ -24,7 +24,7 @@ u16 wepAnimNums[16]={MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,50,49,MAXANIM,MAXAN
 typedef enum { WC_STD = 0, WC_MELEE = 1, WC_ENERGY = 2 } WepClass;
 static WepClass wepClass[16] = {WC_STD, WC_ENERGY, WC_STD, WC_STD, WC_ENERGY, WC_MELEE, WC_MELEE,WC_STD, WC_STD, WC_STD, WC_ENERGY, WC_STD, WC_STD, WC_STD, WC_ENERGY, WC_ENERGY};
 float magpulseShotForce = 2.2f, stungunShotForce = 2.2f, railgunShotForce = 5.0f, plasmaShotForce = 1.5f;
-WeaponFireCtx wfx = { .fireDistance = 200.0f, .overheatedPercent = 80.0f, .reloadContainerHome = {0}, .pendingMeleeFinished = 0.0 };
+WeaponFireCtx wfx = { .hitOffset = 0.16f, .fireDistance = 200.0f, .overheatedPercent = 80.0f, .reloadContainerHome = {0}, .pendingMeleeFinished = 0.0 };
 INLINE Quaternion QuatEulerZ(float degZ) { float r = deg2rad(degZ) * 0.5f; return (Quaternion){0.0f,0.0f,vsinf(r),vcosf(r)}; }
 INLINE bool WeaponsHaveAnyHeat() { if (Cheats.redbull) {return false;} for (int i=0;i<7;i++) {if (World.invP1.curWepHeat[i] > 0.0f) {return true;}} return false; }
 static bool hudHeatTickOn[9];
@@ -130,7 +130,7 @@ static const struct { u16 prefab; u8 type; } impactEffectTypes[] = {
 
 bool SpawnImpactParticleForPrefab(u16 prefab, V3 pos, V3 normal) {
     u16 type=ImpactParticleType(prefab); const PSysDef* preset=PSysTypeGet(type); if (!preset) return false;
-    PSysDef def=*preset; def.pos=V3Add(pos,V3_ScaleByF(normal,wfx.hitOffset-0.08f)); def.rotation=QuatFromToRotation((V3){0,1,0},normal); PSysAddInternal(&def,U16_MAX,U16_MAX);
+    PSysDef def=*preset; def.pos=V3Add(pos,V3_ScaleByF(normal,wfx.hitOffset)); def.rotation=QuatFromToRotation((V3){0,1,0},normal); PSysAddInternal(&def,U16_MAX,U16_MAX);
     for (u32 i = 0; i < sizeof(impactEffectTypes)/sizeof(*impactEffectTypes); ++i) {
         if (impactEffectTypes[i].prefab != prefab || impactEffectTypes[i].type == type) continue;
         const PSysDef* cd = PSysTypeGet(impactEffectTypes[i].type); if (!cd) continue;
@@ -171,7 +171,7 @@ static u16 ProjectileImpactParticleType(u16 projectile) { for (u32 i = 0; i < si
 void SpawnProjectileImpactParticles(u16 projectile,V3 pos,V3 normal) {
     u16 type = ProjectileImpactParticleType(projectile); const PSysDef* preset = PSysTypeGet(type); if(!preset)return;
     
-    PSysDef def = *preset; def.pos = V3Add(pos,V3_ScaleByF(normal,wfx.hitOffset-0.08f)); def.rotation = QuatFromToRotation((V3){0,1,0},normal); PSysAddInternal(&def,U16_MAX,U16_MAX);
+    PSysDef def = *preset; def.pos = V3Add(pos,V3_ScaleByF(normal,wfx.hitOffset)); def.rotation = QuatFromToRotation((V3){0,1,0},normal); PSysAddInternal(&def,U16_MAX,U16_MAX);
     for (u32 i=0;i<sizeof(projectileImpactTypes)/sizeof(*projectileImpactTypes);++i) { if (projectileImpactTypes[i].proj == projectile && projectileImpactTypes[i].type != type) { const PSysDef* cd=PSysTypeGet(projectileImpactTypes[i].type); if (cd) { PSysDef cdef = *cd; cdef.pos = def.pos; cdef.rotation = def.rotation; PSysAddInternal(&cdef,U16_MAX,U16_MAX); } } }
 }
 

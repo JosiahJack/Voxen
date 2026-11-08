@@ -1007,7 +1007,6 @@ void LoadLevel(u8 curlevel, V3 pos) {
         World.colliderCenter[PLAYER1].y = -PLYR_CAM_OFS_Y + (PLYR_HT - World.colliderSize[PLAYER1].y) * 0.5f;
         World.gravity[PLAYER1] = 1.0f;
         if (prevLevel == LEVEL_CYBERSPACE) {
-            play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false);
             V3 cyberFwd = quat_rot_v3(World.rotation[PLAYER1],(V3){0.0f,0.0f,1.0f});
             float yawDeg = __builtin_atan2f(cyberFwd.x,cyberFwd.z) * (180.0f / 3.14159265f);
             float halfYaw = deg2rad(yawDeg) * 0.5f;

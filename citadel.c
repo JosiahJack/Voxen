@@ -543,7 +543,7 @@ float GetDamageTakeAmount(DamageData* dd) {
 }
 
 void SpawnImpactEffect(u16 impactType, V3 pos) { if (impactType == 0 || impactType == U16_MAX) return; u16 fx = SpawnDynamicObject(impactType); if (!EntIdxIsValid(fx)) return; World.position[fx] = pos; Entity* e = &World.instances[fx]; flag_set(&e->entflags, EF_ACTIVE, true); if (e->itemLifeTime <= 0.0f) e->itemLifeTime = 1.0f; e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
-void ExitCyberspace() { UIExitCyberspace(); if (World.curLev != LEVEL_CYBERSPACE) return; if (World.instances[PLAYER1].cyberHealth <= 0.0f) World.instances[PLAYER1].cyberHealth = 1.0f; LoadLevel((World.cyberReturnLevel >= 0 && (u8)World.cyberReturnLevel < MAX_LEVELS) ? (u8)World.cyberReturnLevel : (World.startLevel < MAX_LEVELS ? World.startLevel : 0), World.cyberReturnPos); }
+void ExitCyberspace() { UIExitCyberspace(); if (World.curLev != LEVEL_CYBERSPACE) return; if (World.instances[PLAYER1].cyberHealth <= 0.0f) World.instances[PLAYER1].cyberHealth = 1.0f; play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false); LoadLevel((World.cyberReturnLevel >= 0 && (u8)World.cyberReturnLevel < MAX_LEVELS) ? (u8)World.cyberReturnLevel : (World.startLevel < MAX_LEVELS ? World.startLevel : 0), World.cyberReturnPos); }
 void ReduceCurrentLevelSecurity(SecurityType stype) {
     static const u32 score[3]={4u,10u,27u}; u8 lev = World.curLev; if (lev >= MAX_LEVELS || stype == SecurityType_None) return;
     
