@@ -521,7 +521,7 @@ static void ProjectileLaunched(Entity* self, int n) {
     u16 sidx=(u16)(self - World.instances); const NPCTable* npc = &npcTable[self->index - 419]; int masterIdx=npc->attack[n-1].projectilePrefab; float launchSpd=npc->attack[n-1].projectileSpeed;
     DamageData dd = SetNPCData(self,n); dd.attackType=Att_Ball;
     V3 spos=n==1?ai_sight_pos(self):ai_gun_pos(self,n); u16 eidx=self->enemy; V3 targ=eidx ? self->targettingPosition : (V3){spos.x + self->forward.x*20.0f,spos.y,spos.z + self->forward.z*20.0f}; V3 dir=V3_Normalize(V3_AsubB(targ,spos)); u16 bb = SpawnDynamicObject(masterIdx>0?masterIdx:370);
-    if (!EntIdxIsValid(bb)) bb=SpawnDynamicObject(370); if (!EntIdxIsValid(bb)) return; Entity* proj=&World.instances[bb]; World.layer[bb]=L_NPCBullet; World.position[bb]=spos; proj->forward=dir; World.rotation[bb]=QuatFromToRotation((V3){0.0f,0.0f,1.0f},dir);
+    if (!EntIdxIsValid(bb)) bb=SpawnDynamicObject(370); if (!EntIdxIsValid(bb)) return; Entity* proj=&World.instances[bb]; World.layer[bb]=L_NPCBullet; World.position[bb]=spos; proj->forward=dir; World.rotation[bb]=(masterIdx==489 && vabs(dir.y)<0.999f)?quat_look_rotation(dir,(V3){0.0f,1.0f,0.0f}):QuatFromToRotation((V3){0.0f,0.0f,1.0f},dir);
     proj->damage=dd.damage; proj->strength=dd.penetration; proj->speed=dd.offense; proj->attackType=dd.attackType; proj->recentMostActivator=sidx; ProjectileEffectImpactInitAfterLoad(bb);
     V3 shove = V3_ScaleByF(dir, launchSpd); if (vabs(World.gravity[sidx]) > 0.05f) { shove.x += World.velocity[sidx].x; shove.z += World.velocity[sidx].z; } World.velocity[bb] = (V3){0}; AddForce(bb,shove,true); flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);
 }

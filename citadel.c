@@ -181,7 +181,58 @@ float cyberWallFade[INSTANCE_COUNT]; static u8 cyberWallWasTouching[INSTANCE_COU
 typedef struct { V3 ctr, tip, base; float rad, bound; u8 isCap; } CyberWallToucher; static CyberWallToucher cyberWallTouchers[128]; static u16 cyberWallToucherCount;
 static void CyberWallTouchersBuild() { cyberWallToucherCount = 0; for (u16 i = INSTS_1ST_IDX; i < World.instCount && cyberWallToucherCount < 128; ++i) { Entity* e = &World.instances[i]; if (!(e->entflags & EF_ACTIVE) || (e->entflags & EF_DEAD)) continue; u16 ci = e->index; if (!IdxIsNPC(ci) && !(World.layer[i] & L_NPCBullet) && !((World.layer[i] & L_PlayerBullets) && (ci == 492 || ci == 495))) continue; CyberWallToucher* t = &cyberWallTouchers[cyberWallToucherCount++]; ShapeSphere sph = Entity_GetSph(i); t->ctr = sph.ctr; t->rad = sph.rad; t->bound = World.radius[i] + 0.06f; t->isCap = (World.col[i] == CT_CAP); if (t->isCap) { ShapeCapsule cap = Entity_GetCap(i); t->tip = cap.tip; t->base = cap.base; } } }
 static bool CyberWallToucherTouches(CyberWallToucher* t, ShapeBox panelBox, V3 panelPos, float panelRadius) { float reach = panelRadius + t->bound; if (V3_SqDist(panelPos, t->ctr) >= reach * reach) return false; if (t->isCap) return CapsuleTouchesOBB(t->tip, t->rad + 0.06f, panelBox) || CapsuleTouchesOBB(t->base, t->rad + 0.06f, panelBox) || CapsuleTouchesOBB(t->ctr, t->rad + 0.06f, panelBox); return CapsuleTouchesOBB(t->ctr, t->rad + 0.06f, panelBox); }
-void CyberWallUpdate(u16 self) { Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE)) return; if (cyberWallFade[self] > 0.02f) { cyberWallFade[self] -= 0.49f * vclamp((float)World.dt, 0.0f, 0.1f); if (cyberWallFade[self] < 0.02f) cyberWallFade[self] = 0.02f; } ShapeBox panelBox = Entity_GetBox(self); ShapeSphere sph = Entity_GetSph(PLAYER1); float reach = World.radius[self] + 1.86f; bool touching = false; if (V3_SqDist(World.position[self], sph.ctr) < reach * reach) touching = CapsuleTouchesOBB(sph.ctr, sph.rad + 0.06f, panelBox); for (u16 k = 0; k < cyberWallToucherCount && !touching; ++k) touching = CyberWallToucherTouches(&cyberWallTouchers[k], panelBox, World.position[self], World.radius[self]); if (touching && !cyberWallWasTouching[self]) cyberWallFade[self] = 1.0f; cyberWallWasTouching[self] = touching; }
+#define CYBER_GOL_GENERATION_INTERVAL 1.0f
+#define CYBER_GOL_FADE_RATE 0.49f
+#define CYBER_GOL_PLANAR_NY 0.95f
+#define CYBER_GOL_VOLUME_ON 1.0f
+#define CYBER_GOL_VOLUME_OFF 0.02f
+static u8 cyberGolOpen[ARRSIZE];
+static u8 cyberGolCur[ARRSIZE];
+static u8 cyberGolNext[ARRSIZE];
+static u8 cyberGolBuilt;
+static float cyberGolTimer;
+void CyberGolReset(void) { cyberGolBuilt = 0; }
+static bool CyberGolIsPlanar(u16 self) { V3 wn = quat_rot_v3(World.rotation[self], (V3){0.0f, -1.0f, 0.0f}); return vabs(wn.y) > CYBER_GOL_PLANAR_NY; }
+static void CyberGolOpenBuild(void) {
+    mset(cyberGolOpen, 0, sizeof(cyberGolOpen));
+    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
+        Entity* e = &World.instances[i];
+        u16 ci = e->index;
+        if (ci != 21 && ci != 22) continue;
+        cyberGolOpen[PosGetCellCoords(World.position[i].x, World.position[i].z)] = 1;
+        if (CyberGolIsPlanar(i)) cyberWallFade[i] = CYBER_GOL_VOLUME_ON;
+    }
+    mcpy(cyberGolCur, cyberGolOpen, ARRSIZE);
+    cyberGolTimer = 0.0f;
+    cyberGolBuilt = 1;
+}
+static void CyberGolStep(void) {
+    for (u32 c = 0; c < ARRSIZE; ++c) {
+        if (!cyberGolOpen[c]) { cyberGolNext[c] = 0; continue; }
+        u32 x = c % WORLDX;
+        u32 z = c / WORLDX;
+        u32 n = 0;
+        for (i32 dz = -1; dz <= 1; ++dz) for (i32 dx = -1; dx <= 1; ++dx) {
+            if (!dx && !dz) continue;
+            i32 nx = (i32)x + dx;
+            i32 nz = (i32)z + dz;
+            if (nx < 0 || nx >= WORLDX || nz < 0 || nz >= WORLDX) continue;
+            n += cyberGolCur[(u32)nz * WORLDX + (u32)nx];
+        }
+        if (cyberGolCur[c]) cyberGolNext[c] = (n == 2 || n == 3) ? 1 : 0;
+        else cyberGolNext[c] = (n == 3) ? 1 : 0;
+    }
+    mcpy(cyberGolCur, cyberGolNext, ARRSIZE);
+}
+static void CyberGolUpdate(void) {
+    if (!cyberGolBuilt) CyberGolOpenBuild();
+    cyberGolTimer += vclamp((float)World.dt, 0.0f, 0.1f);
+    if (cyberGolTimer >= CYBER_GOL_GENERATION_INTERVAL) {
+        cyberGolTimer -= CYBER_GOL_GENERATION_INTERVAL;
+        CyberGolStep();
+    }
+}
+void CyberWallUpdate(u16 self) { Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE)) return; bool gol = false; u32 cell = 0; if (cyberGolBuilt) { if (CyberGolIsPlanar(self)) { cell = PosGetCellCoords(World.position[self].x, World.position[self].z); gol = cyberGolOpen[cell] != 0; } } if (gol) { float target = cyberGolCur[cell] ? CYBER_GOL_VOLUME_ON : CYBER_GOL_VOLUME_OFF; float step = CYBER_GOL_FADE_RATE * vclamp((float)World.dt, 0.0f, 0.1f); if (cyberWallFade[self] < target) { cyberWallFade[self] += step; if (cyberWallFade[self] > target) cyberWallFade[self] = target; } else if (cyberWallFade[self] > target) { cyberWallFade[self] -= step; if (cyberWallFade[self] < target) cyberWallFade[self] = target; } } else if (cyberWallFade[self] > 0.02f) { cyberWallFade[self] -= 0.49f * vclamp((float)World.dt, 0.0f, 0.1f); if (cyberWallFade[self] < 0.02f) cyberWallFade[self] = 0.02f; } ShapeBox panelBox = Entity_GetBox(self); ShapeSphere sph = Entity_GetSph(PLAYER1); float reach = World.radius[self] + 1.86f; bool touching = false; if (V3_SqDist(World.position[self], sph.ctr) < reach * reach) touching = CapsuleTouchesOBB(sph.ctr, sph.rad + 0.06f, panelBox); for (u16 k = 0; k < cyberWallToucherCount && !touching; ++k) touching = CyberWallToucherTouches(&cyberWallTouchers[k], panelBox, World.position[self], World.radius[self]); if (touching && !cyberWallWasTouching[self]) { cyberWallFade[self] = 1.0f; if (gol) cyberGolCur[cell] = 1; } cyberWallWasTouching[self] = touching; }
 void ExitCyberspace();
 void CyberItemUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f){ CyberItemOnTriggerEnter(self,PLAYER1); } }
 void CyberMineUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f){ CyberMineOnTriggerEnter(self,PLAYER1); } }
@@ -1247,7 +1298,7 @@ void ModUpdate() {
     if (World.curLev == LEVEL_CYBERSPACE) CyberTimerUpdate(PLAYER1); /*the loop below starts at INSTS_1ST_IDX, so the player's own countdown would never tick*/
     if (!resurrecting && Use()) { Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right); }
     if (World.pauseRelativeTime < World.debugLineFinished && (World.lineVertCnt + 6) < MAX_LINEVRTS) { DrawLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f}); }
-    if (World.curLev == LEVEL_CYBERSPACE) CyberWallTouchersBuild();
+    if (World.curLev == LEVEL_CYBERSPACE) { CyberWallTouchersBuild(); CyberGolUpdate(); }
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
         u16 constdex = World.instances[i].index;
         if(IsLiveGrenade(constdex) && (World.instances[i].entflags & EF_ACTIVE)) { GrenadeUpdate(i); }

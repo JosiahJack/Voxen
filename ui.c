@@ -598,6 +598,7 @@ static void PGCheckCellForPower(int i) { SystemUI* s=&World.Sys_UI; int a=PGOrth
     if (a!=-1 && s->pg_powered[a]) ++pc; if (b!=-1 && s->pg_powered[b]) ++pc; if (l!=-1 && s->pg_powered[l]) ++pc; if (r!=-1 && s->pg_powered[r]) ++pc;
     if (s->pg_type[i]==PuzzleCellType_And) { if (pc>1) s->pg_powered[i]=true; }
     else if (s->pg_type[i]==PuzzleCellType_Standard || s->pg_type[i]==PuzzleCellType_Bypass) { if ((s->pg_cell[i] || s->pg_type[i]==PuzzleCellType_Bypass) && pc>0) s->pg_powered[i]=true; } }
+static float PGProgressValue(void) { SystemUI* s=&World.Sys_UI; int w=(int)s->pg_width,h=(int)s->pg_height; float prog=0.0f; for (int c=0;c<w;++c) { for (int r2=0;r2<h;++r2) if (s->pg_powered[r2*w+c]) { prog=(c+1==w)?6.75f/7.0f:(float)(c+1)/7.0f; break; } } return prog; }
 void PGEvalPuzzle(void) {
     SystemUI* s=&World.Sys_UI; int w=(int)s->pg_width,h=(int)s->pg_height;
     if (w<=0||h<=0) return;
@@ -618,8 +619,6 @@ void PGEvalPuzzle(void) {
         if (l!=-1 && !s->pg_checked[l] && s->pg_cell[l]) { q[qt++]=l; if (isAnd) PGCheckCellForPower(l); }
         if (r!=-1 && !s->pg_checked[r] && s->pg_cell[r]) q[qt++]=r;
         PGCheckCellForPower(mi); s->pg_checked[mi]=true; }
-    float prog=0.0f; for (int c=0;c<w;++c) { for (int r2=0;r2<h;++r2) if (s->pg_powered[r2*w+c]) { prog=(c+1==w)?6.75f/7.0f:(float)(c+1)/7.0f; break; } }
-    (void)prog; // TODO Render bar gauge indicating progress
     int out=(int)s->pg_output; if (out>=0 && out<n && s->pg_powered[out]) s->pg_solved = true;
 }
     
@@ -671,11 +670,14 @@ static void PWClickEnd(int spot,bool colRH) { if (spot<0||spot>6) return; i8* co
     if (col[spot] >= 0 && World.Sys_UI.pw_wireOn[col[spot]]) { World.Sys_UI.pw_selectedWire = (i8)spot; World.Sys_UI.pw_selectedWireRH = colRH; }
 }
 
-static void PWEval(void) { float match=0.0f; bool all=true;
+static float PWMatchValue(void) { float match=0.0f;
     for (i8 w=0;w<7;++w) { if (!World.Sys_UI.pw_wireOn[w]) continue; i8 l=PWFindCol(World.Sys_UI.pw_curL,w),r=PWFindCol(World.Sys_UI.pw_curR,w);
-        bool lok=(l>=0 && l==World.Sys_UI.pw_tgtL[w]), rok=(r>=0 && r==World.Sys_UI.pw_tgtR[w]);
-        if (lok) match+=0.19f; if (rok) match+=0.19f; if (!(lok&&rok)) all=false; }
+        if (l>=0 && l==World.Sys_UI.pw_tgtL[w]) match+=0.19f; if (r>=0 && r==World.Sys_UI.pw_tgtR[w]) match+=0.19f; }
     if (World.diffPuz==1) match+=0.19f;
+    return match; }
+static void PWEval(void) { float match=PWMatchValue(); bool all=true;
+    for (i8 w=0;w<7;++w) { if (!World.Sys_UI.pw_wireOn[w]) continue; i8 l=PWFindCol(World.Sys_UI.pw_curL,w),r=PWFindCol(World.Sys_UI.pw_curR,w);
+        if (!(l>=0 && l==World.Sys_UI.pw_tgtL[w] && r>=0 && r==World.Sys_UI.pw_tgtR[w])) all=false; }
     World.Sys_UI.pw_solved=(match>0.92f || all);
 }
 
@@ -1165,13 +1167,15 @@ void SideMFD(bool isRH) { // 320x240
                     int hoverCell=-1; for (u8 c=0;c<35;++c) if (UIOver(MID(isRH,PUZZLE_CELL_0)+c)) { hoverCell=(int)c; break; }
                     if (hoverCell>=0) { bool preview[35]; PGComputePreview(hoverCell,preview); for (u8 c=0;c<35;++c) if (preview[c]) { i16 cx=(i16)(puzCellX[c%7]+dx),cy=puzCellY[c/7]; RenderUIImage(cx,cy,29,29,2136);/*geniusgrid_highlight*/ } }
                 }
-                RenderUIImage(42+dx,720,221,26,2139);/*ProgressContainer*/ RenderUIImage(45+dx,726,225,13,0);/*Background QUAD:builtin-knob*/ RenderUIImage(48+dx,726,6,13,2142);/*Fill puzzlesliderwire*/
-                UIRImg(MID(isRH,PUZZLE_SLIDER),45+dx,720,225,26,1078);/*Handle - the whole bar is the drag region*/
+                float pgDisp=World.Sys_UI.pg_solved?1.0f:PGProgressValue();
+                RenderUIImage(42+dx,720,221,26,2139);/*ProgressContainer*/ RenderUIImage(45+dx,726,225,13,0);/*Background QUAD:builtin-knob*/ RenderUIImage(48+dx,726,(i16)(6.0f+pgDisp*213.0f),13,2142);/*Fill puzzlesliderwire*/
+                UIR(MID(isRH,PUZZLE_SLIDER),45+dx,720,225,26); RenderUIImage((i16)(48+dx+pgDisp*198.0f),726,21,13,1078);/*Handle*/
                 UIRImg(MID(isRH,PUZZLE_CLOSE),closeButtonX+dx,closeButtonY,29,29,899); RenderTextL(closeButtonTextX+dx,closeButtonTextY,T_STOPD_RED,FONT_NORMAL,0.8,"X");
             }
             if (data==4) {/*WirePuzzle*/
-                RenderUIImage(82+dx,570,139,192,2143);/*ContainerCenter wire_center*/ RenderUIImage(34+dx,521,235,44,2144);/*LevelsBox*/ RenderUIImage(40+dx,526,235,34,0);/*Background*/ RenderUIImage(43+dx,526,6,34,2142);/*Fill*/
-                UIRImg(MID(isRH,WIRE_SLIDER),40+dx,509,235,69,1078);/*Handle - whole levels box drags*/ UIRImg(MID(isRH,WIRE_TARGET),204+dx,522,66,42,2145);/*TargetLine*/
+                float pwDisp=World.Sys_UI.pw_solved?1.0f:vclamp(PWMatchValue()+random_range(0.0f,0.05f),0.0f,1.0f);
+                RenderUIImage(82+dx,570,139,192,2143);/*ContainerCenter wire_center*/ RenderUIImage(34+dx,521,235,44,2144);/*LevelsBox*/ RenderUIImage(40+dx,526,235,34,0);/*Background*/ RenderUIImage(43+dx,526,(i16)(6.0f+pwDisp*223.0f),34,2142);/*Fill*/
+                UIR(MID(isRH,WIRE_SLIDER),40+dx,509,235,69); RenderUIImage((i16)(43+dx+pwDisp*207.0f),526,22,34,1078);/*Handle*/ UIRImg(MID(isRH,WIRE_TARGET),204+dx,522,66,42,2145);/*TargetLine*/
                 i8 geniusHintWire[14]; for (u8 n=0;n<14;++n) geniusHintWire[n]=-1;
                 if (World.geniusActive) { for (u8 w=0;w<7;++w) if (World.Sys_UI.pw_wireOn[w]) { i8 l=World.Sys_UI.pw_tgtL[w],r=World.Sys_UI.pw_tgtR[w]; if (l>=0&&l<7) geniusHintWire[l]=(i8)w; if (r>=0&&r<7) geniusHintWire[7+r]=(i8)w; } }
                 u8 wireHud[7]; for (u8 w=0;w<7;++w) wireHud[w]=(World.diffPuz==3 && !World.geniusActive) ? (u8)HUDC_YELLOW : World.Sys_UI.pw_wireColor[w];
