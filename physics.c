@@ -426,6 +426,7 @@ void CvxMshFillExtraPoints(CvxMshCtx* ctx) {
 }
 
 void BvhWalkAABB_CvxTri(u16 triMesh, const float* triMx, AABB3 hb, CvxMshCtx* ctx) {
+    if (!modelBVHNodes[triMesh] || !modelBVHTriOrder[triMesh] || !physPos[triMesh] || !modelTriangles[triMesh]) return; /*Stale mesh (evicted/never built): no collision, never a fault*/
     const BvhNode* nodes = modelBVHNodes[triMesh]; const u16* triOrder = modelBVHTriOrder[triMesh]; const BvhNode* stack[64]; int sp = 0; stack[sp++] = &nodes[0];
     while (sp > 0) {
         const BvhNode* node = stack[--sp]; V3 wMn, wMx; TransformAABB(node->mn,node->mx,triMx, &wMn, &wMx); bool bvhAABBOverlap = (wMx.x >= hb.mn.x && wMn.x <= hb.mx.x && wMx.y >= hb.mn.y && wMn.y <= hb.mx.y && wMx.z >= hb.mn.z && wMn.z <= hb.mx.z); if (!bvhAABBOverlap) continue;
@@ -571,7 +572,7 @@ void Physics(float dt) {
         mset(cellCounts,0,sizeof(cellCounts)); numTriggers=0;
         for (u16 i=0;i<World.instCount;++i) { // 0. Broadphase cell lists
             posBudget[i] = 0.64f; World.instances[i].cellX=(i16)PosGetCellCoordX(World.position[i].x); World.instances[i].cellZ=(i16)PosGetCellCoordZ(World.position[i].z); World.instances[i].cellIndex=PosGetCellCoordsP(World.instances[i].cellX,World.instances[i].cellZ);
-            u32 cell=(u32)World.instances[i].cellIndex; if(cell < WORLDX*WORLDX){if(cellCounts[cell]<128){cellLists[cell][cellCounts[cell]++]=i;}else{WarnPhysicsCapacity(2,"Reached the 128 bodies-per-cell limit; additional bodies in this cell are skipped.");}} u16 idx=World.instances[i].index; bool isTrigger=((idx>=595&&idx<=601)||idx==703||idx==706||idx==746); if(isTrigger&&(World.instances[i].entflags&EF_ACTIVE)){if(numTriggers<128){triggerVolumes[numTriggers++]=i;}else{WarnPhysicsCapacity(3,"Reached the 128 trigger-volume limit; additional triggers are skipped.");}}
+            u32 cell=(u32)World.instances[i].cellIndex; if(cell < WORLDX*WORLDX && World.col[i] != CT_NONE){if(cellCounts[cell]<128){cellLists[cell][cellCounts[cell]++]=i;}else{WarnPhysicsCapacity(2,"Reached the 128 bodies-per-cell limit; additional bodies in this cell are skipped.");}} u16 idx=World.instances[i].index; bool isTrigger=((idx>=595&&idx<=601)||idx==703||idx==706||idx==746); if(isTrigger&&(World.instances[i].entflags&EF_ACTIVE)){if(numTriggers<128){triggerVolumes[numTriggers++]=i;}else{WarnPhysicsCapacity(3,"Reached the 128 trigger-volume limit; additional triggers are skipped.");}}
         }
         gContactCount=0;
         for (u16 i=0;i<dynamicEntityCount;++i) { // 1. Integrate velocity

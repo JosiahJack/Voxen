@@ -95,7 +95,7 @@ static void UseDecoy() {
     if (World.invP1.softVersions[SW_DECOY] <= 0) { World.invP1.hasSoft &= (u8)~(1u << SW_DECOY); return; }
     
     if (--World.invP1.softVersions[SW_DECOY] == 0) World.invP1.hasSoft &= (u8)~(1u << SW_DECOY);
-    u16 decoyIdx = SpawnDynamicObject(CYBER_DECOY_CONST);
+    u16 decoyIdx = SpawnDynamicObject(553u);
     Entity* e = &World.instances[decoyIdx]; World.position[decoyIdx]=World.position[PLAYER1]; World.velocity[decoyIdx]=(V3){0}; flag_set(&e->entflags,EF_RIGIDBODY,false); e->active = true; e->doSelfAfterList = true; e->despawnInstead = true; e->timerFinished = World.pauseRelativeTime + 15.0f; World.decoyActive=true; World.decoyInstance = decoyIdx; CyberDecoySetTarget(decoyIdx);
 }
 static void UseRecall() { if (World.invP1.softVersions[SW_RECALL] <= 0) {return;} if (--World.invP1.softVersions[SW_RECALL] == 0) {World.invP1.hasSoft &= (u8)~(1u << SW_RECALL);} World.position[PLAYER1] = World.cyberspaceRecallPoint; }
@@ -290,12 +290,12 @@ void SpawnManagerUpdate(u16 self) {
     e->delayFinished = World.pauseRelativeTime + (double)random_range(e->minDelayBetweenSpawns, e->maxDelayBetweenSpawns);
     if (World.diffCbt == 0) {return;}
     u16 spots = 0;
-    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { if(World.instances[i].index == SPAWNPOINT_CONST){++spots;} } if (!spots) {return;}
+    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { if(World.instances[i].index == 715u){++spots;} } if (!spots) {return;}
 
     u16 spot = 0, valid = 0;
     for (u8 shot=0;shot<10;++shot) {
         u16 want = (u16)random_range_u32(0,spots - 1), cand = 0;
-        for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { if(World.instances[i].index != SPAWNPOINT_CONST) {continue;} if(want--==0){cand=i;break;} }
+        for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { if(World.instances[i].index != 715u) {continue;} if(want--==0){cand=i;break;} }
         if (!cand || !SpawnPointIsClear(cand)) {continue;}
         
         spot=cand;
@@ -695,7 +695,7 @@ static void Death(u16 self,bool energyVaporized) {
 
 float TakeDamage(u16 self,DamageData dd) {
     if (Cheats.god && self == PLAYER1) return 0.0f;
-    if (self < World.instCount && World.instances[self].index == CYBER_DECOY_CONST) return 0.0f;
+    if (self < World.instCount && World.instances[self].index == 553u) return 0.0f;
     
     u16 selfIdx = World.instances[self].index;
     bool isCyber = IsCyberEntity(self), isNPC = IdxIsNPC(selfIdx), isPlayer = (self == PLAYER1), isGrenade = IsGrenade(selfIdx);
@@ -1303,7 +1303,7 @@ void ModUpdate() {
         u16 constdex = World.instances[i].index;
         if(IsLiveGrenade(constdex) && (World.instances[i].entflags & EF_ACTIVE)) { GrenadeUpdate(i); }
         DelayedSpawnUpdate(i);
-        if (constdex == CYBER_DECOY_CONST) { if (World.decoyActive && World.instances[World.decoyInstance].timerFinished < World.pauseRelativeTime) { World.decoyActive = false; World.decoyInstance = U16_MAX; CyberDecoySetTarget(U16_MAX); } } // Decoy expired.
+        if (constdex == 553u) { if (World.decoyActive && World.instances[World.decoyInstance].timerFinished < World.pauseRelativeTime) { World.decoyActive = false; World.decoyInstance = U16_MAX; CyberDecoySetTarget(U16_MAX); } } // Decoy expired.
         if (constdex == 614) { RelayPanelUpdate(i); }
         if (IsPuzzleGridPanel(constdex)) { PuzzlePanelUpdate(i); }
         if (World.instances[i].textureAnimating && World.instances[i].tickFinished < World.pauseRelativeTime) { TextureSequenceUpdate(i); }

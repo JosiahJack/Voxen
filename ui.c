@@ -32,13 +32,9 @@ void BiomonitorBlitToUI();
                       UI_ID_##P##_AUTOMAP_SIDE
 void LoadTextForLanguage(u8 lang); void LoadLogTextForLanguage(u8 lang);
 enum{UI_ID_NONE,
-    /*Menu*/ UI_ID_MENU_SINGLEPLAYER, UI_ID_MENU_MULTIPLAYER, UI_ID_MENU_OPTIONS, UI_ID_MENU_QUIT,
-             UI_ID_MENU_CONTINUE, UI_ID_MENU_NEW_GAME, UI_ID_MENU_PLAY_INTRO, UI_ID_MENU_PLAY_CREDITS,
-             UI_ID_MENU_BACK,
-             UI_ID_MENU_TAB_GRAPHICS, UI_ID_MENU_TAB_INPUT, UI_ID_MENU_TAB_AUDIO_LANG,
+    /*Menu*/ UI_ID_MENU_SINGLEPLAYER, UI_ID_MENU_MULTIPLAYER, UI_ID_MENU_OPTIONS, UI_ID_MENU_QUIT, UI_ID_MENU_CONTINUE, UI_ID_MENU_NEW_GAME, UI_ID_MENU_PLAY_INTRO, UI_ID_MENU_PLAY_CREDITS, UI_ID_MENU_BACK, UI_ID_MENU_TAB_GRAPHICS, UI_ID_MENU_TAB_INPUT, UI_ID_MENU_TAB_AUDIO_LANG,
              UI_ID_MENU_MODEL_DETAIL, UI_ID_MENU_FXAA, UI_ID_MENU_SHADOWS, UI_ID_MENU_SSR, UI_ID_MENU_VSYNC, UI_ID_MENU_FOV_SLIDER, UI_ID_MENU_GAMMA_SLIDER, UI_ID_MENU_RESOLUTION, UI_ID_MENU_FULLSCREEN, UI_ID_MENU_TOGGLE_MONITOR, UI_ID_MENU_RES_APPLY,
-             UI_ID_MENU_MASTER_VOLUME_SLIDER, UI_ID_MENU_MUSIC_VOLUME_SLIDER, UI_ID_MENU_SFX_VOLUME_SLIDER, UI_ID_MENU_LOG_VOLUME_SLIDER, UI_ID_MENU_LANGUAGE,
-             UI_ID_MENU_INPUT_0, UI_ID_MENU_INPUT_41=UI_ID_MENU_INPUT_0 + 41,
+             UI_ID_MENU_MASTER_VOLUME_SLIDER, UI_ID_MENU_MUSIC_VOLUME_SLIDER, UI_ID_MENU_SFX_VOLUME_SLIDER, UI_ID_MENU_LOG_VOLUME_SLIDER, UI_ID_MENU_LANGUAGE, UI_ID_MENU_INPUT_0, UI_ID_MENU_INPUT_41=UI_ID_MENU_INPUT_0 + 41,
     /*NewGame*/ UI_ID_MENU_NAME_INPUT, UI_ID_MENU_DIFF_COMBAT, UI_ID_MENU_DIFF_PUZZLE, UI_ID_MENU_DIFF_MISSION, UI_ID_MENU_DIFF_CYBER, UI_ID_MENU_DIFF_CELL_0, UI_ID_MENU_DIFF_CELL_15 = UI_ID_MENU_DIFF_CELL_0 + 15, UI_ID_MENU_START,
     /*Save/Load*/ UI_ID_MENU_SAVE_SLOT_0, UI_ID_MENU_SAVE_SLOT_7=UI_ID_MENU_SAVE_SLOT_0 + 7,
     /*Pause*/ UI_ID_PAUSE_RESUME, UI_ID_PAUSE_LOAD, UI_ID_PAUSE_SAVE, UI_ID_PAUSE_OPTIONS, UI_ID_PAUSE_QUIT_TO_MENU, UI_ID_PAUSE_QUIT_GAME,
@@ -58,11 +54,6 @@ enum{UI_ID_NONE,
 #define UI_MFD_STRIDE (UI_ID_RMFD_TAB_WEAPON-UI_ID_LMFD_TAB_WEAPON)
 #define MID(rh, n) ((u32)UI_ID_LMFD_##n + ((rh) ? (u32)UI_MFD_STRIDE : 0u))/*Mirror an LMFD id onto whichever side we are drawing*/
 #define UIC(i) World.uiComponents[i]
-#define UI_DBLCLICK 0.5
-#define UI_KEY_BACKSPACE 10
-#define UI_KEY_CLEAR 11
-#define TARGETID_MARKER_REF_RANGE 7.68f/*Range at which the authored 128px TargetID marker is the right on-screen size*/
-#define TARGETID_TEXT_BASE_OFFSET 64.0f/*Pixels the two-line label sits above the projected head at the reference range*/
 #define TARGETID_TEXT_Y_GAIN 0.6f/*Label slides down as the target nears and up as it recedes, scaled from the base offset*/
 INLINE bool CursorIsOverBounds(float x0, float x1, float y0, float y1) { return World.cursorPos_x >= x0 && World.cursorPos_x <= x1 && World.cursorPos_y >= y0 && World.cursorPos_y <= y1;/*0,0=top left*/ }
 /* Projects a world point (relative to the player) into the 1366x768 UI space. Inverse of ScreenPointToRay:
@@ -533,8 +524,8 @@ static void SysUIDataClose(void) { MFD_CloseData(); World.Sys_UI.objectInUsePos=
 static void KeycodeSetDigit(int n) { if (World.Sys_UI.keycodeOnes < 0) { World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes; } else if (World.Sys_UI.keycodeTens < 0) { World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes+World.Sys_UI.keycodeTens*10; } else if (World.Sys_UI.keycodeHuns < 0) { World.Sys_UI.keycodeHuns=World.Sys_UI.keycodeTens; World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes+World.Sys_UI.keycodeTens*10+World.Sys_UI.keycodeHuns*100; } else { World.Sys_UI.keycodeHuns=World.Sys_UI.keycodeTens; World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes+World.Sys_UI.keycodeTens*10+World.Sys_UI.keycodeHuns*100; } }
 static void KeycodeKeypress(int k) { SystemUI* s=&World.Sys_UI; if (!s->keycodeValid) return; if (s->keycodeSolved) return; play_wav(sounds[39],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);
     if (k>=0&&k<=9) KeycodeSetDigit(k);
-    else if (k==UI_KEY_BACKSPACE) { if (s->keycodeHuns>=0) { s->keycodeOnes=s->keycodeTens; s->keycodeTens=s->keycodeHuns; s->keycodeHuns=-1; s->keycodeEntry=s->keycodeOnes+s->keycodeTens*10; return; } else if (s->keycodeTens>=0) { s->keycodeOnes=s->keycodeTens; s->keycodeTens=-1; s->keycodeEntry=s->keycodeOnes; return; } else if (s->keycodeOnes>=0) { s->keycodeOnes=-1; s->keycodeEntry=-1; return; } else return;/*empty backspace leaves the preloaded easy-difficulty value intact*/ }
-    else if (k==UI_KEY_CLEAR) { s->keycodeHuns=s->keycodeTens=s->keycodeOnes=-1; s->keycodeEntry=-1; }
+    else if (k==10) { if (s->keycodeHuns>=0) { s->keycodeOnes=s->keycodeTens; s->keycodeTens=s->keycodeHuns; s->keycodeHuns=-1; s->keycodeEntry=s->keycodeOnes+s->keycodeTens*10; return; } else if (s->keycodeTens>=0) { s->keycodeOnes=s->keycodeTens; s->keycodeTens=-1; s->keycodeEntry=s->keycodeOnes; return; } else if (s->keycodeOnes>=0) { s->keycodeOnes=-1; s->keycodeEntry=-1; return; } else return;/*empty backspace leaves the preloaded easy-difficulty value intact*/ }
+    else if (k==11) { s->keycodeHuns=s->keycodeTens=s->keycodeOnes=-1; s->keycodeEntry=-1; }
     if (s->keycodeEntry==s->keycodeValue) { if (s->keycodeHuns>=0) play_wav(sounds[46],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);/*code accepted*/ u16 pad=s->tetheredKeypadKeycode; if (pad>=INSTS_1ST_IDX && pad<World.instCount) { UseTargets(pad,World.instances[pad].targetIdx); if (World.instances[pad].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pad].messageLingdex]); } s->keycodeSolved=true; }
     else if (s->keycodeHuns>=0) play_wav(sounds[43],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);/*code not accepted*/
 }
@@ -544,8 +535,8 @@ void KeycodeEntryKey(i32 k) {
     if (!World.Sys_UI.keycodeValid || World.Sys_UI.keycodeSolved) return;
     if (k>=KEY_0 && k<=KEY_9) KeycodeKeypress(k-KEY_0);
     else if (k>=KEY_KP_0 && k<=KEY_KP_9) KeycodeKeypress(k-KEY_KP_0);
-    else if (k==KEY_BACKSPACE) KeycodeKeypress(UI_KEY_BACKSPACE);
-    else if (k==KEY_DELETE || k==KEY_KP_DECIMAL) KeycodeKeypress(UI_KEY_CLEAR);
+    else if (k==KEY_BACKSPACE) KeycodeKeypress(10);
+    else if (k==KEY_DELETE || k==KEY_KP_DECIMAL) KeycodeKeypress(11);
 }
 void UI_KeycodeClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredKeypadKeycode=U16_MAX; World.Sys_UI.keycodeValid=false; World.Sys_UI.keycodeHuns=World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes=-1; World.Sys_UI.keycodeEntry=-1; World.Sys_UI.keycodeValue=0; World.Sys_UI.keycodeSolved=false; SysUIDataClose(); }
 void UI_ElevFloorClick(bool rh,int btn) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh; if (btn<0||btn>7) return;
@@ -981,7 +972,7 @@ void RenderSearch(bool isRH) {
 }
 
 static const i16 elevBtnY[4]={578,620,663,705};
-static const i16 keyBtnX[3]={86,127,169},keyBtnY[4]={577,620,663,706}; static const u8 keyBtnK[12]={1,2,3,4,5,6,7,8,9,UI_KEY_BACKSPACE,0,UI_KEY_CLEAR}; static const char* keyBtnLabel[12]={"1","2","3","4","5","6","7","8","9","-","0","C"};
+static const i16 keyBtnX[3]={86,127,169},keyBtnY[4]={577,620,663,706}; static const u8 keyBtnK[12]={1,2,3,4,5,6,7,8,9,10,0,11}; static const char* keyBtnLabel[12]={"1","2","3","4","5","6","7","8","9","-","0","C"};
 static const i16 puzCellX[7]={51,80,109,138,166,195,224},puzCellY[5]={565,594,622,651,680};
 static const i16 wireNodeY[7]={566,594,623,651,679,707,736};
 static const i16 mgX[9]={32,32,32,32,156,156,156,156,32},mgY[9]={540,575,610,646,540,575,610,646,681};/*mgName is defined with the UI row handlers*/
@@ -1477,10 +1468,8 @@ static void RenderUI() {
                 float targetRange = V3_Dist(tpos,World.position[PLAYER1]);
                 if (!tid) continue;
                 if (!TargetIDInPlayerPVS(i)) continue;
-                
                 float sx, sy;
                 if (!WorldToScreenPoint(V3_AsubB(tpos,World.position[PLAYER1]),&sx,&sy))continue;
-                
                 float imgSz=vclamp(128.0f * (7.68f / vmax(targetRange,0.25f)), 24.0f, 640.0f), imgHalf=imgSz*0.5f;
                 if(tid&&hw)RenderUIImage((i16)(sx-imgHalf),(i16)sy,(i16)(imgSz*1.2f),(i16)(imgSz*1.38f),1051);
                 char label[192]={0}; size_t used=0; u8 ver=World.invP1.hwVers[HW_TID_IDX]; float range=targetRange;
@@ -1491,11 +1480,7 @@ static void RenderUI() {
                     if (ver > 2 && used < sizeof(label))         used += (size_t)sFormat(label + used, sizeof(label) - used, "%s%.0f, %.1fM, %s", used ? "\n" : "", e->health, range, status);
                     if (!used&&textIdx >= 512 && textIdx <= 515) used += (size_t)sFormat(label + used, sizeof(label) - used, "%s",                status); /*Damage status with v0 hardware*/
                 } else if (textIdx >= 0)                         used += (size_t)sFormat(label + used, sizeof(label) - used, "%s",                status); /*NO DAMAGE always shows, regardless of hardware*/
-                    
-                if (label[0]) { /*Font stays fixed size; the label only slides down as the target gets closer and up as it gets further.*/
-                    float textY = sy - TARGETID_TEXT_BASE_OFFSET + vclamp(TARGETID_TEXT_Y_GAIN * TARGETID_TEXT_BASE_OFFSET*(7.68f / vmax(targetRange, 0.25f) - 1.0f), -128.0f, 96.0f);
-                    RenderText3DC((V3){sx, textY, 0.0f}, T_YELLOW, FONT_NORMAL, 0.8f, label);
-                }
+                if (label[0]) { float textY = sy - 64.0f + vclamp(0.6f * 64.0f * (7.68f / vmax(targetRange, 0.25f) - 1.0f), -128.0f, 96.0f); RenderText3DC((V3){sx, textY, 0.0f}, T_YELLOW, FONT_NORMAL, 0.8f, label); }
             }
             bool cyber = World.curLev == LEVEL_CYBERSPACE;
             if (cyber) { World.Sys_UI.mfdTab[0] = 4; World.Sys_UI.mfdSelected[0] = 4; } /*Unity MFDManager.EnterCyberspace forces the center MFD to the Software tab (CenterTabButtonClickSilent(3)); forcing it every frame also overrides tab hotkeys/clicks while in cyberspace*/
@@ -1504,15 +1489,13 @@ static void RenderUI() {
                 char flt[6]; if (World.Sys_UI.tWrnTextIdx[i]==185) sFormat(flt,6,"%.1f",(double)World.instances[PLAYER1].radiation);
                 RenderTextL(340,72+i*18,World.Sys_UI.tWrnColorIdx[i],FONT_NORMAL,0.8f,"%s%s%s",Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx[i]],World.Sys_UI.tWrnTextIdx[i]==185?flt:World.Sys_UI.tWrnTextIdx2[i]>=0?Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx2[i]]:"",World.Sys_UI.tWrnTextIdx3[i]>=0?Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx3[i]]:"");
             }
-            
             if (!editPanelActive && !World.Sys_UI.fullMapOpen[0] && !World.Sys_UI.fullMapOpen[1]) { if (cyber) { CenterMFD(); } else { SideMFD(false); CenterMFD(); SideMFD(true); } } else if (World.Sys_UI.fullMapOpen[0] || World.Sys_UI.fullMapOpen[1]) { AutomapBlitFullToUI(); UIRImg(UI_ID_FULLMAP_CLOSE,(i16)((UI_W-146)/2),706,146,28,1087); RenderTextL(610,710,T_YELLOW,FONT_NORMAL,0.8,"CLOSE"); }/*while the edit panel is active neither MFD set renders, so no MFD region can intercept a panel click; the full-screen automap is untouched*/
             if(World.diffMis>=3){UIR(UI_ID_CMFD_MISSION_TIMER,43,2,260,14); RenderTextL(43,2,T_YELLOW,FONT_NORMAL,0.8,"%s",World.misTimerMission<1100?Sys_Text.stringTable[World.misTimerMission]:"");/*MissionTimerT*/ {char misT[8]; if(World.misTimerTimesUP) sFormat(misT,sizeof(misT),"%s",869<1100?Sys_Text.stringTable[869]:""); else {float mt=World.misTimerT<0.0f?0.0f:World.misTimerT; int mm=(int)(mt/60.0f),ss=(int)(mt-(float)(mm*60)); sFormat(misT,sizeof(misT),"%02d:%02d",mm,ss);} RenderTextL(258,2,T_YELLOW,FONT_NORMAL,0.8,"%s",misT);}}
             if (World.curLev==LEVEL_CYBERSPACE) { UIR(UI_ID_CMFD_CYBER_TIMER,28,530,80,14); RenderTextL(28,530,T_WHITE,FONT_NORMAL,0.8,"T -"); char cyberT[8]; float ct = World.instances[PLAYER1].cyberTimer < 0.0f ? 0.0f : World.instances[PLAYER1].cyberTimer; int cmm = (int)(ct / 60.0f); sFormat(cyberT,sizeof(cyberT),"%02d:%02d",cmm,(int)(ct - (float)(cmm * 60))); RenderTextL(68,530,T_WHITE,FONT_NORMAL,0.8,"%s",cyberT); } /*the player's live CyberTimer countdown, not the old hardcoded 99:99*/
             if(World.curLev != LEVEL_CYBERSPACE && (World.invP1.hardwareIsActive & HW_BIO)!=0){/*BioMonitor: not part of the cyberspace HUD*/
                 BiomonitorBlitToUI();
-                if (!Cheats.showFPS) {/*showFPS cheat turns graphs into frame-time scopes, so the stock readout is hidden to keep the graph area clear*/
-                    char biomText[128];
-                    int y = 83;
+                if (!Cheats.showFPS) {
+                    char biomText[128]; int y = 83;
                     RenderTextL(4,y,T_YELLOW,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[526]); /*Biomonitor Active:*/ y+=16;
                     RenderTextL(4,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[527]); /*Heart Rate:*/
                     sFormat(biomText,sizeof(biomText),"%d",(int)bioMonitor.heartRate); RenderTextL(120,y,T_GREEN,FONT_NORMAL,0.8,"%s",biomText);
@@ -1560,10 +1543,8 @@ static void RenderUI() {
                 if(editingThis){char buf[44];sFormat(buf,44,"%s%s",editFieldBuffer,caretOn?"|":"");RenderTextL(EF_VALUEX,y,T_RED,FONT_NORMAL,1.0f,"%s",buf);}
                 else { float w=MeasureLineAdvance(v,FONT_NORMAL); UIR(UI_ID_CMFD_EDIT_ROW_0+i,EF_VALUEX,y,(i16)w,26); bool hov=UIOver(UI_ID_CMFD_EDIT_ROW_0+i); RenderTextL(EF_VALUEX,y,hov?T_YELLOW:T_WHITE,FONT_NORMAL,1.0f,"%s",v); }
             }
-            {/*type button + axial spot-direction buttons along the panel bottom edge; rows end at y=578, panel bottom is 684*/
             RenderTextL(EF_LABELX,596,T_GREEN,FONT_NORMAL,1.0f,"type"); UIRImg(UI_ID_CMFD_EDIT_LIGHT_TYPE,EF_VALUEX,596,120,28,1087); {bool hov=UIOver(UI_ID_CMFD_EDIT_LIGHT_TYPE); RenderTextC(EF_VALUEX+60,602,hov?T_YELLOW:T_GREEN,FONT_NORMAL,0.8f,"%s",(L->lflags&LSPOT)?"spot":"point");}
             static const char* lfDirLbl[6]={"N","E","S","W","Up","Dn"}; for(int d=0;d<6;++d){i16 bx=(i16)(EF_LABELX+d*36); u32 bid=UI_ID_CMFD_EDIT_LIGHT_DIR_N+d; UIRImg(bid,bx,644,28,28,1087); bool hov=UIOver(bid); RenderTextC(bx+14,650,hov?T_YELLOW:(LightDirIs((u8)d)?T_YELLOW:T_GREEN),FONT_NORMAL,0.8f,"%s",lfDirLbl[d]);}
-            }
             if(editFieldEditing&&Sys_Input.scrollDelta!=0.0f){EditFieldStep((float)Sys_Input.scrollDelta);Sys_Input.scrollDelta=0.0f;}
         }
     }
@@ -1574,12 +1555,8 @@ static void RenderUI() {
             if (World.Sys_UI.vmailFrame == (vmailStartFrames[clip]+11)) play_wav(sounds[99], AppliedFXVol(1.0f), (V3){0}, false);
             World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; World.Sys_UI.vmailFrame++; if (World.Sys_UI.vmailFrame > vmailEndFrames[clip]) World.Sys_UI.vmailFrame = vmailEndFrames[clip];
         }
-        {
-            u32 want = World.Sys_UI.vmailFrame, nxt = VideoPeekFrame(want); VideoRequestFrame(want); if (nxt != 0xFFFFFFFFu) VideoPrefetchFrame(nxt);/*same decode-ahead feed as RenderVideoPage: nothing else queues VMail frames, so without this the ring never fills and the viewer stays black*/
-            u32 mrt = VideoFrameTexIndex(want);
-            if (mrt != 0xFFFFFFFFu) heldMail = mrt;
-            if (heldMail != 0xFFFFFFFFu) UIRImg(UI_ID_VMAIL_VIEWER,283,184,800,400,heldMail);/*Vmail viewer*/
-        }
+        u32 want = World.Sys_UI.vmailFrame, nxt = VideoPeekFrame(want); VideoRequestFrame(want); if (nxt != 0xFFFFFFFFu) VideoPrefetchFrame(nxt);/*same decode-ahead feed as RenderVideoPage: nothing else queues VMail frames, so without this the ring never fills and the viewer stays black*/
+        heldMail = VideoFrameTexIndex(want); if (heldMail != 0xFFFFFFFFu) UIRImg(UI_ID_VMAIL_VIEWER,283,184,800,400,heldMail);/*Vmail viewer*/
     }
     i16 debugTextStartY = 90;
     if (Cheats.showLocation && !World.menuActive) RenderTextL(16, debugTextStartY, T_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z,World.rotation[PLAYER1].x,World.rotation[PLAYER1].y,World.rotation[PLAYER1].z,World.rotation[PLAYER1].w);

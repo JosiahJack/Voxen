@@ -384,8 +384,8 @@ typedef struct {
     Color fogColor[MAX_LEVELS];
     char playerName[27],audiologNames[LOGCNT][T_LOGSTR_MAX],audiologSubjects[LOGCNT][T_LOGSTR_MAX],audiologSenders[LOGCNT][T_LOGSTR_MAX],audioLogSpeech2Text[LOGCNT][T_LOGSTR_MAX];
 } GlobalContext; // Savable complete game state data
-extern GlobalContext World; extern float modelMatrices[INSTANCE_COUNT*16],**physPos,*world_from_mdl,modelBounds[MAX_MDLS]; extern V3 modelMin[MAX_MDLS],modelMax[MAX_MDLS];extern u32 modelVertexCounts[MAX_MDLS],uniqueCvxMeshCount,globalframe,*physVertCounts,vbos[MAX_MDLS],tbos[MAX_MDLS],drawCalls,vertsRendered,voxelUpdateSP,lightsID,cellVisibleDataID,colorBufferID,texPalID,textureOffsetsID,textureSizesID,texPalOfsID,threadCnt,shadowmapIndirectionList[LIGHT_COUNT],*cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES];
-extern V3 cyberSpaceEntryLocations[8]; extern u16 mdlsCnt,modelTriangleCounts[MAX_MDLS],**modelTriangles,*cvxAdjLists[MAX_UNIQUE_CVX_MESHES],cvxAdjStart[MAX_UNIQUE_CVX_MESHES],playerCellIdx,texCnt,cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX],uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES],**physTris,modelBVHNodeCounts[MAX_MDLS]; extern u32* rtSrcVertCounts; extern u16** modelBVHTriOrder; extern u32 modelBVHTriOrderCounts[MAX_MDLS];
+extern GlobalContext World; extern float modelMatrices[INSTANCE_COUNT*16],**physPos,*world_from_mdl,modelBounds[MAX_MDLS]; extern V3 modelMin[MAX_MDLS],modelMax[MAX_MDLS];extern u32 modelVertexCounts[MAX_MDLS],uniqueCvxMeshCount,globalframe,*physVertCounts,modelVBO,modelIBO,drawCalls,vertsRendered,voxelUpdateSP,lightsID,cellVisibleDataID,colorBufferID,texPalID,textureOffsetsID,textureSizesID,texPalOfsID,threadCnt,shadowmapIndirectionList[LIGHT_COUNT],*cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES];
+extern V3 cyberSpaceEntryLocations[8]; extern u16 mdlsCnt,modelTriangleCounts[MAX_MDLS],**modelTriangles,*cvxAdjLists[MAX_UNIQUE_CVX_MESHES],cvxAdjStart[MAX_UNIQUE_CVX_MESHES],playerCellIdx,texCnt,cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX],uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES],**physTris,modelBVHNodeCounts[MAX_MDLS]; extern u32* rtSrcVertCounts; extern u16** modelBVHTriOrder; extern u32 modelBVHTriOrderCounts[MAX_MDLS]; extern u32 mdlVboOfs[MAX_MDLS],mdlIboOfs[MAX_MDLS],rtCapNodeWords,rtCapTriWords,rtCapPosWords,rtCapUvWords,rtCapOrderU16,rtPersistNodeWords,rtPersistTriWords,rtPersistPosWords,rtPersistUvWords,rtPersistOrderU16; extern u8 mdlPersistentSet[MAX_MDLS];
 extern size_t cvxAdjOffsetBytes[MAX_UNIQUE_CVX_MESHES],cvxAdjListBytes[MAX_UNIQUE_CVX_MESHES];
 extern u32 textDecalVBO[MAX_LEVELS][INSTANCE_COUNT]; extern u32 textDecalVertexCount[MAX_LEVELS][INSTANCE_COUNT];
 #define DECAL_INLINE_TEXT_MAX 128
@@ -418,9 +418,8 @@ void UseTargets(u16,u16),AddForce(u16,V3,bool),TriggerTrippedUpdate(u16),CyberIt
      DrawLine(V3,V3,Color),ForceInventoryMode(),ForceShootMode(),PlayVmail(u8),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),UpdateLights(),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),
      LoadTextForLanguage(u8),RenderTextL(i16,i16,u32,u8,float,const char* restrict,...),RenderTextC(i16,i16,u32,u8,float,const char* restrict,...),RenderText3DC(V3,u32,u8,float,const char* restrict,...),BuildTextDecalMeshes(),CullCore(),PngArenaInit(PngArena*),AppendTextWarning(i32,i32,i32,i32,i32),ChangeAnim(Entity*,u8),ForceDoorPortalOpen(u16),QuestBitSet(u8),QuestBitClear(u8),QuestBitToggle(u8);
 bool VidMenuKeyArmed(void);
-size_t AudioLiveBytes(); /* diagnostics: live audio sample bytes */
+size_t AudioLiveBytes();
 const char *JumpSound(FootStepType),*JumpLandSound(FootStepType); FootStepType GetFootstepTypeForPrefab(int); char* StringFindFirstCharWithin(const char*,char);
-// Quest bits (info_mission constIndex 710).  Only ever set/toggled/checked by info_mission entities.
 enum{QB_RobotSpawnDeactivated=0,QB_IsotopeInstalled,QB_ShieldActivated,QB_LaserSafetyOverriden,QB_LaserDestroyed,QB_BetaGroveCyberUnlocked,QB_GroveAlphaJettisonEnabled,QB_GroveBetaJettisonEnabled,QB_GroveDeltaJettisonEnabled,QB_MasterJettisonBroken,QB_Relay428Fixed,QB_MasterJettisonEnabled,QB_BetaGroveJettisoned,QB_AntennaNorthDestroyed,QB_AntennaSouthDestroyed,QB_AntennaEastDestroyed,QB_AntennaWestDestroyed,QB_SelfDestructActivated,QB_BridgeSeparated,QB_IsolinearChipsetInstalled,QB_COUNT,QB_None=255};
 enum{IO_NONE=0}; u16 IOInternName(const char*);
 enum{TARG_IOFLAGHI_SPAWNER_ACTIVATE=(1u<<0),TARG_IOFLAGHI_SPAWNER_ACTIVATE_ALERTED=(1u<<1),TARG_IOFLAGHI_AWAKE_SLEEPING=(1u<<2),TARG_IOFLAGHI_CYBORG_CONVERSION=(1u<<3)};
@@ -430,7 +429,6 @@ void SpawnManagerActivate(u16 self,bool alerted),SpawnManagerUpdate(u16 self);
 float sinf(float x); float tanf(float x); float cosf(float x);
 #define PI 3.14159265f
 #define TAU 6.2831853f
-#define SERVBOT_MESH_YAW_DEG (-99.0f)/*npc_servbot (437) mesh-vs-forward yaw correction, tuned in-game. Render side (voxen.c UpdateInstanceMatrix4x4s) yaws the mesh by this about global Y; spawn side (entity.c load loop) counter-yaws by minus this so absolute placements are unchanged. Keep both in sync here, not at the use sites.*/
 #define vabs(x) ((x) < 0 ? -(x) : (x))
 #define vmin(a,b) ((a) < (b) ? (a) : (b))
 #define vmax(a,b) ((a) > (b) ? (a) : (b))
@@ -485,9 +483,7 @@ INLINE bool IdxIsDoor(int c) { return (c >= 496 && c < 515); }
 INLINE bool IdxIsLayerDoor(int c) { return c==497||c==500||c==502; }
 INLINE bool IdxIsNPC(int c) { return (c >= 419 && c <= 447); }
 INLINE bool IdxIsCorpse(int c) { return (c >= 465 && c < 472); }
-#define CYBER_DECOY_CONST 553u
-#define SPAWNPOINT_CONST 715u/*info_spawnpoint: the spawn locations a logic_spawner (702) picks from*/
-INLINE bool IsDamageable(const Entity* e) { return IdxIsNPC(e->index) || e->health > 0.0f || e->cyberHealth > 0.0f || e->index == CYBER_DECOY_CONST; }
+INLINE bool IsDamageable(const Entity* e) { return IdxIsNPC(e->index) || e->health > 0.0f || e->cyberHealth > 0.0f || e->index == 553u; }
 INLINE bool IdxIsHardware(int c) { return (c >= 328) && (c <= 339); }     INLINE bool IdxIsAmbient(int c) { return (c >= 621 && c <= 655); }
 INLINE bool IdxIsButtonSwitch(int c) { return ((c >= 688 && c <= 692) || c == 694 || c == 695); }
 INLINE bool IdxIsSearchable(int c) { return ((c >= 464 && c <= 476) || c == 530 || c == 531); }
@@ -538,11 +534,12 @@ typedef void(*FGL_E)(u32), (*FGL_DF)(u32),(*FGL_LP)(u32),  (*FGL_GB)(i32,u32*), 
 typedef void(*FGL_UP)(u32),(*FGL_D)(u32), (*FGL_DM)(bool), (*FGL_LW)(float),    (*FGL_GIV)(u32,i32*),(*FGL_U1UI)(i32,u32),  (*FGL_GSIV)(u32,u32,i32*),  (*FGL_VAF)(u32,i32,u32,bool,u32),  (*FGL_UM3FV)(i32,i32,bool,const float*), (*FGL_U3F)(i32,float,float,float),              (*FGL_U2F)(i32,float,float);
 typedef u32(*FGL_CP)(), (*FGL_GERR)(), (*FGL_CRS)(u32); typedef bool(*FGL_UB)(u32); typedef void(*FGL_GIQ)(i32,u32*),(*FGL_GQOU64)(u32,u32,u64*); typedef void(*FGL_DAI)(u32,i32,i32,i32); typedef void(*FGL_BF)(i32,i32,i32,i32,i32,i32,i32,i32,u32,u32); typedef void(*FGL_GTKP)(u32,i32,u32,i32*); typedef void(*FGL_CISD)(u32,u32,i32,i32,i32,i32,u32,u32,i32,i32,i32,i32,i32,i32,i32);
 extern FGL_GTKP glGetTexLevelParameteriv; extern FGL_BF glBlitFramebuffer; extern FGL_T2D glTexSubImage2D; extern FGL_BFB glBindFramebuffer; extern FGL_GFS glGenFramebuffers; extern FGL_FBT2D glFramebufferTexture2D; extern FGL_GT glGenTextures; extern FGL_T2D glTexImage2D;
-extern u32 uiFBO; void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp); void EnsureReflectionResources(void);void VideoInit(void); u32 VideoFrameTexIndex(u32 texIdx); void VideoRequestFrame(u32 texIdx); void VideoPrefetchFrame(u32 texIdx); u32 VideoPeekFrame(u32 texIdx);
+extern u32 uiFBO; void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp); void EnsureReflectionResources(void);void VideoInit(void); u32 VideoFrameTexIndex(u32 texIdx); void VideoRequestFrame(u32 texIdx); void VideoPrefetchFrame(u32 texIdx); u32 VideoPeekFrame(u32 texIdx); void SwapLevelModels(u8),TrimNonResidentModelCPU(u8),RtSwapPatchModels(); bool EntIsLodCardConst(u16); u8 MdlSwapCurLev(void); u32 MdlExclListForLev(u8,u16*,u32);
 extern FGL_GB glGenBuffers; extern FGL_BB glBindBuffer; extern FGL_BD glBufferData; extern FGL_UB glUnmapBuffer; extern FGL_MBR glMapBufferRange; extern FGL_U2F glUniform2f; extern FGL_U1F glUniform1f; extern FGL_U1UI glUniform1ui; extern FGL_UP glUseProgram; extern FGL_RP glReadPixels; extern FGL_U3F glUniform3f; extern FGL_DC glDispatchCompute; extern FGL_DA glDrawArrays;
 extern FGL_AT glActiveTexture; extern FGL_BVA glBindVertexArray; extern FGL_U1I glUniform1i; extern FGL_E glEnable; extern FGL_U4F glUniform4f; extern FGL_BT glBindTexture; extern FGL_GERR glGetError; extern FGL_GVA glGenVertexArrays; extern FGL_VAF glVertexAttribFormat; extern FGL_VAB glVertexAttribBinding;
 extern FGL_EVAA glEnableVertexAttribArray; extern FGL_BVB glBindVertexBuffer; extern FGL_BSD glBufferSubData; extern FGL_UM4FV glUniformMatrix4fv; extern FGL_DM glDepthMask; extern FGL_DF glDepthFunc; extern FGL_D glDisable; extern FGL_LW glLineWidth; extern FGL_GIQ glGenQueries; extern FGL_GQOU64 glGetQueryObjectui64v; extern FGL_DAI glDrawArraysInstanced; extern FGL_TPFV glTexParameterfv;
 extern FGL_F glFinish; extern FGL_BBB glBindBufferBase; extern FGL_BB glBlendFunc; typedef void(*FGL_BQ)(u32,u32); extern FGL_BQ glBeginQuery; extern FGL_D glEndQuery; typedef void(*FGL_CBSD)(u32,u32,intptr_t,intptr_t,size_t); extern FGL_CBSD glCopyBufferSubData; typedef void(*FGL_CLBSD)(u32,u32,intptr_t,intptr_t,u32,u32,const void*); extern FGL_CLBSD glClearBufferSubData; extern FGL_CISD glCopyImageSubData; extern FGL_CPIV glGetBufferParameteriv; typedef void(*FGL_GBSD)(u32,intptr_t,size_t,void*); extern FGL_GBSD glGetBufferSubData; extern FGL_GB glDeleteBuffers;
+typedef void(*FGL_BBR)(u32,u32,u32,intptr_t,size_t); extern FGL_BBR glBindBufferRange;
 // Input
 enum {JOYHAT_CENTERED=0,JOYHAT_UP=1,JOYHAT_RIGHT=2,JOYHAT_DOWN=4,JOYHAT_LEFT=8,JOYHAT_RIGHT_UP=(2|1),JOYHAT_RIGHT_DOWN=(2|4),JOYHAT_LEFT_UP=(8|1),JOYHAT_LEFT_DOWN=(8|4)};
 enum {KEY_UNKNOWN=-1,KEY_SPACE=32,KEY_APOSTROPHE=39/* ' */,KEY_COMMA=44/* , */,KEY_MINUS=45/* - */,KEY_PERIOD=46/* . */,KEY_SLASH=47/* / */,KEY_0=48,KEY_1=49,KEY_2=50,KEY_3=51,KEY_4=52,KEY_5=53,KEY_6=54,KEY_7=55,KEY_8=56,KEY_9=57,

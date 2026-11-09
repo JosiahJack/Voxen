@@ -216,9 +216,9 @@ static void AISetEnemy(u16 idx, u16 eidx) {
         if (!World.decoyActive) { World.decoyInstance = U16_MAX; }
         else {
             u16 check_d = World.decoyInstance;
-            if (check_d >= INSTS_1ST_IDX && check_d < World.instCount && World.instances[check_d].index == CYBER_DECOY_CONST) { d = check_d; }
+            if (check_d >= INSTS_1ST_IDX && check_d < World.instCount && World.instances[check_d].index == 553u) { d = check_d; }
             else {
-                for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if(World.instances[i].index == CYBER_DECOY_CONST){World.decoyInstance = i; d = i; break;} }
+                for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if(World.instances[i].index == 553u){World.decoyInstance = i; d = i; break;} }
                 if (d == U16_MAX) { World.decoyInstance = U16_MAX; }
             }
         }

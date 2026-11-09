@@ -401,9 +401,10 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     if (entIdx == 594 /*trigger_counter*/) World.instances[i].dontReset = true;
     if (entIdx == 702 /*logic_spawner*/) { Entity* sm=&World.instances[i]; if (sm->numberToSpawn == 0) sm->numberToSpawn = 1; if (sm->maxDelayBetweenSpawns <= 0.0f) { sm->minDelayBetweenSpawns = 15.0f; sm->maxDelayBetweenSpawns = 45.0f; } if (sm->allSpawnedResetDelay <= 0.0f) sm->allSpawnedResetDelay = 120.0f; }
     if (World.levelCurrentlyLoading) { /*So cheat spawns don't affect the %*/ u8 sl=World.curLev; if (sl<MAX_LEVELS) { u8* dst=entIdx==477?&World.levelCameraCount[sl]:entIdx==478?&World.levelLargeNodeCount[sl]:entIdx==479?&World.levelSmallNodeCount[sl]:0; if (dst && *dst<255) (*dst)++; } }
-    World.col[i]=EDefs[entIdx].col; World.colliderCenter[i]=EDefs[entIdx].colCtr; World.colliderSize[i]=EDefs[entIdx].colSz; World.mass[i]=EDefs[entIdx].mass > 0.0f ? EDefs[entIdx].mass : 1.0f; World.gravity[i]=IdxIsDynamicObject(World.instances[i].index) ? 1.0f : 0.0f; if (IdxIsButtonSwitch(entIdx)) { World.instances[i].lockedMessageLingdex = 193; World.instances[i].SFXLockedIndex = -1; }
-    if (entIdx < 307 && cardChunk[entIdx]) { World.instances[i].lodIndex=178;/*LOD card index*/ World.col[i]=CT_BOX; World.colliderCenter[i].y=1.32f; World.colliderSize[i]=(V3){2.56f,0.08f,2.56f}; } World.instCount++; return i;
-}
+    World.col[i]=EDefs[entIdx].col; World.colliderCenter[i]=EDefs[entIdx].colCtr; World.colliderSize[i]=EDefs[entIdx].colSz; World.mass[i]=EDefs[entIdx].mass > 0.0f ? EDefs[entIdx].mass : 1.0f; World.gravity[i]=(IdxIsDynamicObject(World.instances[i].index) && (entIdx<481 || entIdx>495)) ? 1.0f : 0.0f; if (IdxIsButtonSwitch(entIdx)) { World.instances[i].lockedMessageLingdex = 193; World.instances[i].SFXLockedIndex = -1; }
+    if (entIdx < 307 && cardChunk[entIdx]) { World.instances[i].lodIndex=178;/*LOD card index*/ World.col[i]=CT_BOX; World.colliderCenter[i].y=1.32f; World.colliderSize[i]=(V3){2.56f,0.08f,2.56f}; } World.instCount++; return i; }
+
+bool EntIsLodCardConst(u16 entIdx) { return entIdx < 307 && cardChunk[entIdx]; } /*Derived resident-set closure (models.c) needs the private cardChunk table to know which consts fall back to the generic LOD card*/
 
 static const char* mm_ptr; static const char* mm_end;
 #define KEY_EQ(lit) (keyLen == (int)(sizeof(lit)-1) && sCompUpToLen(key, lit, sizeof(lit)-1) == 0)
@@ -956,6 +957,7 @@ void CyberGolReset(void);
 void LoadLevel(u8 curlevel, V3 pos) {
     u8 prevLevel = World.curLev;
     if (curlevel == LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE) { World.cyberReturnLevel = (i8)World.curLev; World.cyberReturnPos = World.position[PLAYER1]; }/*ExitCyberspace returns here*/
+    SwapLevelModels(curlevel); /*Bring this level's exclusive models on the GPU and reparse their CPU welded/physics data; frees the outgoing level's exclusive set. No-ops when everything needed is already resident. No GL buffer is ever deleted: the swap window is overwritten in place.*/
     CloseSearch();
     World.Sys_UI.tetheredKeypadKeycode=World.Sys_UI.tetheredKeypadElevator=World.Sys_UI.tetheredPGP=World.Sys_UI.tetheredPWP=U16_MAX;/*panel tethers are per-level; the entity index they point at dies with the level, so don't sever against a stale one*/
     World.levelCurrentlyLoading = true;
