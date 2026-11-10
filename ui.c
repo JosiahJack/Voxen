@@ -1,7 +1,9 @@
 // ui.c - User Interface(UI) aka HUD
-static bool reflDropdownOpen = false;
-static i8 reflHoverIdx = -1;
-void BiomonitorBlitToUI();
+static bool reflDropdownOpen = false,saveSlotUsed[8]; static i8 reflHoverIdx = -1, rebindRow = -1, saveSlotEditing = -1; static u32 rebindArmedFrame = 0; static char saveSlotNames[8][48],saveNameEntry[48]; static u8 saveNameEntryLen = 0;
+bool enteringSaveName = false;
+extern V3 queuedLevelPos; extern u8 queuedLevelToLoad; extern float reloadTime[16];
+void BiomonitorBlitToUI(),LoadTextForLanguage(u8),LoadLogTextForLanguage(u8),SaveGame(u8,const char*),LoadGame(u8),WeaponFireStartWeaponDip(float),RemoveWeapon(i32),ActualChangeAmmoType(),OverloadButtonAction(),ReloadSecret(bool),Unload(bool),PlayLog(int),CheckForUnreadLogs(),UseTargets(u16,u16),UseCyberspaceItemByIndex(int);;
+bool PlayerInElevatorCell(),FindElevatorKeypadPos(u8,V3*),ReadSaveSlotName(u8,char*,size_t);
 #define UI_MFD_IDS(P) UI_ID_##P##_TAB_WEAPON,           UI_ID_##P##_TAB_ITEM,             UI_ID_##P##_TAB_AUTOMAP,       UI_ID_##P##_TAB_DATA,          UI_ID_##P##_PANEL,                 \
                       UI_ID_##P##_WEAPON_NAME,          UI_ID_##P##_WEAPON_ICON,          UI_ID_##P##_WEAPON_AMMO,       UI_ID_##P##_WEAPON_RELOAD,     UI_ID_##P##_WEAPON_UNLOAD,         \
                       UI_ID_##P##_WEAPON_OVERLOAD,      UI_ID_##P##_WEAPON_ENERGY_SLIDER, UI_ID_##P##_MEDIA_HEADER,      UI_ID_##P##_MEDIA_TAB_0,                                          \
@@ -30,11 +32,9 @@ void BiomonitorBlitToUI();
                       UI_ID_##P##_SEARCH_ICON_3 = UI_ID_##P##_SEARCH_ICON_0 + 3, \
                       UI_ID_##P##_SEARCH_EMPTY,         UI_ID_##P##_SEARCH_CLOSE,         UI_ID_##P##_AUTOMAP_ZOOM_IN,   UI_ID_##P##_AUTOMAP_ZOOM_OUT,  UI_ID_##P##_AUTOMAP_FULL,          \
                       UI_ID_##P##_AUTOMAP_SIDE
-void LoadTextForLanguage(u8 lang); void LoadLogTextForLanguage(u8 lang);
 enum{UI_ID_NONE,
-    /*Menu*/ UI_ID_MENU_SINGLEPLAYER, UI_ID_MENU_MULTIPLAYER, UI_ID_MENU_OPTIONS, UI_ID_MENU_QUIT, UI_ID_MENU_CONTINUE, UI_ID_MENU_NEW_GAME, UI_ID_MENU_PLAY_INTRO, UI_ID_MENU_PLAY_CREDITS, UI_ID_MENU_BACK, UI_ID_MENU_TAB_GRAPHICS, UI_ID_MENU_TAB_INPUT, UI_ID_MENU_TAB_AUDIO_LANG,
-             UI_ID_MENU_MODEL_DETAIL, UI_ID_MENU_FXAA, UI_ID_MENU_SHADOWS, UI_ID_MENU_SSR, UI_ID_MENU_VSYNC, UI_ID_MENU_FOV_SLIDER, UI_ID_MENU_GAMMA_SLIDER, UI_ID_MENU_RESOLUTION, UI_ID_MENU_FULLSCREEN, UI_ID_MENU_TOGGLE_MONITOR, UI_ID_MENU_RES_APPLY,
-             UI_ID_MENU_MASTER_VOLUME_SLIDER, UI_ID_MENU_MUSIC_VOLUME_SLIDER, UI_ID_MENU_SFX_VOLUME_SLIDER, UI_ID_MENU_LOG_VOLUME_SLIDER, UI_ID_MENU_LANGUAGE, UI_ID_MENU_INPUT_0, UI_ID_MENU_INPUT_41=UI_ID_MENU_INPUT_0 + 41,
+    /*Menu*/ UI_ID_MENU_SINGLEPLAYER, UI_ID_MENU_MULTIPLAYER, UI_ID_MENU_OPTIONS, UI_ID_MENU_QUIT, UI_ID_MENU_CONTINUE, UI_ID_MENU_NEW_GAME, UI_ID_MENU_PLAY_INTRO, UI_ID_MENU_PLAY_CREDITS, UI_ID_MENU_BACK, UI_ID_MENU_TAB_GRAPHICS, UI_ID_MENU_TAB_INPUT, UI_ID_MENU_TAB_AUDIO_LANG, UI_ID_MENU_MODEL_DETAIL, UI_ID_MENU_FXAA, UI_ID_MENU_SHADOWS, UI_ID_MENU_SSR, UI_ID_MENU_VSYNC, UI_ID_MENU_FOV_SLIDER, UI_ID_MENU_GAMMA_SLIDER, UI_ID_MENU_RESOLUTION,
+             UI_ID_MENU_FULLSCREEN, UI_ID_MENU_TOGGLE_MONITOR, UI_ID_MENU_RES_APPLY, UI_ID_MENU_MASTER_VOLUME_SLIDER, UI_ID_MENU_MUSIC_VOLUME_SLIDER, UI_ID_MENU_SFX_VOLUME_SLIDER, UI_ID_MENU_LOG_VOLUME_SLIDER, UI_ID_MENU_LANGUAGE, UI_ID_MENU_INPUT_0, UI_ID_MENU_INPUT_41=UI_ID_MENU_INPUT_0 + 41,
     /*NewGame*/ UI_ID_MENU_NAME_INPUT, UI_ID_MENU_DIFF_COMBAT, UI_ID_MENU_DIFF_PUZZLE, UI_ID_MENU_DIFF_MISSION, UI_ID_MENU_DIFF_CYBER, UI_ID_MENU_DIFF_CELL_0, UI_ID_MENU_DIFF_CELL_15 = UI_ID_MENU_DIFF_CELL_0 + 15, UI_ID_MENU_START,
     /*Save/Load*/ UI_ID_MENU_SAVE_SLOT_0, UI_ID_MENU_SAVE_SLOT_7=UI_ID_MENU_SAVE_SLOT_0 + 7,
     /*Pause*/ UI_ID_PAUSE_RESUME, UI_ID_PAUSE_LOAD, UI_ID_PAUSE_SAVE, UI_ID_PAUSE_OPTIONS, UI_ID_PAUSE_QUIT_TO_MENU, UI_ID_PAUSE_QUIT_GAME,
@@ -49,75 +49,37 @@ enum{UI_ID_NONE,
                        UI_ID_CMFD_EMAIL_ENTRY_0, UI_ID_CMFD_EMAIL_ENTRY_14 = UI_ID_CMFD_EMAIL_ENTRY_0 + 14, UI_ID_CMFD_DATA_ENTRY_0, UI_ID_CMFD_DATA_ENTRY_12 = UI_ID_CMFD_DATA_ENTRY_0 + 12, UI_ID_CMFD_NOTE_TOGGLE_0, UI_ID_CMFD_NOTE_TOGGLE_17 = UI_ID_CMFD_NOTE_TOGGLE_0 + 17,
     /*Left/Right MFD*/ UI_MFD_IDS(LMFD), UI_ID_SIDEMFD_PAD, UI_MFD_IDS(RMFD),
     /*In-Game Editor*/ UI_ID_CMFD_EDIT_PANEL, UI_ID_CMFD_EDIT_ROW_0, UI_ID_CMFD_EDIT_ROW_14 = UI_ID_CMFD_EDIT_ROW_0 + 14,
-    UI_ID_CMFD_EDIT_LIGHT_TYPE, UI_ID_CMFD_EDIT_LIGHT_DIR_N, UI_ID_CMFD_EDIT_LIGHT_DIR_E, UI_ID_CMFD_EDIT_LIGHT_DIR_S, UI_ID_CMFD_EDIT_LIGHT_DIR_W, UI_ID_CMFD_EDIT_LIGHT_DIR_UP, UI_ID_CMFD_EDIT_LIGHT_DIR_DN,
-    UI_ID_COUNT};
+    UI_ID_CMFD_EDIT_LIGHT_TYPE, UI_ID_CMFD_EDIT_LIGHT_DIR_N, UI_ID_CMFD_EDIT_LIGHT_DIR_E, UI_ID_CMFD_EDIT_LIGHT_DIR_S, UI_ID_CMFD_EDIT_LIGHT_DIR_W, UI_ID_CMFD_EDIT_LIGHT_DIR_UP, UI_ID_CMFD_EDIT_LIGHT_DIR_DN, UI_ID_COUNT};
 #define UI_MFD_STRIDE (UI_ID_RMFD_TAB_WEAPON-UI_ID_LMFD_TAB_WEAPON)
 #define MID(rh, n) ((u32)UI_ID_LMFD_##n + ((rh) ? (u32)UI_MFD_STRIDE : 0u))/*Mirror an LMFD id onto whichever side we are drawing*/
 #define UIC(i) World.uiComponents[i]
-#define TARGETID_TEXT_Y_GAIN 0.6f/*Label slides down as the target nears and up as it recedes, scaled from the base offset*/
 INLINE bool CursorIsOverBounds(float x0, float x1, float y0, float y1) { return World.cursorPos_x >= x0 && World.cursorPos_x <= x1 && World.cursorPos_y >= y0 && World.cursorPos_y <= y1;/*0,0=top left*/ }
-/* Projects a world point (relative to the player) into the 1366x768 UI space. Inverse of ScreenPointToRay:
-   ndcX = (cot(fov/2)/aspect)*dx/bz maps onto UI_W*0.5 of pixels, so x divides by the window aspect while y
-   (ndcY = cot(fov/2)*dy/bz onto UI_H*0.5) does not. Both collapse to 384.0 for a 16:9 window. */
 INLINE bool WorldToScreenPoint(V3 d, float* sx, float* sy) {
-    V3 f=World.instances[PLAYER1].forward,rt=World.instances[PLAYER1].right,ff=(V3){-f.x,-f.y,-f.z},up=V3_Normalize(V3_Cross(rt,ff));
-    float bz=V3_dot(d,f); if(bz<=0.01f)return false;
-    float tanFov=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),aspect=(float)Sys_Settings.ScreenWidth/(float)Sys_Settings.ScreenHeight,k=tanFov*bz;
-    *sx=(float)UI_W*0.5f+V3_dot(d,rt)*((float)UI_W*0.5f/aspect)/k; *sy=(float)UI_H*0.5f-V3_dot(d,up)*(float)UI_H*0.5f/k; return *sx > -48.0f && *sx < (float)UI_W+48.0f && *sy > -48.0f && *sy < (float)UI_H+48.0f;
+    V3 f = World.instances[PLAYER1].forward, rt = World.instances[PLAYER1].right, ff = (V3){-f.x,-f.y,-f.z}, up = V3_Normalize(V3_Cross(rt,ff)); float bz = V3_dot(d,f); if (bz <= 0.01f) { return false; }
+    float tanFov = vtan((float)Sys_Settings.FOV * 0.5f * PI / 180.0f), aspect = (float)Sys_Settings.ScreenWidth / (float)Sys_Settings.ScreenHeight, k = tanFov * bz; *sx = (float)UI_W*0.5f + V3_dot(d,rt)*((float)UI_W*0.5f / aspect)/k; *sy = (float)UI_H*0.5f - V3_dot(d,up)*(float)UI_H*0.5f / k; return *sx > -48.0f && *sx < (float)UI_W+48.0f && *sy > -48.0f && *sy < (float)UI_H+48.0f;
 }
-INLINE void UIR(u32 id, i16 x, i16 y, i16 w, i16 h){if(!id)return; if(!World.uiComponents[id].initialized){World.uiComponents[id].min=(V2){(float)x,(float)y}; World.uiComponents[id].max=(V2){(float)(x+w),(float)(y+h)}; World.uiComponents[id].initialized=true;} World.uiComponents[id].active=true;}
+INLINE void UIR(u32 id, i16 x, i16 y, i16 w, i16 h) { if (!id) { return; } if (!World.uiComponents[id].initialized) { World.uiComponents[id].min = (V2){(float)x,(float)y}; World.uiComponents[id].max = (V2){(float)(x + w),(float)(y + h)}; World.uiComponents[id].initialized = true; } World.uiComponents[id].active = true; }
 INLINE void UIRImg(u32 id, i16 x, i16 y, i16 w, i16 h, u16 tex) { UIR(id,x,y,w,h); RenderUIImage(x,y,w,h,tex); }
 INLINE i16 UITextW(const char* t, float sc, i16 maxW) { float w=MeasureLineAdvance(t,FONT_NORMAL)*sc; if (w<1.0f) w=1.0f; return (maxW>0 && w>(float)maxW) ? maxW : (i16)w; }
 INLINE void UIRText(u32 id, i16 x, i16 y, u32 col, u8 font, float sc, i16 maxW, const char* t) { UIR(id,x,y,UITextW(t,sc,maxW),(i16)(22.0f*sc)); RenderTextL(x,y,col,font,sc,"%s",t); }
 INLINE bool UIOver(u32 id) { return UIC(id).active && CursorIsOverBounds(UIC(id).min.x,UIC(id).max.x,UIC(id).min.y,UIC(id).max.y); }
 void CreateUIElement(V2 min, V2 max, u32 idx) { if (!idx) return; UIC(idx).min=min; UIC(idx).max=max; UIC(idx).initialized=UIC(idx).active=true; }
 static void UI_BeginFrame() { for (u32 i=1;i<UI_ID_COUNT;++i) UIC(i).active=false; }
-/*Consume a click over a region. Returns 0 none, 1 LMB, 2 RMB, +4 when it was a double click of that same button on that same region.*/
 static u8 UIClicked(u32 id) {
     if (id >= UI_ID_COUNT || id == 0) return 0; if (!UIOver(id)) return 0; bool l=Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed, r=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed; if (!l && !r) return 0;
-    Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed=false; World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true;
-    double* t=l?&World.uiComponents[id].lastLMB:&World.uiComponents[id].lastRMB; u8 dbl=(*t>0.0 && (World.pauseRelativeTime-*t)<=0.5f)?4u:0u; *t=dbl?0.0:World.pauseRelativeTime; return (u8)((l?1u:2u)|dbl);
+    Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed=false; World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; double* t=l?&World.uiComponents[id].lastLMB:&World.uiComponents[id].lastRMB; u8 dbl=(*t>0.0 && (World.pauseRelativeTime-*t)<=0.5f)?4u:0u; *t=dbl?0.0:World.pauseRelativeTime; return (u8)((l?1u:2u)|dbl);
 }
-
-extern float reloadTime[16];
-static i8 rebindRow = -1; static u32 rebindArmedFrame = 0;/*Input tab keybinding capture: -1 = none, else configTable index currently capturing a key*/
-/*Save/Load slot rows. saveSlotNames[] is refreshed from each save file's header whenever the Load or Save page opens.*/
-static char saveSlotNames[8][48]; static bool saveSlotUsed[8]; static i8 saveSlotEditing = -1;/*slot currently being name-typed, -1 = none*/
-static char saveNameEntry[48]; static u8 saveNameEntryLen = 0; bool enteringSaveName = false;/*mirrors enteringPlayerName for winput routing*/
-void SaveGame(u8,const char*),LoadGame(u8); bool ReadSaveSlotName(u8,char*,size_t);
-static void RefreshSaveSlots(void) {
-    for (u8 i=0;i<8;++i) {
-        saveSlotUsed[i]=ReadSaveSlotName(i,saveSlotNames[i],sizeof(saveSlotNames[i]));
-        if (!saveSlotUsed[i]) {
-            const char* t = (i==7) ? "- unused quicksave -" : "- unused -";
-            size_t n = 0;
-            while (t[n] && n < sizeof(saveSlotNames[i]) - 1) { saveSlotNames[i][n] = t[n]; ++n; }
-            saveSlotNames[i][n] = '\0';
-        }
-    }
-}
-
+static void RefreshSaveSlots(void) { for (u8 i=0;i<8;++i) { saveSlotUsed[i] = ReadSaveSlotName(i,saveSlotNames[i],sizeof(saveSlotNames[i])); if (!saveSlotUsed[i]) { const char* t = (i==7) ? "- unused quicksave -" : "- unused -"; size_t n = 0; while (t[n] && n < sizeof(saveSlotNames[i]) - 1) { saveSlotNames[i][n] = t[n]; ++n; } saveSlotNames[i][n] = '\0'; } } }
 static void SaveSlotCancelTyping(void) { saveSlotEditing=-1; enteringSaveName=false; saveNameEntryLen=0; saveNameEntry[0]='\0'; }
-static void SaveSlotConfirmTyping(void) {
-    i8 slot=saveSlotEditing;
-    char name[48]; u8 n=saveNameEntryLen;
-    if (n>47) n=47; for (u8 i=0;i<n;++i) name[i]=saveNameEntry[i]; name[n]='\0';
-    SaveSlotCancelTyping(); if (slot<0||slot>7||n==0) return;
-    for (u8 i=0;i<=n;++i) saveSlotNames[slot][i]=name[i]; /*overwrite the slot's savename string*/
-    World.menuActive=false; World.paused=false; returnToPause=false; /*close menu + unpause BEFORE saving so the save captures clean in-game state*/
-    SaveGame((u8)slot,name);
-}
-
+static void SaveSlotConfirmTyping(void) { i8 slot = saveSlotEditing; char name[48]; u8 n=saveNameEntryLen; if (n > 47) { n = 47; } for (u8 i=0;i<n;++i) name[i] = saveNameEntry[i]; name[n] = '\0'; SaveSlotCancelTyping(); if (slot < 0 || slot > 7 || n == 0) return; for (u8 i=0;i<=n;++i) saveSlotNames[slot][i] = name[i]; World.menuActive = false; World.paused = false; returnToPause = false; SaveGame((u8)slot,name); }
 void SaveNameEntry(i32 k) {
     if (k==KEY_ESCAPE) { Sys_Input.keyStates[KEY_ESCAPE].pressed=false; SaveSlotCancelTyping(); return; }
-    if (k==KEY_ENTER||k==KEY_KP_ENTER) { Sys_Input.keyStates[KEY_ENTER].pressed=Sys_Input.keyStates[KEY_KP_ENTER].pressed=false; SaveSlotConfirmTyping(); return; }
-    if (k==KEY_BACKSPACE && saveNameEntryLen>0) { saveNameEntry[--saveNameEntryLen]='\0'; return; }
-    if (k==KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { saveNameEntry[0]='\0'; saveNameEntryLen=0; return; }
-    if (saveNameEntryLen>=47) return;
-    char c=(k>=KEY_A&&k<=KEY_Z)?(char)('a'+(k-KEY_A)):((k>=KEY_1&&k<=KEY_9)?(char)('1'+(k-KEY_1)):((k==KEY_0)?'0':((k==KEY_SPACE)?' ':0)));
-    if (c) { saveNameEntry[saveNameEntryLen]=c; saveNameEntry[++saveNameEntryLen]='\0'; }
+    if (k==KEY_ENTER||k==KEY_KP_ENTER) { Sys_Input.keyStates[KEY_ENTER].pressed = Sys_Input.keyStates[KEY_KP_ENTER].pressed = false; SaveSlotConfirmTyping(); return; }
+    if (k==KEY_BACKSPACE && saveNameEntryLen>0) { saveNameEntry[--saveNameEntryLen] = '\0'; return; }
+    if (k==KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { saveNameEntry[0] = '\0'; saveNameEntryLen = 0; return; }
+    if (saveNameEntryLen>=47) { return; }
+    char c = (k >= KEY_A && k <= KEY_Z) ? (char)('a' + (k - KEY_A)):((k >= KEY_1 && k <= KEY_9) ? (char)('1' + (k - KEY_1)) : ((k == KEY_0) ? '0' : ((k == KEY_SPACE) ? ' ' : 0))); if (c) { saveNameEntry[saveNameEntryLen] = c; saveNameEntry[++saveNameEntryLen] = '\0'; }
 }
-
 void MFD_ResetGeneral() { World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.consumableClickRow=-1; World.Sys_UI.generalClickSlot = -1; }
 void MFD_ShowGeneralItem() { u8 side=World.Sys_UI.lastItemSideRH?2:1; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdGeneralItem=true; World.Sys_UI.mfdHardwareItem=false; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; World.Sys_UI.mfdTab[side]=2; World.Sys_UI.mfdSelected[side]=2; }
 void MFD_OpenSearch(bool isRH) { for (u8 side=0;side<2;++side) {u8 tab=World.Sys_UI.mfdTab[1+!!side]; if (!(tab==2 && World.Sys_UI.mfdItemReader[side]) && World.Sys_UI.MFD_Data!=5) { World.Sys_UI.mfdReturnTab[side+1]=tab; World.Sys_UI.mfdReturnView[side+1]=World.Sys_UI.MFD_Data;}} World.Sys_UI.MFD_Data=5; World.Sys_UI.mfdTab[1+!!isRH]=4;}
@@ -126,52 +88,26 @@ void MFD_OpenData(bool isRH,u8 code) { u8 side=isRH?2:1; u8 tab=World.Sys_UI.mfd
 void MFD_CloseData(void) { if (World.Sys_UI.MFD_Data == 0 || World.Sys_UI.MFD_Data == 5) return; u8 keepDataTab=(World.Sys_UI.mfdReturnTab[1]==4||World.Sys_UI.mfdReturnTab[2]==4); for (u8 side=0;side<2;++side) {u8* tab=&World.Sys_UI.mfdTab[1+!!side]; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];} World.Sys_UI.MFD_Data=keepDataTab?(((World.invP1.hasHardware&HW_SYS)?7:0)):0; }
 INLINE void MFD_SelectTab(u8 panel, u8 tab, bool toggle) {
     World.Sys_UI.generalClickSlot = -1;
-    if (panel && tab == 2) World.Sys_UI.lastItemSideRH = (panel == 2);
-    if (panel && tab == 3) World.Sys_UI.lastAutomapSideRH = (panel == 2);/*side MFD tab click/F-key: remember which side the player wants the automap on*/
-    if (panel && tab == 4) World.Sys_UI.lastDataSideRH = (panel == 2);
-    u8* current = &World.Sys_UI.mfdTab[panel];
-    *current = toggle && *current == tab ? 0 : tab;
-    World.Sys_UI.mfdSelected[panel] = tab;
-    u8 view = World.Sys_UI.MFD_Data;
-    if (!(panel && ((tab == 2 && World.Sys_UI.mfdItemReader[panel - 1]) || ( tab == 4 && view == 5)))) {
-        World.Sys_UI.mfdReturnTab[panel] = *current;
-        if (view != 5) World.Sys_UI.mfdReturnView[panel] = view;
-    }
-    
-    if (panel && tab == 4 && view == 5) World.Sys_UI.lastSearchSideRH = (panel == 2);
-    if (panel && tab == 4 && view == 9) World.Sys_UI.lastMinigameSideRH = (panel == 2);/*side MFD tab click/F-key while the games view is up: remember which side the player wants games on*/
+    if (panel && tab == 2) { World.Sys_UI.lastItemSideRH = (panel == 2); }
+    if (panel && tab == 3) { World.Sys_UI.lastAutomapSideRH = (panel == 2); }
+    if (panel && tab == 4) { World.Sys_UI.lastDataSideRH = (panel == 2); }
+    u8* current = &World.Sys_UI.mfdTab[panel]; *current = toggle && *current == tab ? 0 : tab; World.Sys_UI.mfdSelected[panel] = tab; u8 view = World.Sys_UI.MFD_Data;
+    if (!(panel && ((tab == 2 && World.Sys_UI.mfdItemReader[panel - 1]) || ( tab == 4 && view == 5)))) { World.Sys_UI.mfdReturnTab[panel] = *current; if (view != 5) World.Sys_UI.mfdReturnView[panel] = view; }
+    if (panel && tab == 4 && view == 5) { World.Sys_UI.lastSearchSideRH   = (panel == 2); }
+    if (panel && tab == 4 && view == 9) { World.Sys_UI.lastMinigameSideRH = (panel == 2); }
     play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0},false);
 }
-
-void WeaponFireStartWeaponDip(float t);
-void RemoveWeapon(i32 slot);
 void WeaponSelectSlot(int slot) {
-    int wi = (int)World.invP1.wepInvIndices[slot];
-    if (wi < 0 || wi >= MAX_ENTITIES) { return; }
-    if ((int)World.invP1.wepCur == slot) { return; }
-    if (World.invP1.reloadFinished > World.pauseRelativeTime) { return; }
-    
-    play_wav(sounds[80], AppliedFXVol(1.0f), (V3){0.0f, 0.0f, 0.0f}, false);
-    World.invP1.wepCurPending = (i16)slot;
-    World.invP1.weaponIndexPending = (i16)wi;
-    int w = Get16WeaponIndexFromConstIndex(wi);
-    WeaponFireStartWeaponDip((w>=0&&w<16) ? reloadTime[w] : 0.5f);
+    int wi = (int)World.invP1.wepInvIndices[slot]; if (wi < 0 || wi >= MAX_ENTITIES || (int)World.invP1.wepCur == slot || World.invP1.reloadFinished > World.pauseRelativeTime) { return; }
+    play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); World.invP1.wepCurPending = (i16)slot; World.invP1.weaponIndexPending = (i16)wi; int w = Get16WeaponIndexFromConstIndex(wi); WeaponFireStartWeaponDip((w >= 0 && w < 16) ? reloadTime[w] : 0.5f);
 }
-
 __attribute__((noinline)) bool MenuEnter() { return !Cheats.consoleActive && (Sys_Input.keyStates[KEY_KP_ENTER].pressed || Sys_Input.keyStates[KEY_ENTER].pressed); }
 static bool uiClickLock = false, uiClickBlocked = false;
-static void UiClickGate(void) {
-    bool anyDown = false;
-    for (u8 b = 0; b < MAX_MOUSE_BUTTONS; ++b) anyDown |= Sys_Input.mouseButtons[b].down;
-    uiClickBlocked = false;
-    if (uiClickLock) { if (!anyDown) uiClickLock = false; else uiClickBlocked = true; }
-}
-
+static void UiClickGate(void) { bool anyDown = false; for (u8 b = 0; b < MAX_MOUSE_BUTTONS; ++b) anyDown |= Sys_Input.mouseButtons[b].down; uiClickBlocked = false; if (uiClickLock) { if (!anyDown) uiClickLock = false; else uiClickBlocked = true; } }
 __attribute__((noinline)) u8 UI_MenuInteractable(u32 id, i16 x, i16 y, float w, float h, bool* cursorOver, i8 this, bool sustained) {
-    UIR(id,x,(i16)((float)y-h),(i16)w,(i16)h); bool cursorIsOver = CursorIsOverBounds(x, x + w, (float)y - h, (float)y); if (cursorIsOver && mouseMovementThisFrame && !resDropdownOpen) { currentMenuItem = this; if (cursorOver != NULL) {*cursorOver = cursorIsOver;} } if (uiClickBlocked) return 0u;/*press already consumed earlier this frame, or the last one has not been released yet*/ if ((sustained ? Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].down : Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].pressed) && cursorIsOver) { uiClickBlocked = true; uiClickLock = true; return 1u; }/*UI_CLICK_CONSUMED*/
+    UIR(id,x,(i16)((float)y-h),(i16)w,(i16)h); bool cursorIsOver = CursorIsOverBounds(x, x + w, (float)y - h, (float)y); if (cursorIsOver && mouseMovementThisFrame && !resDropdownOpen) { currentMenuItem = this; if (cursorOver != NULL) {*cursorOver = cursorIsOver;} } if (uiClickBlocked) return 0u; if ((sustained ? Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].down : Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].pressed) && cursorIsOver) { uiClickBlocked = true; uiClickLock = true; return 1u; }
     if ((sustained ? Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down : Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) && cursorIsOver) { uiClickBlocked = true; uiClickLock = true; return 2u; } return 0u;
 }
-
 __attribute__((noinline)) u8 UI_Button(u32 id, i16 x, i16 y, float w, float h, bool* cursorOver, i8 this) { return UI_MenuInteractable(id,x,y,w,h,cursorOver,this,false); }
 __attribute__((noinline)) bool AnyLeftRightMouseDown() { return (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down); }
 bool UI_Slider(u32 id, i16 x, i16 y, i16 w, i16 h, i16 sliderPos, i16 xPosForLabel, u8* out, bool* sliderActive, u8 min, u8 max, u8 step, u8 mindex, u16 lingdex) {
@@ -179,27 +115,19 @@ bool UI_Slider(u32 id, i16 x, i16 y, i16 w, i16 h, i16 sliderPos, i16 xPosForLab
     if (!AnyLeftRightMouseDown()) { if (*sliderActive) { *sliderActive = false; SaveConfig(); } } if (MenuEnter() && currentMenuItem == mindex) {bool shiftHeld = Sys_Input.keyStates[KEY_LEFT_SHIFT].down || Sys_Input.keyStates[KEY_RIGHT_SHIFT].down; if (shiftHeld)*out=*out<=((min+step)-1) ? max : *out-step; else *out=*out >=((max-step)+1) ?  min : *out+step; changed=true;}
     over=over||currentMenuItem==mindex; RenderTextL(xPosForLabel,y,over ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"%s %u",Sys_Text.stringTable[lingdex],*out); if (changed && !AnyLeftRightMouseDown()) SaveConfig(); return changed;
 }
-
 u8 UI_MenuButton(u32 id, i16 bX, i16 bY, u8 menuItem, i16 bW, i16 bH, i16 tX, i16 tY, const char* text, i16 pX, i16 pY){bool over=false; u8 retvalue=0u; retvalue=UI_Button(id,bX,bY,bW,bH,&over,menuItem); if(!retvalue)retvalue=(MenuEnter()&&currentMenuItem==menuItem); over=over||currentMenuItem==menuItem; RenderTextL(tX,tY,over ? T_STOPD_RED : T_RED_MENU,FONT_STOPD,1.5f,text); RenderUIImage(pX,pY,40,40,over ? 1029 : 1028);/*Menu pad*/ return retvalue;}
 bool UI_Checkbox(u32 id, i16 x, i16 y, i8 mitem, u16 textIdx, bool currentlyOn){RenderUIImage(x,y,16,16,910);/*Checkbox background*/ bool over=false; bool changed=(UI_Button(id,x,y+16,210,16,&over,mitem)||(MenuEnter()&&currentMenuItem==mitem)); over=over||currentMenuItem==mitem; if(currentlyOn)RenderUIImage(x+2,y+2,12,12,912);/*Checkbox check*/ RenderTextL(x+20,y,over ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,Sys_Text.stringTable[textIdx]); return changed;}
 __attribute__((noinline)) void UI_HeaderText(i16 x, const char* text) { RenderTextL(x,50,T_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,text); RenderTextL(x,46,T_GREEN_MENU_GLOW,FONT_STOPD,1.75f,text); RenderTextL(x,48,T_GREEN_MENU,FONT_STOPD,1.75f,text); }
 void PlayMenuMusic(),mp3_clear(),SndClearAll(),PlayVideoPageMusic(bool),PlayDeathVideoMusic(),StopVideoPageMusic();
 __attribute__((noinline)) void MenuGoBack() {
     if (enteringSaveName) { SaveSlotCancelTyping(); return; }
-    
     bool leavingClipPage = (currentMenuPage==MPG_INTRO||currentMenuPage==MPG_CREDS||currentMenuPage==MPG_DEATH), toPause=returnToPause;
     if (toPause) { returnToPause = World.menuActive = false; World.paused = true; mp3_clear(); }
     if (currentMenuPage == MPG_SINGPLYR || currentMenuPage == MPG_MULTPLYR || currentMenuPage == MPG_OPTS) { currentMenuPage = MPG_FRONT; }
     else if (currentMenuPage == MPG_LOAD || currentMenuPage == MPG_NEWGM || currentMenuPage == MPG_INTRO || currentMenuPage == MPG_CREDS) { currentMenuPage = MPG_SINGPLYR; }
     else if (currentMenuPage == MPG_DEATH) { currentMenuPage = MPG_FRONT; }
-
-    if (leavingClipPage) {
-        currentMenuItem = currentMenuTab = 0;
-        if (toPause) StopVideoPageMusic();
-        else PlayMenuMusic();
-    }
+    if (leavingClipPage) { currentMenuItem = currentMenuTab = 0; if (toPause) StopVideoPageMusic(); else PlayMenuMusic(); }
 }
-
 static void CreateShadowBuffers() { shadowMapSSBO = MakeSSBO(&shadowMapSSBO, 5, (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32), NULL, GL_STATIC_DRAW); shadowMapsIndirectionID = MakeSSBO(&shadowMapsIndirectionID, 6, LIGHT_COUNT * sizeof(u32), NULL, GL_STATIC_DRAW);  shadowBuffersCreated = true; }
 // Menu Video Playback
 static double introVidStart = 0.0, creditsVidStart = 0.0, deathVidStart = 0.0;
@@ -222,8 +150,7 @@ void ChangeMenuPage(u8 pg) { currentMenuPage = pg; currentMenuItem = currentMenu
 void GameEndSequence() { World.gameFinished = true; World.paused = true; World.menuActive = true; ChangeMenuPage(MPG_CREDS); }
 void GameDeathSequence() { World.paused = true; World.menuActive = true; returnToPause = false; SndClearAll(); ChangeMenuPage(MPG_DEATH); }
 static void RenderVideoPage(u8 page) {
-    bool isIntro = (page==MPG_INTRO);
-    bool isDeath = (page==MPG_DEATH);
+    bool isIntro = (page==MPG_INTRO), isDeath = (page==MPG_DEATH);
     double start = isIntro ? introVidStart : (isDeath ? deathVidStart : creditsVidStart);
     if (start <= 0.0) { start=World.absoluteTime; if (isIntro) introVidStart=start; else if (isDeath) deathVidStart=start; else creditsVidStart=start; }
     double elapsed = World.absoluteTime - start;
@@ -231,18 +158,18 @@ static void RenderVideoPage(u8 page) {
     int cardCount = isIntro ? 15 : (isDeath ? 2 : 3);
     double vidLen = isIntro ? 117.141f : (isDeath ? 16.8f : 54.144f); double cardsEnd = isIntro ? vidLen : (isDeath ? 16.8f : 14.0);
     int frames = isIntro ? 735 : (isDeath ? 506 : 408); u32 frameBase = isIntro ? 2166u : (isDeath ? 3454u : 2901u);
-    if (frameBase+(u32)frames > (u32)texCnt) frames = 0;/*frames missing from textures.txt: leave the black ground rather than sample past the array*/
+    if (frameBase + (u32)frames > (u32)texCnt) frames = 0;
     i32 frame = frames>0 ? (i32)(elapsed*(double)frames/vidLen) : 0; if (frame<0) frame = 0; else if (frame>=frames) frame = frames-1;
-    static u32 heldRt = 0xFFFFFFFFu, heldBase = 0xFFFFFFFFu; /*zero order hold: a ring slot that is still decoding must keep the last frame on screen, not punch a hole to the background*/
+    static u32 heldRt = 0xFFFFFFFFu, heldBase = 0xFFFFFFFFu;
     if (heldBase != frameBase) { heldBase = frameBase; heldRt = 0xFFFFFFFFu; }
     if (frames>0) { u32 want = frameBase+(u32)frame; u32 nxt = VideoPeekFrame(want); VideoRequestFrame(want); if (nxt != 0xFFFFFFFFu) VideoPrefetchFrame(nxt); u32 rt = VideoFrameTexIndex(want); if (rt != 0xFFFFFFFFu) heldRt = rt; if (heldRt != 0xFFFFFFFFu) RenderUIImage(43,isIntro ? 39 : 0,1280,isIntro ? 600 : 720,heldRt); }    
     int card = -1;
     if (elapsed < cardsEnd) { for (int i=cardCount-1;i>=0;--i) { if (elapsed >= at[i]) { card = i; break; } } }
     if (card >= 0) { RenderTextC(546,544,T_VIDEOTEXT,FONT_NORMAL,1.25f,"%s",Sys_Text.stringTable[(isIntro?613:(isDeath?628:610))+card]); }
     bool click = VidSkipPressed();
-    if (click) { uiClickBlocked = uiClickLock = true; }/*UI_CLICK_CONSUMED: latch every skip input, Enter included, so the press that leaves the clip cannot also land on the menu underneath*/
+    if (click) { uiClickBlocked = uiClickLock = true; }
     bool skip = (isIntro || isDeath) ? (elapsed>1.5 && click) : click;
-    if(skip || elapsed >= vidLen){if (isIntro || isDeath) MenuGoBack(); else { World.creditsActive=true; World.creditsPageIndex=0; /*outro skipped or over: the credit pages take over*/ }}
+    if(skip || elapsed >= vidLen){if (isIntro || isDeath) MenuGoBack(); else { World.creditsActive=true; World.creditsPageIndex=0; }}
 }
 static void MenuBackButton(i16 bgX, i16 bgY, i16 tX, i16 tY, i8 item) { RenderUIImage(bgX,bgY,84,36,1252);/*Back Button background*/ bool over=false; if (UI_Button(UI_ID_MENU_BACK,bgX,bgY+34,84,32,&over,item) || (MenuEnter() && currentMenuItem==item && !rebindCaptureActive)) MenuGoBack(); over=over||currentMenuItem==item; RenderTextL(tX,tY,over ? T_STOPD_RED_HIGHLIGHT : T_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]); }
 static void DiffDigits(i16 tx, i16 ty, u8 cur) { static const i16 dx4[4]={0,71,145,217}; for (u8 i=0;i<4;++i) RenderTextL(tx+dx4[i],ty,cur==i ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"%u",i); }
@@ -298,7 +225,7 @@ void RenderMenu() {
             char reflBuf[32]; sFormat(reflBuf, sizeof(reflBuf), "%s", reflNames[Sys_Settings.Reflections > 2u ? 0u : Sys_Settings.Reflections]);
             RenderUIImage(476,590,16,16,overRefl ? 1119 : 1077); RenderTextL(200,590,overRefl ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"REFLECTIONS %s",reflBuf);
             if (reflDropdownOpen) { int rlh=3*16, rTop=590-rlh;
-                reflHoverIdx = (World.cursorPos_x>=336 && World.cursorPos_x<=496 && World.cursorPos_y>=rTop && World.cursorPos_y<rTop+rlh) ? (World.cursorPos_y-rTop)/16 : -1;
+                reflHoverIdx = (World.cursorPos_x>=336 && World.cursorPos_x<=496 && World.cursorPos_y>=rTop && World.cursorPos_y<rTop+rlh) ? (World.cursorPos_y-rTop)/16 : -1; 
                 RenderUIImage(336,rTop,160,rlh,922);
                 for (int ri=0; ri<3; ++ri) { if (ri==Sys_Settings.Reflections) RenderUIImage(336,rTop-2+ri*16,160,18,1087); RenderTextL(366,rTop+ri*16, (ri==reflHoverIdx) ? T_YELLOW : T_GREEN, FONT_NORMAL, 0.9f, "%s", reflNames[ri]); }
             } else { reflHoverIdx=-1; }
@@ -423,23 +350,17 @@ void RenderMenu() {
     static const i8 ngSwap[7] = {0,3,4,1,2,6,5};
     if (Sys_Input.keyStates[KEY_RIGHT].pressed || Sys_Input.keyStates[KEY_LEFT].pressed) { if (!rebindCaptureActive) { int dir = Sys_Input.keyStates[KEY_RIGHT].pressed ? 1 : -1; currentMenuTab = (currentMenuTab + menuTabCount + dir) % menuTabCount; if (currentMenuPage == MPG_NEWGM && currentMenuItem < 7) {currentMenuItem=ngSwap[currentMenuItem];} } }
 }
-
 void RenderPausedUI() {
     menuItemCount = 6; menuTabCount = 1; static const i16 pY[6]={330,390,450,510,570,714},pH[6]={52,52,60,60,60,42},pTx[6]={610,630,635,599,546,572},pTy[6]={306,364,422,480,538,690}; static const u16 pStr[6]={725,726,727,721,728,729};
     RenderUIImage(519,276,328,300,1025);/*Pause Menu background*/ RenderUIImage(519,276,328,300,1080);/*Pause Menu background outline*/ RenderUIImage(519,672,328,42,1252);/*Pause Quit Game background*/ RenderTextL(610,210,T_STOPD_RED_PAUSETITLE,FONT_STOPD,1.0f,/*"PAUSED"*/Sys_Text.stringTable[724]);
     for (u8 i=0;i<6;++i) {
         bool over=false;
-        if (UI_Button(UI_ID_PAUSE_RESUME+i,522,pY[i],322,pH[i],&over,(i8)i) || (MenuEnter() && currentMenuItem==i)) {
-            if (i==0) World.paused=false; else if (i==5) OS_Exit(0);
-            else { if (i==4) { DualLog("Player exited to menu\n"); clearRenderTargetsOnNextFrame = true; } ChangeMenuPage(i==1?MPG_LOAD:i==2?MPG_SAVE:i==3?MPG_OPTS:MPG_FRONT); PlayMenuMusic(); World.menuActive=true; returnToPause=(i!=4); }
-        }
+        if (UI_Button(UI_ID_PAUSE_RESUME+i,522,pY[i],322,pH[i],&over,(i8)i) || (MenuEnter() && currentMenuItem==i)) { if (i==0) World.paused=false; else if (i==5) OS_Exit(0); else { if (i==4) { DualLog("Player exited to menu\n"); clearRenderTargetsOnNextFrame = true; } ChangeMenuPage(i==1?MPG_LOAD:i==2?MPG_SAVE:i==3?MPG_OPTS:MPG_FRONT); PlayMenuMusic(); World.menuActive=true; returnToPause=(i!=4); } }
         over=over||currentMenuItem==i; RenderTextL(pTx[i],pTy[i],over ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.0f,Sys_Text.stringTable[pStr[i]]);
     }
 }
-
 void GetWeaponAmmoText(int slot,char* buf,size_t bufSize) {
-    buf[0] = '\0'; int wepIdx = World.invP1.wepInvIndices[slot]; bool alt = World.invP1.wepLoadedWithAlternate[slot]; float heat = World.invP1.curWepHeat[slot];
-    u8 mag = alt ? World.invP1.currentMagazineAmount2[slot] : World.invP1.currentMagazineAmount[slot];
+    buf[0] = '\0'; int wepIdx = World.invP1.wepInvIndices[slot]; bool alt = World.invP1.wepLoadedWithAlternate[slot]; float heat = World.invP1.curWepHeat[slot]; u8 mag = alt ? World.invP1.currentMagazineAmount2[slot] : World.invP1.currentMagazineAmount[slot];
     switch(wepIdx) {
         case 343: if (alt){sFormat(buf,bufSize,"%upn | %umg, %upn",mag,World.invP1.wepAmmo[0],World.invP1.wepAmmoSecondary[0]);}else{sFormat(buf,bufSize,"%umg | %umg, %upn",mag,World.invP1.wepAmmo[0],World.invP1.wepAmmoSecondary[0]);} break;/*MK3 Assault Rifle*/
         case 344: case 347: case 353: case 357: case 358: scpy_to_a_from_b(buf,heat > 80.0f ? Sys_Text.stringTable[14] : Sys_Text.stringTable[15],bufSize); break;/*Energy weapons*/
@@ -455,12 +376,11 @@ void GetWeaponAmmoText(int slot,char* buf,size_t bufSize) {
         default: break;
     }
 }
-
 void TickBar(bool isEnergy) {
-    RenderUIImage(isEnergy ? 1333 : 1332,isEnergy ? 36 : 2,32,32,isEnergy ? 939 : 956);/*Indicator*/ int p1H=isEnergy ? World.invP1.energy : (World.curLev == LEVEL_CYBERSPACE ? World.instances[PLAYER1].cyberHealth : World.instances[PLAYER1].health);/*Unity MFDManager.DrawTicks(health) reads hm.cyberHealth instead of health in cyberspace*/ if(p1H>255){p1H=255;} i16 tY=isEnergy ? 35 : 4;
+    RenderUIImage(isEnergy ? 1333 : 1332,isEnergy ? 36 : 2,32,32,isEnergy ? 939 : 956);/*Indicator*/ int p1H=isEnergy ? World.invP1.energy : (World.curLev == LEVEL_CYBERSPACE ? World.instances[PLAYER1].cyberHealth : World.instances[PLAYER1].health); if(p1H>255){p1H=255;} i16 tY=isEnergy ? 35 : 4;
     for (int i=7;i>=0;--i) if(i==7/*Always render at least 1 tick*/||p1H>(7-i)*11){RenderUIImage(1050-(i*16),tY,32,32,964);/*Tick Red*/} for (int i=7;i>=0;--i) if(p1H>88+(7-i)*11){RenderUIImage(1178-(i*16),tY,32,32,963);/*Tick Orange*/} for (int i=7;i>=0;--i) if(p1H>176+(7-i)*11){RenderUIImage(1306-(i*16),tY,32,32,962);/*Tick Green*/}
-    if (isEnergy && World.invP1.drainJPM > 0) RenderTextL(1340,tY+8,T_GREEN,FONT_NORMAL,0.8f,"%d J/min",(int)World.invP1.drainJPM); }
-
+    if (isEnergy && World.invP1.drainJPM > 0) RenderTextL(1340,tY+8,T_GREEN,FONT_NORMAL,0.8f,"%d J/min",(int)World.invP1.drainJPM);
+}
 INLINE int HwActiveTexIndex(int active, int version, int off, int v1, int v2, int v3, int v4) { if (!active) return off; if (v4 >= 0 && version >= 4) return v4; if (version >= 3) return v3; if (version == 2) return v2; return v1; }
 typedef struct { u32 bit; u8 idx; i16 x,y; u16 t[5]; u8 sOn,sOff,eng; } HwBtn;
 static const HwBtn hwBtns[8]={{HW_BIO,HW_BIO_IDX,0,180,{989,991,992,992,992},78,78,1},{HW_SNS,HW_SNS_IDX,0,240,{1009,1011,1012,1013,1013},93,82,0},{HW_LAN,HW_LAN_IDX,0,300,{1004,1006,1007,1008,1008},78,78,0},{HW_SHD,HW_SHD_IDX,0,360,{1014,1015,1016,1017,1018},96,95,0},
@@ -468,57 +388,21 @@ static const HwBtn hwBtns[8]={{HW_BIO,HW_BIO_IDX,0,180,{989,991,992,992,992},78,
 void HardwareButtons() {
     u32 hw=World.invP1.hasHardware;
     for(u8 i=0;i<8;++i){
-        const HwBtn* b=&hwBtns[i]; if (!(hw&b->bit))continue;
-        
-        u16 tex;
-        if (b->eng==3) tex = ((World.inventoryMode && UIOver(UI_ID_HUD_HW_0+i) && AnyLeftRightMouseDown()) || ((World.invP1.hasNewEmail || World.invP1.hasNewLogs) && ((int)World.pauseRelativeTime & 1))) ? 997 : 996;
-        else           tex = (u16)HwActiveTexIndex((World.invP1.hardwareIsActive & b->bit)!=0,World.invP1.hwVers[b->idx],b->t[0],b->t[1],b->t[2],b->t[3],b->t[4]);
+        const HwBtn* b = &hwBtns[i]; if (!(hw & b->bit)) { continue; } u16 tex; if (b->eng==3) tex = ((World.inventoryMode && UIOver(UI_ID_HUD_HW_0+i) && AnyLeftRightMouseDown()) || ((World.invP1.hasNewEmail || World.invP1.hasNewLogs) && ((int)World.pauseRelativeTime & 1))) ? 997 : 996; else tex = (u16)HwActiveTexIndex((World.invP1.hardwareIsActive & b->bit)!=0,World.invP1.hwVers[b->idx],b->t[0],b->t[1],b->t[2],b->t[3],b->t[4]);
         UIRImg(UI_ID_HUD_HW_0+i,b->x,b->y,40,40,tex);
     }
 }
-
 void RenderShieldEffect() {
-    if (World.pauseRelativeTime > World.Sys_UI.shieldAnimationFinished) return;
-    
-    float t = vclamp((float)(World.pauseRelativeTime - World.Sys_UI.shieldAnimationStarted),0.0f,1.2f);
-    if (World.Sys_UI.shieldAnimationIsActivate) {
-        float upY = 384.0f + (0.0f - 384.0f) * t;
-        float dnY = 384.0f + (768.0f - 384.0f) * t;
-        RenderUIImage(0, (i16)(upY + 40 - 80.0f), 1366, 160, 1076);
-        RenderUIImageExtended(0, (i16)(dnY - 40 - 80.0f), 1366, 160, 1076, 3.14159265f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f);
-    } else {
-        float upY = 0.0f + (384.0f - 0.0f) * t;
-        float dnY = 768.0f + (384.0f - 768.0f) * t;
-        RenderUIImage(0, (i16)(upY + 0 - 80.0f), 1366, 160, 1076);
-        RenderUIImageExtended(0, (i16)(dnY - 0 - 80.0f), 1366, 160, 1076, 3.14159265f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f);
-    }
+    if (World.pauseRelativeTime > World.Sys_UI.shieldAnimationFinished) { return; } float t = vclamp((float)(World.pauseRelativeTime - World.Sys_UI.shieldAnimationStarted),0.0f,1.2f);
+    if (World.Sys_UI.shieldAnimationIsActivate) { float upY = 384.0f + (0.0f - 384.0f) * t; float dnY = 384.0f + (768.0f - 384.0f) * t; RenderUIImage(0, (i16)(upY + 40 - 80.0f), 1366, 160, 1076); RenderUIImageExtended(0, (i16)(dnY - 40 - 80.0f), 1366, 160, 1076, 3.14159265f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f); }
+    else                                        { float upY = 0.0f + (384.0f - 0.0f) * t;   float dnY = 768.0f + (384.0f - 768.0f) * t; RenderUIImage(0, (i16)(upY + 0 - 80.0f), 1366, 160, 1076);  RenderUIImageExtended(0, (i16)(dnY - 0 - 80.0f), 1366, 160, 1076, 3.14159265f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f);  }
 }
-
 void HwToggle(u8 i) {
-    const HwBtn* b=&hwBtns[i];
-    bool noEng = World.invP1.energy <= 0.0f, on = (World.invP1.hardwareIsActive & b->bit) != 0;
-    if (!(World.invP1.hasHardware & b->bit)) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; }/*no-op for the HUD buttons, which are only drawn for owned hardware; the hotkey path needs it*/
-    if (b->bit == HW_BIO && Cheats.showFPS) return;/*the FPS cheat owns the biomonitor graphs, see cmd_showfps*/
-        
-    if (b->eng == 3) {
-        MFD_ResetGeneral();
-        World.Sys_UI.mfdTab[0]=5;
-        World.Sys_UI.mfdTab[1]=2;
-        World.Sys_UI.mfdItemReader[0]=true;
-        World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS;
-        World.Sys_UI.MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened;
-        if (World.Sys_UI.MFD_MediaTab > MM_NOTES || (World.Sys_UI.MFD_MediaTab == MM_NOTES && !World.diffMis)) World.Sys_UI.MFD_MediaTab=MM_LOG_TABLE;
-        play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0},false);
-        return;
-    }
-    
+    const HwBtn* b = &hwBtns[i]; bool noEng = World.invP1.energy <= 0.0f, on = (World.invP1.hardwareIsActive & b->bit) != 0; if (!(World.invP1.hasHardware & b->bit)) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } if (b->bit == HW_BIO && Cheats.showFPS) { return; }
+    if (b->eng == 3) { MFD_ResetGeneral(); World.Sys_UI.mfdTab[0] = 5; World.Sys_UI.mfdTab[1] = 2; World.Sys_UI.mfdItemReader[0] = true; World.Sys_UI.MFD_ReaderView = MFD_READER_CONTENTS; World.Sys_UI.MFD_MediaTab = World.Sys_UI.lastMultiMediaTabOpened; if (World.Sys_UI.MFD_MediaTab > MM_NOTES || (World.Sys_UI.MFD_MediaTab == MM_NOTES && !World.diffMis)) World.Sys_UI.MFD_MediaTab = MM_LOG_TABLE; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0},false); return; }
     if (noEng && (b->eng==0 || (b->eng==1 && World.invP1.hwVersSetting[b->idx]==0) || (b->eng==2 && World.invP1.hwVersSetting[b->idx]>=1))) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; }
     play_wav(sounds[on ? b->sOff : b->sOn],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive ^= b->bit; if (b->bit==HW_SHD) { World.Sys_UI.shieldAnimationIsActivate = !on; World.Sys_UI.shieldAnimationStarted = World.pauseRelativeTime; World.Sys_UI.shieldAnimationFinished = World.pauseRelativeTime + (World.Sys_UI.shieldAnimationIsActivate ? 1.0 : 1.167); } if (b->bit==HW_BIO && on && !Cheats.showFPS) BioMonitorClearGraphs();
 }
-
-extern V3 queuedLevelPos; extern u8 queuedLevelToLoad;
-bool PlayerInElevatorCell(void); bool FindElevatorKeypadPos(u8 level,V3* outPos);
-void ActualChangeAmmoType(void); void OverloadButtonAction(void); void ReloadSecret(bool isSilent); void Unload(bool isSilent); void PlayLog(int logIndex); void CheckForUnreadLogs(void); void UseTargets(u16,u16);
 static const char* mgName[9]={"Ping","15","Wing 0","Botbounce","Eel Zapper","Road","TriopToe","Corp Conq","Chess"};
 static void SysUIDataClose(void) { MFD_CloseData(); World.Sys_UI.objectInUsePos=(V3){999.0f,999.0f,999.0f}; }
 static void KeycodeSetDigit(int n) { if (World.Sys_UI.keycodeOnes < 0) { World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes; } else if (World.Sys_UI.keycodeTens < 0) { World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes+World.Sys_UI.keycodeTens*10; } else if (World.Sys_UI.keycodeHuns < 0) { World.Sys_UI.keycodeHuns=World.Sys_UI.keycodeTens; World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes+World.Sys_UI.keycodeTens*10+World.Sys_UI.keycodeHuns*100; } else { World.Sys_UI.keycodeHuns=World.Sys_UI.keycodeTens; World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes+World.Sys_UI.keycodeTens*10+World.Sys_UI.keycodeHuns*100; } }
@@ -529,7 +413,6 @@ static void KeycodeKeypress(int k) { SystemUI* s=&World.Sys_UI; if (!s->keycodeV
     if (s->keycodeEntry==s->keycodeValue) { if (s->keycodeHuns>=0) play_wav(sounds[46],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);/*code accepted*/ u16 pad=s->tetheredKeypadKeycode; if (pad>=INSTS_1ST_IDX && pad<World.instCount) { UseTargets(pad,World.instances[pad].targetIdx); if (World.instances[pad].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pad].messageLingdex]); } s->keycodeSolved=true; }
     else if (s->keycodeHuns>=0) play_wav(sounds[43],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);/*code not accepted*/
 }
-
 void UI_KeycodeKey(bool rh,int k) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh; if (k<0||k>11) return; KeycodeKeypress(k); }
 void KeycodeEntryKey(i32 k) {
     if (!World.Sys_UI.keycodeValid || World.Sys_UI.keycodeSolved) return;
@@ -546,27 +429,25 @@ void UI_ElevFloorClick(bool rh,int btn) { World.Sys_UI.mouseClickHeldOverGUI=tru
     if (!doorClosed) { CenterStatusPrint("%s",Sys_Text.stringTable[7]); return; }/*Door not closed.*/
     if (World.Sys_UI.elevButtonLabelIdx[btn]<0 || !World.Sys_UI.buttonsEnabled[btn] || World.Sys_UI.buttonsDarkened[btn]) { CenterStatusPrint("%s",Sys_Text.stringTable[8]); return; }/*Floor not accessible.*/
     u8 destLevel=World.Sys_UI.elevButtonLevelIdx[btn]; if (destLevel==255) { CenterStatusPrint("%s",Sys_Text.stringTable[8]); return; }
-    
     V3 srcKeypad=World.Sys_UI.objectInUsePos; V3 offset=V3_AsubB(World.position[PLAYER1],srcKeypad);
     V3 destKeypad; if (FindElevatorKeypadPos(destLevel,&destKeypad)) queuedLevelPos=V3Add(destKeypad,offset); else queuedLevelPos=(V3){0.0f,0.0f,0.0f};
     queuedLevelToLoad=destLevel;
 }
 
 void UI_ElevClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredKeypadElevator=U16_MAX; World.Sys_UI.linkedElevatorDoor=U16_MAX; SysUIDataClose(); }
-void UI_AudioLogClick(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh;/*audio logs fill left info + right image; no side preference to track*/ if (!(World.invP1.hasHardware&HW_ERD)) return;
-    if (World.Sys_UI.logActive) { World.Sys_UI.logActive=false; CenterStatusPrint("%s",Sys_Text.stringTable[1019]); return; }/*Log playback stopped.*/
-    if (World.Sys_UI.logReferenceIndex<(u16)LOGCNT && World.invP1.hasLog[World.Sys_UI.logReferenceIndex] && audioLogs[World.Sys_UI.logReferenceIndex] && audioLogs[World.Sys_UI.logReferenceIndex][0]) { PlayLog((int)World.Sys_UI.logReferenceIndex); World.Sys_UI.logActive=true; }
+void UI_AudioLogClick() {
+    World.Sys_UI.mouseClickHeldOverGUI = true; if (!(World.invP1.hasHardware&HW_ERD)) { return; } if (World.Sys_UI.logActive) { World.Sys_UI.logActive=false; CenterStatusPrint("%s",Sys_Text.stringTable[1019]); return; }
+    if (World.Sys_UI.logReferenceIndex<(u16)LOGCNT && World.invP1.hasLog[World.Sys_UI.logReferenceIndex] && audioLogs[World.Sys_UI.logReferenceIndex] && audioLogs[World.Sys_UI.logReferenceIndex][0]) { PlayLog((int)World.Sys_UI.logReferenceIndex); World.Sys_UI.logActive = true; }
 }
-
 static void PGToggleLine(int i,int dx,int dy) { int w=World.Sys_UI.pg_width,h=World.Sys_UI.pg_height,r=i/w+dy,c=i%w+dx; while (r>=0&&r<h&&c>=0&&c<w) { int ci=r*w+c; if (World.Sys_UI.pg_type[ci]!=PuzzleCellType_Standard) break; World.Sys_UI.pg_cell[ci]=!World.Sys_UI.pg_cell[ci]; r+=dy; c+=dx; } }
 static void PGPreviewLine(int i,int dx,int dy,bool* preview) { int w=World.Sys_UI.pg_width,h=World.Sys_UI.pg_height,r=i/w+dy,c=i%w+dx; while (r>=0&&r<h&&c>=0&&c<w) { int ci=r*w+c; if (World.Sys_UI.pg_type[ci]!=PuzzleCellType_Standard) break; if (ci>=0&&ci<35) preview[ci]=true; r+=dy; c+=dx; } }
 static void PGComputePreview(int cell,bool* preview) {
     for (int i=0;i<35;++i) preview[i]=false;
     int w=(int)World.Sys_UI.pg_width,h=(int)World.Sys_UI.pg_height; int n=w*h; if (n<=0||cell<0||cell>=n||cell>=35) return;
     if (World.Sys_UI.pg_type[cell]!=PuzzleCellType_Standard) return;
-    preview[cell]=true;
-    PuzzleGridType gt=(World.diffPuz==1)?(PuzzleGridType)PuzzleGridType_King:(PuzzleGridType)World.Sys_UI.pg_gridType;
-    int r=cell/w,c=cell%w;
+    preview[cell] = true;
+    PuzzleGridType gt = (World.diffPuz==1) ? (PuzzleGridType)PuzzleGridType_King : (PuzzleGridType)World.Sys_UI.pg_gridType;
+    int r = cell / w, c = cell % w;
     switch (gt) {
         case PuzzleGridType_King:
             for (int dr=-1;dr<=1;++dr) for (int dc=-1;dc<=1;++dc) { if (!dr&&!dc) continue; int rr=r+dr,cc=c+dc; if (rr<0||rr>=h||cc<0||cc>=w) continue; int ci=rr*w+cc; if (ci>=0&&ci<35&&World.Sys_UI.pg_type[ci]==PuzzleCellType_Standard) preview[ci]=true; }
@@ -591,36 +472,24 @@ static void PGCheckCellForPower(int i) { SystemUI* s=&World.Sys_UI; int a=PGOrth
     else if (s->pg_type[i]==PuzzleCellType_Standard || s->pg_type[i]==PuzzleCellType_Bypass) { if ((s->pg_cell[i] || s->pg_type[i]==PuzzleCellType_Bypass) && pc>0) s->pg_powered[i]=true; } }
 static float PGProgressValue(void) { SystemUI* s=&World.Sys_UI; int w=(int)s->pg_width,h=(int)s->pg_height; float prog=0.0f; for (int c=0;c<w;++c) { for (int r2=0;r2<h;++r2) if (s->pg_powered[r2*w+c]) { prog=(c+1==w)?6.75f/7.0f:(float)(c+1)/7.0f; break; } } return prog; }
 void PGEvalPuzzle(void) {
-    SystemUI* s=&World.Sys_UI; int w=(int)s->pg_width,h=(int)s->pg_height;
-    if (w<=0||h<=0) return;
-    
+    SystemUI* s=&World.Sys_UI; int w=(int)s->pg_width,h=(int)s->pg_height; if (w<=0||h<=0) return;
     int n = vmin(w*h,35);
     for (int i=0;i<n;++i) { s->pg_powered[i]=false; s->pg_checked[i]=false; if (s->pg_type[i]==PuzzleCellType_And) s->pg_cell[i]=true; } /*And gates are always conducting, whatever the player has clicked*/
-    int src = (int)s->pg_source; if (src<0||src>=n) return;
-    s->pg_powered[src]=s->pg_cell[src]; if (!s->pg_powered[src]) return; /*the source node has to be a plus itself, or nothing conducts*/
-    
+    int src = (int)s->pg_source; if (src<0||src>=n) { return; } s->pg_powered[src]=s->pg_cell[src]; if (!s->pg_powered[src]) { return; }
     int q[142], qt = 0, qh = 0; q[qt++]=src;
     while (qh<qt) {
-        int mi = q[qh++]; if (s->pg_checked[mi]) continue;
-        
-        int a = PGOrth(mi,-1,0),b=PGOrth(mi,1,0),l=PGOrth(mi,0,-1),r=PGOrth(mi,0,1);
-        bool isAnd = s->pg_type[mi] == PuzzleCellType_And;
+        int mi = q[qh++]; if (s->pg_checked[mi]) { continue; }
+        int a = PGOrth(mi,-1,0),b=PGOrth(mi,1,0),l=PGOrth(mi,0,-1),r=PGOrth(mi,0,1); bool isAnd = s->pg_type[mi] == PuzzleCellType_And;
         if (a!=-1 && !s->pg_checked[a] && s->pg_cell[a]) { q[qt++]=a; if (isAnd) PGCheckCellForPower(a); }
         if (b!=-1 && !s->pg_checked[b] && s->pg_cell[b]) { q[qt++]=b; if (isAnd) PGCheckCellForPower(b); }
         if (l!=-1 && !s->pg_checked[l] && s->pg_cell[l]) { q[qt++]=l; if (isAnd) PGCheckCellForPower(l); }
         if (r!=-1 && !s->pg_checked[r] && s->pg_cell[r]) q[qt++]=r;
-        PGCheckCellForPower(mi); s->pg_checked[mi]=true; }
-    int out=(int)s->pg_output; if (out>=0 && out<n && s->pg_powered[out]) s->pg_solved = true;
+        PGCheckCellForPower(mi); s->pg_checked[mi] = true;
+    }
+    int out = (int)s->pg_output; if (out >= 0 && out < n && s->pg_powered[out]) s->pg_solved = true;
 }
-    
-void UI_PuzzleGridCell(bool rh,int cell) {
-    World.Sys_UI.mouseClickHeldOverGUI = true;
-    (void)rh;
-    if (World.Sys_UI.tetheredPGP == U16_MAX) return;
-    if (World.Sys_UI.pg_solved) return;
-    int n = (int)(World.Sys_UI.pg_width * World.Sys_UI.pg_height); if (n <= 0 || cell < 0 || cell >= n) return;
-    if (World.Sys_UI.pg_type[cell] != PuzzleCellType_Standard) return;
-    
+void UI_PuzzleGridCell(int cell) {
+    World.Sys_UI.mouseClickHeldOverGUI = true; if (World.Sys_UI.tetheredPGP == U16_MAX || World.Sys_UI.pg_solved) { return; } int n = (int)(World.Sys_UI.pg_width * World.Sys_UI.pg_height); if (n <= 0 || cell < 0 || cell >= n) { return; } if (World.Sys_UI.pg_type[cell] != PuzzleCellType_Standard) { return; }    
     PuzzleGridType gt = (World.diffPuz == 1) ? (PuzzleGridType)PuzzleGridType_King : (PuzzleGridType)World.Sys_UI.pg_gridType;
     switch (gt) {
         case PuzzleGridType_King:   PGFlipperKing(cell);   break;
@@ -632,69 +501,39 @@ void UI_PuzzleGridCell(bool rh,int cell) {
     }
     PGEvalPuzzle();
     u16 pgi = World.Sys_UI.tetheredPGP;
-    if (pgi >= INSTS_1ST_IDX && pgi < World.instCount) {
-        Entity* pe = &World.instances[pgi];
-        for (int k=0;k<35;++k) Entity_SetGridCell(pe,k,World.Sys_UI.pg_cell[k]);
-        pe->puzzleSolved = World.Sys_UI.pg_solved;
-        if (World.Sys_UI.pg_fired) pe->puzzleFired = true;
-    }
+    if (pgi >= INSTS_1ST_IDX && pgi < World.instCount) { Entity* pe = &World.instances[pgi]; for (int k=0;k<35;++k) Entity_SetGridCell(pe,k,World.Sys_UI.pg_cell[k]); pe->puzzleSolved = World.Sys_UI.pg_solved; if (World.Sys_UI.pg_fired) pe->puzzleFired = true; }
     if (World.Sys_UI.pg_solved) {
         if (World.Sys_UI.pg_fired) { CenterStatusPrint("%s",Sys_Text.stringTable[312]); return; }
-        
         World.Sys_UI.pg_fired = true;
-        play_wav(sounds[46],AppliedFXVol(1.0f),(V3){0},false);/*code accepted / puzzle solved sound*/
+        play_wav(sounds[46],AppliedFXVol(1.0f),(V3){0},false);/*puzzle solved*/
         u16 pg = World.Sys_UI.tetheredPGP;
-        if (pg>=INSTS_1ST_IDX && pg<World.instCount) {
-            UseTargets(pg,World.instances[pg].targetIdx);
-            if (World.instances[pg].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pg].messageLingdex]);
-        }
+        if (pg>=INSTS_1ST_IDX && pg<World.instCount) { UseTargets(pg,World.instances[pg].targetIdx); if (World.instances[pg].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pg].messageLingdex]); }
     }
 }
-
-void UI_PuzzleGridSlide(bool rh,float f) { (void)rh; (void)f;  }
 void UI_PuzzleGridClose() { World.Sys_UI.mouseClickHeldOverGUI = true; World.Sys_UI.tetheredPGP = U16_MAX; World.Sys_UI.pg_solved = false; World.Sys_UI.pg_width = World.Sys_UI.pg_height = 0; SysUIDataClose(); }
 static i8 PWFindCol(const i8* arr,int wire) { for (i8 c=0;c<7;++c) if ((int)arr[c]==wire) return c; return -1; }
-static void PWClickEnd(int spot,bool colRH) { if (spot<0||spot>6) return; i8* col=colRH?World.Sys_UI.pw_curR:World.Sys_UI.pw_curL;
-    if (World.Sys_UI.pw_selectedWire >= 0 && World.Sys_UI.pw_selectedWireRH == colRH) { i8 sel = World.Sys_UI.pw_selectedWire; i8 temp = col[spot]; col[spot] = col[sel]; col[sel] = temp; World.Sys_UI.pw_selectedWire = -1; return; }
-    
-    World.Sys_UI.pw_selectedWire = -1;
-    if (col[spot] >= 0 && World.Sys_UI.pw_wireOn[col[spot]]) { World.Sys_UI.pw_selectedWire = (i8)spot; World.Sys_UI.pw_selectedWireRH = colRH; }
+static void PWClickEnd(int spot,bool colRH) {
+    if (spot<0||spot>6) return;
+    i8* col=colRH?World.Sys_UI.pw_curR:World.Sys_UI.pw_curL; if (World.Sys_UI.pw_selectedWire >= 0 && World.Sys_UI.pw_selectedWireRH == colRH) { i8 sel = World.Sys_UI.pw_selectedWire; i8 temp = col[spot]; col[spot] = col[sel]; col[sel] = temp; World.Sys_UI.pw_selectedWire = -1; return; } World.Sys_UI.pw_selectedWire = -1; if (col[spot] >= 0 && World.Sys_UI.pw_wireOn[col[spot]]) { World.Sys_UI.pw_selectedWire = (i8)spot; World.Sys_UI.pw_selectedWireRH = colRH; }
 }
-
-static float PWMatchValue(void) { float match=0.0f;
-    for (i8 w=0;w<7;++w) { if (!World.Sys_UI.pw_wireOn[w]) continue; i8 l=PWFindCol(World.Sys_UI.pw_curL,w),r=PWFindCol(World.Sys_UI.pw_curR,w);
-        if (l>=0 && l==World.Sys_UI.pw_tgtL[w]) match+=0.19f; if (r>=0 && r==World.Sys_UI.pw_tgtR[w]) match+=0.19f; }
-    if (World.diffPuz==1) match+=0.19f;
-    return match; }
-static void PWEval(void) { float match=PWMatchValue(); bool all=true;
-    for (i8 w=0;w<7;++w) { if (!World.Sys_UI.pw_wireOn[w]) continue; i8 l=PWFindCol(World.Sys_UI.pw_curL,w),r=PWFindCol(World.Sys_UI.pw_curR,w);
-        if (!(l>=0 && l==World.Sys_UI.pw_tgtL[w] && r>=0 && r==World.Sys_UI.pw_tgtR[w])) all=false; }
-    World.Sys_UI.pw_solved=(match>0.92f || all);
+static float PWMatchValue(void) { float match=0.0f; for (i8 w=0;w<7;++w) { if (!World.Sys_UI.pw_wireOn[w]) { continue; } i8 l = PWFindCol(World.Sys_UI.pw_curL,w), r = PWFindCol(World.Sys_UI.pw_curR,w); if (l>=0 && l==World.Sys_UI.pw_tgtL[w]) match += 0.19f; if (r>=0 && r==World.Sys_UI.pw_tgtR[w]) match += 0.19f; } if (World.diffPuz==1) { match += 0.19f; } return match; }
+static void PWEval(void) { float match=PWMatchValue(); bool all=true; for (i8 w=0;w<7;++w) { if (!World.Sys_UI.pw_wireOn[w]) continue; i8 l=PWFindCol(World.Sys_UI.pw_curL,w),r=PWFindCol(World.Sys_UI.pw_curR,w); if (!(l>=0 && l==World.Sys_UI.pw_tgtL[w] && r>=0 && r==World.Sys_UI.pw_tgtR[w])) all=false; } World.Sys_UI.pw_solved=(match>0.92f || all); }
+void UI_WireNodeClick(bool rh,int node) {
+    World.Sys_UI.mouseClickHeldOverGUI = true; (void)rh; if (World.Sys_UI.tetheredPWP == U16_MAX || World.Sys_UI.pw_solved || node < 0 || node > 13) { return; } if (!World.Sys_UI.pw_rowActive[node%7]) { return; }
+    PWClickEnd(node % 7, node >= 7); PWEval(); if (World.Sys_UI.pw_solved) { u16 pw=World.Sys_UI.tetheredPWP; if (pw>=INSTS_1ST_IDX && pw<World.instCount) { UseTargets(pw,World.instances[pw].targetIdx); if (World.instances[pw].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pw].messageLingdex]); } }
 }
-
-void UI_WireNodeClick(bool rh,int node) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh; if (World.Sys_UI.tetheredPWP==U16_MAX) return; if (World.Sys_UI.pw_solved) return; if (node<0||node>13) return; if (!World.Sys_UI.pw_rowActive[node%7]) return;/*hidden node rows take no input either: nodeRowIsActive false means SetActive(false), so the row has no button.*/
-    PWClickEnd(node%7, node>=7); PWEval();
-    if (World.Sys_UI.pw_solved) { u16 pw=World.Sys_UI.tetheredPWP; if (pw>=INSTS_1ST_IDX && pw<World.instCount) { UseTargets(pw,World.instances[pw].targetIdx); if (World.instances[pw].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pw].messageLingdex]); } }
-}
-
-void UI_WireSlide(bool rh,float f) { (void)rh; (void)f;  }
-void UI_WireClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredPWP=U16_MAX; World.Sys_UI.pw_solved=false; World.Sys_UI.pw_selectedWire=-1; SysUIDataClose(); }
-void UI_BlockedClose(void) { World.Sys_UI.mouseClickHeldOverGUI=true; SysUIDataClose(); }
+void UI_WireClose() { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredPWP=U16_MAX; World.Sys_UI.pw_solved=false; World.Sys_UI.pw_selectedWire=-1; SysUIDataClose(); }
+void UI_BlockedClose() { World.Sys_UI.mouseClickHeldOverGUI=true; SysUIDataClose(); }
 void UI_SysAnalyzerClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; MFD_CloseData(); }
 void UI_MinigameStart(bool rh,int game) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastMinigameSideRH=rh; if (game<0||game>8) return; if (!World.invP1.hasMinigame) return; World.Sys_UI.mg_current=(i8)game; World.Sys_UI.mg_running[rh?1:0]=true; CenterStatusPrint("%s %s",Sys_Text.stringTable[1021],mgName[game]); play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
 void UI_MinigameInput(bool rh,int x,int y) { (void)rh;(void)x;(void)y; /*The Funpack gameplay engines are not ported yet; a click inside the running view would land here and is only consumed.*/ World.Sys_UI.mouseClickHeldOverGUI=true; }
 void UI_MinigameBack(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.mg_current<0) return; World.Sys_UI.mg_current=-1; World.Sys_UI.mg_running[rh?1:0]=false; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
-#define LOG_IMG_BASE 1272
-#define LOG_TX 372
-#define LOG_TY 574
-#define LOG_TW 520
-#define LOG_TSC 0.8f
 #define LOG_TLINES 8
 #define LOG_PAGE_CHARS 568
 #define LOG_BTN_Y 721
 static int UILogWrap(char* out,int outSz,int startChar,int maxLines) {/*word-wraps the whole log; emits lines starting at or after startChar (up to maxLines) into out joined by \n; returns the total wrapped line count*/
     int li=(int)World.Sys_UI.logReferenceIndex; if (li<0||li>=LOGCNT||!out||outSz<8) { if(out&&outSz) *out=0; return 0; }
-    const char* s=World.audioLogSpeech2Text[li]; char line[T_LOGSTR_MAX]; float maxU=(float)LOG_TW/LOG_TSC;
+    const char* s=World.audioLogSpeech2Text[li]; char line[T_LOGSTR_MAX]; float maxU = (float)520 / 0.8f;
     int total=0,op=0,emitted=0,lineStart=0;
     while (*s) {
         int n=0; float w=0; const char* lastSp=NULL; int lastN=0;
@@ -713,49 +552,27 @@ static int UILogWrap(char* out,int outSz,int startChar,int maxLines) {/*word-wra
     }
     out[op]=0; return total;
 }
-static char logPageBuf[T_LOGSTR_MAX];/*current page: wrapped lines joined by \n*/
-static char UILogCountBuf[8];
-static int UILogTotalLines(void) { return UILogWrap(logPageBuf,sizeof(logPageBuf),(int)World.Sys_UI.logReaderPage*LOG_PAGE_CHARS,LOG_TLINES); }
-static int UILogFullLines(void) { return UILogWrap(UILogCountBuf,sizeof(UILogCountBuf),0,0); }/*total wrapped lines of the whole log, for the multipage test*/
+static char logPageBuf[T_LOGSTR_MAX],UILogCountBuf[8];
+static int UILogTotalLines(void) { return UILogWrap(logPageBuf,sizeof(logPageBuf),(int)World.Sys_UI.logReaderPage*LOG_PAGE_CHARS,8); }
+static int UILogFullLines(void) { return UILogWrap(UILogCountBuf,sizeof(UILogCountBuf),0,0); }
 static bool UILogHasMore(void) { int li=(int)World.Sys_UI.logReferenceIndex; if (li<0||li>=LOGCNT) return false; return (int)slen(World.audioLogSpeech2Text[li]) > (int)(World.Sys_UI.logReaderPage+1)*LOG_PAGE_CHARS; }
 static const char* UILogTextPage() { UILogTotalLines(); return logPageBuf; }
-void MFD_OpenAudioLog(int idx) {
-    if (idx<0||idx>=LOGCNT) return; World.invP1.hardwareIsActive|=HW_ERD;/*ereader stays powered on*/
-    World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.logReaderPage=0; MFD_OpenData(false,6); if (Sys_Text.audioLogImagesRefIndicesRH[idx]) MFD_OpenData(true,6);
-    World.Sys_UI.mfdTab[0]=5; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT; }
-void MFD_OpenPaperLog(int idx, V3 tetherPoint) {
-    if (idx<0||idx>=LOGCNT) return; World.invP1.hardwareIsActive|=HW_ERD;
-    if (Sys_Text.audioLogImagesRefIndicesLH[idx]) MFD_OpenData(false,6);
-    if (Sys_Text.audioLogImagesRefIndicesRH[idx]) MFD_OpenData(true,6);
-    World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.logReaderPage=0; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT;
-    World.Sys_UI.mfdTab[0]=5; World.Sys_UI.MFD_MediaTab=MM_LOG_TABLE;/*the TEXT view renders only under center tab 5 (EReader) + the LOG_TABLE branch; without these the frob opened only the side image tabs and the text never displayed, unlike MFD_OpenAudioLog which sets CenterTab=5*/
-    World.Sys_UI.objectInUsePos=tetherPoint; }
-
-static void UIOpenEntryAndRead(int idx,bool playable) { if (idx<0||idx>=LOGCNT) return; World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT; World.Sys_UI.logReaderPage=0; World.invP1.readLog[idx]=true;
-    if (playable && (World.invP1.hasHardware&HW_ERD) && audioLogs[idx] && audioLogs[idx][0]) PlayLog(idx);
-    CheckForUnreadLogs(); if (!World.invP1.hasNewEmail && !World.invP1.hasNewLogs && !World.invP1.hasNewNotes) World.Sys_UI.highlightStatus[MM_EMAIL_TABLE]=World.Sys_UI.highlightStatus[MM_LOG_TABLE]=World.Sys_UI.highlightStatus[MM_DATA_TABLE]=false; }
-void UI_LogTableClick(int level) { World.Sys_UI.mouseClickHeldOverGUI=true; if (level<0||level>9) return; World.invP1.hardwareIsActive|=HW_ERD; World.Sys_UI.logFolderCount=0; World.Sys_UI.MFD_ReaderView=MFD_READER_FOLDER;
-    for (int i=0;i<LOGCNT && World.Sys_UI.logFolderCount<15;++i) if (World.invP1.hasLog[i] && Sys_Text.audioLogLevelFound[i]==(u8)level) { World.Sys_UI.logFolderList[World.Sys_UI.logFolderCount]=(i16)i; World.Sys_UI.logFolderCount++; }
-    play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
+void MFD_OpenAudioLog(int idx) { if (idx<0||idx>=LOGCNT) return; World.invP1.hardwareIsActive|=HW_ERD; World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.logReaderPage=0; MFD_OpenData(false,6); if (Sys_Text.audioLogImagesRefIndicesRH[idx]) MFD_OpenData(true,6); World.Sys_UI.mfdTab[0]=5; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT; }
+void MFD_OpenPaperLog(int idx, V3 tetherPoint) { if (idx<0||idx>=LOGCNT) return; World.invP1.hardwareIsActive|=HW_ERD; if (Sys_Text.audioLogImagesRefIndicesLH[idx]) MFD_OpenData(false,6); if (Sys_Text.audioLogImagesRefIndicesRH[idx]) MFD_OpenData(true,6); World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.logReaderPage=0; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT; World.Sys_UI.mfdTab[0]=5; World.Sys_UI.MFD_MediaTab=MM_LOG_TABLE; World.Sys_UI.objectInUsePos=tetherPoint; }
+static void UIOpenEntryAndRead(int idx,bool playable) {
+    if (idx<0||idx>=LOGCNT) return; World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT; World.Sys_UI.logReaderPage=0; World.invP1.readLog[idx]=true;
+    if (playable && (World.invP1.hasHardware&HW_ERD) && audioLogs[idx] && audioLogs[idx][0]) PlayLog(idx); CheckForUnreadLogs(); if (!World.invP1.hasNewEmail && !World.invP1.hasNewLogs && !World.invP1.hasNewNotes) World.Sys_UI.highlightStatus[MM_EMAIL_TABLE]=World.Sys_UI.highlightStatus[MM_LOG_TABLE]=World.Sys_UI.highlightStatus[MM_DATA_TABLE]=false;
+}
+void UI_LogTableClick(int level) { World.Sys_UI.mouseClickHeldOverGUI=true; if (level<0||level>9) return; World.invP1.hardwareIsActive|=HW_ERD; World.Sys_UI.logFolderCount=0; World.Sys_UI.MFD_ReaderView=MFD_READER_FOLDER; for (int i=0;i<LOGCNT && World.Sys_UI.logFolderCount<15;++i) if (World.invP1.hasLog[i] && Sys_Text.audioLogLevelFound[i]==(u8)level) { World.Sys_UI.logFolderList[World.Sys_UI.logFolderCount]=(i16)i; World.Sys_UI.logFolderCount++; } play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
 void UI_LogEntryClick(int entry) { World.Sys_UI.mouseClickHeldOverGUI=true; if (entry<0||entry>=(int)World.Sys_UI.logFolderCount) return; UIOpenEntryAndRead((int)World.Sys_UI.logFolderList[entry],true); }
 static int UIEmailRefAt(int pos) { int c=0; for (int i=0;i<LOGCNT;++i) if (World.invP1.hasLog[i] && Sys_Text.audioLogType[i]==AudioLogType_Email) { if (c==pos) return i; ++c; } return -1; }
 static int UIDataRefAt(int pos) { int c=0; for (int i=0;i<LOGCNT;++i) if (World.invP1.hasLog[i] && Sys_Text.audioLogType[i]==AudioLogType_Papers) { if (c==pos) return i; ++c; } return -1; }
 void UI_EmailEntryClick(int entry) { World.Sys_UI.mouseClickHeldOverGUI=true; if (entry<0||entry>14) return; int idx=UIEmailRefAt(entry); if (idx<0) return; UIOpenEntryAndRead(idx,false); }/*emails have no voice track*/
 void UI_DataEntryClick(int entry) { World.Sys_UI.mouseClickHeldOverGUI=true; if (entry<0||entry>12) return; int idx=UIDataRefAt(entry); if (idx<0) return; UIOpenEntryAndRead(idx,false); }
-void UI_LogMore(void) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.MFD_ReaderView!=MFD_READER_TEXT) return;
-    if (UILogHasMore()) { World.Sys_UI.logReaderPage++; return; }/*[MORE]: another wrapped page follows*/
-    World.Sys_UI.logReaderPage=0; MFD_CloseData();/*[CLOSE]: the side MFD log info/image data views give the tabs back to the player, same as any other panel close*/
-    World.Sys_UI.MFD_ReaderView=MFD_READER_FOLDER; }
-void UI_LogBack(void) { World.Sys_UI.mouseClickHeldOverGUI=true;
-    if (World.Sys_UI.MFD_ReaderView==MFD_READER_TEXT) { if (World.Sys_UI.logReaderPage>0) { World.Sys_UI.logReaderPage--; return; } return; }
-    if (World.Sys_UI.MFD_ReaderView==MFD_READER_FOLDER) World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS; }
+void UI_LogMore(void) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.MFD_ReaderView!=MFD_READER_TEXT) return; if (UILogHasMore()) { World.Sys_UI.logReaderPage++; return; }/*[MORE]*/ World.Sys_UI.logReaderPage=0; MFD_CloseData();/*[CLOSE]*/ World.Sys_UI.MFD_ReaderView=MFD_READER_FOLDER; }
+void UI_LogBack(void) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.MFD_ReaderView==MFD_READER_TEXT) { if (World.Sys_UI.logReaderPage>0) { World.Sys_UI.logReaderPage--; return; } return; } if (World.Sys_UI.MFD_ReaderView==MFD_READER_FOLDER) World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS; }
 void UI_NoteToggleClick(int note) { World.Sys_UI.mouseClickHeldOverGUI=true; if (note<0||note>17) return; if (!World.questNotesActive[note]) return; World.questNotesChecked[note]=!World.questNotesChecked[note]; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
-void UI_HardwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if (idx<0||idx>=HW_COUNT) return; World.invP1.hardwareInvCurrent=idx; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);
-    bool rh=World.Sys_UI.lastItemSideRH; World.Sys_UI.mfdHardwareItem=true; World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false;
-    if (idx==HW_SYS_IDX) { /*the system analyzer is a data-tab view, so it opens on the last-used data side rather than the item side*/
-        MFD_OpenData(World.Sys_UI.lastDataSideRH,7); return; }
-    World.Sys_UI.mfdTab[1+!!rh]=2; }
-void UseCyberspaceItemByIndex(int);
+void UI_HardwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if (idx<0||idx>=HW_COUNT) return; World.invP1.hardwareInvCurrent=idx; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); bool rh=World.Sys_UI.lastItemSideRH; World.Sys_UI.mfdHardwareItem=true; World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; if (idx==HW_SYS_IDX) { MFD_OpenData(World.Sys_UI.lastDataSideRH,7); return; } World.Sys_UI.mfdTab[1+!!rh]=2; }
 void UI_SoftwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if (idx<0||idx>6) return; bool cyber = World.curLev == LEVEL_CYBERSPACE;/*row 0 ICE Drill, 1 Pulser, 2 Cyber Shield, 3 Turbo, 4 Decoy, 5 Recall, 6 Games*/
     if (idx==SW_DRILL)  { World.invP1.isPulserNotDrill = false; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ return; }
     if (idx==SW_PULSER) { World.invP1.isPulserNotDrill = true;  play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ return; }
@@ -764,27 +581,20 @@ void UI_SoftwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if 
     if (!cyber) { CenterStatusPrint("%s",Sys_Text.stringTable[460]); return; }
     UseCyberspaceItemByIndex(idx - SW_TURBO);
 }
-
 void UI_WeaponIconClick() { World.Sys_UI.mouseClickHeldOverGUI=true; if (CurrentWeaponUsesEnergy()) OverloadButtonAction(); else ActualChangeAmmoType(); }
 void UI_AutomapClick(bool rh,int action) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastAutomapSideRH=rh; u8 side=rh?1:0; u8* z=&World.automapZoom;
     if (World.invP1.hwVers[HW_NAV_IDX]<2 && action!=UI_AUTOMAP_FULL && action!=UI_AUTOMAP_SIDE) { CenterStatusPrint("%s",Sys_Text.stringTable[465]); return; }
-    
     if (action==UI_AUTOMAP_ZOOM_IN) { if (*z==0) { CenterStatusPrint("%s",Sys_Text.stringTable[317]); return; } (*z)--; }
     else if (action==UI_AUTOMAP_ZOOM_OUT) { if (*z==2) { CenterStatusPrint("%s",Sys_Text.stringTable[316]); return; } (*z)++; }
     else if (action==UI_AUTOMAP_FULL) { bool open=!(World.Sys_UI.fullMapOpen[0] || World.Sys_UI.fullMapOpen[1]); World.Sys_UI.fullMapOpen[0]=World.Sys_UI.fullMapOpen[1]=open; }
     else if (action==UI_AUTOMAP_SIDE) { World.Sys_UI.autoSide[side]=!World.Sys_UI.autoSide[side]; }
     else return; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);
 }
-
 void CloseFullmap() { World.Sys_UI.fullMapOpen[0]=World.Sys_UI.fullMapOpen[1]=false; }
 void AddItemToInventory(int index, int custIdx); void ResetHeldItem();
 static const u16 vmailStartFrames[6]={1579,1645,1713,1784,1864,1931}; static const u16 vmailEndFrames[6]={1644,1712,1783,1863,1930,1988}; static double avgCPUt[AVG_CPU_TAPS]={0}; static int avgCPUt_idx = 0;
 void AppendTextWarning(i32 sidx, i32 sidx2, i32 sidx3, i32 col, i32 id) { World.Sys_UI.tWrnTextIdx[id]=sidx; World.Sys_UI.tWrnTextIdx2[id]=sidx2; World.Sys_UI.tWrnTextIdx3[id]=sidx3; World.Sys_UI.tWrnFinished[id]=World.Sys_UI.tWrnFinished[id] < World.pauseRelativeTime ? World.pauseRelativeTime + 0.1f : World.Sys_UI.tWrnFinished[id] + 0.1f; World.Sys_UI.tWrnColorIdx[id] = col; }
-enum { EF_POSX,EF_POSY,EF_POSZ,EF_ROTX,EF_ROTY,EF_ROTZ,EF_ROTW,EF_SCLX,EF_SCLY,EF_SCLZ,EF_TEX,EF_MODEL,EF_GLOW,EF_SPEC,EF_NORM,EF_LAST };
-bool editFieldEditing=false; static u8 editFieldSlot=EF_LAST; static char editFieldBuffer[40]={0};
-#define EF_LABELX 982
-#define EF_VALUEX 1108
-static const i16 efRowY[EF_LAST]={160,188,216,244,272,300,328,356,384,412,440,468,496,524,552};
+enum { EF_POSX,EF_POSY,EF_POSZ,EF_ROTX,EF_ROTY,EF_ROTZ,EF_ROTW,EF_SCLX,EF_SCLY,EF_SCLZ,EF_TEX,EF_MODEL,EF_GLOW,EF_SPEC,EF_NORM,EF_LAST }; bool editFieldEditing=false; static u8 editFieldSlot=EF_LAST; static char editFieldBuffer[40]={0}; static const i16 efRowY[EF_LAST]={160,188,216,244,272,300,328,356,384,412,440,468,496,524,552};
 static const char* efRowLabel[EF_LAST]={"position x","position y","position z","rotation x","rotation y","rotation z","rotation w","scale x","scale y","scale z","texIndex","modelIndex","glowIndex","specIndex","normIndex"};
 extern Quaternion quat_normalize(Quaternion);
 static void* EditFieldPtr(u8 slot,u16 s) {
@@ -797,37 +607,31 @@ static void* EditFieldPtr(u8 slot,u16 s) {
 static void EditFieldValueText(u8 slot,u16 sel,char* out,size_t n) { void* p=EditFieldPtr(slot,sel); if (!p) { if (n) out[0]=0; return; } if (slot<EF_TEX) sFormat(out,n,slot>=EF_ROTX && slot<=EF_ROTW ? "%.3f" : "%.2f",*(float*)p); else sFormat(out,n,"%u",*(u16*)p); }
 static bool EditSelIsActive(void){return Cheats.editMode&&editModeSelection<U16_MAX&&editModeSelection>=INSTS_1ST_IDX&&editModeSelection<World.instCount;}
 static bool EditLightSelIsActive(void){return Cheats.editMode&&editModeLightSelection<U16_MAX&&editModeLightSelection<World.loadedLights;}
-/*Light properties in the same edit panel, when a light (not an entity) is selected. Rows reuse the EDIT_ROW ids; only one branch renders at a time.*/
 enum { LF_POSX,LF_POSY,LF_POSZ,LF_INT,LF_RANGE,LF_SPOTANG,LF_COLR,LF_COLG,LF_COLB,LF_MINI,LF_MAXI,LF_SDIRX,LF_SDIRY,LF_SDIRZ,LF_SDIRW,LF_LAST };
 static const char* lfRowLabel[LF_LAST]={"position x","position y","position z","intensity","range","spotAng","color r","color g","color b","minIntensity","maxIntensity","spotDir x","spotDir y","spotDir z","spotDir w"};
 static const u16 lfOffsets[LF_LAST]={
-    __builtin_offsetof(Light,pos.x),__builtin_offsetof(Light,pos.y),__builtin_offsetof(Light,pos.z),__builtin_offsetof(Light,intensity),__builtin_offsetof(Light,range),
+    __builtin_offsetof(Light,pos.x),__builtin_offsetof(Light,pos.y),__builtin_offsetof(Light,pos.z),__builtin_offsetof(Light,intensity),__builtin_offsetof(Light,range), 
     __builtin_offsetof(Light,spotAng),__builtin_offsetof(Light,col.r),__builtin_offsetof(Light,col.g),__builtin_offsetof(Light,col.b),__builtin_offsetof(Light,minIntensity),
-    __builtin_offsetof(Light,maxIntensity),__builtin_offsetof(Light,spotDir.x),__builtin_offsetof(Light,spotDir.y),__builtin_offsetof(Light,spotDir.z),__builtin_offsetof(Light,spotDir.w)
-};
+    __builtin_offsetof(Light,maxIntensity),__builtin_offsetof(Light,spotDir.x),__builtin_offsetof(Light,spotDir.y),__builtin_offsetof(Light,spotDir.z),__builtin_offsetof(Light,spotDir.w)};
 static void LightFieldValueText(u8 slot,u16 li,char* out,size_t n) { if (slot>=LF_LAST) { if (n) out[0]=0; return; } sFormat(out,n,(slot>=LF_COLR && slot<=LF_COLB) || slot>=LF_SDIRX ? "%.3f" : "%.2f",*(float*)((u8*)&World.lights[li]+lfOffsets[slot])); }
-static void LightFieldWrite(u16 li,float f){Light* L=&World.lights[li];if (editFieldSlot>=LF_LAST) return; *(float*)((u8*)L+lfOffsets[editFieldSlot])=f;
-    if(editFieldSlot<=LF_POSZ){World.lightsNewPosition[li]=L->pos;flag_set(&L->lflags,LDIRTY,true);}/*UpdateLights() overwrites pos from lightsNewPosition every frame, and LDIRTY rebuilds the shadow views*/
-    if(editFieldSlot>=LF_SDIRX&&editFieldSlot<=LF_SDIRW)L->spotDir=quat_normalize(L->spotDir);/*keep the spot quaternion unit-length like entity rotation edits do*/}
+static void LightFieldWrite(u16 li,float f){Light* L=&World.lights[li];if (editFieldSlot>=LF_LAST) return; *(float*)((u8*)L+lfOffsets[editFieldSlot])=f; if(editFieldSlot<=LF_POSZ){World.lightsNewPosition[li]=L->pos;flag_set(&L->lflags,LDIRTY,true);} if(editFieldSlot>=LF_SDIRX&&editFieldSlot<=LF_SDIRW)L->spotDir=quat_normalize(L->spotDir); }
 static void LightFieldCommitLive(void){if(!EditLightSelIsActive())return;float f=0;{const char* p=editFieldBuffer;f=fast_atof(&p);}LightFieldWrite(editModeLightSelection,f);}
 static void LightFieldStep(float delta){if(!editFieldEditing||!EditLightSelIsActive())return;float cur;{const char* p=editFieldBuffer;cur=fast_atof(&p);}int steps=delta>0?(int)(delta+0.5f):-(int)((-delta)+0.5f);cur+=steps*0.01f;int prec=((editFieldSlot>=LF_COLR&&editFieldSlot<=LF_COLB)||(editFieldSlot>=LF_SDIRX&&editFieldSlot<=LF_SDIRW))?3:2;sFormat(editFieldBuffer,40,prec==3 ? "%.3f" : "%.2f",cur);LightFieldCommitLive();}
-/*Light type cycle: point<->spot only. Directional is not a panel type (hardcoded in the shader); a picked light is never directional, and the toggle keeps LSPOT/LDIR mutually exclusive so a light can never end up both.*/
 static void LightTypeCycle(void){if(!EditLightSelIsActive())return;Light* L=&World.lights[editModeLightSelection];bool spot=!(L->lflags&LSPOT);flag_set(&L->lflags,LSPOT,spot);flag_set(&L->lflags,LDIR,false);}
-/*Axial spot directions. The chunk shader derives the spot vector as R(spotDir)*(0,0,1); automap convention is north=+Z, east=+X. 0.70710678f is sin/cos 45 degrees.*/
 static const Quaternion lfDirQuat[6]={{0,0,0,1},{0,0.70710678f,0,0.70710678f},{0,1,0,0},{0,-0.70710678f,0,0.70710678f},{-0.70710678f,0,0,0.70710678f},{0.70710678f,0,0,0.70710678f}};/*N,E,S,W,Up,Dn*/
 static void LightDirSet(u8 d){if(!EditLightSelIsActive()||d>=6)return;World.lights[editModeLightSelection].spotDir=lfDirQuat[d];}
 static bool LightDirIs(u8 d){if(!EditLightSelIsActive()||d>=6)return false;Quaternion q=World.lights[editModeLightSelection].spotDir;V3 sd=V3_Normalize((V3){2.0f*(q.x*q.z+q.w*q.y),2.0f*(q.y*q.z-q.w*q.x),1.0f-2.0f*(q.x*q.x+q.y*q.y)});static const V3 lfAxes[6]={{0,0,1},{1,0,0},{0,0,-1},{-1,0,0},{0,1,0},{0,-1,0}};return V3_dot(sd,lfAxes[d])>0.99f;}/*direction-dot, so -q matches the same button as q*/
 bool EditPanelPointerHover(void){if(!EditSelIsActive()&&!EditLightSelIsActive())return false;if(!World.inventoryMode)return false;for(int i=0;i<EF_LAST;++i)if(UIOver(UI_ID_CMFD_EDIT_ROW_0+i))return true;if(UIOver(UI_ID_CMFD_EDIT_LIGHT_TYPE))return true;for(int d=0;d<6;++d)if(UIOver(UI_ID_CMFD_EDIT_LIGHT_DIR_N+d))return true;return false;}
 static void EditStop(void){editFieldEditing=false;editFieldSlot=EF_LAST;}
-static void EditFieldWrite(u16 s,float f,i32 iv) { void* p=EditFieldPtr(editFieldSlot,s); if (!p) return; if (editFieldSlot<EF_TEX) *(float*)p=f; else *(u16*)p=(u16)vclamp(iv,0,editFieldSlot==EF_MODEL ? MAX_MDLS-1 : MAXTEX-1); if (editFieldSlot>=EF_ROTX && editFieldSlot<=EF_ROTW) World.rotation[s]=quat_normalize(World.rotation[s]); }
-
-static void EditFieldCommitLive(void){if(EditLightSelIsActive()){LightFieldCommitLive();return;}if(!EditSelIsActive())return;u16 s=editModeSelection;float f=0;{const char* p=editFieldBuffer;f=fast_atof(&p);}EditFieldWrite(s,f,s2i32(editFieldBuffer));}
-static void EditFieldStep(float delta){if(!editFieldEditing)return;if(EditLightSelIsActive()){LightFieldStep(delta);return;}if(!EditSelIsActive())return;float cur;{const char* p=editFieldBuffer;cur=fast_atof(&p);}
+static void EditFieldWrite(u16 s,float f,i32 iv) { void* p = EditFieldPtr(editFieldSlot,s); if (!p) return; if (editFieldSlot<EF_TEX) *(float*)p = f; else *(u16*)p=(u16)vclamp(iv,0,(editFieldSlot == EF_MODEL ? MAX_MDLS : MAXTEX) - 1); if (editFieldSlot >= EF_ROTX && editFieldSlot <= EF_ROTW) World.rotation[s] = quat_normalize(World.rotation[s]); }
+static void EditFieldCommitLive(void) {
+    if(EditLightSelIsActive()){LightFieldCommitLive();return;}if(!EditSelIsActive())return;u16 s=editModeSelection;float f=0;{const char* p=editFieldBuffer;f=fast_atof(&p);}EditFieldWrite(s,f,s2i32(editFieldBuffer));}
+static void EditFieldStep(float delta) {
+    if(!editFieldEditing)return;if(EditLightSelIsActive()){LightFieldStep(delta);return;}if(!EditSelIsActive())return;float cur;{const char* p=editFieldBuffer;cur=fast_atof(&p);}
     if(editFieldSlot<EF_TEX){int steps=delta>0?(int)(delta+0.5f):-(int)((-delta)+0.5f);cur+=steps*0.01f;int prec=(editFieldSlot>=EF_ROTX&&editFieldSlot<=EF_ROTW)?3:2;sFormat(editFieldBuffer,40,prec==3 ? "%.3f" : "%.2f",cur);}
     else{int steps=delta>0?(int)(delta+0.5f):-(int)((-delta)+0.5f);i32 iv=(i32)cur+steps;iv=vclamp(iv,0,(editFieldSlot==EF_MODEL?MAX_MDLS-1:MAXTEX-1));sFormat(editFieldBuffer,40,"%d",iv);}
     EditFieldCommitLive();
 }
-
 void EditFieldKey(i32 keycode){
     if(!editFieldEditing)return; if(keycode==KEY_ESCAPE){EditStop();return;} if(keycode==KEY_ENTER||keycode==KEY_KP_ENTER){EditStop();return;}
     size_t len=slen(editFieldBuffer); bool changed=false;
@@ -838,16 +642,7 @@ void EditFieldKey(i32 keycode){
     else if(keycode==KEY_BACKSPACE){if(len>0){editFieldBuffer[len-1]='\0';changed=true;}}
     if(changed)EditFieldCommitLive();
 }
-
-/*The whole point of the region table: one loop decides whether the pointer is over any live UI, which winput.c turns into World.uiIsBlocking so use/fire are suppressed.*/
-bool UIInteractions() {
-    if (!World.inventoryMode) return false;
-    if (World.menuActive || World.paused || World.creditsActive || Cheats.consoleActive) return true;
-    if (Cheats.noHUD || World.Sys_UI.vmailActive) return false;
-    for (u32 i=UI_ID_NONE+1;i<UI_ID_COUNT;++i) if (UIOver(i)) return true;
-    return false;
-}
-
+bool UIInteractions() { if (!World.inventoryMode) return false; if (World.menuActive || World.paused || World.creditsActive || Cheats.consoleActive) return true; if (Cheats.noHUD || World.Sys_UI.vmailActive) return false; for (u32 i=UI_ID_NONE+1;i<UI_ID_COUNT;++i) if (UIOver(i)) return true; return false; }
 bool InventoryPointerHover() { return UIInteractions(); }
 int GeneralInvItem(int);
 bool GeneralInvCanUse(int),GeneralInvCanVaporize(int),GeneralInvTake(int slot);
@@ -862,31 +657,10 @@ void UseGrenade(int),PatchUse(int);
 int ConsumableSlot(bool patch,int row) { return row<0 || row>=7?-1:patch?patchSlots[row]:row; }
 int ConsumableItem(bool patch,int row) { int slot=ConsumableSlot(patch,row); return slot<0?-1:patch?14+slot:grenadeItems[row]; }
 static u8 ConsumableCount(bool patch,int row) { int slot=ConsumableSlot(patch,row); return slot<0?0:patch?World.invP1.patchCounts[slot]:World.invP1.grenAmmo[slot]; }
-void ConsumableSelect(bool patch,int row) {
-    if (!ConsumableCount(patch,row)) return;
-    play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/
-    if (patch) World.invP1.patchCur=(u8)ConsumableSlot(true,row); else World.invP1.grenCur=(u8)row;
-    MFD_ShowGeneralItem(); World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=patch?2:1;
-}
-
-void ConsumableUse(bool patch,int row) {
-    if (!ConsumableCount(patch,row) || World.invP1.holdingObject) return;
-    ConsumableSelect(patch,row); if (patch) PatchUse(ConsumableSlot(true,row)); else UseGrenade(ConsumableItem(false,row)+307);
-    World.Sys_UI.consumableClickRow=-1;
-}
-
-static int ConsumableSelectedRow() {
-    if (World.Sys_UI.mfdConsumable==1) return World.invP1.grenCur<7?World.invP1.grenCur:-1;
-    if (World.Sys_UI.mfdConsumable==2) for (int row=0;row<7;++row) if (patchSlots[row]==World.invP1.patchCur) return row;
-    return -1;
-}
-
-void ConsumableSetTimer(float fraction) {
-    int row=ConsumableSelectedRow(); if (World.Sys_UI.mfdConsumable!=1 || row<5 || !ConsumableCount(false,row)) return;
-    float min=row==5?2.0f:4.0f,value=min+vclamp(fraction,0.0f,1.0f)*(60.0f-min);
-    if (row==5) World.invP1.nitroTimeSetting=value; else World.invP1.earthShakerTimeSetting=value;
-}
-
+void ConsumableSelect(bool patch,int row) { if (!ConsumableCount(patch,row)) return; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ if (patch) World.invP1.patchCur=(u8)ConsumableSlot(true,row); else World.invP1.grenCur=(u8)row; MFD_ShowGeneralItem(); World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=patch?2:1; }
+void ConsumableUse(bool patch,int row) { if (!ConsumableCount(patch,row) || World.invP1.holdingObject) return; ConsumableSelect(patch,row); if (patch) PatchUse(ConsumableSlot(true,row)); else UseGrenade(ConsumableItem(false,row)+307); World.Sys_UI.consumableClickRow=-1; }
+static int ConsumableSelectedRow() { if (World.Sys_UI.mfdConsumable==1) return World.invP1.grenCur<7?World.invP1.grenCur:-1; if (World.Sys_UI.mfdConsumable==2) for (int row=0;row<7;++row) if (patchSlots[row]==World.invP1.patchCur) return row; return -1; }
+void ConsumableSetTimer(float fraction) { int row=ConsumableSelectedRow(); if (World.Sys_UI.mfdConsumable!=1 || row<5 || !ConsumableCount(false,row)) return; float min=row==5?2.0f:4.0f,value=min+vclamp(fraction,0.0f,1.0f)*(60.0f-min); if (row==5) World.invP1.nitroTimeSetting=value; else World.invP1.earthShakerTimeSetting=value; }
 void RenderConsumableItem(bool isRH) {
     int row=ConsumableSelectedRow(); bool patch=World.Sys_UI.mfdConsumable==2; if (row<0 || !ConsumableCount(patch,row)) return;
     i16 dx=isRH?1059:0; int item=ConsumableItem(patch,row); const char* text=Sys_Text.stringTable[item+326];
@@ -899,16 +673,11 @@ void RenderConsumableItem(bool isRH) {
         UIRImg(MID(isRH,ITEM_TIMER_SLIDER),dx+40,650,224,24,1087); RenderUIImage(dx+40+(i16)(204.0f*vclamp((value-min)/(60.0f-min),0.0f,1.0f)),652,20,20,1086);
     }
 }
-
-/*The booster is the one hardware whose mode the player picks instead of inheriting it from the item's version; hwVersSetting[HW_BST_IDX]==0 is skates and >=1 is boost, matching Inventory.BoosterSetToSkates()/BoosterSetToBoost()*/
 static void BoosterSetMode(bool boost) { if (!(World.invP1.hasHardware & HW_BST)) return; World.invP1.hwVersSetting[HW_BST_IDX] = boost ? (u8)vmax(1,(int)World.invP1.hwVers[HW_BST_IDX]-1) : 0; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
 static void RenderHardwareItem(bool isRH) {
-    int slot=World.invP1.hardwareInvCurrent; i16 dx=isRH?1059:0; int ref=World.invP1.hardwareInvReferenceIndex[slot];
-    UIRText(MID(isRH,ITEM_NAME),dx+28,540,T_YELLOW,FONT_NORMAL,0.8f,260,ref<0?"":Sys_Text.stringTable[ref+326]);
-    if (slot==HW_BST_IDX) { /*the booster is the only hardware with selectable modes, so it gets the SKATE/BOOST pair instead of a plain readout*/
-        bool skates=World.invP1.hwVersSetting[HW_BST_IDX]==0; for(u8 m=0;m<2;++m){ u32 rid = m ? MID(isRH,ITEM_BOOST) : MID(isRH,ITEM_SKATE); i16 y=m?691:628; UIRImg(rid,dx+34,y,160,40,1087); RenderTextL(dx+34,y,skates==(m==0)?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8,"%s",m?"BOOST":"SKATE"); } return; }
-    u16 tex=ref<0?MAXTEX:GetItemFrobTexture((u16)(ref+307)); /*hardware frob icons live at 328..339, not 307..318: hardwareInvReferenceIndex is the +21 remap that lines names and icons up*/
-    if (tex<MAXTEX) UIRImg(MID(isRH,ITEM_ICON),dx+112,560,80,64,tex);
+    int slot=World.invP1.hardwareInvCurrent; i16 dx=isRH?1059:0; int ref=World.invP1.hardwareInvReferenceIndex[slot]; UIRText(MID(isRH,ITEM_NAME),dx+28,540,T_YELLOW,FONT_NORMAL,0.8f,260,ref<0?"":Sys_Text.stringTable[ref+326]);
+    if (slot==HW_BST_IDX) { bool skates=World.invP1.hwVersSetting[HW_BST_IDX]==0; for(u8 m=0;m<2;++m){ u32 rid = m ? MID(isRH,ITEM_BOOST) : MID(isRH,ITEM_SKATE); i16 y=m?691:628; UIRImg(rid,dx+34,y,160,40,1087); RenderTextL(dx+34,y,skates==(m==0)?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8,"%s",m?"BOOST":"SKATE"); } return; }
+    u16 tex = ref < 0 ? MAXTEX : GetItemFrobTexture((u16)(ref+307)); if (tex<MAXTEX) UIRImg(MID(isRH,ITEM_ICON),dx+112,560,80,64,tex);
     RenderTextL(dx+112,650,T_GREEN_MENU,FONT_NORMAL,0.8,"v%d",(int)World.invP1.hwVers[slot]);
 }
 void RenderGeneralItem(bool isRH) {
@@ -1120,7 +889,7 @@ void SideMFD(bool isRH) { // 320x240
             if (data==5) RenderSearch(isRH);
             if (data==6) {
                 int li=(int)World.Sys_UI.logReferenceIndex; if(li<0||li>=LOGCNT){li=0;} u16 im=(u16)(isRH?Sys_Text.audioLogImagesRefIndicesRH[li]:Sys_Text.audioLogImagesRefIndicesLH[li]);
-                UIRImg(MID(isRH,AUDIOLOG_IMAGE),20+dx,528,263,240,(u16)(LOG_IMG_BASE+im));/*LogImage*/
+                UIRImg(MID(isRH,AUDIOLOG_IMAGE),20+dx,528,263,240,(u16)(1272 + im));/*LogImage*/
                 char snd[192]; if(isRH) snd[0]=0; else sFormat(snd,sizeof(snd),"%s%s",Sys_Text.stringTable[893],World.audiologSenders[li]);
                 UIRText(MID(isRH,AUDIOLOG_NAME),29+dx,523,T_YELLOW,FONT_NORMAL,0.8f,0,World.audiologNames[li]); UIRText(MID(isRH,AUDIOLOG_SENDER),29+dx,557,T_YELLOW,FONT_NORMAL,0.8f,0,snd);
                 UIR(MID(isRH,AUDIOLOG_SUBJECT),29+dx,701,(i16)(MeasureLineAdvance(Sys_Text.stringTable[894],FONT_NORMAL)*0.8f),(i16)(3*22.0f*0.8f)); RenderTextL(29+dx,701,T_YELLOW,FONT_NORMAL,0.8,isRH?"":"%s\n\n%s",Sys_Text.stringTable[894],World.audiologSubjects[li]);
@@ -1269,7 +1038,7 @@ void CenterMFD() { //640x240
             } else if (World.Sys_UI.MFD_ReaderView==MFD_READER_FOLDER) {
                 for (u8 i=0;i<15;++i) { i16 x=mediaColX[i/8],y=mediaRowY[i%8]; int li=i<(int)World.Sys_UI.logFolderCount?World.Sys_UI.logFolderList[i]:-1; if(li<0){continue;} UIR(UI_ID_CMFD_LOG_ENTRY_0+i,x,y,222,21); RenderTextL(x,y,World.invP1.readLog[li]?T_GREEN_MENU_GLOW:T_GREEN,FONT_NORMAL,0.8,"%s",World.audiologNames[li]); }
             } else if (World.Sys_UI.MFD_ReaderView==MFD_READER_TEXT) {
-                UIR(UI_ID_CMFD_LOG_TEXT,LOG_TX,LOG_TY,LOG_TW,LOG_TLINES*22); RenderTextL(LOG_TX,LOG_TY,T_GREEN,FONT_NORMAL,LOG_TSC,"%s",UILogTextPage());
+                UIR(UI_ID_CMFD_LOG_TEXT,372,574,520,LOG_TLINES*22); RenderTextL(372,574,T_GREEN,FONT_NORMAL,0.8f,"%s",UILogTextPage());
                 i16 cmw=(i16)(TAB_THICK+MFD_SPACING+SIDE_MFD_W+MFD_SPACINGCTR); bool more=UILogHasMore(); int totL=UILogFullLines();
                 const char* mcb=Sys_Text.stringTable[more?26:27]; i16 mcbW=(i16)(MeasureLineAdvance(mcb,FONT_NORMAL)*0.8f);
                 UIR(UI_ID_CMFD_LOG_MORE,(i16)(cmw+CTR_MFD_W-mcbW),LOG_BTN_Y,mcbW,26); RenderTextL((i16)(cmw+CTR_MFD_W-mcbW),LOG_BTN_Y,T_YELLOW,FONT_NORMAL,0.8,"%s",mcb);
@@ -1298,9 +1067,9 @@ static void UI_DragRegions(void) {
     if (!Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down) return;
     for (u8 s=0;s<2;++s) {
         u32 id=MID(s,ITEM_TIMER_SLIDER); if (UIOver(id)) { World.Sys_UI.lastItemSideRH=s!=0; ConsumableSetTimer(((float)World.cursorPos_x-UIC(id).min.x)/224.0f); World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; }
-        id=MID(s,PUZZLE_SLIDER); if (UIOver(id)) { UI_PuzzleGridSlide(s!=0,vclamp(((float)World.cursorPos_x-UIC(id).min.x)/225.0f,0.0f,1.0f)); World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; }
-        id=MID(s,WIRE_SLIDER); if (UIOver(id)) { UI_WireSlide(s!=0,vclamp(((float)World.cursorPos_x-UIC(id).min.x)/235.0f,0.0f,1.0f)); World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; }
-        id=MID(s,WEAPON_ENERGY_SLIDER); if (UIOver(id)) UI_WeaponEnergySliderSet(s!=0);
+        id = MID(s,PUZZLE_SLIDER); if (UIOver(id)) { World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; }
+        id = MID(s,WIRE_SLIDER); if (UIOver(id)) { World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; }
+        id = MID(s,WEAPON_ENERGY_SLIDER); if (UIOver(id)) UI_WeaponEnergySliderSet(s!=0);
     }
 }
 /*c: 1 LMB, 2 RMB, +4 double click of that same button.*/
@@ -1363,11 +1132,11 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_LMFD_ELEV_CLOSE: UI_ElevClose(rh); return;
         case UI_ID_LMFD_KEYCODE_0 ... UI_ID_LMFD_KEYCODE_11: UI_KeycodeKey(rh,(int)(id-UI_ID_LMFD_KEYCODE_0)); return;
         case UI_ID_LMFD_KEYCODE_CLOSE: UI_KeycodeClose(rh); return;
-        case UI_ID_LMFD_AUDIOLOG_IMAGE: UI_AudioLogClick(rh); return;
-        case UI_ID_LMFD_PUZZLE_CELL_0 ... UI_ID_LMFD_PUZZLE_CELL_34: UI_PuzzleGridCell(rh,(int)(id-UI_ID_LMFD_PUZZLE_CELL_0)); return;
+        case UI_ID_LMFD_AUDIOLOG_IMAGE: UI_AudioLogClick(); return;
+        case UI_ID_LMFD_PUZZLE_CELL_0 ... UI_ID_LMFD_PUZZLE_CELL_34: UI_PuzzleGridCell((int)(id-UI_ID_LMFD_PUZZLE_CELL_0)); return;
         case UI_ID_LMFD_PUZZLE_CLOSE: UI_PuzzleGridClose(); return;
         case UI_ID_LMFD_WIRE_NODE_0 ... UI_ID_LMFD_WIRE_NODE_13: UI_WireNodeClick(rh,(int)(id-UI_ID_LMFD_WIRE_NODE_0)); return;
-        case UI_ID_LMFD_WIRE_CLOSE: UI_WireClose(rh); return;
+        case UI_ID_LMFD_WIRE_CLOSE: UI_WireClose(); return;
         case UI_ID_LMFD_SYS_CLOSE: UI_SysAnalyzerClose(rh); return;
         case UI_ID_LMFD_MINIGAME_0 ... UI_ID_LMFD_MINIGAME_8: UI_MinigameStart(rh,(int)(id-UI_ID_LMFD_MINIGAME_0)); return;
         case UI_ID_LMFD_MINIGAME_VIEW: UI_MinigameInput(rh,World.cursorPos_x,World.cursorPos_y); return;
@@ -1524,39 +1293,36 @@ static void RenderUI() {
             u16 sel=editModeSelection; Entity* e=&World.instances[sel];
             float sx,sy; if (WorldToScreenPoint(V3_AsubB(World.position[sel],World.position[PLAYER1]),&sx,&sy)) RenderUIImage((i16)(sx-24.0f),(i16)(sy-24.0f),48,48,1051);
             RenderUIImage(966,84,400,600,1025);/*Edit object info panel bg (non-interactive backdrop)*/
-            RenderTextL(EF_LABELX,104,T_YELLOW,FONT_NORMAL,1.0f,"EDIT OBJECT #%u",sel); {char v[40];sFormat(v,40,"%u",e->index);RenderTextL(EF_LABELX,132,T_GREEN,FONT_NORMAL,1.0f,"const index"); RenderTextL(EF_VALUEX,132,T_GREEN,FONT_NORMAL,1.0f,"%s",v);} bool caretOn=((u32)(get_time()*2.0f)&1)!=0;
+            RenderTextL(982,104,T_YELLOW,FONT_NORMAL,1.0f,"EDIT OBJECT #%u",sel); {char v[40];sFormat(v,40,"%u",e->index);RenderTextL(982,132,T_GREEN,FONT_NORMAL,1.0f,"const index"); RenderTextL(1108,132,T_GREEN,FONT_NORMAL,1.0f,"%s",v);} bool caretOn=((u32)(get_time()*2.0f)&1)!=0;
             for(int i=0;i<EF_LAST;++i){u8 slot=(u8)i;i16 y=efRowY[i];char v[40];EditFieldValueText(slot,sel,v,40);
-                bool editingThis=editFieldEditing&&editFieldSlot==slot; RenderTextL(EF_LABELX,y,editingThis?T_RED:T_GREEN,FONT_NORMAL,1.0f,"%s",efRowLabel[i]);
-                if(editingThis){char buf[44];sFormat(buf,44,"%s%s",editFieldBuffer,caretOn?"|":"");RenderTextL(EF_VALUEX,y,T_RED,FONT_NORMAL,1.0f,"%s",buf);}
-                else { float w=MeasureLineAdvance(v,FONT_NORMAL); UIR(UI_ID_CMFD_EDIT_ROW_0+i,EF_VALUEX,y,(i16)w,26); bool hov=UIOver(UI_ID_CMFD_EDIT_ROW_0+i); RenderTextL(EF_VALUEX,y,hov?T_YELLOW:(i<EF_TEX?T_WHITE:T_GREEN),FONT_NORMAL,1.0f,"%s",v); }
+                bool editingThis=editFieldEditing&&editFieldSlot==slot; RenderTextL(982,y,editingThis?T_RED:T_GREEN,FONT_NORMAL,1.0f,"%s",efRowLabel[i]);
+                if(editingThis){char buf[44];sFormat(buf,44,"%s%s",editFieldBuffer,caretOn?"|":"");RenderTextL(1108,y,T_RED,FONT_NORMAL,1.0f,"%s",buf);}
+                else { float w=MeasureLineAdvance(v,FONT_NORMAL); UIR(UI_ID_CMFD_EDIT_ROW_0+i,1108,y,(i16)w,26); bool hov=UIOver(UI_ID_CMFD_EDIT_ROW_0+i); RenderTextL(1108,y,hov?T_YELLOW:(i<EF_TEX?T_WHITE:T_GREEN),FONT_NORMAL,1.0f,"%s",v); }
             }
             if(editFieldEditing&&Sys_Input.scrollDelta!=0.0f){EditFieldStep((float)Sys_Input.scrollDelta);Sys_Input.scrollDelta=0.0f;}
-            if(sel==World.weaponVModelIndex){int wep16=Get16WeaponIndexFromConstIndex(e->index);if(wep16>=0&&wep16<16){V3 offs=vWepOfs[wep16];offs.y+=wfx.reloadContainerPos.y;RenderTextL(EF_LABELX,580,T_GREEN,FONT_NORMAL,1.0f,"vm offset");RenderTextL(EF_VALUEX,580,T_YELLOW,FONT_NORMAL,1.0f,"%.5f %.5f %.5f",offs.x,offs.y,offs.z);}}
+            if(sel==World.weaponVModelIndex){int wep16=Get16WeaponIndexFromConstIndex(e->index);if(wep16>=0&&wep16<16){V3 offs=vWepOfs[wep16];offs.y+=wfx.reloadContainerPos.y;RenderTextL(982,580,T_GREEN,FONT_NORMAL,1.0f,"vm offset");RenderTextL(1108,580,T_YELLOW,FONT_NORMAL,1.0f,"%.5f %.5f %.5f",offs.x,offs.y,offs.z);}}
         }
         else if (EditLightSelIsActive()) {/*Edit mode light info panel: same dialogue, light properties instead of entity fields*/
             u16 li=editModeLightSelection; Light* L=&World.lights[li];
             float sx,sy; if (WorldToScreenPoint(V3_AsubB(L->pos,World.position[PLAYER1]),&sx,&sy)) RenderUIImage((i16)(sx-24.0f),(i16)(sy-24.0f),48,48,1051);
             RenderUIImage(966,84,400,600,1025);/*Edit object info panel bg (non-interactive backdrop)*/
-            RenderTextL(EF_LABELX,104,T_YELLOW,FONT_NORMAL,1.0f,"EDIT LIGHT #%u",li); {char v[40];sFormat(v,40,"0x%x %s",L->lflags,(L->lflags&LIGHTON)?"on":"off");RenderTextL(EF_LABELX,132,T_GREEN,FONT_NORMAL,1.0f,"flags"); RenderTextL(EF_VALUEX,132,T_GREEN,FONT_NORMAL,1.0f,"%s",v);} bool caretOn=((u32)(get_time()*2.0f)&1)!=0;
+            RenderTextL(982,104,T_YELLOW,FONT_NORMAL,1.0f,"EDIT LIGHT #%u",li); {char v[40];sFormat(v,40,"0x%x %s",L->lflags,(L->lflags&LIGHTON)?"on":"off");RenderTextL(982,132,T_GREEN,FONT_NORMAL,1.0f,"flags"); RenderTextL(1108,132,T_GREEN,FONT_NORMAL,1.0f,"%s",v);} bool caretOn=((u32)(get_time()*2.0f)&1)!=0;
             for(int i=0;i<LF_LAST;++i){u8 slot=(u8)i;i16 y=efRowY[i];char v[40];LightFieldValueText(slot,li,v,40);
-                bool editingThis=editFieldEditing&&editFieldSlot==slot; RenderTextL(EF_LABELX,y,editingThis?T_RED:T_GREEN,FONT_NORMAL,1.0f,"%s",lfRowLabel[i]);
-                if(editingThis){char buf[44];sFormat(buf,44,"%s%s",editFieldBuffer,caretOn?"|":"");RenderTextL(EF_VALUEX,y,T_RED,FONT_NORMAL,1.0f,"%s",buf);}
-                else { float w=MeasureLineAdvance(v,FONT_NORMAL); UIR(UI_ID_CMFD_EDIT_ROW_0+i,EF_VALUEX,y,(i16)w,26); bool hov=UIOver(UI_ID_CMFD_EDIT_ROW_0+i); RenderTextL(EF_VALUEX,y,hov?T_YELLOW:T_WHITE,FONT_NORMAL,1.0f,"%s",v); }
+                bool editingThis=editFieldEditing&&editFieldSlot==slot; RenderTextL(982,y,editingThis?T_RED:T_GREEN,FONT_NORMAL,1.0f,"%s",lfRowLabel[i]);
+                if(editingThis){char buf[44];sFormat(buf,44,"%s%s",editFieldBuffer,caretOn?"|":"");RenderTextL(1108,y,T_RED,FONT_NORMAL,1.0f,"%s",buf);}
+                else { float w=MeasureLineAdvance(v,FONT_NORMAL); UIR(UI_ID_CMFD_EDIT_ROW_0+i,1108,y,(i16)w,26); bool hov=UIOver(UI_ID_CMFD_EDIT_ROW_0+i); RenderTextL(1108,y,hov?T_YELLOW:T_WHITE,FONT_NORMAL,1.0f,"%s",v); }
             }
-            RenderTextL(EF_LABELX,596,T_GREEN,FONT_NORMAL,1.0f,"type"); UIRImg(UI_ID_CMFD_EDIT_LIGHT_TYPE,EF_VALUEX,596,120,28,1087); {bool hov=UIOver(UI_ID_CMFD_EDIT_LIGHT_TYPE); RenderTextC(EF_VALUEX+60,602,hov?T_YELLOW:T_GREEN,FONT_NORMAL,0.8f,"%s",(L->lflags&LSPOT)?"spot":"point");}
-            static const char* lfDirLbl[6]={"N","E","S","W","Up","Dn"}; for(int d=0;d<6;++d){i16 bx=(i16)(EF_LABELX+d*36); u32 bid=UI_ID_CMFD_EDIT_LIGHT_DIR_N+d; UIRImg(bid,bx,644,28,28,1087); bool hov=UIOver(bid); RenderTextC(bx+14,650,hov?T_YELLOW:(LightDirIs((u8)d)?T_YELLOW:T_GREEN),FONT_NORMAL,0.8f,"%s",lfDirLbl[d]);}
+            RenderTextL(982,596,T_GREEN,FONT_NORMAL,1.0f,"type"); UIRImg(UI_ID_CMFD_EDIT_LIGHT_TYPE,1108,596,120,28,1087); {bool hov=UIOver(UI_ID_CMFD_EDIT_LIGHT_TYPE); RenderTextC(1108 + 60,602,hov?T_YELLOW:T_GREEN,FONT_NORMAL,0.8f,"%s",(L->lflags&LSPOT)?"spot":"point");}
+            static const char* lfDirLbl[6]={"N","E","S","W","Up","Dn"}; for(int d=0;d<6;++d){i16 bx=(i16)(982 + d*36); u32 bid=UI_ID_CMFD_EDIT_LIGHT_DIR_N+d; UIRImg(bid,bx,644,28,28,1087); bool hov=UIOver(bid); RenderTextC(bx+14,650,hov?T_YELLOW:(LightDirIs((u8)d)?T_YELLOW:T_GREEN),FONT_NORMAL,0.8f,"%s",lfDirLbl[d]);}
             if(editFieldEditing&&Sys_Input.scrollDelta!=0.0f){EditFieldStep((float)Sys_Input.scrollDelta);Sys_Input.scrollDelta=0.0f;}
         }
     }
     if (World.Sys_UI.vmailActive) {
-        u8 clip=(u8)(World.Sys_UI.vmailActive-1);/*vmailActive stores clip+1: nonzero means a mail is playing, and clip-1 indexes the ui.c clip tables*/
-        static u32 heldMail = 0xFFFFFFFFu, heldMailClip = 0xFFu; if (heldMailClip != World.Sys_UI.vmailActive) { heldMailClip = World.Sys_UI.vmailActive; heldMail = 0xFFFFFFFFu; }/*switching clips must not show the previous clip's last frame while the new one decodes*/
-        if (World.Sys_UI.vmailFrameFinished < World.pauseRelativeTime && World.Sys_UI.vmailFrame < vmailEndFrames[clip]) {
-            if (World.Sys_UI.vmailFrame == (vmailStartFrames[clip]+11)) play_wav(sounds[99], AppliedFXVol(1.0f), (V3){0}, false);
-            World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; World.Sys_UI.vmailFrame++; if (World.Sys_UI.vmailFrame > vmailEndFrames[clip]) World.Sys_UI.vmailFrame = vmailEndFrames[clip];
-        }
-        u32 want = World.Sys_UI.vmailFrame, nxt = VideoPeekFrame(want); VideoRequestFrame(want); if (nxt != 0xFFFFFFFFu) VideoPrefetchFrame(nxt);/*same decode-ahead feed as RenderVideoPage: nothing else queues VMail frames, so without this the ring never fills and the viewer stays black*/
-        heldMail = VideoFrameTexIndex(want); if (heldMail != 0xFFFFFFFFu) UIRImg(UI_ID_VMAIL_VIEWER,283,184,800,400,heldMail);/*Vmail viewer*/
+        u8 clip=(u8)(World.Sys_UI.vmailActive-1);
+        static u32 heldMail = 0xFFFFFFFFu, heldMailClip = 0xFFu; if (heldMailClip != World.Sys_UI.vmailActive) { heldMailClip = World.Sys_UI.vmailActive; heldMail = 0xFFFFFFFFu; }
+        if (World.Sys_UI.vmailFrameFinished < World.pauseRelativeTime && World.Sys_UI.vmailFrame < vmailEndFrames[clip]) { if (World.Sys_UI.vmailFrame == (vmailStartFrames[clip]+11)) play_wav(sounds[99], AppliedFXVol(1.0f), (V3){0}, false); World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; World.Sys_UI.vmailFrame++; if (World.Sys_UI.vmailFrame > vmailEndFrames[clip]) World.Sys_UI.vmailFrame = vmailEndFrames[clip]; }
+        u32 want = World.Sys_UI.vmailFrame, nxt = VideoPeekFrame(want); VideoRequestFrame(want); if (nxt != 0xFFFFFFFFu) VideoPrefetchFrame(nxt);
+        heldMail = VideoFrameTexIndex(want); if (heldMail != 0xFFFFFFFFu) UIRImg(UI_ID_VMAIL_VIEWER,283,184,800,400,heldMail);
     }
     i16 debugTextStartY = 90;
     if (Cheats.showLocation && !World.menuActive) RenderTextL(16, debugTextStartY, T_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z,World.rotation[PLAYER1].x,World.rotation[PLAYER1].y,World.rotation[PLAYER1].z,World.rotation[PLAYER1].w);

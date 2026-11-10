@@ -895,7 +895,7 @@ void UseTargets(u16 activator, u16 targetIdx) {
 // Frob/Use
 static const float FROB_DISTANCE = 4.9f;
 void MFD_OpenSearch(bool isRH),MFD_CloseSearch(void),MFD_OpenData(bool isRH,u8 code),MFD_OpenPaperLog(int,V3);
-void UI_KeycodeClose(bool),UI_ElevClose(bool),UI_WireClose(bool);
+void UI_KeycodeClose(bool),UI_ElevClose(bool),UI_WireClose();
 static void PaperLogUse(u16 self) { ForceInventoryMode();/*Unity PaperLog.Use forces inventory mode, as do the sibling panel uses here; without it the reader's [MORE]/[CLOSE] clicks cannot work (UI interaction is inventory-mode-only)*/ MFD_OpenPaperLog((int)World.instances[self].logIndex, World.position[self]); }
 static bool IsPuzzleGridPanel(u16 index) { return index>=609&&index<=613; }
 static bool IsPuzzleWirePanel(u16 index) { return index>=741&&index<=745; }
@@ -1322,6 +1322,6 @@ void ModUpdate() {
     if (PanelTetherBroken(World.Sys_UI.tetheredPGP)) UI_PuzzleGridClose();
     if (PanelTetherBroken(World.Sys_UI.tetheredKeypadKeycode)) UI_KeycodeClose(false);
     if (PanelTetherBroken(World.Sys_UI.tetheredKeypadElevator)) UI_ElevClose(false);
-    if (PanelTetherBroken(World.Sys_UI.tetheredPWP)) UI_WireClose(false);
+    if (PanelTetherBroken(World.Sys_UI.tetheredPWP)) UI_WireClose();
     if (World.Sys_UI.MFD_Data == 8 && V3_SqDist(World.position[PLAYER1],World.Sys_UI.objectInUsePos) > 64.0f) UI_BlockedClose();
 }

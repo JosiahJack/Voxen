@@ -776,13 +776,7 @@ void LoadPerLevelModels(u8 lev) {
     for (u32 k=0;k<ic;++k) incStamp[incList[k]] = 1;
     for (u32 m=0; m<mdlsCnt; ++m) { bool inc = incStamp[m] != 0; bool outg = anyOut && MdlIsWinMemberSet((u16)m, mdlSwapLev); if (!inc && !outg) continue; if (physPos[m] || modelTriangles[m] || modelVertexCounts[m]) { MdlSwapWindowDisposeData((u16)m); } mdlVboOfs[m] = mdlIboOfs[m] = 0xFFFFFFFFu; }
     if (incList) OS_Free(incList, incCnt*sizeof(u16));
-    if (incCnt) {
-        u32 winVB = mdlPoolVbBytes - mdlSwapVboBase, winIB = mdlPoolIbBytes - mdlSwapIboBase;
-        double startSwapTime = get_time();
-        MdlLoadSet s = { lo, hi, incStamp, 1, winVB, winIB, NULL, NULL };
-        MdlLoadModelSet(&s);
-        DualLog("LoadPerLevelModels lev %u models %u .......................................................took %.6f secs\n",lev,incCnt,get_time() - startSwapTime);
-    }
+    if (incCnt) { u32 winVB = mdlPoolVbBytes - mdlSwapVboBase, winIB = mdlPoolIbBytes - mdlSwapIboBase; double startSwapTime = get_time(); MdlLoadSet s = {lo,hi,incStamp,1,winVB,winIB,NULL,NULL}; MdlLoadModelSet(&s); DualLog("Loading models for lev %u, count %u ...............................................took %.6f secs\n",lev,incCnt,get_time() - startSwapTime); }
     mdlSwapLev = lev;
     RtSwapPatchModels();
 }
@@ -810,7 +804,7 @@ void ParseAllModels(void) {
     MdlLoadModelSet(&s);
     u32 metaV = 0, metaT = 0; for (u32 m=0;m<mdlsCnt;++m) { metaV += mdlMetaVertCounts[m]; metaT += mdlMetaTriCounts[m]; }
     OS_FreeInitPhase();
-    DualLog(" metadata verts: %u, tris: %u................took %.6f secs\n", metaV, metaT, get_time() - startParseTime);
+    DualLog(" total verts: %u, tris: %u...................took %.6f secs\n", metaV, metaT, get_time() - startParseTime);
 }
 void LoadModels() {
     static bool mdlPersistentsLoaded = false;
@@ -818,14 +812,11 @@ void LoadModels() {
     double startModelTime = get_time();
     u32 lo = mdlsCnt, hi = 0, pstCnt = 0;
     for (u32 m=0; m<mdlsCnt; ++m) { if (mdlPersistentSet[m]) { ++pstCnt; if (m < lo) lo = m; if (m > hi) hi = m; } }
-    DualLog("Loading   models ( %d persistent) ...",pstCnt);
+    DualLog("Loading   models ( %d persistent) ",pstCnt);
     if (lo > hi) { mdlPersistentsLoaded = true; return; }
     mdlPstHalfV = OS_Alloc(mdlsCnt * sizeof(void*)); mset(mdlPstHalfV,0,mdlsCnt*sizeof(void*));
     mdlPstTri   = OS_Alloc(mdlsCnt * sizeof(void*)); mset(mdlPstTri,0,mdlsCnt*sizeof(void*));
-    u32 tv=0, tt=0;
-    MdlLoadSet s = { lo, hi, mdlPersistentSet, 0, 0, 0, &tv, &tt };
-    MdlLoadModelSet(&s);
-    u32 vrun = 0, irun = 0;
+    u32 tv = 0, tt = 0, vrun = 0, irun = 0; MdlLoadSet s = { lo, hi, mdlPersistentSet, 0, 0, 0, &tv, &tt }; MdlLoadModelSet(&s);
     for (u32 m=0; m<mdlsCnt; ++m) { if (!mdlPersistentSet[m] || !mdlPstHalfV[m]) continue; mdlVboOfs[m] = (vrun + 255u) & ~255u; vrun = mdlVboOfs[m] + MdlVbBytesRaw((u16)m); mdlIboOfs[m] = (irun + 255u) & ~255u; irun = mdlIboOfs[m] + MdlIbBytesRaw((u16)m); }
     mdlSwapVboBase = (vrun + 255u) & ~255u; mdlSwapIboBase = (irun + 255u) & ~255u;
     u32 pOrdU16 = 0, pNodeSlW = 0, pTriW = 0, pUvW = 0;
@@ -859,7 +850,7 @@ void LoadModels() {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
     for (u32 m=0; m<mdlsCnt; ++m) { if (mdlPstHalfV[m]) OS_Free(mdlPstHalfV[m], (size_t)rtSrcVertCounts[m]*VRT_ATT_SZ); if (mdlPstTri[m]) OS_Free(mdlPstTri[m], (size_t)modelTriangleCounts[m]*6+4); }
     OS_Free(mdlPstHalfV, mdlsCnt*sizeof(void*)); OS_Free(mdlPstTri, mdlsCnt*sizeof(void*)); mdlPstHalfV = NULL; mdlPstTri = NULL;
-    DualLog(" vertices: %u, tris: %u......................took %.6f secs\n", tv, tt, get_time() - startModelTime);
+    DualLog(" vertices: %u, tris: %u..................took %.6f secs\n", tv, tt, get_time() - startModelTime);
     mdlPersistentsLoaded = true;
 }
 AnimationClip mdlAnimClips[MAXANIM][MAX_ANIMCLIPS] = { // speed, frameStart, frameEnd, frameStartModelIndex, framerate
