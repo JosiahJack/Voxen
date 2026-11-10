@@ -242,6 +242,7 @@ void CycleWeaponSlot(int),CloseFullmap(),UI_AutomapClick(bool,int),UpdateScreenS
         wglSwapIntervalEXT = (PFN_SWE)wglGetProcAddress("wglSwapIntervalEXT");
         GPFAivARB          = (PFN_GPFAIVA)wglGetProcAddress("wglGetPixelFormatAttribivARB");
         wglMakeCurrent(pdc,prc);
+        if (!CCAARB || !GPFAivARB) { DualLogError("Required WGL extensions missing (WGL_ARB_create_context / WGL_ARB_pixel_format) - GPU driver too old or Microsoft Basic Display is active\n"); OS_Exit(1); } /*Compat: clean exit instead of NULL-deref crash on Win7 basic display / pre-4.3 drivers*/
         int pixelFormat; PIXELFORMATDESCRIPTOR pfd2; w->context.wgl.dc = GetDC(w->win32.handle); static const int attribs2[] = {0x2010,0x2001,0x2013,0x2003,0x2011,0x2015,0x2017,0x2019,0x201b,0x2022,0x2023}; int values[11], i, nativeCount, usableCount = 0; const int query = 0x2000;
         GPFAivARB(w->context.wgl.dc,1,0,1,&query,&nativeCount); FBC* usableConfigs = OS_Alloc(nativeCount*sizeof(FBC));
         for (i = 0; i < nativeCount; i++) { 
@@ -252,7 +253,8 @@ void CycleWeaponSlot(int),CloseFullmap(),UI_AutomapClick(bool,int),UpdateScreenS
         pixelFormat = (int)closest->handle; OS_Free(usableConfigs,nativeCount * sizeof(FBC));
         DescribePixelFormat(w->context.wgl.dc,pixelFormat,sizeof(pfd2),&pfd2); SetPixelFormat(w->context.wgl.dc,pixelFormat,&pfd2);
         int attribs[40], index=0; attribs[index++] = 0x2091; attribs[index++] = 4; attribs[index++] = 0x2092; attribs[index++] = 3; attribs[index++] = 0x9126; attribs[index++] = 1; attribs[index++] = 0; attribs[index++] = 0;
-        w->context.wgl.handle = CCAARB(w->context.wgl.dc,NULL,attribs); w->context.makeCurrent=makeContextCurrentWGL; w->context.swapBuffers=swapBuffersWGL; w->context.swapInterval=swapIntervalWGL; w->context.getProcAddress=getProcAddressWGL; 
+        w->context.wgl.handle = CCAARB(w->context.wgl.dc,NULL,attribs); w->context.makeCurrent=makeContextCurrentWGL; w->context.swapBuffers=swapBuffersWGL; w->context.swapInterval=swapIntervalWGL; w->context.getProcAddress=getProcAddressWGL;
+        if (!w->context.wgl.handle) { DualLogError("Failed to create an OpenGL 4.3 core context - GPU driver must support OpenGL 4.3 or newer\n"); OS_Exit(1); } /*Compat: attribs request 4.3 core, so NULL means the driver cannot provide it*/
         return w;
     }
 // End Windows section
@@ -383,6 +385,7 @@ void CycleWeaponSlot(int),CloseFullmap(),UI_AutomapClick(bool,int),UpdateScreenS
         for (int i=0;names[i] && !WinSys.glx.handle;i++) { WinSys.glx.handle = dlopen(names[i],2); }
         WinSys.glx.ChooseFBConfigs=(GLX_CFBCP)PlatformGetModuleSymbol(WinSys.glx.handle,"glXChooseFBConfig");                  WinSys.glx.MakeCurrent = (GLX_MCP)PlatformGetModuleSymbol(WinSys.glx.handle,"glXMakeCurrent");        WinSys.glx.SwapBuffers = (GLX_SBP)PlatformGetModuleSymbol(WinSys.glx.handle,"glXSwapBuffers");  WinSys.glx.CreateWindow = (GLX_CWP)PlatformGetModuleSymbol(WinSys.glx.handle,"glXCreateWindow");
         WinSys.glx.GetVisualFromFBConfig = (GLX_GVFFBCP)PlatformGetModuleSymbol(WinSys.glx.handle,"glXGetVisualFromFBConfig"); WinSys.glx.GetProcAddress = (GLX_GPAP)PlatformGetModuleSymbol(WinSys.glx.handle,"glXGetProcAddress"); WinSys.glx.SwapIntervalEXT = (GLX_SIEP)getProcAddressGLX("glXSwapIntervalEXT");                 WinSys.glx.CreateContextAttribsARB = (GLX_CCAA)getProcAddressGLX("glXCreateContextAttribsARB");
+        if (!WinSys.glx.CreateContextAttribsARB) { DualLogError("GLX_ARB_create_context unavailable - GPU driver too old for OpenGL 4.3\n"); OS_Exit(1); } /*Compat: clean exit instead of NULL-deref crash*/
         GLXFBConfig native=NULL; XVisualInfo* result; GLXFBConfig* nativeConfigs; int nativeCount; static const int chooseAttribs[] = {0x8011/*GLX_DRAWABLE_TYPE*/,1/*GLX_WINDOW_BIT*/, 0x8010/*GLX_RENDER_TYPE*/,1/*GLX_RGBA_BIT*/, 5/*GLX_DOUBLEBUFFER*/,1, 0};
         nativeConfigs = WinSys.glx.ChooseFBConfigs(WinSys.x11.display,WinSys.x11.screen,chooseAttribs,&nativeCount); if (nativeCount > 0) native = nativeConfigs[0]; WinSys.x11.xlib.Free(nativeConfigs); if (!native) { DualLogError("No usable GLX framebuffer config\n"); OS_Exit(1); }
         result = WinSys.glx.GetVisualFromFBConfig(WinSys.x11.display,native); Visual* visual=result->visual; int depth = result->depth; WinSys.x11.xlib.Free(result);
@@ -401,6 +404,7 @@ void CycleWeaponSlot(int),CloseFullmap(),UI_AutomapClick(bool,int),UpdateScreenS
         WinSys.x11.xlib.MapWindow(WinSys.x11.display,w->x11.handle);
         int attribs[40], index=0; attribs[index++] = 0x2091; attribs[index++] = 4; attribs[index++] = 0x2092; attribs[index++] = 3; attribs[index++] = 0x9126; attribs[index++] = 1; attribs[index++] = 0; attribs[index++] = 0;
         w->context.glx.handle = WinSys.glx.CreateContextAttribsARB(WinSys.x11.display,native,NULL,1,attribs); w->context.glx.window = WinSys.glx.CreateWindow(WinSys.x11.display,native,w->x11.handle,NULL); w->context.makeCurrent = makeContextCurrentGLX; w->context.swapBuffers = swapBuffersGLX; w->context.swapInterval = swapIntervalGLX; w->context.getProcAddress = getProcAddressGLX;
+        if (!w->context.glx.handle) { DualLogError("Failed to create an OpenGL 4.3 core context via GLX - GPU driver must support OpenGL 4.3 or newer\n"); OS_Exit(1); } /*Compat: attribs request 4.3 core, so NULL means the driver cannot provide it*/
         if (WinSys.x11.NET_ACTIVE_WINDOW) sendEventToWM(w,WinSys.x11.NET_ACTIVE_WINDOW,1,0,0,0,0); else { XWindowAttributes attr; if (WinSys.x11.xlib.GetWindowAttributes(WinSys.x11.display,w->x11.handle,&attr) && attr.map_state==2) { WinSys.x11.xlib.RaiseWindow(WinSys.x11.display,w->x11.handle); WinSys.x11.xlib.SetInputFocus(WinSys.x11.display,w->x11.handle,2,0L); } }
         return w;
     }
@@ -410,7 +414,7 @@ FGL_UP glUseProgram;    FGL_DM glDepthMask;    FGL_VAB glVertexAttribBinding;   
 FGL_D glDisable;FGL_CM glColorMask;     FGL_CS glCompileShader;FGL_UM3FV glUniformMatrix3fv;    FGL_DA glDrawArrays;  FGL_VAF glVertexAttribFormat;FGL_CP glCreateProgram;   FGL_CRS glCreateShader;  FGL_BFS glBlendFuncSeparate; FGL_UB glUnmapBuffer; FGL_BD glBufferData; FGL_F glFinish;
 FGL_C glClear;  FGL_DE glDrawElements;  FGL_U2UI glUniform2ui; FGL_UM4FV glUniformMatrix4fv;    FGL_GIV glGetIntegerv;FGL_GSIL glGetShaderInfoLog; FGL_GPIL glGetProgramInfoLog; FGL_U2F glUniform2f;      FGL_U1UI glUniform1ui;   FGL_GVA glGenVertexArrays;  FGL_RP glReadPixels;      FGL_SS glShaderSource;FGL_TPI glTexParameteri; FGL_TPFV glTexParameterfv;   FGL_U1F glUniform1f;
 FGL_E glEnable; FGL_FF glFrontFace;     FGL_GB glGenBuffers;   FGL_FBT2D glFramebufferTexture2D;FGL_GERR glGetError;  FGL_GFS glGenFramebuffers;   FGL_GT glGenTextures;     FGL_BSD glBufferSubData; FGL_MBR glMapBufferRange;   FGL_U1I glUniform1i;      FGL_T2D glTexImage2D; FGL_BIT glBindImageTexture;FGL_BT glBindTexture; FGL_BBR glBindBufferRange;
-FGL_GIQ glGenQueries; FGL_GQOU64 glGetQueryObjectui64v; FGL_BQ glBeginQuery; FGL_D glEndQuery; FGL_DAI glDrawArraysInstanced; FGL_BB glBlendFunc;  FGL_BF glBlitFramebuffer; FGL_T2D glTexSubImage2D; FGL_GTKP glGetTexLevelParameteriv; FGL_CBSD glCopyBufferSubData; FGL_CLBSD glClearBufferSubData; FGL_CISD glCopyImageSubData; FGL_CPIV glGetBufferParameteriv; FGL_GBSD glGetBufferSubData; FGL_GB glDeleteBuffers;
+FGL_GIQ glGenQueries; FGL_GQOU64 glGetQueryObjectui64v; FGL_BQ glBeginQuery; FGL_D glEndQuery; FGL_DAI glDrawArraysInstanced; FGL_BB glBlendFunc;  FGL_BF glBlitFramebuffer; FGL_T2D glTexSubImage2D; FGL_GTKP glGetTexLevelParameteriv; FGL_CBSD glCopyBufferSubData; FGL_CLBSD glClearBufferSubData; FGL_CISD glCopyImageSubData; FGL_CPIV glGetBufferParameteriv; FGL_GBSD glGetBufferSubData; FGL_GB glDeleteBuffers; FGL_MB glMemoryBarrier;
 void SetGLContext_GetFunctionPointers() {
     WSWin* h=window;
     #define X(n,t) n=(t)h->context.getProcAddress(#n);
@@ -419,7 +423,7 @@ void SetGLContext_GetFunctionPointers() {
     X(glBindBuffer,FGL_BB)        X(glBufferData,FGL_BD)      X(glGenBuffers,FGL_GB)       X(glUnmapBuffer,FGL_UB)         X(glAttachShader,FGL_AS)            X(glCompileShader,FGL_CS)      X(glCreateProgram,FGL_CP)     X(glCreateShader,FGL_CRS)   X(glDrawBuffers,FGL_DB)               X(glGetProgramiv,FGL_CPIV)        X(glGetShaderInfoLog,FGL_GSIL)  X(glGetProgramInfoLog,FGL_GPIL)     X(glGetShaderiv,FGL_GSIV)
     X(glLinkProgram,FGL_LP)       X(glShaderSource,FGL_SS)    X(glUniform1f,FGL_U1F)       X(glUniform1i,FGL_U1I)          X(glUniform2f,FGL_U2F)              X(glUniform3f,FGL_U3F)         X(glUniform4f,FGL_U4F)        X(glTexParameteri,FGL_TPI)  X(glTexParameterfv,FGL_TPFV)          X(glUniform1ui,FGL_U1UI)          X(glUniform2ui,FGL_U2UI)        X(glUniformMatrix3fv,FGL_UM3FV)     X(glUniformMatrix4fv,FGL_UM4FV)
     X(glUseProgram,FGL_UP)        X(glBindBufferBase,FGL_BBB) X(glFinish,FGL_F)            X(glBindFramebuffer,FGL_BFB)    X(glGenFramebuffers,FGL_GFS)        X(glMapBufferRange,FGL_MBR)    X(glBindImageTexture,FGL_BIT) X(glBindVertexBuffer,FGL_BVB) X(glDispatchCompute,FGL_DC)         X(glGenVertexArrays,FGL_GVA)      X(glVertexAttribFormat,FGL_VAF) X(glFramebufferTexture2D,FGL_FBT2D) X(glBufferSubData,FGL_BSD) X(glBindBufferRange,FGL_BBR)
-    X(glGenQueries,FGL_GIQ) X(glGetQueryObjectui64v,FGL_GQOU64) X(glBeginQuery,FGL_BQ) X(glEndQuery,FGL_D) X(glDrawArraysInstanced,FGL_DAI) X(glBlendFunc,FGL_BB) X(glBlitFramebuffer,FGL_BF) X(glTexSubImage2D,FGL_T2D) X(glGetTexLevelParameteriv,FGL_GTKP) X(glCopyBufferSubData,FGL_CBSD) X(glClearBufferSubData,FGL_CLBSD) X(glCopyImageSubData,FGL_CISD)  X(glGetBufferParameteriv,FGL_CPIV)  X(glGetBufferSubData,FGL_GBSD) X(glDeleteBuffers,FGL_GB)
+    X(glGenQueries,FGL_GIQ) X(glGetQueryObjectui64v,FGL_GQOU64) X(glBeginQuery,FGL_BQ) X(glEndQuery,FGL_D) X(glDrawArraysInstanced,FGL_DAI) X(glBlendFunc,FGL_BB) X(glBlitFramebuffer,FGL_BF) X(glTexSubImage2D,FGL_T2D) X(glGetTexLevelParameteriv,FGL_GTKP) X(glCopyBufferSubData,FGL_CBSD) X(glClearBufferSubData,FGL_CLBSD) X(glCopyImageSubData,FGL_CISD)  X(glGetBufferParameteriv,FGL_CPIV)  X(glGetBufferSubData,FGL_GBSD) X(glDeleteBuffers,FGL_GB) X(glMemoryBarrier,FGL_MB)
     #undef X
 }
 size_t monitorAllocationSize = 0;
@@ -754,16 +758,11 @@ void ProcessConsoleCommand(const char* c) {
             break;
         }
     }
-    if (!commandProcessed) { CenterStatusPrint("%s%s",Sys_Text.stringTable[1014],ct); } /*"Unknown command or function: "*/
-    consoleEntryText[0] = currentEntryLength = 0;
-    historyPos = numHistory;
-    ToggleConsole();
+    if (!commandProcessed) { CenterStatusPrint("%s%s",Sys_Text.stringTable[1014],ct); } /*"Unknown command or function: "*/ consoleEntryText[0] = currentEntryLength = 0; historyPos = numHistory; ToggleConsole();
 }
 void ConsoleEmulator(i32 keycode) {
-    if (keycode==KEY_UP || keycode==KEY_DOWN) { RecallHistory(keycode==KEY_UP ? 1 : -1); return; }
-    if (keycode==KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { consoleEntryText[0]=currentEntryLength=0; return; }
-    char c=keycode>=KEY_A && keycode<=KEY_Z ? 'a'+keycode-KEY_A : keycode>=KEY_1 && keycode<=KEY_9 ? '1'+keycode-KEY_1 : keycode==KEY_0 ? '0' : keycode==KEY_SPACE ? ' ' : 0;
-    if (keycode==KEY_MINUS || keycode==KEY_KP_SUBTRACT) c=Sys_Input.keyStates[KEY_LEFT_SHIFT].down || Sys_Input.keyStates[KEY_RIGHT_SHIFT].down ? '_' : '-';
+    if (keycode==KEY_UP || keycode==KEY_DOWN) { RecallHistory(keycode==KEY_UP ? 1 : -1); return; } if (keycode==KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { consoleEntryText[0]=currentEntryLength=0; return; }
+    char c=keycode>=KEY_A && keycode<=KEY_Z ? 'a'+keycode-KEY_A : keycode>=KEY_1 && keycode<=KEY_9 ? '1'+keycode-KEY_1 : keycode==KEY_0 ? '0' : keycode==KEY_SPACE ? ' ' : 0; if (keycode==KEY_MINUS || keycode==KEY_KP_SUBTRACT) c=Sys_Input.keyStates[KEY_LEFT_SHIFT].down || Sys_Input.keyStates[KEY_RIGHT_SHIFT].down ? '_' : '-';
     if (c) { if (currentEntryLength<T_BUFFER_SIZE-1) { consoleEntryText[currentEntryLength++]=c; consoleEntryText[currentEntryLength]=0; } }
     else if (keycode==KEY_BACKSPACE && currentEntryLength>0) consoleEntryText[--currentEntryLength]=0;
     else if (keycode==KEY_ENTER || keycode==KEY_KP_ENTER) { DualLog("Console command: %s\n",consoleEntryText); ProcessConsoleCommand(consoleEntryText); }
@@ -775,27 +774,10 @@ RaycastHit RayTriangle(V3 origin, V3 dir, V3 A, V3 B, V3 C) {
     return (RaycastHit){.point = V3Add(origin, V3_ScaleByF(dir, d)), .normal = V3_Normalize(n), .distance = d, .hitInstanceIndex = INSTANCE_COUNT, .hit = vabs(det) >= 0.00000001f};
 }
 INLINE RaycastHit RaySphere(V3 origin, V3 dir, ShapeSphere sph, float maxDist) {
-    RaycastHit h = {.distance=maxDist,.hitInstanceIndex=INSTANCE_COUNT}; float r = sph.rad; if (r < 0.0001f) return h;
-    V3 oc = V3_AsubB(origin, sph.ctr); float b=V3_dot(oc,dir), c=V3_dot(oc,oc) - r * r; float disc=b*b - c; if (disc < 0.0f) return h;
-    float s = vsqrtf(disc); float t = -b - s; if (t < 0.0f) t = -b + s; if (t < 0.0f || t > maxDist) return h;
-    
+    RaycastHit h = {.distance=maxDist,.hitInstanceIndex=INSTANCE_COUNT}; float r = sph.rad; if (r < 0.0001f) return h; V3 oc = V3_AsubB(origin, sph.ctr); float b=V3_dot(oc,dir), c=V3_dot(oc,oc) - r * r; float disc=b*b - c; if (disc < 0.0f) return h; float s = vsqrtf(disc); float t = -b - s; if (t < 0.0f) t = -b + s; if (t < 0.0f || t > maxDist) return h;
     h.hit = true; h.distance = t; h.point = V3Add(origin, V3_ScaleByF(dir, t)); h.normal = V3_ScaleByF(V3_AsubB(h.point, sph.ctr), 1.0f / r); return h;
 }
-
-u16 EditModePickLight(V3 origin, V3 dir, float maxDist, float* outDist) {
-    u16 best = U16_MAX; float bestDist = maxDist;
-    for (u16 i = 0; i < World.loadedLights; ++i) {
-        Light* L = &World.lights[i];
-        if (L->lflags & (LSPOT | LDIR)) continue;
-        if (L->range <= 0.001f) continue;
-        
-        RaycastHit h = RaySphere(origin, dir, (ShapeSphere){L->pos, 0.02f*L->range}, maxDist);
-        if (h.hit && h.distance < bestDist) { best = i; bestDist = h.distance; }
-    }
-    if (outDist) *outDist = bestDist;
-    return best;
-}
-
+u16 EditModePickLight(V3 o, V3 dir, float maxDist, float* outDist) { u16 best = U16_MAX; float bd = maxDist; for (u16 i = 0; i < World.loadedLights; ++i) { Light* L = &World.lights[i]; if ((L->lflags & (LSPOT | LDIR)) || L->range <= 0.001f) { continue; } RaycastHit h = RaySphere(o,dir,(ShapeSphere){L->pos,0.02f*L->range},maxDist); if (h.hit && h.distance < bd) { best = i; bd = h.distance; } } if (outDist) { *outDist = bd; } return best; }
 INLINE RaycastHit RayCapsule(V3 origin, V3 dir, ShapeCapsule cap, float maxDist) {
     RaycastHit h={.hit=false,.distance=maxDist,.point={0},.normal={0},.hitInstanceIndex=INSTANCE_COUNT}; float r = cap.rad; if (r < 0.0001f) return h; V3 ba = V3_AsubB(cap.tip,cap.base), oa = V3_AsubB(origin,cap.base), nBest = {0}; float baba = V3_dot(ba,ba); if (baba < 0.00001f) return RaySphere(origin, dir, (ShapeSphere){cap.base, r}, maxDist);
     float bard = V3_dot(ba,dir), baoa = V3_dot(ba,oa), tBest=-1.0f; float a = baba - bard * bard, b = baba * V3_dot(dir,oa) - baoa * bard, c = baba * V3_dot(oa,oa) - baoa * baoa - r * r * baba; float disc = b * b - a * c;
@@ -804,51 +786,28 @@ INLINE RaycastHit RayCapsule(V3 origin, V3 dir, ShapeCapsule cap, float maxDist)
         if (t0 >= 0.0f && t0 <= maxDist && y0 > 0.0f && y0 < baba) { tBest = t0; V3 p = V3Add(origin,V3_ScaleByF(dir,t0)); V3 q=V3Add(cap.base,V3_ScaleByF(ba,y0/baba)); nBest=V3_Normalize(V3_AsubB(p,q));}
         else { float t1=(-b+sh)/a; float y1=baoa+t1*bard; if (t1 >= 0.0f && t1 <= maxDist && y1 > 0.0f && y1 < baba) { tBest=t1; V3 p=V3Add(origin,V3_ScaleByF(dir,t1)),q=V3Add(cap.base,V3_ScaleByF(ba,y1/baba)); nBest=V3_Normalize(V3_AsubB(p,q)); } }
     }
-    
     for (int k = 0; k < 2; k++) {
         V3 ctr = k == 0 ? cap.base : cap.tip; V3 oc = V3_AsubB(origin, ctr); float bs = V3_dot(oc, dir); float cs = V3_dot(oc, oc) - r * r; float ds = bs * bs - cs; if (ds < 0.0f) continue; float shs = vsqrtf(ds); float ts = -bs - shs; if (ts < 0.0f) ts = -bs + shs; if (ts < 0.0f || ts > maxDist) continue; if (tBest >= 0.0f && ts >= tBest) continue;
-        V3 ps = V3Add(origin, V3_ScaleByF(dir, ts)); float y = V3_dot(V3_AsubB(ps, cap.base), ba); if ((k == 0 && y > 0.0f) || (k == 1 && y < baba)) continue; tBest = ts; nBest = V3_ScaleByF(V3_AsubB(ps, ctr), 1.0f / r);
+        V3 ps = V3Add(origin,V3_ScaleByF(dir,ts)); float y = V3_dot(V3_AsubB(ps,cap.base), ba); if ((k == 0 && y > 0.0f) || (k == 1 && y < baba)) continue; tBest = ts; nBest = V3_ScaleByF(V3_AsubB(ps,ctr),1.0f / r);
     }
     if (tBest >= 0.0f) { h.hit = true; h.distance = tBest; h.point = V3Add(origin, V3_ScaleByF(dir, tBest)); h.normal = nBest; } return h;
 }
-
 INLINE RaycastHit RayBox(V3 origin, V3 dir, ShapeBox box, float maxDist) {
-    RaycastHit h = {.hit=false,.distance=maxDist,.point={0},.normal={0},.hitInstanceIndex=INSTANCE_COUNT};
-    Quaternion inv = {-box.rot.x,-box.rot.y,-box.rot.z,box.rot.w};
-    V3 lo = quat_rot_v3(inv, V3_AsubB(origin, box.ctr));
-    V3 ld = quat_rot_v3(inv, dir);
-    float o[3] = {lo.x, lo.y, lo.z}, d[3] = {ld.x, ld.y, ld.z}, he[3] = {box.hExt.x, box.hExt.y, box.hExt.z};
-    float tmin = 0.0f, tmax = maxDist; int axis = -1; float asign = 0.0f;
-    for (int a = 0; a < 3; ++a) {
-        if (vabs(d[a]) < 0.000001f) { if (vabs(o[a]) > he[a]) return h; }
-        else {
-            float t1 = (-he[a] - o[a]) / d[a], t2 = (he[a] - o[a]) / d[a];
-            float tNear = vmin(t1, t2), tFar = vmax(t1, t2);
-            float ns = (d[a] > 0.0f) ? -1.0f : 1.0f;
-            if (tNear > tmin) { tmin = tNear; axis = a; asign = ns; }
-            if (tFar < tmax) tmax = tFar;
-            if (tmin > tmax) return h;
-        }
-    }
-    if (axis < 0) { h.hit = true; h.distance = 0.0f; h.point = origin; h.normal = V3_ScaleByF(dir, -1.0f); return h; }
-    V3 ln = {0.0f, 0.0f, 0.0f}; if (axis == 0) ln.x = asign; else if (axis == 1) ln.y = asign; else ln.z = asign;
-    h.hit = true; h.distance = tmin; h.point = V3Add(origin, V3_ScaleByF(dir, tmin)); h.normal = quat_rot_v3(box.rot, ln); return h;
+    RaycastHit h = {.hit=false,.distance=maxDist,.point={0},.normal={0},.hitInstanceIndex=INSTANCE_COUNT}; Quaternion inv = {-box.rot.x,-box.rot.y,-box.rot.z,box.rot.w}; V3 lo = quat_rot_v3(inv, V3_AsubB(origin, box.ctr)), ld = quat_rot_v3(inv, dir);
+    float o[3] = {lo.x, lo.y, lo.z}, d[3] = {ld.x, ld.y, ld.z}, he[3] = {box.hExt.x, box.hExt.y, box.hExt.z}; float tmin = 0.0f, tmax = maxDist; int axis = -1; float asign = 0.0f;
+    for (int a = 0; a < 3; ++a) { if (vabs(d[a]) < 0.000001f) { if (vabs(o[a]) > he[a]) return h; } else { float t1 = (-he[a] - o[a]) / d[a], t2 = (he[a] - o[a]) / d[a]; float tNear = vmin(t1,t2), tFar = vmax(t1,t2), ns = (d[a] > 0.0f) ? -1.0f : 1.0f; if (tNear > tmin) { tmin = tNear; axis = a; asign = ns; } if (tFar < tmax) { tmax = tFar; } if (tmin > tmax) { return h; } } }
+    if (axis < 0) { h.hit = true; h.distance = 0.0f; h.point = origin; h.normal = V3_ScaleByF(dir, -1.0f); return h; } V3 ln = {0.0f, 0.0f, 0.0f}; if (axis == 0) { ln.x = asign; } else if (axis == 1) { ln.y = asign; } else { ln.z = asign; } h.hit = true; h.distance = tmin; h.point = V3Add(origin, V3_ScaleByF(dir, tmin)); h.normal = quat_rot_v3(box.rot, ln); return h;
 }
-float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist) {
-    float tmin = 0.0f, tmax = maxDist;
-    if (vabs(dir.x) < 0.00000001f) { if (origin.x < mn.x || origin.x > mx.x) return -1.0f; } else { float inv=1.0f/dir.x; float t1=(mn.x-origin.x) * inv, t2=(mx.x-origin.x) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > tmin){tmin=t1;} if(t2 < tmax){tmax=t2;} if (tmin > tmax) return -1.0f; } //X slab
-    if (vabs(dir.y) < 0.00000001f) { if (origin.y < mn.y || origin.y > mx.y) return -1.0f; } else { float inv=1.0f/dir.y; float t1=(mn.y-origin.y) * inv, t2=(mx.y-origin.y) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > tmin){tmin=t1;} if(t2 < tmax){tmax=t2;} if (tmin > tmax) return -1.0f; } //Y slab
-    if (vabs(dir.z) < 0.00000001f) { if (origin.z < mn.z || origin.z > mx.z) return -1.0f; } else { float inv=1.0f/dir.z; float t1=(mn.z-origin.z) * inv, t2=(mx.z-origin.z) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > tmin){tmin=t1;} if(t2 < tmax){tmax=t2;} if (tmin > tmax) return -1.0f; } /*Z slab*/ return tmin;
+float BvhRayAABBHit(V3 o, V3 d, V3 a, V3 b, float m) {
+    float mn = 0.0f, mx = m;
+    if (vabs(d.x) < 0.00000001f) { if (o.x < a.x || o.x > b.x) return -1.0f; } else { float inv=1.0f/d.x; float t1=(a.x - o.x) * inv, t2=(b.x - o.x) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > mn){mn=t1;} if(t2 < mx){mx=t2;} if (mn > mx) return -1.0f; } /*X slab*/
+    if (vabs(d.y) < 0.00000001f) { if (o.y < a.y || o.y > b.y) return -1.0f; } else { float inv=1.0f/d.y; float t1=(a.y - o.y) * inv, t2=(b.y - o.y) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > mn){mn=t1;} if(t2 < mx){mx=t2;} if (mn > mx) return -1.0f; } /*Y slab*/
+    if (vabs(d.z) < 0.00000001f) { if (o.z < a.z || o.z > b.z) return -1.0f; } else { float inv=1.0f/d.z; float t1=(a.z - o.z) * inv, t2=(b.z - o.z) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > mn){mn=t1;} if(t2 < mx){mx=t2;} if (mn > mx) return -1.0f; } /*Z slab*/ return mn;
 }
-static u16 rayCellHeads[ARRSIZE], rayNext[INSTANCE_COUNT];
-static u32 rayGridFrame=U32_MAX;
+static u16 rayCellHeads[ARRSIZE],rayNext[INSTANCE_COUNT]; static u32 rayGridFrame=U32_MAX;
 INLINE void RayGridRebuild(void) { rayGridFrame = globalframe; for (u32 c=0;c<ARRSIZE;++c) { rayCellHeads[c] = INSTANCE_COUNT; } for (u16 i=0;i<World.instCount;++i){ u16 c=(u16)World.instances[i].cellIndex; if (c>=ARRSIZE){ c = (u16)PosGetCellCoords(World.position[i].x, World.position[i].z); } rayNext[i] = rayCellHeads[c]; rayCellHeads[c] = i; } }
 RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
-    double rStart = get_time();
-    RaycastHit result = { .hit = false, .distance = maxDist, .point = {0.0f, 0.0f, 0.0f}, .normal = {0.0f, 0.0f, 0.0f}, .hitInstanceIndex = INSTANCE_COUNT };
-    dir = V3_Normalize(dir);
-    const float maxDistSq = maxDist * maxDist;
-    if (unlikely(rayGridFrame != globalframe)) { RayGridRebuild(); }
+    double rStart = get_time(); const float maxDistSq = maxDist * maxDist; dir = V3_Normalize(dir); RaycastHit result = {.hit = false,.distance = maxDist,.point = origin,.normal = dir,.hitInstanceIndex = INSTANCE_COUNT}; if (unlikely(rayGridFrame != globalframe)) { RayGridRebuild(); }
     float wx = World.worldMin_x[World.curLev], wz = World.worldMin_z[World.curLev], ex = origin.x + dir.x*maxDist, ez = origin.z + dir.z*maxDist;
     float xA = vmin(origin.x, ex) - 24.0f, xB = vmax(origin.x, ex) + 24.0f, zA = vmin(origin.z, ez) - 24.0f, zB = vmax(origin.z, ez) + 24.0f;
     i32 b0x = (i32)vfloor((xA - wx + CELLXHALF) / CELLSZ), b1x = (i32)vfloor((xB - wx + CELLXHALF) / CELLSZ), b0z = (i32)vfloor((zA - wz + CELLXHALF) / CELLSZ), b1z = (i32)vfloor((zB - wz + CELLXHALF) / CELLSZ);
@@ -1184,6 +1143,7 @@ void UpdateLights() {
     glBindBuffer(GL_SSBO, lightsID); glBufferSubData(GL_SSBO, 0, World.loadedLights * sizeof(Light), World.lights);
     glUseProgram(voxelUpdateSP); glUniform3f(5, World.position[PLAYER1].x, World.position[PLAYER1].y, World.position[PLAYER1].z); glUniform3f(8, World.instances[PLAYER1].forward.x, World.instances[PLAYER1].forward.y, World.instances[PLAYER1].forward.z); glUniform1ui(9, Sys_Settings.Reflections); glUniform1ui(2, World.loadedLights);
     glDispatchCompute((VOXELS_X + 15) / 16, (VOXELS_Z + 15) / 16, 1);
+    glMemoryBarrier(0x2000/*GL_SHADER_STORAGE_BARRIER_BIT*/); /*Compat: voxel light lists/counters (SSBOs 2,3,5,6,7) are read by chunk_frag and rt.compute afterwards - without this barrier the reads are undefined per GL4.3/ES3.1*/
 }
 
 // Shadowmapping
@@ -1706,6 +1666,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         if (rt) { glUniform2f(7,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]); glUniform1ui(9,texCnt); }
         u32 group=rt ? 8 : 32;
         glDispatchCompute((Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES + group - 1)/group,(Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES + group - 1) / group,1);
+        glMemoryBarrier(0x20/*GL_SHADER_IMAGE_ACCESS_BARRIER_BIT*/ | 0x8/*GL_TEXTURE_FETCH_BARRIER_BIT*/); /*Compat: SSR/RT wrote outputImage via imageStore; the composite pass samples it as a texture right after - undefined without a barrier per GL4.3/ES3.1*/
     }
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);  /*DIAG: RT pass ends here*/
     glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][4]);
@@ -1999,6 +1960,7 @@ static void RtDispatchModelCopy(u16 m) {
     glBindBufferRange(GL_SSBO, 18, modelIBO, (intptr_t)mdlIboOfs[m], (size_t)((size_t)modelTriangleCounts[m]*6u + 4u));
     glUniform1ui(3, tcnt); glUniform1ui(4, rtModelInfo[m].triBase); glUniform1ui(5, rtModelInfo[m].orderBase);
     glDispatchCompute((tcnt + 255u) / 256u, 1, 1);
+    glMemoryBarrier(0x2000/*GL_SHADER_STORAGE_BARRIER_BIT*/); /*Compat: rtcopy writes RTGeom(16)/SrcOrder(19) SSBOs that rt.compute reads on its dispatch - undefined without a barrier per GL4.3/ES3.1*/
 }
 void EnsureReflectionResources(void) {
     if (Sys_Settings.Reflections >= 1u && outputImageID == 0) { GenerateAndBindTexture(&outputImageID,GL_RGBA8,Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES,Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL); glBindImageTexture(4,outputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); glActiveTexture(GL_TEXTURE4); glBindTexture(GL_TEXTURE_2D,outputImageID); }

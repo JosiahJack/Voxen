@@ -116,6 +116,9 @@ void DebugRAMPeak(void) { // Kernel high-water mark of RSS over process lifetime
     #endif
 }
 void DebugRAMActual(const char *context) { // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
+    #if defined(_WIN32)
+        (void)context;/*no /proc and no brk(2) on Windows - the raw `syscall` below is a privileged instruction in ring 3 there and would crash the process*/
+    #else
     static void* heap_start = (void*)-1; if(heap_start == (void*)-1){ long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); heap_start = (void*)r; }
     long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); void* current_brk = (void*)r;
     size_t heap_bytes = (size_t)((char*)current_brk - (char*)heap_start); size_t uss_bytes = 0; FHandle fd = OS_OpenReadonly("/proc/self/smaps_rollup"); if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); return; }
@@ -126,6 +129,7 @@ void DebugRAMActual(const char *context) { // Get USS aka the total RAM uniquely
             p++; while(*p == ' ' || *p == '\t'){p++;} while(*p >= '0' && *p <= '9'){val=val * 10 + (*p - '0'); p++;} uss_bytes += val * 1024;
         } p++;
     } u32 mmapped=(u32)__atomic_load_n(&g_mmap_live,__ATOMIC_RELAXED); DualLog("Mem at %s: Heap %ub(%uKB|%.2fMB), USS %ub(%uKB|%.2fMB), MMAP %uKB|%.2fMB\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0,mmapped / 1024,mmapped / 1024.0 / 1024.0);
+    #endif
 }
 u32 random_range_rng = 0x12345678u;
 static u32 xs32() { u32 x = random_range_rng; x ^= x << 13; x ^= x >> 17; x ^= x << 5; return random_range_rng = x ? x : 0xdeadbeefu; } // tasty
