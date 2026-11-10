@@ -27,7 +27,7 @@ static void WarmPairGovern(u16 a,u16 b,Manifold *m) {
 }
 static void WarnPhysicsCapacity(u8 kind,const char* message){if(kind<5&&World.pauseRelativeTime>=nextCapacityWarn[kind]){DualLogWarn("%s\n",message);nextCapacityWarn[kind]=World.pauseRelativeTime+5.0f;}}
 INLINE bool AnimWaking(u16 j) { if(j == PLAYER1){return false;} u16 an = World.instances[j].animationNum; if (!((an == 0 || an == 1 || (an >= 4 && an <= 20) || (an >= 43 && an <= 45) || an == 47 || an == 48) && an < MAXANIM && World.instances[j].clip < MAX_ANIMCLIPS)) return false; u8 fr = mdlAnimClips[an][World.instances[j].clip].framerate; return fr > 0 && (World.current_time - World.instances[j].animFinished) * (double)fr < 1.0; }
-void AddForce(u16 i, V3 f, bool imp){if(imp){World.velocity[i]=V3Add(World.velocity[i],V3_ScaleByF(f,1.0f/vmax(World.mass[i],0.001f)));}else{World.instances[i].accumulatedForce=V3Add(World.instances[i].accumulatedForce,f);} World.physSleep[i]=false;}
+void AddForce(u16 i, V3 f, bool imp){if(imp){World.velocity[i]=V3Add(World.velocity[i],V3_ScaleByF(f,1.0f/vmax(EntMass(i),0.001f)));}else{World.instances[i].accumulatedForce=V3Add(World.instances[i].accumulatedForce,f);} World.physSleep[i]=false;}
 // Trigger System
 void AddAccessCardToInventory(int index); void UseTargets(u16 activator, u16 targetIdx); void GrenadeOnCollision(u16 self);
 static bool IsImpactGrenade(u16 idx) { return idx == 370 || idx == 372 || idx == 387 || idx == 404; }
@@ -77,8 +77,8 @@ void TriggerOnTriggerEnter(u16 self, u16 other) { if (World.instances[self].allD
 void TriggerOnTriggerStay(u16 self, u16 other) { if (World.instances[self].allDone && World.instances[self].onlyOnce){return;} TriggerTriggerTripped(self,other); }
 static float GravityLiftTopY(u16 liftIdx) { ShapeBox box=Entity_GetBox(liftIdx); V3 up=quat_rot_v3(box.rot,(V3){0,1,0}); float extent=vabs(up.x)*box.hExt.x+vabs(up.y)*box.hExt.y+vabs(up.z)*box.hExt.z; return box.ctr.y+extent; }
 static float GravityLiftBodyBottomY(u16 body) { if(World.col[body]==CT_CAP){ShapeCapsule cap=Entity_GetCap(body);return cap.base.y-cap.rad;} return World.position[body].y-(World.colliderSize[body].y*0.5f*vabs(World.scale[body].y)); }
-static float GravityLiftGravityAccel(u16 body) { if(body==PLAYER1&&(Cheats.noclip||World.invP1.ladderState>0||World.curLev==LEVEL_CYBERSPACE))return 0.0f; return 9.81f*World.gravity[body]; }
-static float GravityLiftTopControlForce(u16 body,float gap) { /* Underdamped spring toward the top plane; at rest this exactly balances gravity. */ float accel=vclamp(gap*64.0f-World.velocity[body].y*6.0f,-32.0f,20.0f); return vmax(World.mass[body],0.001f)*(GravityLiftGravityAccel(body)+accel); }
+static float GravityLiftGravityAccel(u16 body) { if(body==PLAYER1&&(Cheats.noclip||World.invP1.ladderState>0||World.curLev==LEVEL_CYBERSPACE))return 0.0f; return World.instances[body].hasGravity ? 9.81f : 0.0f; }
+static float GravityLiftTopControlForce(u16 body,float gap) { /* Underdamped spring toward the top plane; at rest this exactly balances gravity. */ float accel=vclamp(gap*64.0f-World.velocity[body].y*6.0f,-32.0f,20.0f); return vmax(EntMass(body),0.001f)*(GravityLiftGravityAccel(body)+accel); }
 static void GravityLiftApplyTopSupport(u16 body) {
     u16 marker=gravityLiftTopSupport[body]; if(!marker)return; u16 liftIdx=(u16)(marker-1u);
     if(liftIdx<INSTS_1ST_IDX||liftIdx>=World.instCount||World.instances[liftIdx].index!=596||!World.instances[liftIdx].active){gravityLiftTopSupport[body]=0;return;}
@@ -93,7 +93,7 @@ static void GravityLiftApplyTopSupport(u16 body) {
 
 void trigger_gravitylift_touch(u16 self, u16 other, bool entering) {
     Entity *lift=&World.instances[self]; if(entering)lift->initialBurstFinished=World.pauseRelativeTime+1.0f;
-    float forceY=0.0f,gravityAccel=GravityLiftGravityAccel(other),mass=vmax(World.mass[other],0.001f);
+    float forceY=0.0f,gravityAccel=GravityLiftGravityAccel(other),mass=vmax(EntMass(other),0.001f);
     if(other==PLAYER1)flag_set(&World.instances[other].entflags,EF_GRAVLIFT,true);
     bool initialBurst=entering||lift->initialBurstFinished>World.pauseRelativeTime,jumpingFromTop=false;
     if(lift->active){
@@ -107,7 +107,7 @@ void trigger_gravitylift_touch(u16 self, u16 other, bool entering) {
                 else if (World.col[other] == CT_CAP) gravityLiftTopSupport[other] = (u16)(self + 1u);
             }
             if (!jumpingFromTop) forceY = GravityLiftTopControlForce(other, gap);
-        } else if (initialBurst) { forceY = (lift->strength*World.mass[other] - velY) * 2.0f; }
+        } else if (initialBurst) { forceY = (lift->strength*EntMass(other) - velY) * 2.0f; }
         else { float riseAccel = vclamp((lift->strength - velY) * 3.0f, -16.0f, 12.0f); forceY = mass * (gravityAccel + riseAccel); }
     } else { if (other == PLAYER1) gravityLiftTopSupport[other] = 0; if (World.velocity[other].y < lift->offStrengthFactor) { forceY = lift->offStrengthFactor - World.velocity[other].y; if (initialBurst) forceY *= 2.0f; } }
     AddForce(other,(V3){0.0f,forceY,0.0f},false);
@@ -159,8 +159,8 @@ static u8 g_hullComWarned[MAX_MDLS] = {0};
 typedef struct { u32 mi,massBits,sxBits,syBits,szBits; float inv[6],comMag,r; u8 state; } InertiaMemo; /*state 0=empty, 1=tensor cached, 2=no tensor possible (degenerate hull or near-singular tensor; comMag/r still cached for the warning check)*/
 static InertiaMemo inertiaMemo[256][4]; static u8 inertiaMemoVictim[256];
 INLINE u32 inertia_f32bits(float f) { union { float f; u32 u; } b; b.f=f; return b.u; }
-#define INERTIA_MEMO_HIT(c) ((c)->mi==mi && (c)->state && (c)->massBits==inertia_f32bits(World.mass[i]) && (c)->sxBits==inertia_f32bits(World.scale[i].x) && (c)->syBits==inertia_f32bits(World.scale[i].y) && (c)->szBits==inertia_f32bits(World.scale[i].z))
-#define INERTIA_MEMO_STORE(c,st,mag,rad) ((c)->mi=mi, (c)->massBits=inertia_f32bits(World.mass[i]), (c)->sxBits=inertia_f32bits(World.scale[i].x), (c)->syBits=inertia_f32bits(World.scale[i].y), (c)->szBits=inertia_f32bits(World.scale[i].z), (c)->state=(st), (c)->comMag=(mag), (c)->r=(rad))
+#define INERTIA_MEMO_HIT(c) ((c)->mi==mi && (c)->state && (c)->massBits==inertia_f32bits(EntMass(i)) && (c)->sxBits==inertia_f32bits(World.scale[i].x) && (c)->syBits==inertia_f32bits(World.scale[i].y) && (c)->szBits==inertia_f32bits(World.scale[i].z))
+#define INERTIA_MEMO_STORE(c,st,mag,rad) ((c)->mi=mi, (c)->massBits=inertia_f32bits(EntMass(i)), (c)->sxBits=inertia_f32bits(World.scale[i].x), (c)->syBits=inertia_f32bits(World.scale[i].y), (c)->szBits=inertia_f32bits(World.scale[i].z), (c)->state=(st), (c)->comMag=(mag), (c)->r=(rad))
 void ComputeConvexMeshInertiaTensor(u16 i) {
     u16 mi = World.instances[i].colMeshIndex; World.invTnsrValid[i]=false; if (mi >= MAX_MDLS || !modelTriangleCounts[mi] || !modelVertexCounts[mi]) {return;}
     InertiaMemo* set = inertiaMemo[mi & 255];
@@ -185,8 +185,8 @@ void ComputeConvexMeshInertiaTensor(u16 i) {
     if(vabs(volAcc) < 1e-12f){ INERTIA_MEMO_STORE(ce,2,0.0f,0.0f); return;}/*absolute 1e-4 (PHY_EPSILON) rejected thin cards to the sphere fallback*/
         
     float sx=World.scale[i].x,sy=World.scale[i].y,sz=World.scale[i].z;
-    float sd=World.mass[i]/(volAcc * 10.0f/*6/60*/), so = World.mass[i] / (volAcc * 20.0f/*6/120*/);/*Diagonals=6/60, off-diagonals=6/120, since those have the 2.0f multiplied above from the x^2 expansion resulting in 2xy terms.*/
-    float scx=cm[0]*sx/(4.0f*volAcc),scy=cm[1]*sy/(4.0f*volAcc),scz=cm[2]*sz/(4.0f*volAcc),m=World.mass[i];
+    float sd=EntMass(i)/(volAcc * 10.0f/*6/60*/), so = EntMass(i) / (volAcc * 20.0f/*6/120*/);/*Diagonals=6/60, off-diagonals=6/120, since those have the 2.0f multiplied above from the x^2 expansion resulting in 2xy terms.*/
+    float scx=cm[0]*sx/(4.0f*volAcc),scy=cm[1]*sy/(4.0f*volAcc),scz=cm[2]*sz/(4.0f*volAcc),m=EntMass(i);
     float Ixx = sd*(acc[1]*sy*sy + acc[2]*sz*sz), Iyy = sd*(acc[0]*sx*sx + acc[2]*sz*sz), Izz = sd*(acc[0]*sx*sx + acc[1]*sy*sy), Ixy = -so*acc[3]*sx*sy, Ixz = -so*acc[4]*sx*sz, Iyz = -so*acc[5]*sy*sz;
     float r = modelBounds[mi] * vmax(vmax(sx,sy),sz); float comMag = vsqrtf(scx*scx + scy*scy + scz*scz);
     if (!g_hullComWarned[mi] && comMag > 0.25f*r) { g_hullComWarned[mi]=1; }
@@ -463,7 +463,7 @@ Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB, u16 
 }
 
 INLINE void quat_to_mat3(Quaternion q, float R[3][3]) { float x=q.x,y=q.y,z=q.z,w=q.w, xx=x*x,yy=y*y,zz=z*z, xy=x*y,xz=x*z,yz=y*z, wx=w*x,wy=w*y,wz=w*z; R[0][0]=1.0f-2.0f*(yy+zz); R[0][1]=2.0f*(xy-wz); R[0][2]=2.0f*(xz+wy); R[1][0]=2.0f*(xy+wz); R[1][1]=1.0f-2.0f*(xx+zz); R[1][2]=2.0f*(yz-wx); R[2][0]=2.0f*(xz-wy); R[2][1]=2.0f*(yz+wx); R[2][2]=1.0f-2.0f*(xx+yy); }
-INLINE void BuildInvInertiaMatrix(u16 i, const float R[3][3], float K[3][3]) { /* K = R * I_inv * R^T, precomputed per body for solver hotpath */ float I0,I1,I2,I3,I4,I5; if (World.col[i]==CT_BOX) { ShapeBox b=Entity_GetBox(i); float m=World.mass[i],hx=b.hExt.x,hy=b.hExt.y,hz=b.hExt.z; I0=1.0f/vmax((1.0f/3.0f)*m*(hy*hy+hz*hz),0.000001f); I1=1.0f/vmax((1.0f/3.0f)*m*(hx*hx+hz*hz),0.000001f); I2=1.0f/vmax((1.0f/3.0f)*m*(hx*hx+hy*hy),0.000001f); I3=I4=I5=0.0f; } else if (World.col[i]==CT_CVX && World.invTnsrValid[i]) { float *II=World.invInertiaTensor[i]; I0=II[0]; I1=II[1]; I2=II[2]; I3=II[3]; I4=II[4]; I5=II[5]; } else { float s=1.0f/vmax((2.0f/5.0f)*World.mass[i]*World.radius[i]*World.radius[i],0.000001f); I0=I1=I2=s; I3=I4=I5=0.0f; } for (int r=0;r<3;++r) for (int c=0;c<3;++c) K[r][c]=R[r][0]*(I0*R[c][0]+I3*R[c][1]+I4*R[c][2])+R[r][1]*(I3*R[c][0]+I1*R[c][1]+I5*R[c][2])+R[r][2]*(I4*R[c][0]+I5*R[c][1]+I2*R[c][2]); }
+INLINE void BuildInvInertiaMatrix(u16 i, const float R[3][3], float K[3][3]) { /* K = R * I_inv * R^T, precomputed per body for solver hotpath */ float I0,I1,I2,I3,I4,I5; if (World.col[i]==CT_BOX) { ShapeBox b=Entity_GetBox(i); float m=EntMass(i),hx=b.hExt.x,hy=b.hExt.y,hz=b.hExt.z; I0=1.0f/vmax((1.0f/3.0f)*m*(hy*hy+hz*hz),0.000001f); I1=1.0f/vmax((1.0f/3.0f)*m*(hx*hx+hz*hz),0.000001f); I2=1.0f/vmax((1.0f/3.0f)*m*(hx*hx+hy*hy),0.000001f); I3=I4=I5=0.0f; } else if (World.col[i]==CT_CVX && World.invTnsrValid[i]) { float *II=World.invInertiaTensor[i]; I0=II[0]; I1=II[1]; I2=II[2]; I3=II[3]; I4=II[4]; I5=II[5]; } else { float s=1.0f/vmax((2.0f/5.0f)*EntMass(i)*World.radius[i]*World.radius[i],0.000001f); I0=I1=I2=s; I3=I4=I5=0.0f; } for (int r=0;r<3;++r) for (int c=0;c<3;++c) K[r][c]=R[r][0]*(I0*R[c][0]+I3*R[c][1]+I4*R[c][2])+R[r][1]*(I3*R[c][0]+I1*R[c][1]+I5*R[c][2])+R[r][2]*(I4*R[c][0]+I5*R[c][1]+I2*R[c][2]); }
 INLINE V3 M33_v(const float M[3][3], V3 v) { return (V3){M[0][0]*v.x+M[0][1]*v.y+M[0][2]*v.z, M[1][0]*v.x+M[1][1]*v.y+M[1][2]*v.z, M[2][0]*v.x+M[2][1]*v.y+M[2][2]*v.z}; }
 void SolveGlobalContacts(void) { // PGS over the FULL contact set queued this substep.
     for (int it=0;it<SOLVER_ITER_GLOBAL;++it) {
@@ -495,9 +495,9 @@ void SolveGlobalContacts(void) { // PGS over the FULL contact set queued this su
 void DrawSphereContact(V3 pos, float rad);
 void PrepareSolverContact(u16 a, u16 b, const Manifold *m, float dt, float dtsub) {
     if (!m->n || (World.col[b] == CT_MSH && World.col[a] == CT_MSH)) return; if (gContactCount >= MAX_GLOBAL_CONTACTS) { WarnPhysicsCapacity(0,"Ran out of global contact slots!"); return; }
-    SolverContact *sc = &gContacts[gContactCount++]; sc->a=a; sc->b=b; sc->m=*m; sc->bStatic = (!(World.instances[b].entflags & EF_RIGIDBODY) || World.mass[b] < 0.001f || World.col[b] == CT_NONE || World.col[b] == CT_MSH || World.physSleep[b]);
+    SolverContact *sc = &gContacts[gContactCount++]; sc->a=a; sc->b=b; sc->m=*m; sc->bStatic = (!(World.instances[b].entflags & EF_RIGIDBODY) || EntMass(b) < 0.001f || World.col[b] == CT_NONE || World.col[b] == CT_MSH || World.physSleep[b]);
     for (int i=0;i<m->n;++i) { if(m->p[i].pen > 0.0f){DrawSphereContact(m->p[i].point,0.02f);} }
-    sc->invMassA = World.mass[a] < 0.001f ? 1.0f : 1.0f / World.mass[a]; sc->invMassB = (sc->bStatic || World.mass[b] < 0.001f) ? 0.0f : 1.0f / World.mass[b];
+    sc->invMassA = EntMass(a) < 0.001f ? 1.0f : 1.0f / EntMass(a); sc->invMassB = (sc->bStatic || EntMass(b) < 0.001f) ? 0.0f : 1.0f / EntMass(b);
     sc->canRotateA = (a != PLAYER1 && World.col[a] != CT_CAP && !IdxIsNPC(World.instances[a].index)); sc->canRotateB = (!sc->bStatic && b != PLAYER1 && World.col[b] != CT_CAP && !IdxIsNPC(World.instances[b].index));
     float R[3][3]; if (sc->canRotateA) { quat_to_mat3(World.rotation[a],R); BuildInvInertiaMatrix(a,R,sc->Ka); }
     if (sc->canRotateB) { quat_to_mat3(World.rotation[b],R); BuildInvInertiaMatrix(b,R,sc->Kb); }
@@ -548,7 +548,7 @@ void Physics(float dt) {
         for (u16 i=0;i<dynamicEntityCount;++i) { // 1. Integrate velocity
             u16 a=dynamicEntities[i]; if (IdxIsNPC(World.instances[a].index) && (World.instances[a].entflags & EF_ASLEEP)) { continue; }
             
-            V3 acc = {0.0f,-9.81f * World.gravity[a],0.0f}; if (World.curLev == LEVEL_CYBERSPACE) acc.y = 0.0f; /*Nothing gets gravity in cyberspace: NPCs, items, projectiles, and the player all float (user directive 2026-10-23).*/ else if ((a == PLAYER1) && (Cheats.noclip || World.invP1.ladderState > 0)) acc.y = 0.0f; if (a == PLAYER1 && World.curLev == LEVEL_CYBERSPACE && World.diffCyb > 1 && !Cheats.noclip && V3_dot(World.velocity[a],World.velocity[a]) < 10000.0f) { acc = V3Add(acc,V3_ScaleByF(quat_rot_v3(World.rotation[a],(V3){0.0f,0.0f,1.0f}),2.0f)); } /*Unity CyberspaceMovement detrimental force at difficultyCyber>1: AddForce(viewDir*walkAcceleration*0.05*dt, ForceMode.Force). The Unity player Rigidbody mass is 1, so at Unity's 50Hz fixed step that force is an effective 2.0 m/s^2 along the full 3D view direction; applied mass-independently here because the Voxen player mass is 10 (same convention as trigger_cyberpush 595, which scales its force by mass). The 10000 gate is Unity's velocity.magnitude < walkAcceleration*0.05 (=100) test, squared.*/ acc = V3Add(acc,V3_ScaleByF(World.instances[a].accumulatedForce,1.0f / World.mass[a])); World.velocity[a] = V3Add(World.velocity[a],V3_ScaleByF(acc,dtsub));
+            V3 acc = {0.0f,World.instances[a].hasGravity ? -9.81f : 0.0f,0.0f}; if (World.curLev == LEVEL_CYBERSPACE) acc.y = 0.0f; /*Nothing gets gravity in cyberspace: NPCs, items, projectiles, and the player all float (user directive 2026-10-23).*/ else if ((a == PLAYER1) && (Cheats.noclip || World.invP1.ladderState > 0)) acc.y = 0.0f; if (a == PLAYER1 && World.curLev == LEVEL_CYBERSPACE && World.diffCyb > 1 && !Cheats.noclip && V3_dot(World.velocity[a],World.velocity[a]) < 10000.0f) { acc = V3Add(acc,V3_ScaleByF(quat_rot_v3(World.rotation[a],(V3){0.0f,0.0f,1.0f}),2.0f)); } /*Unity CyberspaceMovement detrimental force at difficultyCyber>1: AddForce(viewDir*walkAcceleration*0.05*dt, ForceMode.Force). The Unity player Rigidbody mass is 1, so at Unity's 50Hz fixed step that force is an effective 2.0 m/s^2 along the full 3D view direction; applied mass-independently here because the Voxen player mass is 10 (same convention as trigger_cyberpush 595, which scales its force by mass). The 10000 gate is Unity's velocity.magnitude < walkAcceleration*0.05 (=100) test, squared.*/ acc = V3Add(acc,V3_ScaleByF(World.instances[a].accumulatedForce,1.0f / EntMass(a))); World.velocity[a] = V3Add(World.velocity[a],V3_ScaleByF(acc,dtsub));
             if (!V3_IsSane(World.velocity[a])) { World.velocity[a]=(V3){0.0f,0.0f,0.0f}; } else { float speed=V3_Mag(World.velocity[a]); if (speed > MAX_SPEED) World.velocity[a]=V3_ScaleByF(World.velocity[a],MAX_SPEED / speed); }
             float linDrag = (World.instances[a].index >= 481 && World.instances[a].index <= 495) ? 1.0f : bodyDrag;
             World.velocity[a].x*=linDrag; /*Y axis left unaffected, so gravity accumulates*/ World.velocity[a].z*=linDrag; if (Cheats.noclip) World.velocity[a].y*=linDrag*linDrag; World.angularVelocity[a]=V3_ScaleByF(World.angularVelocity[a],angDrag); SetPosition(a,V3Add(World.position[a],V3_ScaleByF(World.velocity[a],dtsub)));
@@ -608,14 +608,14 @@ void Physics(float dt) {
                     }
                 }
             }
-            World.colliding[a]=false; flag_set(&World.instances[a].entflags,EF_GROUNDED,false); for (int c = 0; c < contactCount; ++c) { Manifold *mfp=&contactsMani[c]; u16 b=contactsOther[c]; World.colliding[a]=World.colliding[b]=true; if (V3_dot(mfp->normal,(V3){0.0f,1.0f,0.0f})>=0.574f) {World.instances[a].entflags |= EF_GROUNDED;} if ((World.instances[b].entflags&EF_RIGIDBODY) && !World.physSleep[b] && World.mass[b]>=0.001f && V3_dot(mfp->normal,(V3){0.0f,-1.0f,0.0f})>=0.574f) {World.instances[b].entflags |= EF_GROUNDED;} PrepareSolverContact(a,b,mfp,dt,dtsub); } World.instances[a].accumulatedForce = (V3){0.0f,0.0f,0.0f};
+            World.colliding[a]=false; flag_set(&World.instances[a].entflags,EF_GROUNDED,false); for (int c = 0; c < contactCount; ++c) { Manifold *mfp=&contactsMani[c]; u16 b=contactsOther[c]; World.colliding[a]=World.colliding[b]=true; if (V3_dot(mfp->normal,(V3){0.0f,1.0f,0.0f})>=0.574f) {World.instances[a].entflags |= EF_GROUNDED;} if ((World.instances[b].entflags&EF_RIGIDBODY) && !World.physSleep[b] && EntMass(b)>=0.001f && V3_dot(mfp->normal,(V3){0.0f,-1.0f,0.0f})>=0.574f) {World.instances[b].entflags |= EF_GROUNDED;} PrepareSolverContact(a,b,mfp,dt,dtsub); } World.instances[a].accumulatedForce = (V3){0.0f,0.0f,0.0f};
         }
         SolveGlobalContacts(); // 3. Restitution
         for (u32 c=0;c<gContactCount;++c) { SolverContact *sc=&gContacts[c]; WarmPairSave(sc->a,sc->b,&sc->m,dtsub,sc->accumN,sc->accumT); } // persist each pair's converged ramp for the next substep's warm start (substep dt: the ramp must track the per-substep impulse, not the frame length)
         for (u32 c=0; c<gContactCount; ++c) { // 3.5 Positional Correction (Projection)
             SolverContact *sc = &gContacts[c]; float avgPen = 0.0f; for (int p=0; p<sc->m.n; ++p) avgPen += sc->m.p[p].pen; if (sc->m.n > 0)avgPen/=(float)sc->m.n; float correction=vmax(avgPen-0.005f,0.0f)*0.4f; float massDiv=sc->invMassA+sc->invMassB+PHY_EPSILON; SetPosition(sc->a,V3Add(World.position[sc->a],V3_ScaleByF(sc->m.normal,correction*sc->invMassA/massDiv))); if (!sc->bStatic) SetPosition(sc->b, V3_AsubB(World.position[sc->b], V3_ScaleByF(sc->m.normal, correction * sc->invMassB / massDiv)));
         }
-        bool ladderTouched = false; World.invP1.radiationArea=World.Sys_Music.inZone=World.Sys_Music.elevator=World.Sys_Music.cyberTube=World.Sys_Music.distortion=false; World.gravity[PLAYER1] = World.curLev == LEVEL_CYBERSPACE ? 0.0f : 1.0f;
+        bool ladderTouched = false; World.invP1.radiationArea=World.Sys_Music.inZone=World.Sys_Music.elevator=World.Sys_Music.cyberTube=World.Sys_Music.distortion=false; World.instances[PLAYER1].hasGravity = World.curLev != LEVEL_CYBERSPACE;
         for (u16 i=0;i<numTriggers;++i) {
             u16 self = triggerVolumes[i]; u16 trigdx=World.instances[self].index; if (Cheats.showPhys) {if(trigdx==703)DrawCapsuleCollider(self);else DrawBoxColliderColored(self,(Color){1.0f,0.642f,0.0f,0.5f});} ShapeBox trigBox = Entity_GetBox(self); ShapeCapsule teleportCap=trigdx==703?Entity_GetCap(self):(ShapeCapsule){0};
             for (u16 o=0;o<dynamicEntityCount;++o) { // 4. Triggers
@@ -627,7 +627,7 @@ void Physics(float dt) {
                 else {float sphereRadius=vmax(vmax(vabs(World.colliderSize[other].x*World.scale[other].x),vabs(World.colliderSize[other].y*World.scale[other].y)),vabs(World.colliderSize[other].z*World.scale[other].z)); if(sphereRadius<=0.0f)sphereRadius=0.32f; touches=CapsuleTouchesOBB(World.position[other],sphereRadius,trigBox);}
                 if (!touches) continue; if(trigdx==596){ if(other==PLAYER1 && Cheats.noclip) continue;/*noclip flies the player through trigger volumes, so don't latch a gravity lift onto them*/ u16 mark=(u16)(self+1);bool entering=gravityLiftWasInside[other]!=mark&&gravityLiftTouched[other]!=mark;gravityLiftTouched[other]=mark;trigger_gravitylift_touch(self,other,entering);continue;} if(trigdx==703){u16 mark=(u16)(self+1);if(teleportWasTouching!=mark&&teleportTouched!=mark)TeleportTouchOnTriggerEnter(self,other);teleportTouched=mark;continue;}
                 switch(trigdx) {
-                    case 554/*prop_cyber_exit*/:if(other == PLAYER1){UIExitCyberspace();} break;   case 595/*trigger_cyberpush*/:if(other == PLAYER1 && World.diffCyb >= 1){AddForce(other,V3_ScaleByF(World.instances[self].dir,World.instances[self].force*0.02f*World.mass[other]),false); World.Sys_Music.cyberTube=true; World.Sys_Music.inZone=true; World.Sys_Music.zoneTrack=TT_Cybertube; World.Sys_Music.zoneMusic=MT_Override;} break;
+                    case 554/*prop_cyber_exit*/:if(other == PLAYER1){UIExitCyberspace();} break;   case 595/*trigger_cyberpush*/:if(other == PLAYER1 && World.diffCyb >= 1){AddForce(other,V3_ScaleByF(World.instances[self].dir,World.instances[self].force*0.02f*EntMass(other)),false); World.Sys_Music.cyberTube=true; World.Sys_Music.inZone=true; World.Sys_Music.zoneTrack=TT_Cybertube; World.Sys_Music.zoneMusic=MT_Override;} break;
                     case 597/*trigger_ladder*/:if(other == PLAYER1 && !Cheats.noclip){/*noclip flies the player through trigger volumes, so don't latch a ladder onto them*/World.invP1.ladderState=1; ladderTouched=true; ladderTopY=trigBox.ctr.y + trigBox.hExt.y;} break;
                     case 598/*trigger_multiple*/: case 600/*trigger_once*/: TriggerTriggerTripped(self,other); break;  case 599/*trigger_music*/:if(other == PLAYER1){TrackType tt=World.instances[self].trackType; MusicType mt=World.instances[self].musicType; World.Sys_Music.inZone=true; World.Sys_Music.elevator=(tt == TT_Elev); World.Sys_Music.distortion=(tt == TT_Distortion); World.Sys_Music.zoneTrack=tt; World.Sys_Music.zoneMusic=mt;} break;
                     case 601/*trigger_radiation*/:if(other == PLAYER1){World.invP1.radiationArea=true;World.instances[PLAYER1].radiation=World.instances[self].radiation;} break; /* radiation bleedoff / amelioration handled in physics update */
@@ -650,7 +650,7 @@ void Physics(float dt) {
     if (!reverbZoneActive){synth_set_reverb_preset(0); World.invP1.inReverbZone=false;}else{synth_set_reverb_preset(activeReverbPreset); World.invP1.inReverbZone = true;}
     {   const i32 WAKE_CELLS = 2;
         for (u32 i=0;i<World.instCount;++i) {
-            if (AnimWaking(i)) flag_set(&World.instances[i].entflags,EF_MOVING,true); u32 ef = World.instances[i].entflags; bool canSleep=(i!=PLAYER1 && IdxIsDynamicObject(World.instances[i].index) && (ef & EF_RIGIDBODY) && (ef & EF_ACTIVE) && World.col[i]!=CT_NONE && World.mass[i] >= 0.001f && !IdxIsNPC(World.instances[i].index)); if(!canSleep){World.physSleep[i]=0;continue;}
+            if (AnimWaking(i)) flag_set(&World.instances[i].entflags,EF_MOVING,true); u32 ef = World.instances[i].entflags; bool canSleep=(i!=PLAYER1 && IdxIsDynamicObject(World.instances[i].index) && (ef & EF_RIGIDBODY) && (ef & EF_ACTIVE) && World.col[i]!=CT_NONE && EntMass(i) >= 0.001f && !IdxIsNPC(World.instances[i].index)); if(!canSleep){World.physSleep[i]=0;continue;}
             i32 cx = PosGetCellCoordX(World.position[i].x), cz = PosGetCellCoordZ(World.position[i].z); bool nearAwake = false;
             for (i32 x=vmax(cx-WAKE_CELLS,0),xe=vmin(cx+WAKE_CELLS,WORLDX-1);x<=xe && !nearAwake;++x)
               for (i32 z=vmax(cz-WAKE_CELLS,0),ze=vmin(cz+WAKE_CELLS,WORLDX-1);z<=ze && !nearAwake;++z) {

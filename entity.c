@@ -377,9 +377,7 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     World.physSleep[i] = 0;
     World.invTnsrValid[i] = false;
     World.rotation[i] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
-    World.scale[i].x = World.scale[i].y = World.scale[i].z = World.mass[i] = 1.0f;
-    World.dynamicFriction[i] = 0.5f;
-    World.staticFriction[i] = 0.6f;
+    World.scale[i].x = World.scale[i].y = World.scale[i].z = 1.0f;
     for (u8 slot=0;slot<4;++slot) { World.instances[i].contents[slot] = World.instances[i].custIdx[slot] = -1; }
     for (u8 slot=0;slot<7;++slot) { World.instances[i].randomItem[slot] = World.instances[i].randomItemCustIdx[slot] = -1; }
     World.instances[i].index = entIdx;
@@ -401,7 +399,7 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     if (entIdx == 594 /*trigger_counter*/) World.instances[i].dontReset = true;
     if (entIdx == 702 /*logic_spawner*/) { Entity* sm=&World.instances[i]; if (sm->numberToSpawn == 0) sm->numberToSpawn = 1; if (sm->maxDelayBetweenSpawns <= 0.0f) { sm->minDelayBetweenSpawns = 15.0f; sm->maxDelayBetweenSpawns = 45.0f; } if (sm->allSpawnedResetDelay <= 0.0f) sm->allSpawnedResetDelay = 120.0f; }
     if (World.levelCurrentlyLoading) { /*So cheat spawns don't affect the %*/ u8 sl=World.curLev; if (sl<MAX_LEVELS) { u8* dst=entIdx==477?&World.levelCameraCount[sl]:entIdx==478?&World.levelLargeNodeCount[sl]:entIdx==479?&World.levelSmallNodeCount[sl]:0; if (dst && *dst<255) (*dst)++; } }
-    World.col[i]=EDefs[entIdx].col; World.colliderCenter[i]=EDefs[entIdx].colCtr; World.colliderSize[i]=EDefs[entIdx].colSz; World.mass[i]=EDefs[entIdx].mass > 0.0f ? EDefs[entIdx].mass : 1.0f; World.gravity[i]=(IdxIsDynamicObject(World.instances[i].index) && (entIdx<481 || entIdx>495)) ? 1.0f : 0.0f; if (IdxIsButtonSwitch(entIdx)) { World.instances[i].lockedMessageLingdex = 193; World.instances[i].SFXLockedIndex = -1; }
+    World.col[i]=EDefs[entIdx].col; World.colliderCenter[i]=EDefs[entIdx].colCtr; World.colliderSize[i]=EDefs[entIdx].colSz; World.instances[i].hasGravity = (IdxIsDynamicObject(World.instances[i].index) && (entIdx<481 || entIdx>495)); if (IdxIsButtonSwitch(entIdx)) { World.instances[i].lockedMessageLingdex = 193; World.instances[i].SFXLockedIndex = -1; }
     if (entIdx < 307 && cardChunk[entIdx]) { World.instances[i].lodIndex=178;/*LOD card index*/ World.col[i]=CT_BOX; World.colliderCenter[i].y=1.32f; World.colliderSize[i]=(V3){2.56f,0.08f,2.56f}; } World.instCount++; return i; }
 
 bool EntIsLodCardConst(u16 entIdx) { return entIdx < 307 && cardChunk[entIdx]; } /*Derived resident-set closure (models.c) needs the private cardChunk table to know which consts fall back to the generic LOD card*/
@@ -425,12 +423,8 @@ void SetLevelPointers(u8 lev) {
     World.col=World.levelCollider[lev];
     World.rotation=World.levelRotation[lev];
     World.layer=World.levelLayer[lev];
-    World.mass=World.levelMass[lev];
     World.radius=World.levelRadius[lev];
-    World.gravity          = World.levelGravity[lev];
     World.invInertiaTensor = World.levelInvInertiaTensor[lev];
-    World.dynamicFriction  = World.levelDynamicFriction[lev];
-    World.staticFriction   = World.levelStaticFriction[lev];
     World.invTnsrValid     = World.levelInvTnsrValid[lev];
     World.colliding        = World.levelColliding[lev];
     World.instCount        = World.levelInstCount[lev];
@@ -443,9 +437,9 @@ void SetLevelPointers(u8 lev) {
 void CopyPlayerState(u8 srcLevel, u8 dstLevel) {
     if(srcLevel >= MAX_LEVELS || dstLevel >= MAX_LEVELS || srcLevel == dstLevel){return;} u16 s=PLAYER1; World.levelInstances[dstLevel][s]=World.levelInstances[srcLevel][s]; World.levelPosition[dstLevel][s]=World.levelPosition[srcLevel][s]; World.levelScale[dstLevel][s]=World.levelScale[srcLevel][s];
     World.levelVelocity[dstLevel][s]=World.levelVelocity[srcLevel][s]; World.levelAngularVelocity[dstLevel][s]=World.levelAngularVelocity[srcLevel][s]; World.levelColliderCenter[dstLevel][s]=World.levelColliderCenter[srcLevel][s]; World.levelColliderSize[dstLevel][s]=World.levelColliderSize[srcLevel][s];
-    World.levelCollider[dstLevel][s]=World.levelCollider[srcLevel][s]; World.levelRotation[dstLevel][s]=World.levelRotation[srcLevel][s]; World.levelLayer[dstLevel][s]=World.levelLayer[srcLevel][s]; World.levelMass[dstLevel][s]=World.levelMass[srcLevel][s]; World.levelRadius[dstLevel][s]=World.levelRadius[srcLevel][s];
-    World.levelGravity[dstLevel][s]=World.levelGravity[srcLevel][s]; mcpy(World.levelInvInertiaTensor[dstLevel][s],World.levelInvInertiaTensor[srcLevel][s],6 * sizeof(float));
-    World.levelDynamicFriction[dstLevel][s]=World.levelDynamicFriction[srcLevel][s]; World.levelStaticFriction[dstLevel][s]=World.levelStaticFriction[srcLevel][s]; World.levelInvTnsrValid[dstLevel][s]=World.levelInvTnsrValid[srcLevel][s]; World.levelColliding[dstLevel][s]=World.levelColliding[srcLevel][s];
+    World.levelCollider[dstLevel][s]=World.levelCollider[srcLevel][s]; World.levelRotation[dstLevel][s]=World.levelRotation[srcLevel][s]; World.levelLayer[dstLevel][s]=World.levelLayer[srcLevel][s]; World.levelRadius[dstLevel][s]=World.levelRadius[srcLevel][s];
+    mcpy(World.levelInvInertiaTensor[dstLevel][s],World.levelInvInertiaTensor[srcLevel][s],6 * sizeof(float));
+    World.levelInvTnsrValid[dstLevel][s]=World.levelInvTnsrValid[srcLevel][s]; World.levelColliding[dstLevel][s]=World.levelColliding[srcLevel][s];
 }
 
 static char lineSpace[LINE_LEN_MAX]; char ioNames[MAX_IO_NAMES][TARG_STRLEN]; u16 ioNameCount,fwParentOf[INSTANCE_COUNT]; static u16 fwSlotStart[INSTANCE_COUNT],fwSlotCount[INSTANCE_COUNT],fwPoolUsed,fwPoolPrefab[FW_POOL_MAX],fwCurChild,fwLastChunkSlot,lwPrefab[FW_MAX_CHILDREN];
@@ -808,13 +802,13 @@ void LoadLevelMod(u8 lev) {
     headmountedLanternLight = AddLightSimple(World.position[PLAYER1],(Color3){1.0f,1.0f,1.0f},11.52f,0.0f,LIGHTON);
     if (World.instCount < INSTANCE_COUNT) {
         u16 wvi = World.instCount; mset(&World.instances[wvi],0,sizeof(Entity)); World.instances[wvi].entflags=EF_ACTIVE|EF_NO_SHADOWS; World.layer[wvi]=L_Default; World.instances[wvi].camView=255; World.instances[wvi].modelIndex=World.instances[wvi].lodIndex=World.instances[wvi].colMeshIndex=MAX_MDLS;
-        World.instances[wvi].texIndex=World.instances[wvi].glowIndex=World.instances[wvi].specIndex=World.instances[wvi].normIndex=MAXTEX; World.scale[wvi].x=World.scale[wvi].y=World.scale[wvi].z=World.mass[wvi]=World.rotation[wvi].w=1.0f; World.dynamicFriction[wvi]=0.5f; World.staticFriction[wvi]=0.6f;
+        World.instances[wvi].texIndex=World.instances[wvi].glowIndex=World.instances[wvi].specIndex=World.instances[wvi].normIndex=MAXTEX; World.scale[wvi].x=World.scale[wvi].y=World.scale[wvi].z=World.rotation[wvi].w=1.0f;
         World.col[wvi]=CT_NONE; flag_set(&World.instances[wvi].entflags,EF_RIGIDBODY,false);
         World.instances[wvi].index=0; World.position[wvi]=World.position[PLAYER1]; World.rotation[wvi]=QUAT_IDENTITY; World.instances[wvi].modelIndex=MAX_MDLS; World.instances[wvi].animationNum=MAXANIM; World.weaponVModelIndex=wvi; World.instCount++;
     }
     if (World.instCount < INSTANCE_COUNT) {
         u16 editTextIdx = World.instCount; mset(&World.instances[editTextIdx],0,sizeof(Entity)); World.instances[editTextIdx].entflags=EF_ACTIVE; World.layer[editTextIdx]=L_Default; World.instances[editTextIdx].camView=255; World.instances[editTextIdx].modelIndex=World.instances[editTextIdx].lodIndex=World.instances[editTextIdx].colMeshIndex=MAX_MDLS;
-        World.instances[editTextIdx].index=592; World.position[editTextIdx]=(V3){0.0f,0.0f,0.0f}; World.rotation[editTextIdx]=QUAT_IDENTITY; World.scale[editTextIdx].x=World.scale[editTextIdx].y=World.scale[editTextIdx].z=World.mass[editTextIdx]=World.rotation[editTextIdx].w=1.0f;
+        World.instances[editTextIdx].index=592; World.position[editTextIdx]=(V3){0.0f,0.0f,0.0f}; World.rotation[editTextIdx]=QUAT_IDENTITY; World.scale[editTextIdx].x=World.scale[editTextIdx].y=World.scale[editTextIdx].z=World.rotation[editTextIdx].w=1.0f;
         World.instances[editTextIdx].messageLingdex = 0;
         World.instances[editTextIdx].texIndex = 881;
         World.editTextInstanceIndex = editTextIdx; World.instCount++;
@@ -896,12 +890,11 @@ void LoadAllLevels() {
             u16 mi = World.instances[i].modelIndex;
             World.radius[i] = ((mi < mdlsCnt && modelBounds[mi] > 0.0f) ? modelBounds[mi] : 2.56f) * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
             World.instances[i].shadRadius = World.radius[i] * 2.00f;
-            World.mass[i] *= 10.0f;
-            if (World.mass[i] < 0.001f && World.col[i] != CT_NONE && World.col[i] != CT_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) { World.mass[i]=0.2f;/*At least something for movables!*/ }
+            World.instances[i].massScaled = true;
         }
         for (int i=PLAYER1;i<World.instCount;++i) {
             u16 constIndex = World.instances[i].index;
-            if (i == PLAYER1 || IdxIsDynamicObject(constIndex) || (IdxIsNPC(constIndex) && constIndex < 443/*not cyber*/)){World.gravity[i] = 1.0f;}else{World.gravity[i] = 0.0f;}
+            World.instances[i].hasGravity = (i == PLAYER1 || IdxIsDynamicObject(constIndex) || (IdxIsNPC(constIndex) && constIndex < 443));
             if (IdxIsGeometry(constIndex)) World.layer[i] = L_Geometry;
             else if (IdxIsUsableObject(constIndex)) {
                 if (World.diffPuz == 3 && World.instances[i].index == 361 && random_range(0.0f,1.0f) < 0.33f) DeleteInstance(i); // 33% chance of not spawning logic probes on Puzzle difficulty of 3
@@ -1007,13 +1000,13 @@ void LoadLevel(u8 curlevel, V3 pos) {
     World.invP1.ladderState = 0;
     World.invP1.noiseFinished=World.pauseRelativeTime - 1.0;
     if (curlevel == LEVEL_CYBERSPACE) {
-        World.col[PLAYER1] = CT_SPH; World.colliderSize[PLAYER1] = (V3){PLYR_RAD,PLYR_RAD,PLYR_RAD}; World.colliderCenter[PLAYER1] = (V3){0.0f,0.0f,0.0f}; World.radius[PLAYER1] = PLYR_RAD; World.gravity[PLAYER1] = 0.0f;
+        World.col[PLAYER1] = CT_SPH; World.colliderSize[PLAYER1] = (V3){PLYR_RAD,PLYR_RAD,PLYR_RAD}; World.colliderCenter[PLAYER1] = (V3){0.0f,0.0f,0.0f}; World.radius[PLAYER1] = PLYR_RAD; World.instances[PLAYER1].hasGravity = false;
         if (prevLevel != LEVEL_CYBERSPACE) { play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false); CyberTimerReset(PLAYER1,World.diffCyb); CyberGolReset(); World.instances[PLAYER1].timerFinished = World.pauseRelativeTime + 1.0; }
     } else {
         World.col[PLAYER1] = CT_CAP;
         World.colliderSize[PLAYER1] = (V3){PLYR_RAD,PLYR_HT * World.invP1.currentCrouchRatio,1.0f};
         World.colliderCenter[PLAYER1].y = -PLYR_CAM_OFS_Y + (PLYR_HT - World.colliderSize[PLAYER1].y) * 0.5f;
-        World.gravity[PLAYER1] = 1.0f;
+        World.instances[PLAYER1].hasGravity = true;
         if (prevLevel == LEVEL_CYBERSPACE) {
             V3 cyberFwd = quat_rot_v3(World.rotation[PLAYER1],(V3){0.0f,0.0f,1.0f});
             float yawDeg = __builtin_atan2f(cyberFwd.x,cyberFwd.z) * (180.0f / 3.14159265f);

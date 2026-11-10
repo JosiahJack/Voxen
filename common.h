@@ -169,7 +169,7 @@ enum {/*Initialization*/ SCRATCH_ARENA_SIZE = (92ULL * 1024 * 1024),
       /*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELL), VOXELS_Z = (WORLDZ * VOXELS_PER_CELL), VOXEL_COUNT = (VOXELS_X * VOXELS_Z) /*64 * 64 * 8 * 8*/, 
                  MAX_PORTALS = 640, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128, MAX_CULL_FILESIZE = 500000,
       /*Entity Management*/ MAX_LEVELS = 14, LEVEL_CYBERSPACE = 13, AVG_CPU_TAPS = 2048, MAX_ENTITIES = 864, INSTANCE_COUNT = 9032, MAX_LEVEL_PARTICLES = 128, WORLD = 0, PLAYER1 = 1, INSTS_1ST_IDX = 2, NUM_AI_TYPES = 29, MAX_IO_NAMES = 1024,
-                            FW_MAX_CHILDREN = 48, FW_POOL_MAX = 512, MAX_ELEV_DESTS_PER_LEVEL = 8, SAVE_VERSION = 25,
+                            FW_MAX_CHILDREN = 48, FW_POOL_MAX = 512, MAX_ELEV_DESTS_PER_LEVEL = 8, SAVE_VERSION = 26,
       /*Lights*/ LIGHT_COUNT = 2048, LANIM_MAX = 128, MAX_LIGHTS_PER_VOXEL = 96, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 80, SUN_SHADOW_SIZE = 4096, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, SHADOW_NEARMESH_MAX = 1024, SC_MAX = (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS),
       /*Models*/ MAX_MDLS = 7490, WELD_HASH_SIZE = 32768, MAX_VERT_ELEMENT_SIZE = 6964, MAX_OUTPUT_VERTS = 22960, VRT_ATT_SZ = 16, CPU_VRT_SZ = 32, MAX_GLB_JOINTS = 96, MAX_GLB_BLOCKS = 60, SUB_MAIN = 32,
       /*Textures*/ MAXTEX = 4096, MAX_TOTAL_PIXELS = 48000000u, MAX_UNIQUE_COLORS = 86000u, TEXHASH_SZ = 256, NUM_TEXTURE_CLIPS = 49, VIDEO_MAXFRAME = (1280u*720u), VIDEO_RING = 8,
@@ -331,7 +331,7 @@ typedef /*FAT*/ struct  {
     u32 entflags,ioflags,ioflagsHi; u16 modelIndex,index,portalIndex;
     u32 deferredIoflags,deferredIoflagsHi; V3 forward,right,lastPosition,targetPosition,startPosition,activatedScale,dir; u16 texIndex,glowIndex,specIndex,normIndex,lodIndex,colMeshIndex;
     i32 cellIndex; i16 cellX,cellZ;
-    u8 clip,animationNum,texAnimClip,camView,securityThreshold,maxRandomItems,questBitID,questTestMode; FuncStates/*u8*/ funcState; BodyState/*u8*/ bodyState; 
+    u8 clip,animationNum,texAnimClip,camView,securityThreshold,maxRandomItems,questBitID,questTestMode;
     float shadRadius,health,cyberHealth,radiation,speed,ajarPercentage,percentMoved,gracePeriodFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime,timeTillEnemyChangeFinished,timeTillDeadFinished,timeTillPainFinished,huntFinished,randWaitAtt1Finished,randWaitAtt2Finished,randWaitAtt3Finished,
           attackFinished,deathBurstFinished,tranquilizeFinished,wanderFinished,timeSinceMovedEnough,posCheckFinished,currentFrameFinished,animFinished,animSwapFinished,switchAnimFinished,delay,panelTimer,damage,itemLifeTime,randomMin,randomMax,timeInterval,cyberTimer,intervalFinished,delayFinished,
           tickFinished,aiThinkFinished,useFinished,waitBefClose,amount,resetTime,minSecurityLevel,rechargeFinished,camStartYAngle,camEndYAngle,camWaitTime,camWaitingFinished,camYaw,camYaw0,timeBeforeLasersOn,force,strength,offStrengthFactor,distancePaddingToTopPoint,initialBurstFinished,justUsed,timerFinished,randomItemDropChance[7],reverbMaxDist,deathAnimationStart;
@@ -342,18 +342,28 @@ typedef /*FAT*/ struct  {
     i16 customIndex,version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,logIndex,ammo,ammo2,contents[4],custIdx[4],randomItem[7],randomItemCustIdx[7];
     u64 countOnlySameIndex:1,alertEnemiesOnAwake:1,playEverywhere:1,srchInUse:1,generateContents:1,generationDone:1,dontReset:1,onlyOnce:1,allDone:1,curTex:1,useRandomTimes:1,active:1,panelOpen:1,panelInstalled:1,panelArmed:1,
         touchEnabled:1,broken:1,requireRecharge:1,stayOpen:1,startOpen:1,targetAlreadyDone:1,toggleLasers:1,targettingOnlyUnlocks:1,changeLayerOnOpenClose:1,despawnInstead:1,doSelfAfterList:1,iceActive:1,forceFieldDirectionX:1,forceFieldDirectionY:1,forceFieldDirectionZ:1,heldObjectLoadedAlternate:1,lerping:1,onlyTargetOnce:1,autoPlayEmail:1,textureAnimating:1,texAnimStopsAtDie:1,texAnimInReverse:1,
-        texAnimRandom:1,ajar:1,deathAnimationActive:1,puzzleFired:1,puzzleSolved:1,codeScreen:1,camRotatePositive:1,camRotateEnabled:1,camSweepInit:1,branchOnSecond:1,relayEnabled:1,relayOnceEver:1,relayAlreadyDone:1,useQuestKeycode1:1,useQuestKeycode2:1;
+        texAnimRandom:1,ajar:1,deathAnimationActive:1,puzzleFired:1,puzzleSolved:1,codeScreen:1,camRotatePositive:1,camRotateEnabled:1,camSweepInit:1,branchOnSecond:1,relayEnabled:1,relayOnceEver:1,relayAlreadyDone:1,useQuestKeycode1:1,useQuestKeycode2:1,hasGravity:1,massScaled:1;
     V3 panelItemPos; Quaternion panelItemRot;
     u64 gridCellsBits; /*gridCells[35] packed: bit i = cell i. Use Entity_GetGridCell/Entity_SetGridCell; never index directly.*/
-    AttType attackType; AccCardType requiredAccessCard; BloodType bloodType; DoorState doorOpen; ForceFieldColor fieldColor; TrackType trackType; MusicType musicType; DoorState doorState; AIState currentState; u16 texAnimResourceFolderIdx;
+    u16 texAnimResourceFolderIdx; u8 attackType,requiredAccessCard,bloodType,doorOpen,fieldColor,trackType,musicType,doorState,currentState,funcState,bodyState;
     i8 wireCurL[7],wireCurR[7];
 } Entity; // phew what a porker of a struct, it's been a eatin!
+_Static_assert(AIState_Dead <= 255, "AIState fits in u8");
+_Static_assert(BodyState_ProningUp <= 255, "BodyState fits in u8");
+_Static_assert(Att_Drill <= 255, "AttType fits in u8");
+_Static_assert(DoorState_Opening <= 255, "DoorState fits in u8");
+_Static_assert(FStat_AjarMovingTarget <= 255, "FuncStates fits in u8");
+_Static_assert(ACC_Per5 <= 255, "AccCardType fits in u8");
+_Static_assert(MT_Override <= 255, "MusicType fits in u8");
+_Static_assert(TT_Distortion <= 255, "TrackType fits in u8");
+_Static_assert(BloodType_GrayMutation <= 255, "BloodType fits in u8");
+_Static_assert(ForceFieldColor_RedFaint <= 255, "ForceFieldColor fits in u8");
 INLINE bool Entity_GetGridCell(const Entity* e, int i) { return (bool)((e->gridCellsBits >> i) & 1u); }
 INLINE void Entity_SetGridCell(Entity* e, int i, bool v) { if (v) e->gridCellsBits |= (1ull << i); else e->gridCellsBits &= ~(1ull << i); }
 typedef struct{bool initialized,active;V2 min,max;double lastLMB,lastRMB;}UIComponent;
 typedef struct {
     double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_physics_time,dt,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp,gpuFrameMs,gpuShadowMs,gpuPreMs,gpuMainMs,gpuSsrMs,gpuCompMs,automapNextRaster;
-    float farPlane[MAX_LEVELS],damageDealt,damageReceived,timeScale,worldMin_x[MAX_LEVELS],worldMin_z[MAX_LEVELS],voxMinCtrX[MAX_LEVELS],voxMinCtrZ[MAX_LEVELS],misTimerFinished,misTimerT,painStaticAlpha,empStaticAlpha,levelMass[MAX_LEVELS][INSTANCE_COUNT],levelRadius[MAX_LEVELS][INSTANCE_COUNT],levelGravity[MAX_LEVELS][INSTANCE_COUNT],levelInvInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6],levelDynamicFriction[MAX_LEVELS][INSTANCE_COUNT],levelStaticFriction[MAX_LEVELS][INSTANCE_COUNT];
+    float farPlane[MAX_LEVELS],damageDealt,damageReceived,timeScale,worldMin_x[MAX_LEVELS],worldMin_z[MAX_LEVELS],voxMinCtrX[MAX_LEVELS],voxMinCtrZ[MAX_LEVELS],misTimerFinished,misTimerT,painStaticAlpha,empStaticAlpha,levelRadius[MAX_LEVELS][INSTANCE_COUNT],levelInvInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6];
     u32 lastFrameSecCount,lineVertCnt,shotsFired,grenadesThrown,savesScummed,levelLayer[MAX_LEVELS][INSTANCE_COUNT];
     u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount,shields[4],weaponVModelIndex,levelWepVModel[MAX_LEVELS],TeleportTouch_allTeleportTouches[8],levelInstCount[MAX_LEVELS],levelLoadedLights[MAX_LEVELS],editTextInstanceIndex,misTimerMission;
     i32 fogFac,cursorPos_x,cursorPos_y,currentMouse_dx,currentMouse_dy;
@@ -377,7 +387,7 @@ typedef struct {
     ColliderType* col;
     Quaternion* rotation;
     u32* layer,targetIOActivatorIoflags,targetIOActivatorIoflagsHi;
-    float* mass,*radius,*gravity,(*invInertiaTensor)[6],*dynamicFriction,*staticFriction,cam_pitch,cam_yaw,cam_roll;
+    float* radius,(*invInertiaTensor)[6],cam_pitch,cam_yaw,cam_roll;
     u16 levelLightTargetnames[MAX_LEVELS][LIGHT_COUNT],*lightTargetnames,loadedLights,decoyInstance;
     Light *lights; LightAnimation *lanims;
     u16 *lanimLightIdx;
@@ -399,6 +409,7 @@ extern AnimationClip mdlAnimClips[MAXANIM][MAX_ANIMCLIPS]; bool FrobHeldItemInto
 typedef struct { u16 modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex; float mass; u8 animationNum; ColliderType col; V3 colCtr,colSz; } EPerms;
 void Mat4FromTRS(const float*,const float*,const float*,float*);
 extern EPerms EDefs[MAX_ENTITIES]; extern u16 fwParentOf[INSTANCE_COUNT]; extern const char* audioLogs[LOGCNT]; extern u32 gridCellStates[ARRSIZE];
+INLINE float EntMass(u16 i) { if (i == 0) return 0.0f; const Entity* e = &World.instances[i]; float m = EDefs[e->index].mass > 0.0f ? EDefs[e->index].mass : 1.0f; return e->massScaled ? m * 10.0f : m; }
 extern float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[MAX_SHADOWMAPS][6][4][4],lightViewProj[MAX_SHADOWMAPS][6][16]; extern V3 ressurectionLocations[]; extern void PlayTrack(TrackType,MusicType);
 typedef struct { V3 normal; float d; } FrustumPlane; extern FrustumPlane lightFrustumPlanes[MAX_SHADOWMAPS][6][6],playerFrustumPlanes[6];
 typedef struct PngArena { u8*base,*cursor,*end; } PngArena; extern PngArena png_arena_main;

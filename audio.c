@@ -514,7 +514,7 @@ static void wave_mix(wav_channel_t* w, float* mix) {
     float vol=AppliedFXVol(w->volume); if(w->positional){if(!PositionVisibleFromPlayerCell(w->pos.x,w->pos.z)){vol=0.0f;/*Skip audio if source cell not in player PVS*/}else{vol*=vclamp(1.0f-V3_Dist(w->pos,World.position[PLAYER1])/20.0f,0.0f,1.0f);}}
     float step=(w->pitch==0.0f)?1.0f:__builtin_exp2f(w->pitch/12.0f);/*semitone offset -> resample rate; 0 = no shift*/
     for(i32 f=0;f<AUDIO_FRAMES;++f){
-        u32 i0 = (u32)w->frame_pos; if (i0 >= w->frame_count) { if (w->looping) { w->frame_pos = 0.0f; i0=0; } else { w->playing = false; break; } } u32 i1 = (i0 + 1 < w->frame_count) ? i0 + 1 : i0; float t = w->frame_pos - (float)i0;
+        u32 i0 = (u32)w->frame_pos; if (i0 >= w->frame_count) { if (w->looping) { w->frame_pos = 0.0f; i0=0; } else { w->playing = false; WavReleaseSamples(w); break; } } u32 i1 = (i0 + 1 < w->frame_count) ? i0 + 1 : i0; float t = w->frame_pos - (float)i0;
         float l = w->samples[i0*2 + 0] + t*(w->samples[i1*2 + 0]-w->samples[i0*2 + 0]), r = w->samples[i0*2 + 1] + t*(w->samples[i1*2 + 1] - w->samples[i0*2 + 1]);
         mix[f*2 + 0] += l * vol; mix[f*2 + 1] += r * vol; w->frame_pos += step;
     }

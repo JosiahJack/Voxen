@@ -325,7 +325,7 @@ static void AIRunMove(u16 self) {
     if (World.instances[self].entflags & EF_ACT_AS_TURRET) return;
     
     float rs = npcTable[World.instances[self].index - 419].runSpeed;
-    World.velocity[self] = (V3){World.instances[self].forward.x * rs,(vabs(World.gravity[self]) > 0.05f) ? World.velocity[self].y : World.instances[self].forward.y * rs,World.instances[self].forward.z * rs};
+    World.velocity[self] = (V3){World.instances[self].forward.x * rs,World.instances[self].hasGravity ? World.velocity[self].y : World.instances[self].forward.y * rs,World.instances[self].forward.z * rs};
 }
 
 static void AIHunt(Entity* self) {
@@ -420,7 +420,7 @@ static void AIDying(u16 i) {
             if (sded >= 0 && sded < (i16)SOUNDS_COUNT) { play_wav(sounds[sded],AppliedFXVol(1.0f),World.position[i],true); }
         }
             
-        World.gravity[i] = (npcTable[npcID].type == NPCType_Cyber || gibs) ? 0.0f : 1.0f;
+        World.instances[i].hasGravity = !(npcTable[npcID].type == NPCType_Cyber || gibs);
         flag_set(&World.instances[i].entflags,EF_ASLEEP,false);
         World.layer[i] = L_Corpse | L_CorpseSearchable;
         flag_set(&World.instances[i].entflags,EF_FIRST_SIGHTING,true);
@@ -449,8 +449,8 @@ static void AIDead(u16 idx) {
     u16 npcID = World.instances[idx].index - 419;
     World.instances[idx].currentState = AIState_Dead;
     World.layer[idx] = L_Corpse | L_CorpseSearchable;
-    if (World.instances[idx].entflags & EF_TELEPORT_ON_DEATH) { World.gravity[idx] = 1.0f; DeleteInstance(idx); /* TeleportAway not yet fully implemented; keep delete for now */ }
-    else if (npcTable[npcID].type == NPCType_Cyber) { World.gravity[idx] = 0.0f; DeleteInstance(idx); /* Gib effect: spawn basic debris using deathBurst index if defined */ }
+    if (World.instances[idx].entflags & EF_TELEPORT_ON_DEATH) { World.instances[idx].hasGravity = true; DeleteInstance(idx); /* TeleportAway not yet fully implemented; keep delete for now */ }
+    else if (npcTable[npcID].type == NPCType_Cyber) { World.instances[idx].hasGravity = false; DeleteInstance(idx); /* Gib effect: spawn basic debris using deathBurst index if defined */ }
     else if (World.instances[idx].index == 419) { DeleteInstance(idx); } /*Autobomb removes self*/
     else if (npcID < NUM_AI_TYPES && npcGibRanges[npcID].first != 0) {
         NPCGibRange range = npcGibRanges[npcID];
@@ -462,7 +462,7 @@ static void AIDead(u16 idx) {
             World.position[gib] = gibPos;
             World.rotation[gib] = gibRot;
             World.velocity[gib] = (V3){0.0f, World.velocity[idx].y, 0.0f};
-            World.gravity[gib] = 1.0f;
+            World.instances[gib].hasGravity = true;
             World.layer[gib] = L_Corpse;
             Entity* g = &World.instances[gib];
             if (gibConst == range.primary) {
@@ -476,7 +476,7 @@ static void AIDead(u16 idx) {
         World.layer[idx] = L_Corpse | L_CorpseSearchable;
         if (ai_has_search_collider(npcID)) { World.instances[idx].health = 50.0f; }
         World.velocity[idx].x = World.velocity[idx].z = 0.0f;
-        if (World.instances[idx].index != 433) World.gravity[idx] = 1.0f;
+        if (World.instances[idx].index != 433) World.instances[idx].hasGravity = true;
     }
     flag_set(&World.instances[idx].entflags, EF_DEAD_CHECKS_DONE, true);
 }
@@ -522,7 +522,7 @@ static void ProjectileLaunched(Entity* self, int n) {
     V3 spos=n==1?ai_sight_pos(self):ai_gun_pos(self,n); u16 eidx=self->enemy; V3 targ=eidx ? self->targettingPosition : (V3){spos.x + self->forward.x*20.0f,spos.y,spos.z + self->forward.z*20.0f}; V3 dir=V3_Normalize(V3_AsubB(targ,spos)); u16 bb = SpawnDynamicObject(masterIdx>0?masterIdx:370);
     if (!EntIdxIsValid(bb)) bb=SpawnDynamicObject(370); if (!EntIdxIsValid(bb)) return; Entity* proj=&World.instances[bb]; World.layer[bb]=L_NPCBullet; World.position[bb]=spos; proj->forward=dir; World.rotation[bb]=(masterIdx==489 && vabs(dir.y)<0.999f)?quat_look_rotation(dir,(V3){0.0f,1.0f,0.0f}):QuatFromToRotation((V3){0.0f,0.0f,1.0f},dir);
     proj->damage=dd.damage; proj->strength=dd.penetration; proj->speed=dd.offense; proj->attackType=dd.attackType; proj->recentMostActivator=sidx; ProjectileEffectImpactInitAfterLoad(bb);
-    V3 shove = V3_ScaleByF(dir, launchSpd); if (vabs(World.gravity[sidx]) > 0.05f) { shove.x += World.velocity[sidx].x; shove.z += World.velocity[sidx].z; } World.velocity[bb] = (V3){0}; AddForce(bb,shove,true); flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);
+    V3 shove = V3_ScaleByF(dir, launchSpd); if (World.instances[sidx].hasGravity) { shove.x += World.velocity[sidx].x; shove.z += World.velocity[sidx].z; } World.velocity[bb] = (V3){0}; AddForce(bb,shove,true); flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);
 }
 
 static void AIExplodeAttack(Entity* self) {
@@ -561,7 +561,7 @@ static void AIFlierMoveToHoverHeight(Entity* self) {
         } else self->idealPos=World.position[sidx];
     }
     float dy = self->idealPos.y - World.position[sidx].y, maxV = npc->runSpeed * World.timeScale, vDesired = vclamp(dy * 8.0f, -maxV, maxV);
-    AddForce(sidx, (V3){0.0f, (vDesired - World.velocity[sidx].y) * World.mass[sidx], 0.0f}, true);
+    AddForce(sidx, (V3){0.0f, (vDesired - World.velocity[sidx].y) * EntMass(sidx), 0.0f}, true);
 }
 
 void AIAlert(u16 idx) { if (!World.diffCbt){return;} Entity* self = &World.instances[idx]; AISetEnemy(idx,PLAYER1); self->currentDestination = World.position[PLAYER1]; flag_set(&self->entflags, EF_ENEM_IN_SIGHT, false); }
@@ -577,7 +577,7 @@ void AIControllerUpdate(u16 idx) {
     
     u16 ndx = edx - 419, eidx = self->enemy;
     const NPCTable* npc = &npcTable[ndx]; bool cyber = npc->type == NPCType_Cyber;
-    if (self->currentState != AIState_Dead && self->currentState != AIState_Dying) { World.gravity[idx] = (cyber || npc->moveType == AIMoveType_Fly) ? 0.0f : 1.0f; }
+    if (self->currentState != AIState_Dead && self->currentState != AIState_Dying) { World.instances[idx].hasGravity = !(cyber || npc->moveType == AIMoveType_Fly); }
     if (self->aiThinkFinished < World.pauseRelativeTime) { self->aiThinkFinished = World.pauseRelativeTime + 0.1f; /*Sight/front checks refresh at think rate: every runtime consumer of EF_ENEM_IN_SIGHT/LOS/FOV/FRONT runs inside AIThink (the only other reader is the showai debug color in citadel.c), so running the sight raycast per frame bought nothing.*/
         flag_set(&self->entflags,EF_ENEM_IN_SIGHT,AICheckIfPlayerInSight(idx));
         if (eidx && HasHealth(idx)) {

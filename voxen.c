@@ -1858,8 +1858,6 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.menuActive = World.paused = enteringPlayerName = fovSliderActive = gammaSliderActive = masterVolumeSliderActive = musicVolumeSliderActive = messageVolumeSliderActive = sfxVolumeSliderActive = returnToPause = false;
     for (int i=0;i<MAX_LEVELS;++i) { World.worldMin_x[i] = levMins[i].x; World.worldMin_z[i] = levMins[i].y; World.voxMinCtrX[i] = World.worldMin_x[i] + (VOXEL_SIZE * 0.5f); World.voxMinCtrZ[i] = World.worldMin_z[i] + (VOXEL_SIZE * 0.5f); World.farPlane[i] = lFars[i]; World.fogColor[i] = fogLUT[i]; World.fogColor[i].a *= 3.8f; }
     World.curLev = 0;
-    World.mass[0] = 0.0f;
-    World.dynamicFriction[0] = 0.4f;
     World.col[0] = CT_NONE;
     currentMenuItem = currentMenuTab = 0;
     currentMenuPage = MPG_FRONT;
@@ -1876,13 +1874,10 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.col[PLAYER1] = CT_CAP;
     World.colliderCenter[PLAYER1].y = -PLYR_CAM_OFS_Y;
     World.colliderSize[PLAYER1] = (V3){PLYR_RAD,PLYR_HT,1.0f};
-    World.mass[PLAYER1] = 1.0f;
     World.velocity[PLAYER1] = (V3){0.0f,0.0f,0.0f};
     World.cam_yaw = 90.0f;
     World.cam_pitch = World.cam_roll = World.invP1.leanTarget = 0.0f;
-    World.gravity[PLAYER1] = 1.0f;
-    World.dynamicFriction[PLAYER1] = 0.6f;
-    World.staticFriction[PLAYER1] = 0.8f; 
+    World.instances[PLAYER1].hasGravity = true;
     World.instances[PLAYER1].health = 211.0f; World.instances[PLAYER1].cyberHealth = 255.0f; World.instances[PLAYER1].bloodType = BloodType_Red;
     World.invP1.noiseFinished = World.pauseRelativeTime;
     World.invP1.energy = 54.0f; World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1 + (double)random_range(0.5f,1.0f);
