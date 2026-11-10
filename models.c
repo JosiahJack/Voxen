@@ -21,7 +21,7 @@ INLINE void MdlMarkLevel(u16 m, u16 levBit, bool persistForced) { if (m >= mdlsC
 static void MdlMarkAnimNum(u16 a, u16 levBit, bool persistForced) { if (a >= MAXANIM) return; for (u8 k = 0; k < animNumSpanCnt[a]; ++k) { AnimEntryRef* r = &animNumSpans[a][k]; if (!r->spanLen) { MdlMarkLevel((u16)r->base, levBit, persistForced); continue; } for (u32 m = r->base; m < r->base + r->spanLen && m < mdlsCnt; ++m) { MdlMarkLevel((u16)m, levBit, persistForced); } } }
 static void MdlCloseConst(u16 c, u16 levBit, bool persistForced) { if (c >= MAX_ENTITIES) return; const EPerms* ed = &EDefs[c]; if (ed->modelIndex < mdlsCnt) MdlMarkLevel(ed->modelIndex, levBit, persistForced); if (ed->colMeshIndex < mdlsCnt) MdlMarkLevel(ed->colMeshIndex, levBit, persistForced); if (EntIsLodCardConst(c)) MdlMarkLevel(178, levBit, persistForced); if (!persistForced) MdlMarkAnimNum(ed->animationNum, levBit, false); }
 INLINE void MdlScanConstVal(const char* v, const char* ln, u32 lnN, u16 levBit) { if (*v == '-') return; MdlCloseConst(parse_numberu16(v, ln, lnN), levBit, false); }
-INLINE bool MdlIsWinMemberSet(u16 m, u8 lev) { if (mdlPersistentSet[m] || lev >= MAX_LEVELS) return false; u16 lb = (u16)(1u << lev); if (mdlIsAnimFrame[m]) return (mdlLevelBits[m] & lb) != 0; return mdlLevelBits[m] == lb; }
+bool MdlIsWinMemberSet(u16 m, u8 lev) { if (mdlPersistentSet[m] || lev >= MAX_LEVELS) return false; u16 lb = (u16)(1u << lev); if (mdlIsAnimFrame[m]) return (mdlLevelBits[m] & lb) != 0; return mdlLevelBits[m] == lb; }
 static const u16 mdlRegRanges[7][2] = {{307,406},{417,417},{419,447},{458,463},{471,476},{496,514},{768,855}};
 static void DeriveResidentModelSets(const ModelData* entries, u32 count) {
     if (mdlDerivDone) return; mdlDerivDone = true;
@@ -65,24 +65,6 @@ static void DeriveResidentModelSets(const ModelData* entries, u32 count) {
 }
 INLINE u32 MdlVbBytesRaw(u16 m) { return rtSrcVertCounts ? (u32)((size_t)rtSrcVertCounts[m]*VRT_ATT_SZ) : 0; }
 INLINE u32 MdlIbBytesRaw(u16 m) { return (u32)modelTriangleCounts[m]*6u + 4u; }
-INLINE bool MdlHasRenderData(u16 m) { return m < mdlsCnt && modelVertexCounts[m] && rtSrcVertCounts[m]; }
-INLINE bool MdlIsWinMember(u16 m, u8 lev) { return MdlIsWinMemberSet(m, lev) && MdlHasRenderData(m); }
-u32 MdlExclListForLev(u8 lev, u16* list, u32 maxCnt) { if (lev >= MAX_LEVELS) return 0; u32 cnt = 0; for (u32 m=0; m<mdlsCnt; ++m) { if (!MdlIsWinMember((u16)m, lev)) continue; if (cnt < maxCnt) list[cnt] = (u16)m; ++cnt; } return cnt; }
-static void MdlWindowSizesForLev(u8 lev, u32* vb, u32* ib, u32* orderU16, u32* nodeSlots, u32* triOffs, u32* vtxOffs) {
-    u32 ov = 0, oi = 0, oord = 0, onode = 0, otri = 0, ovtx = 0;
-    for (u32 m=0; m<mdlsCnt; ++m) { if (!MdlIsWinMember((u16)m, lev)) continue; ov = ((ov + 255u) & ~255u) + MdlVbBytesRaw((u16)m); oi = ((oi + 255u) & ~255u) + MdlIbBytesRaw((u16)m); if (BvhHasBVH((u16)m)) { onode += modelBVHNodeCounts[m]; otri += modelBVHTriOrderCounts[m]; oord = (oord + 1u) & ~1u; oord += modelBVHTriOrderCounts[m]; } ovtx += rtSrcVertCounts[m]; }
-    *vb = ov; *ib = oi; *orderU16 = oord; *nodeSlots = onode; *triOffs = otri; *vtxOffs = ovtx;
-}
-INLINE void MdlCvtHalf(half* dst, const float* verts, u32 vc) { for (u32 k = 0; k < vc; ++k) { __m256 v_in = (*(__m256_u const *)(&verts[k*8])); __m128i v_half = ((__m128i)__builtin_ia32_vcvtps2ph256((__v8sf)(__m256)v_in, (int)(0x00/*_MM_FROUND_TO_NEAREST_INT*/|0x08/*_MM_FROUND_NO_EXC*/))); _mm_storeu_si128((__m128i*)&dst[k*8], v_half); } }
-static void MdlSwapWindowDisposeData(u16 m) {
-    if (physPos[m]) { OS_Free(physPos[m], (size_t)physVertCounts[m]*3*sizeof(float)); physPos[m] = NULL; }
-    if (physTris[m]) { OS_Free(physTris[m], (size_t)modelTriangleCounts[m]*3*sizeof(u16)); physTris[m] = NULL; }
-    if (modelTriangles[m]) { modelTriangles[m] = NULL; }
-    if (modelBVHNodes[m]) { OS_Free(modelBVHNodes[m], (size_t)modelBVHNodeCounts[m]*sizeof(BvhNode)); modelBVHNodes[m] = NULL; }
-    if (modelBVHTriOrder[m]) { OS_Free(modelBVHTriOrder[m], (size_t)modelBVHTriOrderCounts[m]*sizeof(u16)); modelBVHTriOrder[m] = NULL; }
-    modelBVHNodeCounts[m] = 0; modelBVHTriOrderCounts[m] = 0; physVertCounts[m] = 0; modelVertexCounts[m] = 0; modelTriangleCounts[m] = 0;
-    if (vPos) { vPos[m] = NULL; }
-}
 typedef struct { u32 start,end; i32 tid; } PhysGeomTask;
 typedef struct { BvhNode *nodes; u8 *triOctants; u16 *triOrder,*triScratch,*initialTris; u32 nodeCount,triCount; } BvhBuildCtx;
 typedef enum { glb_attribute_type_invalid,glb_attribute_type_position,glb_attribute_type_normal,glb_attribute_type_texcoord,glb_attribute_type_joints,glb_attribute_type_weights}glb_attribute_type;
@@ -664,6 +646,14 @@ static void* PhysGeomWorker(void* a) {
         }
     } return NULL;
 }
+void MdlSwapWindowDisposeData(u16 m) {
+    OS_Free(physPos[m],(size_t)physVertCounts[m]*3*sizeof(float)); physPos[m] = NULL;
+    OS_Free(physTris[m],(size_t)modelTriangleCounts[m]*3*sizeof(u16)); physTris[m] = NULL;
+    OS_Free(modelBVHNodes[m],(size_t)modelBVHNodeCounts[m]*sizeof(BvhNode)); modelBVHNodes[m] = NULL;
+    OS_Free(modelBVHTriOrder[m],(size_t)modelBVHTriOrderCounts[m]*sizeof(u16)); modelBVHTriOrder[m] = NULL;
+    modelTriangles[m] = NULL; modelBVHNodeCounts[m] = 0; modelBVHTriOrderCounts[m] = 0; physVertCounts[m] = 0; modelVertexCounts[m] = 0; modelTriangleCounts[m] = 0; if (vPos) { vPos[m] = NULL; }
+}
+INLINE void MdlCvtHalf(half* dst, const float* verts, u32 vc) { for (u32 k = 0; k < vc; ++k) { __m256 v_in = (*(__m256_u const *)(&verts[k*8])); __m128i v_half = ((__m128i)__builtin_ia32_vcvtps2ph256((__v8sf)(__m256)v_in, (int)(0/*_MM_FROUND_TO_NEAREST_INT*/|0x8/*_MM_FROUND_NO_EXC*/))); _mm_storeu_si128((__m128i*)&dst[k*8], v_half); } }
 void SwapLevelModels(u8 lev) {
     if (lev >= MAX_LEVELS || !mdlDerivDone || modelVBO == 0 || mdlSwapLev == lev) return;
     u32 incCnt = 0, ic = 0;
@@ -678,14 +668,19 @@ void SwapLevelModels(u8 lev) {
         size_t bvh_nodes_sz = (size_t)BVH_MAX_NODES_PER_MDL * sizeof(BvhNode);
         size_t bvh_u8_sz = (size_t)BVH_MAX_TRIS_PER_MDL * sizeof(u8);
         size_t bvh_u16_sz = (size_t)BVH_MAX_TRIS_PER_MDL * sizeof(u16);
+        const size_t SUB_ARENA_SZ = (2ULL * 512 * 1024) * ((32ULL + threadCnt - 1) / threadCnt);
+        const size_t SUB_MAIN_SZ = 12ULL * 1024 * 1024; size_t slices_tot = SUB_ARENA_SZ*(size_t)threadCnt + SUB_MAIN_SZ;
+        size_t psz = MAX_VERT_ELEMENT_SIZE*3*sizeof(float), usz = MAX_OUTPUT_VERTS*8*sizeof(float);
         size_t rawSz = (size_t)mdlsCnt;
-        size_t arena = rawSz*sizeof(RawOBJ) + 8*threadCnt*sizeof(void*) + (size_t)threadCnt * ((MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*2)*sizeof(float) + MAX_OUTPUT_VERTS*8*sizeof(float) + WELD_HASH_SIZE*sizeof(u32) + MAX_OUTPUT_VERTS*sizeof(u32) + remap_sz + cache_sz + bvh_nodes_sz + bvh_u8_sz + 3*bvh_u16_sz);
-        char* arena_base = OS_Alloc(arena + 4096); mset(arena_base,0,rawSz*sizeof(RawOBJ)); char* p = arena_base; RawOBJ* raw = (RawOBJ*)p; p = ARENA_ALIGN(p + rawSz*sizeof(RawOBJ));
-        bool* isGLBAnimSrc = OS_Alloc(mdlsCnt*sizeof(bool)); mset(isGLBAnimSrc,0,mdlsCnt*sizeof(bool));
-        bool* isGLBStaticSrc = OS_Alloc(mdlsCnt*sizeof(bool)); mset(isGLBStaticSrc,0,mdlsCnt*sizeof(bool));
-        u16* bOfList = OS_Alloc(incCnt*sizeof(u16)); u32 bOfCnt = 0;
+        size_t arena = rawSz*sizeof(RawOBJ) + 8*threadCnt*sizeof(void*) + (size_t)threadCnt * ((MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*2)*sizeof(float) + MAX_OUTPUT_VERTS*8*sizeof(float) + WELD_HASH_SIZE*sizeof(u32) + MAX_OUTPUT_VERTS*sizeof(u32) + remap_sz + cache_sz + bvh_nodes_sz + bvh_u8_sz + 3*bvh_u16_sz) + mdlsCnt*sizeof(bool) + mdlsCnt*sizeof(bool) + incCnt*sizeof(u16) + rawSz + slices_tot;
+        char* arena_base = OS_Alloc(arena + 4096); mset(arena_base,0,rawSz*sizeof(RawOBJ));
+        char* p = arena_base;
+        RawOBJ*        raw = (RawOBJ*)p;                                              p = ARENA_ALIGN(p + rawSz*sizeof(RawOBJ));
+        bool*   isGLBAnimSrc = (bool*)p; mset(isGLBAnimSrc,0,mdlsCnt*sizeof(bool));   p = ARENA_ALIGN(p + mdlsCnt*sizeof(bool));
+        bool* isGLBStaticSrc = (bool*)p; mset(isGLBStaticSrc,0,mdlsCnt*sizeof(bool)); p = ARENA_ALIGN(p + mdlsCnt*sizeof(bool));
+        u16*          bOfList = (u16*)p; u32 bOfCnt = 0;                              p = ARENA_ALIGN(p + incCnt*sizeof(u16));
+        u8*             opened = (u8*)p; mset(opened,0,rawSz);                        p = ARENA_ALIGN(p + rawSz);
         for (u32 m=lo; m<=hi; ++m) { if (!incStamp[m]) continue; u32 b = mdlSpanBase[m]; if(!bOfCnt || bOfList[bOfCnt-1] != b) bOfList[bOfCnt++] = (u16)b; }
-        u8* opened = OS_Alloc(rawSz); mset(opened,0,rawSz);
         for (u32 k=0;k<bOfCnt;++k) { u32 b = bOfList[k]; FHandle d; int sz=0; raw[b].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(g_mdlData[b].path,&d,&sz); raw[b].size = sz; opened[b] = 1; }
         for (u32 k=0;k<incCnt;++k) { u32 m = incList[k]; if (opened[m]) continue; if (g_mdlData[m].index == U16_MAX || !g_mdlData[m].path[0]) continue; FHandle d; int sz=0; raw[m].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(g_mdlData[m].path,&d,&sz); raw[m].size = sz; opened[m] = 1; }
         for (u32 k=0;k<incCnt;++k) { u32 m = incList[k], b = mdlSpanBase[m]; if (g_mdlData[b].animated && IsGLBSourcePath(g_mdlData[b].path)) isGLBAnimSrc[m] = true; else if (IsGLBSourcePath(g_mdlData[m].path)) isGLBStaticSrc[m] = true; }
@@ -694,7 +689,7 @@ void SwapLevelModels(u8 lev) {
         u16 **bvh_order_p = (u16**)p;         p = ARENA_ALIGN(p + threadCnt*sizeof(u16*));
         u16 **bvh_scr_p = (u16**)p;           p = ARENA_ALIGN(p + threadCnt*sizeof(u16*));
         u16 **bvh_init_p = (u16**)p;          p = ARENA_ALIGN(p + threadCnt*sizeof(u16*));
-        size_t psz = MAX_VERT_ELEMENT_SIZE*3*sizeof(float), usz = MAX_OUTPUT_VERTS*8*sizeof(float);
+        u8* slice_base = (u8*)p;              p = ARENA_ALIGN(p + slices_tot);
         for (int i=0; i<(i32)threadCnt; ++i) {
             meshScratch[i].pos=(float*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + psz);
             meshScratch[i].nrm=(float*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + psz);
@@ -712,9 +707,6 @@ void SwapLevelModels(u8 lev) {
             mset(meshScratch[i].hash, 0xFF, WELD_HASH_SIZE * sizeof(u32));
             thrd_bvh_ctx[i]=(BvhBuildCtx){ .nodes = bvh_nodes_p[i], .triOctants = bvh_oct_p[i], .triOrder = bvh_order_p[i], .triScratch = bvh_scr_p[i], .initialTris = bvh_init_p[i], .nodeCount = 0, .triCount = 0 };
         }
-        const size_t SUB_ARENA_SZ = (2ULL * 512 * 1024) * ((32ULL + threadCnt - 1) / threadCnt);
-        const size_t SUB_MAIN_SZ = 12ULL * 1024 * 1024; size_t slices_tot = SUB_ARENA_SZ*(size_t)threadCnt + SUB_MAIN_SZ;
-        u8* slice_base = OS_Alloc(slices_tot);
         for (u32 si=0; si<threadCnt; ++si) OS_SubArenaSliceInit(si, slice_base + si*SUB_ARENA_SZ, SUB_ARENA_SZ);
         OS_SubArenaSliceInit(SUB_MAIN, slice_base + threadCnt*SUB_ARENA_SZ, SUB_MAIN_SZ);
         poolThreadCnt=poolReady=poolStop=poolGen=poolJobNext=poolJobDone=poolPending=0; poolJobCount=0;
@@ -742,19 +734,19 @@ void SwapLevelModels(u8 lev) {
                 }
             }
             for (int i=0;i<(i32)threadCnt;++i) { ptasks[i] = (PhysGeomTask){sub + (u32)i*chunk, ((u32)i+1)*chunk > wcnt ? subEnd : sub + ((u32)i+1)*chunk, i}; pjobs[i] = (PoolJob){PhysGeomWorker,&ptasks[i]}; }
-            PoolDispatch(pjobs, threadCnt); /*Sneak the physics deduplication passes underneath the GPU upload ;)*/
+            PoolDispatch(pjobs, threadCnt);
             for (u32 m = sub; m < subEnd; ++m) {
-                if (!incStamp[m] || !MdlHasRenderData((u16)m)) continue;
+                if (!incStamp[m] || m >= mdlsCnt || !modelVertexCounts[m] || !rtSrcVertCounts[m]) continue;
                 u32 vb = MdlVbBytesRaw((u16)m), ib = MdlIbBytesRaw((u16)m);
                 u32 vOfs = ((vrun + 255u) & ~255u), iOfs = ((irun + 255u) & ~255u);
                 if (vOfs + vb > winVB || iOfs + ib > winIB) { DualLogError("Model swap %u exceeds window cap (v %u/%u, i %u/%u): leaving model %u CPU-only (it degrades to the resident fallback)\n",lev,vOfs+vb,winVB,iOfs+ib,winIB,m); continue; }
                 rtSrcVertCounts[m] = modelVertexCounts[m];
                 mdlVboOfs[m] = mdlSwapVboBase + vOfs; mdlIboOfs[m] = mdlSwapIboBase + iOfs;
                 vrun = ((vrun + 255u) & ~255u) + vb; irun = ((irun + 255u) & ~255u) + ib;
-                glBindBuffer(GL_ARRAY_BUFFER, modelVBO); half* mpv = (half*)glMapBufferRange(GL_ARRAY_BUFFER, (intptr_t)mdlVboOfs[m], vb, 0x0002/*GL_MAP_WRITE_BIT*/|0x0004/*GL_MAP_INVALIDATE_RANGE_BIT*/);
+                glBindBuffer(GL_ARRAY_BUFFER, modelVBO); half* mpv = (half*)glMapBufferRange(GL_ARRAY_BUFFER, (intptr_t)mdlVboOfs[m], vb, 0x2/*GL_MAP_WRITE_BIT*/|0x4/*GL_MAP_INVALIDATE_RANGE_BIT*/);
                 MdlCvtHalf(mpv, vPos[m], modelVertexCounts[m]);
                 glUnmapBuffer(GL_ARRAY_BUFFER);
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, modelIBO); void* mpt = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, (intptr_t)mdlIboOfs[m], ib, 0x0002|0x0008/*GL_MAP_INVALIDATE_BUFFER*/);
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, modelIBO); void* mpt = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, (intptr_t)mdlIboOfs[m], ib, 0x2|0x8/*GL_MAP_INVALIDATE_BUFFER*/);
                 mcpy(mpt, modelTriangles[m], (size_t)modelTriangleCounts[m]*6); mset((u8*)mpt + (size_t)modelTriangleCounts[m]*6, 0, 4); glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
             }
             glBindBuffer(GL_ARRAY_BUFFER,0);
@@ -767,12 +759,7 @@ void SwapLevelModels(u8 lev) {
         }
         if(poolThreadCnt) { poolJobCount=0; __atomic_store_n(&poolStop,1,__ATOMIC_RELEASE); __atomic_fetch_add(&poolGen,1,__ATOMIC_RELEASE); OS_FutexWakeAll(&poolGen); for(u32 i=0;i<poolThreadCnt;++i) OS_ThreadJoin(&poolThreads[i]); poolThreadCnt=0; }
         for (u32 k=0;k<rawSz;++k) { if (opened && opened[k] && raw[k].data) { OS_Free((void*)raw[k].data, raw[k].size); } }
-        OS_Free(bOfList, incCnt*sizeof(u16));
-        OS_Free(opened, rawSz);
         OS_Free(arena_base, arena + 4096);
-        OS_Free(isGLBAnimSrc, mdlsCnt*sizeof(bool));
-        OS_Free(isGLBStaticSrc, mdlsCnt*sizeof(bool));
-        OS_Free(slice_base, slices_tot);
         OS_Free(incList, incCnt*sizeof(u16));
         glb_Tasks = NULL;
         poolSkipStamp = NULL;
@@ -780,7 +767,6 @@ void SwapLevelModels(u8 lev) {
     mdlSwapLev = lev;
     RtSwapPatchModels();
 }
-void TrimNonResidentModelCPU(u8 keepLev) { for (u32 m=0; m<mdlsCnt; ++m) { if (mdlPersistentSet[m]) continue; if (keepLev < MAX_LEVELS && MdlIsWinMemberSet((u16)m, keepLev)) continue; if (physPos[m] || modelTriangles[m] || modelVertexCounts[m]) { MdlSwapWindowDisposeData((u16)m); } } }
 void LoadModels() {
     double startModelTime = get_time();
     ModelDataParser mp = {0}; ParseModelData(&mp,MAX_MDLS,"./Data/models.txt");
@@ -789,12 +775,16 @@ void LoadModels() {
     DualLog("Loading   models ( %d) ...",totalActual);
     mdlsCnt = (u16)maxid + 1; if ((u16)maxid >= MAX_MDLS){DualLogError("Too many models!  Exceeds %u!\n",MAX_MDLS); OS_Exit(1);}
     DeriveResidentModelSets(mp.entries, mp.count);
-    vPos = OS_Alloc(mdlsCnt * sizeof(float*))/*persistent table: the level-swap reparse paths at runtime still point workers at vPos[m] slots*/;
-    mdlPstHalfV = OS_Alloc(mdlsCnt * sizeof(void*)); mset(mdlPstHalfV,0,mdlsCnt*sizeof(void*));
-    mdlPstTri   = OS_Alloc(mdlsCnt * sizeof(void*)); mset(mdlPstTri,0,mdlsCnt*sizeof(void*));
-    modelTriangles = OS_Alloc(mdlsCnt * sizeof(u16*));
-    modelBVHNodes = OS_Alloc(mdlsCnt * sizeof(BvhNode*));
-    modelBVHTriOrder = OS_Alloc(mdlsCnt * sizeof(u16*));
+    mdlPstHalfV = OS_AllocScratch(mdlsCnt * sizeof(void*)); mset(mdlPstHalfV,0,mdlsCnt*sizeof(void*));
+    mdlPstTri   = OS_AllocScratch(mdlsCnt * sizeof(void*)); mset(mdlPstTri,0,mdlsCnt*sizeof(void*));
+    vPos = OS_Alloc(/*vpos*/mdlsCnt*sizeof(float*) + /*modelTriangles*/mdlsCnt*sizeof(u16*) + /*modelBVHNodes*/mdlsCnt*sizeof(BvhNode*) + /*modelBVHTriOrder*/mdlsCnt*sizeof(u16*) + /*physPos*/mdlsCnt*sizeof(float*) + /*physTris*/mdlsCnt*sizeof(u16*) + /*physVertCounts*/mdlsCnt*sizeof(u32) + /*rtSrcVertCounts*/(size_t)mdlsCnt*sizeof(u32));
+    modelTriangles = (u16**)((u8*)vPos + mdlsCnt * sizeof(float*));
+    modelBVHNodes = (BvhNode**)((u8*)modelTriangles + mdlsCnt * sizeof(u16*));
+    modelBVHTriOrder = (u16**)((u8*)modelBVHNodes + (mdlsCnt * sizeof(BvhNode*)));
+    physPos = (float**)((u8*)modelBVHTriOrder + mdlsCnt*sizeof(u16*));
+    physTris = (u16**)((u8*)physPos + mdlsCnt*sizeof(float*));
+    physVertCounts = (u32*)((u8*)physTris + mdlsCnt*sizeof(u16*));
+    rtSrcVertCounts = (u32*)((u8*)physVertCounts + mdlsCnt*sizeof(u32)); mset(rtSrcVertCounts,0,(size_t)mdlsCnt*sizeof(u32));
     size_t remap_sz = (size_t)MAX_OUTPUT_VERTS * sizeof(u32), cache_sz = ((MAX_OUTPUT_VERTS/3) * sizeof(TriSort)) * 2 + (MAX_OUTPUT_VERTS * sizeof(u16));
     size_t bvh_nodes_sz = (size_t)BVH_MAX_NODES_PER_MDL * sizeof(BvhNode);
     size_t bvh_u8_sz = (size_t)BVH_MAX_TRIS_PER_MDL * sizeof(u8);
@@ -813,7 +803,7 @@ void LoadModels() {
     u16 **bvh_scr_p = (u16**)p;           p = ARENA_ALIGN(p + threadCnt*sizeof(u16*));
     u16 **bvh_init_p = (u16**)p;          p = ARENA_ALIGN(p + threadCnt*sizeof(u16*));
     size_t psz = MAX_VERT_ELEMENT_SIZE*3*sizeof(float), usz = MAX_OUTPUT_VERTS*8*sizeof(float);
-    for (int i=0; i<(i32)threadCnt; ++i) { 
+    for (int i=0; i<(i32)threadCnt; ++i) {
         meshScratch[i].pos=(float*)ARENA_ALIGN(p);           p = ARENA_ALIGN(p + psz);
         meshScratch[i].nrm = (float*)ARENA_ALIGN(p);         p = ARENA_ALIGN(p + psz);
         meshScratch[i].uv = (float*)ARENA_ALIGN(p);          p = ARENA_ALIGN(p + MAX_VERT_ELEMENT_SIZE*2*sizeof(float));
@@ -837,8 +827,7 @@ void LoadModels() {
     for (u32 si = 0; si < threadCnt; ++si) OS_SubArenaSliceInit(si, slice_base + si * SUB_ARENA_SZ, SUB_ARENA_SZ);
     OS_SubArenaSliceInit(SUB_MAIN, slice_base + threadCnt * SUB_ARENA_SZ, SUB_MAIN_SZ);
     ModelParseTask tasks[32]; PhysGeomTask ptasks[32]; PoolJob pjobs[32]; u32 tv=0,tt=0;
-    LoadGLBAnimatedSources(mp.entries,mp.count,raw); physPos=OS_Alloc(mdlsCnt*sizeof(float*)); physTris=OS_Alloc(mdlsCnt*sizeof(u16*)); physVertCounts=OS_Alloc(mdlsCnt*sizeof(u32));
-    rtSrcVertCounts = OS_Alloc((size_t)mdlsCnt*sizeof(u32)); mset(rtSrcVertCounts,0,(size_t)mdlsCnt*sizeof(u32));
+    LoadGLBAnimatedSources(mp.entries,mp.count,raw);
     u32 validCount=totalActual;
     u32* valid = OS_AllocScratch(validCount * sizeof(u32));
     validCount = 0;
@@ -870,7 +859,7 @@ void LoadModels() {
             for (u32 i = sub; i < subEnd; ++i) {
                 if (!modelVertexCounts[i]) { continue; } tv += modelVertexCounts[i]; tt += modelTriangleCounts[i];
                 rtSrcVertCounts[i] = modelVertexCounts[i];
-                if (mdlPersistentSet[i]) { mdlPstHalfV[i] = OS_Alloc((size_t)modelVertexCounts[i] * VRT_ATT_SZ); MdlCvtHalf(mdlPstHalfV[i], vPos[i], modelVertexCounts[i]); mdlPstTri[i] = OS_Alloc((size_t)modelTriangleCounts[i]*6 + 4); mcpy(mdlPstTri[i], modelTriangles[i], (size_t)modelTriangleCounts[i]*6); mset((u8*)mdlPstTri[i] + (size_t)modelTriangleCounts[i]*6, 0, 4); }
+                if (mdlPersistentSet[i]) { mdlPstHalfV[i] = OS_AllocScratch((size_t)modelVertexCounts[i] * VRT_ATT_SZ); MdlCvtHalf(mdlPstHalfV[i], vPos[i], modelVertexCounts[i]); mdlPstTri[i] = OS_AllocScratch((size_t)modelTriangleCounts[i]*6 + 4); mcpy(mdlPstTri[i], modelTriangles[i], (size_t)modelTriangleCounts[i]*6); mset((u8*)mdlPstTri[i] + (size_t)modelTriangleCounts[i]*6, 0, 4); }
             }
             if(poolPending) { u32 d; while((d=__atomic_load_n(&poolJobDone,__ATOMIC_ACQUIRE)) < poolThreadCnt) OS_FutexWait(&poolJobDone,d); poolPending=0; }
             for (u32 m = sub; m < subEnd; ++m) { if (vPos[m]) { vPos[m]=physPos[m]; modelTriangles[m]=physTris[m]; modelVertexCounts[m]=physVertCounts[m]; } }
@@ -890,18 +879,11 @@ void LoadModels() {
     for (u32 m=0; m<mdlsCnt; ++m) { if (!mdlPersistentSet[m] || !mdlPstHalfV[m]) continue; if (BvhHasBVH((u16)m)) { pOrdU16 = (pOrdU16 + 1u) & ~1u; pOrdU16 += modelBVHTriOrderCounts[m]; pNodeSlW += modelBVHNodeCounts[m]; pTriW += modelBVHTriOrderCounts[m]; } pUvW += rtSrcVertCounts[m]; }
     u32 wvbMax=0, wibMax=0, wOrdMax=0, wNodeMax=0, wTriMax=0, wVtxMax=0;
     for (u8 lev=0; lev<MAX_LEVELS; ++lev) {
-        u32 vb, ib, ord, nsl, tri, vtx;
-        MdlWindowSizesForLev(lev, &vb, &ib, &ord, &nsl, &tri, &vtx);
-        if (vb > wvbMax) wvbMax = vb; if (ib > wibMax) wibMax = ib;
-        if (ord > wOrdMax) wOrdMax = ord; if (nsl > wNodeMax) wNodeMax = nsl;
-        if (tri > wTriMax) wTriMax = tri; if (vtx > wVtxMax) wVtxMax = vtx;
+        u32 vb = 0, ib = 0, ord = 0, nsl = 0, tri = 0, vtx = 0;
+        for (u32 m=0; m<mdlsCnt; ++m) { if (!(MdlIsWinMemberSet((u16)m,lev) && m < mdlsCnt && modelVertexCounts[m] && rtSrcVertCounts[m])) continue; vb = ((vb + 255u) & ~255u) + MdlVbBytesRaw((u16)m); ib = ((ib + 255u) & ~255u) + MdlIbBytesRaw((u16)m); if (BvhHasBVH((u16)m)) { nsl += modelBVHNodeCounts[m]; tri += modelBVHTriOrderCounts[m]; ord = (ord + 1u) & ~1u; ord += modelBVHTriOrderCounts[m]; } vtx += rtSrcVertCounts[m]; }
+        if (vb > wvbMax) wvbMax = vb; if (ib > wibMax) wibMax = ib; if (ord > wOrdMax) wOrdMax = ord; if (nsl > wNodeMax) wNodeMax = nsl; if (tri > wTriMax) wTriMax = tri; if (vtx > wVtxMax) wVtxMax = vtx;
     }
-    rtCapNodeWords = (pNodeSlW + wNodeMax) * 16u;
-    rtCapTriWords  = (pTriW + wTriMax) * 2u;
-    rtCapPosWords  = pUvW * 2u + wVtxMax * 2u;
-    rtCapUvWords   = pUvW + wVtxMax;
-    rtCapOrderU16  = pOrdU16 + wOrdMax + 2u;
-    rtPersistNodeWords = pNodeSlW * 16u; rtPersistTriWords = pTriW * 2u; rtPersistPosWords = pUvW * 2u; rtPersistUvWords = pUvW; rtPersistOrderU16 = pOrdU16;
+    rtCapNodeWords = (pNodeSlW + wNodeMax) * 16u; rtCapTriWords  = (pTriW + wTriMax) * 2u; rtCapPosWords  = pUvW * 2u + wVtxMax * 2u; rtCapUvWords   = pUvW + wVtxMax; rtCapOrderU16  = pOrdU16 + wOrdMax + 2u; rtPersistNodeWords = pNodeSlW * 16u; rtPersistTriWords = pTriW * 2u; rtPersistPosWords = pUvW * 2u; rtPersistUvWords = pUvW; rtPersistOrderU16 = pOrdU16;
     mdlPoolVbBytes = mdlSwapVboBase + wvbMax; mdlPoolIbBytes = mdlSwapIboBase + wibMax;
     glGenBuffers(1, &modelVBO); glBindBuffer(GL_ARRAY_BUFFER, modelVBO); glBufferData(GL_ARRAY_BUFFER, mdlPoolVbBytes, NULL, GL_STATIC_DRAW);
     glGenBuffers(1, &modelIBO); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, modelIBO); glBufferData(GL_ELEMENT_ARRAY_BUFFER, mdlPoolIbBytes, NULL, GL_STATIC_DRAW);
@@ -910,21 +892,18 @@ void LoadModels() {
         if (!mdlPersistentSet[m] || !mdlPstHalfV[m]) continue;
         vb = MdlVbBytesRaw((u16)m); ib = MdlIbBytesRaw((u16)m);
         glBindBuffer(GL_ARRAY_BUFFER, modelVBO);
-        half* mpv = (half*)glMapBufferRange(GL_ARRAY_BUFFER, mdlVboOfs[m], vb, 0x0002/*GL_MAP_WRITE_BIT*/|0x0004/*GL_MAP_INVALIDATE_RANGE_BIT*/);
+        half* mpv = (half*)glMapBufferRange(GL_ARRAY_BUFFER, mdlVboOfs[m], vb, 0x2/*GL_MAP_WRITE_BIT*/|0x4/*GL_MAP_INVALIDATE_RANGE_BIT*/);
         mcpy(mpv, mdlPstHalfV[m], vb); glUnmapBuffer(GL_ARRAY_BUFFER);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, modelIBO);
-        void* mpt = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, mdlIboOfs[m], ib, 0x0002|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
+        void* mpt = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, mdlIboOfs[m], ib, 0x2|0x8/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
         mcpy(mpt, mdlPstTri[m], ib); glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
         if (++batch >= 32) { glFinish(); batch = 0; }
     }
     if (batch) { glFinish(); }
     glBindBuffer(GL_ARRAY_BUFFER,0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
-    for (u32 m=0; m<mdlsCnt; ++m) { if (mdlPstHalfV[m]) { OS_Free(mdlPstHalfV[m], (size_t)rtSrcVertCounts[m]*VRT_ATT_SZ); mdlPstHalfV[m] = NULL; } if (mdlPstTri[m]) { OS_Free(mdlPstTri[m], (size_t)modelTriangleCounts[m]*6u+4u); mdlPstTri[m] = NULL; } }
-    OS_Free(mdlPstHalfV, (size_t)mdlsCnt*sizeof(void*)); OS_Free(mdlPstTri, (size_t)mdlsCnt*sizeof(void*));
     g_mdlDataCnt = mp.count; g_mdlData = OS_Alloc((size_t)mp.count * sizeof(ModelData)); mset(g_mdlData,0,(size_t)mp.count*sizeof(ModelData));
     for (u32 i=0;i<mp.count;++i) { if (mp.entries[i].index == U16_MAX) continue; g_mdlData[i] = mp.entries[i]; if (mp.entries[i].animated && mp.entries[i].frameCount) { u16* nf = OS_Alloc((size_t)mp.entries[i].frameCount * sizeof(u16)); mcpy(nf, mp.entries[i].frames, (size_t)mp.entries[i].frameCount*sizeof(u16)); g_mdlData[i].frames = nf; } }
-    mp.entries = NULL;
     OS_FreeInitPhase();
     DualLog(" vertices: %u, tris: %u......................took %.6f secs\n", tv, tt, get_time() - startModelTime);
 }
@@ -970,7 +949,6 @@ AnimationClip mdlAnimClips[MAXANIM][MAX_ANIMCLIPS] = { // speed, frameStart, fra
     [52]={[A_LOOP_ALL]={1.0f,1,40,7446,24}},/*g_energmine*/   [53]={[A_LOOP_ALL]={1.0f,1,260,6076,24}},/*cyber_data*/   [54]={[A_LOOP_ALL]={1.0f,1,80,6336,24}},/*cyber_datafrag*/
     [55]={[A_LOOP_ALL]={1.0f,1,100,6416,24}},/*cyber_exit*/   [56]={[A_LOOP_ALL]={1.0f,1,99,6516,24}},/*cyber_ice*/     [57]={[A_LOOP_ALL]={1.0f,1,260,6615,24}},/*cyber_item*/ [58]={[A_INACTIVE]={1.0f,1,1,80,24},[A_ACTIVATED]={1.0f,2,2,81,24}},/*cyber_switch: 1=off, 2=on*/
 };
-
 void PortalCulling(); bool ToggleDoorPortal(u32,u16,u16);
 void ChangeAnim(Entity* e, u8 c) { if (e->animationNum >= MAXANIM || c >= MAX_ANIMCLIPS) return; AnimationClip* clip=&mdlAnimClips[e->animationNum][c]; if (clip->framerate <= 0 || clip->speed <= 0 || e->clip == c) return; e->clip=c; e->frame=clip->frameStart; e->modelIndex=clip->frameStartModelIndex; e->currentFrameFinished=0.0; }
 bool SpawnImpactParticleForPrefab(u16,V3,V3), ai_effect_flash(V3,Color3,float,float,double);

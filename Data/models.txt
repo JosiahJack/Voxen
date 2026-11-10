@@ -13,6 +13,9 @@
 // definition for a pickup item will specify model by index)
 // example: index: 451
 //
+// Use the following bash command to generate animation sequences,changing the model name to suit:
+// c=6545; for f in {1..258}; do printf "#Models/npc_mutant_cyborg_%06d.obj\nindex: %d\n" "$f" "$((++c))"; done; echo
+//
 // For Blender .obj export use -Y Forward, Z Up, and check: Write Normals, Include UVs, Keep Vertex Order, Scale 1.00, and for animated meshes check Animation. 
 #Models/access_card.obj
 index: 0

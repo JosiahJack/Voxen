@@ -12,12 +12,10 @@ void* mcpy(void *dst,const void *src,size_t n){
     else if (rem == 1) { *rd = *rs;}
     return dst;
 }
-
 void* mset(void *dst,int c,size_t n){
     u8 *p=(u8*)dst;size_t i=0; if(n>=32){ __m256i v256=_mm256_set1_epi8_fast((char)c); for(;i+128<=n;i+=128){*(__m256i*)(p+i)=v256;*(__m256i*)(p+i+32)=v256;*(__m256i*)(p+i+64)=v256;*(__m256i*)(p+i+96)=v256;}for(;i+32<=n;i+=32){*(__m256i*)(p+i)=v256;} } size_t rem=n-i;u8* rp=p+i; if(rem>=16){__m128i v128=_mm_set1_epi8_fast((char)c);_mm_storeu_si128((__m128i*)rp,v128);_mm_storeu_si128((__m128i*)(p+n-16),v128);}
-    else if(rem>=8){u64 v64=0x0101010101010101ULL*(u8)c;*(u64_u*)rp=v64;*(u64_u*)(p+n-8)=v64;}else if(rem>=4){u32 v32=0x01010101U*(u8)c;*(u32_u*)rp=v32;*(u32_u*)(p+n-4)=v32;}else if(rem>=2){u16 v16=0x0101U*(u8)c;*(u16_u*)rp=v16;*(u16_u*)(p+n-2)=v16;}else if(rem==1){*rp=(u8)c;}    return dst;
+    else if(rem>=8){u64 v64=0x101010101010101ULL*(u8)c;*(u64_u*)rp=v64;*(u64_u*)(p+n-8)=v64;}else if(rem>=4){u32 v32=0x1010101U*(u8)c;*(u32_u*)rp=v32;*(u32_u*)(p+n-4)=v32;}else if(rem>=2){u16 v16=0x101U*(u8)c;*(u16_u*)rp=v16;*(u16_u*)(p+n-2)=v16;}else if(rem==1){*rp=(u8)c;}    return dst;
 }
-
 size_t slen(const char* s) { if (s == NULL) {return 0;} const char *p=s; while (*(p++)); return (size_t)(p - s - 1); } // strlen replacement
 bool cEmpty(const char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; } // isspace replacement
 char* data_parser_trim(char* s) { while(cEmpty((u8)*s)){s++;} if (*s == 0){return s;} char* e=s + slen(s) - 1; while(e > s && cEmpty((u8)*e)){e--;} e[1]=0; return s; }
@@ -28,26 +26,22 @@ void scpy_to_a_from_b(char* a, const char* b, size_t bufsz) { size_t szb=slen(b)
 __attribute__((noinline)) u32 parse_numberu32(const char* str, const char* line, u32 lineNum) {
     if(str == 0 || *str == '\0'){DualLogError("Invalid from line[%d]: %s\n",lineNum+1,line); return 0;} while(cEmpty(*str)){str++;} if(*str == '+'){str++;} if(*str == '-'){DualLogError("Invalid negative u32(%s) from line[%d]: %s\n",str,lineNum+1,line); return 0;} u64 result=0; while (*str >= '0' && *str <= '9') { i32 digit=*str-'0'; result=result*10 + (u64)digit; str++; } return (u32)result;
 }
-
 __attribute__((noinline)) u16 parse_numberu16(const char* str, const char* line, u32 lineNum) { u32 retval = parse_numberu32(str, line, lineNum); if (retval > U16_MAX) { DualLogError("Value %u out of range for u16 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (u16)retval; }
 __attribute__((noinline)) u8 parse_numberu8(const char* str, const char* line, u32 lineNum) { u32 retval = parse_numberu32(str, line, lineNum); if (retval > 255) { DualLogError("Value %u out of range for u8 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (u8)retval; }
 __attribute__((noinline)) bool parse_bool(const char* str, const char* line, u32 lineNum) { u32 parseval = parse_numberu32(str, line, lineNum); if (parseval > 1) {DualLogWarn("Loaded %u but expected boolean from line[%u]: %s\n",parseval, lineNum+1, line);} return parseval != 0; }
 void sCpy2aSubFromb(char* a, size_t subsz, const char* b, size_t bufsz) { if (subsz >= bufsz) { DualLogError("sCpy2aSubFromb substring overflow!\n"); OS_Exit(1); } size_t i=0; for (;i<subsz && b[i];++i) a[i]=b[i]; mset(a+i,0,subsz-i+1); } // strncpy replacement (hopefully my mnemonic "a_subfrom_b" will help)
-char c2Lower(const char c) { return c + ((c >= 'A' && c <= 'Z') ? 32 : 0); } // If uppercase 'A'-'Z' (65-90), +32 into 'a'-'z' (97-122)
+char c2Lower(const char c) { return c + ((c >= 'A' && c <= 'Z') ? 32 : 0); }
 char* sFindSub(const char* s, const char* sub) { if (sub[0] == '\0') {return (char*)s;} for (size_t i = 0; s[i] != '\0'; ++i) { if (s[i] == sub[0]/*Only look if first matches*/) { size_t si=i, subi=0; while (s[si] != '\0' && sub[subi] != '\0' && s[si] == sub[subi]){si++; subi++;} if(sub[subi] == '\0'){return (char*)&s[i];} } } return NULL;/*No match*/ } // strstr replacement
 const char* StringFindLastChar(const char* str, const char c) { const char* lastSeen = NULL; do { if (*str == c) lastSeen = str; } while (*str++); return lastSeen; } // strrchr replacement
 char* StringFindFirstCharWithin(const char *s, char c) { char* stringwalker = (char*)s; while (*stringwalker != c) { if (!*stringwalker) {return NULL;} stringwalker++; } return stringwalker; } // strchr replacement
 void double2str(char* dest, double value, int decs, size_t bufsz) {
-    union { double d; u64 u; } bits; bits.d = value; // Bit-test for nan/inf since -ffast-math elides __builtin_isnan
-    if (((bits.u & 0x7FF0000000000000ULL) == 0x7FF0000000000000ULL) && ((bits.u & 0x000FFFFFFFFFFFFFULL) != 0 || (bits.u >> 63))) { dest[0]='n';dest[1]='a';dest[2]='n';dest[3]='\0'; return; } if (((bits.u & 0x7FF0000000000000ULL) == 0x7FF0000000000000ULL)) { dest[0]='i';dest[1]='n';dest[2]='f';dest[3]='\0'; return; } if (decs < 0 || decs > 9) { DualLogError("double2str: too many decimals\n"); OS_Exit(1); }
+    union { double d; u64 u; } bits; bits.d = value; if (((bits.u & 0x7FF0000000000000ULL) == 0x7FF0000000000000ULL) && ((bits.u & 0xFFFFFFFFFFFFFULL) != 0 || (bits.u >> 63))) { dest[0]='n';dest[1]='a';dest[2]='n';dest[3]='\0'; return; } if (((bits.u & 0x7FF0000000000000ULL) == 0x7FF0000000000000ULL)) { dest[0]='i';dest[1]='n';dest[2]='f';dest[3]='\0'; return; } if (decs < 0 || decs > 9) { DualLogError("double2str: too many decimals\n"); OS_Exit(1); }
     if (value < 0.0) { if (bufsz < 2) {DualLogError("double2str: buffer too small A\n"); OS_Exit(1);} *dest++ = '-'; bufsz--; value = -value; } double scale=1.0; for (int i=0;i<decs;++i) scale*=10.0;
     u64 whole=(u64)value,fracs=(u64)((value-whole)*scale+0.5); if (decs && fracs>=(u64)scale) { whole++; fracs-=(u64)scale; }
-    char temp[32]; size_t len=0; do { temp[len++]='0'+whole%10; whole/=10; } while (whole);
-    if (len >= bufsz) {DualLogError("double2str: len larger than buffer\n"); OS_Exit(1);}
+    char temp[32]; size_t len=0; do { temp[len++]='0'+whole%10; whole/=10; } while (whole); if (len >= bufsz) {DualLogError("double2str: len larger than buffer\n"); OS_Exit(1);}
     for (size_t i = 0; i < len; ++i) {dest[i] = temp[len - 1 - i];} dest += len; bufsz -= len; if(decs == 0) {*dest = '\0'; return;} if(bufsz < 1) {DualLogError("double2str: buffer too small B\n"); OS_Exit(1);}
     *dest++ = '.'; bufsz--; for (int i = decs - 1; i >= 0; --i) { if (bufsz < 1) {DualLogError("double2str: buffer too small C\n"); OS_Exit(1);} dest[i]='0' + (fracs%10); fracs/=10; } dest[decs] = '\0';
 }
-
 int sFormatV(char* buf, size_t bufsz, const char* f, va_list args) {
     if(bufsz == 0){return 0;} size_t pos=0;
     while (*f && pos < bufsz - 1) {
@@ -63,7 +57,6 @@ int sFormatV(char* buf, size_t bufsz, const char* f, va_list args) {
         } f++;
     } buf[pos] = '\0'; return (int)pos;
 }
-
 int sFormat(char* buffer, size_t bufsz, const char* format, ...) { va_list args; __builtin_va_start(args,format); int ret = sFormatV(buffer,bufsz,format,args); __builtin_va_end(args); return ret; } // snprintf replacement
 char* sUpToEndLine(char* buf, int sz, FHandle fd){if(sz<=1 || buf == NULL){return NULL;} char* p=buf; int rem=sz-1; static int pos=0,end=0; static char b[4096]; while(rem > 0){if(pos>=end){long n=OS_Read(fd,b,sizeof(b)); if(n <= 0){if(p==buf){return NULL;} goto done;} pos=0; end=(int)n;} while(rem>0 && pos<end){char c=b[pos++]; *p++=c; rem--; if(c=='\n'){goto done;}}} done:*p='\0'; return buf;} // fgets replacement, not thread safe but no multithreading
 FHandle console_log_file=0;
@@ -78,7 +71,6 @@ static void DualLogMain(bool writeToFileToo, const char *prefix, const char *fmt
     OS_RawWrite(out,buf,len);
     if (console_log_file != INVALID_FHANDLE && writeToFileToo) { if(prefix) { OS_Write(console_log_file,prefix,prefixLen,"console.log"); OS_Write(console_log_file,"\033[0m ",5,"console.log"); }    OS_Write(console_log_file,buf,len,"console.log"); }
 }
-
 void DualLog(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain(true,NULL,s,a); __builtin_va_end(a); } void DualLogWarn(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain(true,"\033[1;38;5;208mWARN:",s,a); __builtin_va_end(a); } void DualLogError(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain(true,"\033[1;31mERROR:",s,a); __builtin_va_end(a); }
 INLINE int pntz(size_t p[2]) { return (p[0] != 1) ? __builtin_ctzll(p[0] - 1) : (p[1] ? 8 * sizeof(size_t) + __builtin_ctzll(p[1]) : 0); }
 INLINE void shl(size_t p[2], int n) { if (n >= 8 * (int)sizeof(size_t)) { p[1] = p[0]; p[0] = 0; n -= 8 * sizeof(size_t); } if (n) { p[1] = (p[1] << n) | (p[0] >> (8 * sizeof(size_t) - n)); p[0] <<= n; } }
@@ -88,13 +80,11 @@ static void sift(u8* hd, size_t w, cmpfun_r cmp, void* arg, int ps, size_t lp[])
 static void trinkle(u8* hd, size_t w, cmpfun_r cmp, void* arg, size_t pp[2], int ps, int trusty, size_t lp[]) {
     u8* ar[(16*sizeof(size_t))]; int i=1; ar[0]=hd; size_t p[2]={pp[0],pp[1]}; while (p[0]!=1||p[1]!=0) { u8* ss=hd-lp[ps]; if(cmp(ss,ar[0],arg)<=0){break;} if(!trusty&&ps>1){ u8* rt=hd-w,*lf=rt-lp[ps-2]; if(cmp(rt,ss,arg)>=0||cmp(lf,ss,arg)>=0){break;} } ar[i++&((16*sizeof(size_t))-1)]=ss; hd=ss; int t=pntz(p); shr(p,t); ps+=t; trusty=0; } if (!trusty) { scycle(w,ar,i&((16*sizeof(size_t))-1)); sift(hd,w,cmp,arg,ps,lp); }
 }
-
 void qsort_new(void* base, size_t nel, size_t w, cmpfun cmp) {
     size_t lp[12*sizeof(size_t)], p[2]={1,0}, size=w*nel; int ps=1,trail; if (!size){return;} u8 *hd=base,*high=hd+size-w; for(size_t i=2;lp[0]=lp[1]=w,(lp[i]=lp[i-2]+lp[i-1]+w)<size;i++)/*empty body*/; cmpfun_r cmp_r=(cmpfun_r)(void*)cmp; void* arg=NULL;
     while (hd<high) {if ((p[0]&3)==3) { sift(hd,w,cmp_r,arg,ps,lp); shr(p,2); ps+=2; }else { if(lp[ps-1]>=((size_t)(high-hd))){trinkle(hd,w,cmp_r,arg,p,ps,0,lp);}else {sift(hd,w,cmp_r,arg,ps,lp);}  if(ps==1){shl(p,1); ps=0;}else{shl(p,ps-1); ps=1;} } p[0]|=1; hd+=w;}
     trinkle(hd,w,cmp_r,arg,p,ps,0,lp); while (ps!=1||p[0]!=1||p[1]!=0) { if(ps<=1) {trail=pntz(p); shr(p,trail); ps+=trail;}else{shl(p,2); ps-=2; p[0]^=7; shr(p,1); trinkle(hd-lp[ps]-w,w,cmp_r,arg,p,ps+1,1,lp); shl(p,1); p[0]|=1; trinkle(hd-w,w,cmp_r,arg,p,ps,1,lp);} hd-=w; }
 }
-
 i32 PosGetCellCoordX(float x) { return (u16)vclampi((i32)vfloor((x - World.worldMin_x[World.curLev] + CELLXHALF) / CELLSZ),0,(WORLDX - 1)); }
 i32 PosGetCellCoordZ(float z) { return (u16)vclampi((i32)vfloor((z - World.worldMin_z[World.curLev] + CELLXHALF) / CELLSZ),0,(WORLDX - 1)); }
 i32 PosGetCellCoords(float x, float z) { return (PosGetCellCoordZ(z) * WORLDX) + PosGetCellCoordX(x); }
@@ -103,22 +93,19 @@ char statusText[T_BUFFER_SIZE];
 void CenterStatusPrint(const char * restrict fmt, ...) { if (!fmt || *fmt == '\0') {return;} va_list args; __builtin_va_start(args, fmt); sFormatV(statusText,T_BUFFER_SIZE,fmt,args); __builtin_va_end(args); DualLog("%s\n",statusText); World.statusTextDecayFinished = get_time() + 3.5;/*secs decay time before text dissappears.*/ }
 void BmpWrite(char const *filename, int x, int y, const void *data) {
     FHandle f = OS_OpenWriteonly(filename); if (f == INVALID_FHANDLE) { DualLogError("Failed to open %s for writing\n", filename); return; }
-    u32 fileSize = 14 + 108 + (u32)x * y * 4;/*BMP file header (14 bytes)*/ u8 fileHeader[14] = {'B','M',fileSize & 0xFF,(fileSize >> 8) & 0xFF,(fileSize >> 16) & 0xFF,(fileSize >> 24) & 0xFF,0,0,0,0,14 + 108,0,0,0}; u8 infoHeader[108]={0}; *(u32*)(infoHeader+0)=108;/*size*/
-    *(u32*)(infoHeader+4)=(u32)x;/*w*/ *(u32*)(infoHeader+8)=(u32)-y;/*h*/ *(u16*)(infoHeader+12)=1;/*planes*/ *(u16*)(infoHeader+14)=32;/*bit count*/ *(u32*)(infoHeader+16)=3;/*bit fields*/
-    *(u32*)(infoHeader+40)=0x000000FF;/*Red*/ *(u32*)(infoHeader + 44) = 0x0000FF00;/*Green*/ *(u32*)(infoHeader + 48) = 0x00FF0000;/*Blue*/ *(u32*)(infoHeader + 52) = 0x00000000;/*Alpha*/
+    u32 fileSize = 14 + 108 + (u32)x * y * 4;/*BMP file header (14 bytes)*/ u8 fileHeader[14] = {'B','M',fileSize & 255,(fileSize >> 8) & 255,(fileSize >> 16) & 255,(fileSize >> 24) & 255,0,0,0,0,14 + 108,0,0,0}; u8 infoHeader[108]={0}; *(u32*)(infoHeader+0)=108;/*size*/
+    *(u32*)(infoHeader+4)=(u32)x;/*w*/ *(u32*)(infoHeader+8)=(u32)-y;/*h*/ *(u16*)(infoHeader+12)=1;/*planes*/ *(u16*)(infoHeader+14)=32;/*bit count*/ *(u32*)(infoHeader+16)=3;/*bit fields*/ *(u32*)(infoHeader+40)=0xFF;/*Red*/ *(u32*)(infoHeader + 44) = 0xFF00;/*Green*/ *(u32*)(infoHeader + 48) = 0xFF0000;/*Blue*/ *(u32*)(infoHeader + 52) = 0;/*Alpha*/
     OS_Write(f,fileHeader,14,filename); OS_Write(f,infoHeader,108,filename);
     const u8 *pixels = (const u8 *)data; for (int j=y-1;j>=0;--j) OS_Write(f,(void*)(pixels + j*x*4),(size_t)x*4,filename); OS_Close(f);
 }
-
 void Screenshot() {
     World.screenshotTimeout = World.current_time + 1.0;/*Prevent saving more than 1 per second for sanity purposes.*/ OS_MakeFolder("Screenshots"); u16 w=Sys_Settings.ScreenWidth, h=Sys_Settings.ScreenHeight;
     u8* pixels = OS_Alloc(w * h * 4 * sizeof(char)); glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,pixels); 
     char filename[96]; sFormat(filename,sizeof(filename),"Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp",get_time(),World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z);
     BmpWrite(filename,w,h,pixels); CenterStatusPrint("Saved screenshot %s\n",filename); OS_Free(pixels,w * h * 4 * sizeof(char));
 }
-
 size_t g_mmap_live = 0;
-void DebugRAMPeak(void) { // VmHWM: kernel high-water mark of RSS over process lifetime, catches transient spikes between checkpoints (includes shared libs (aka RSS), unlike USS)
+void DebugRAMPeak(void) { // Kernel high-water mark of RSS over process lifetime
     #if defined(_WIN32)
         (void)0;/*no /proc on Windows*/
     #else
@@ -140,9 +127,8 @@ void DebugRAMActual(const char *context) { // Get USS aka the total RAM uniquely
         } p++;
     } u32 mmapped=(u32)__atomic_load_n(&g_mmap_live,__ATOMIC_RELAXED); DualLog("Mem at %s: Heap %ub(%uKB|%.2fMB), USS %ub(%uKB|%.2fMB), MMAP %uKB|%.2fMB\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0,mmapped / 1024,mmapped / 1024.0 / 1024.0);
 }
-
 u32 random_range_rng = 0x12345678u;
-static u32 xs32() { u32 x = random_range_rng; x ^= x << 13; x ^= x >> 17; x ^= x << 5; return random_range_rng = x ? x : 0xdeadbeefu; }
+static u32 xs32() { u32 x = random_range_rng; x ^= x << 13; x ^= x >> 17; x ^= x << 5; return random_range_rng = x ? x : 0xdeadbeefu; } // tasty
 u8 random_range_u8(u8 a, u8 b) { if (a > b) { u8 temp = a; a = b; b = temp; } if (a == b) {return a;} u32 r = (u32)b - a + 1u; u32 v,limit = 256u - (256u % r); do { v = xs32() & 0xFFu; } while (v >= limit); return (u8)(a + (v % r)); }
 u32 random_range_u32(u32 a, u32 b) { if (a > b) { u32 temp = a; a = b; b = temp; } if (a == b) {return a;} u64 range = (u64)b - a + 1u; return a + (u32)(((u64)xs32() * range) >> 32);  }
 float random_range(float a, float b) { float factor = ((float)(xs32() >> 8)) * (1.0f / 16777216.0f); return a + (b - a) * factor; }

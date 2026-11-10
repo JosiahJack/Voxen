@@ -305,8 +305,8 @@ void RenderMenu() {
             if (UI_Checkbox(UI_ID_MENU_VSYNC,200,620,4,/*VSYNC*/1026,Sys_Settings.Vsync)) { Sys_Settings.Vsync = Sys_Settings.Vsync ? 0u : 1u; window->context.swapInterval((i32)Sys_Settings.Vsync); SaveConfig(); }
             RenderTextL(310,620,T_GREEN,FONT_NORMAL,1.0f,"(FPS: %d)", globalframesPerLastSecond);/*Helper to see vsync take effect.*/
             UI_Slider(UI_ID_MENU_FOV_SLIDER,400,650,128,16,(((Sys_Settings.FOV - 45.0f) / 105.0f) * (128 - 16)),200,&Sys_Settings.FOV,&fovSliderActive,45,150,5,5,/*Field of View*/775);
-            UI_Slider(UI_ID_MENU_GAMMA_SLIDER,400,680,128,16,((Sys_Settings.Brightness / 100.0f) * (128 - 16)),200,&Sys_Settings.Brightness,&gammaSliderActive,0,100,2,6,/*Gamma*/774);
-            if (UI_Button(UI_ID_MENU_RESOLUTION,190,726,328,16,&overRes,7) || (MenuEnter() && currentMenuItem == 7)) { DualLog("Resolution dropdown clicked! %u\n",globalframe); if(!resDropdownOpen){ GatherResolutionModes(); if(resDropdownCount>0){resDropdownOpen=true;} } else{resDropdownOpen=false;} currentMenuItem = 7; }
+            UI_Slider(UI_ID_MENU_GAMMA_SLIDER,400,680,128,16,((Sys_Settings.Brightness / 100.0f) * (128 - 16)),200,&Sys_Settings.Brightness,&gammaSliderActive,0,100,2,6,/*Brightness*/774);
+            if (UI_Button(UI_ID_MENU_RESOLUTION,190,726,328,16,&overRes,7) || (MenuEnter() && currentMenuItem == 7)) { DualLog("Resolution dropdown clicked! %u\n",globalframe); if(!resDropdownOpen){ GatherResolutionModesFor(GetCurrentMonitorIndex()); if(resDropdownCount>0){resDropdownOpen=true;} } else{resDropdownOpen=false;} currentMenuItem = 7; }
             overRes = overRes || currentMenuItem == 7; char resBuf[32];
             if (resDropdownCount > 0) sFormat(resBuf, sizeof(resBuf), "%ux%u",(u32)resModes[resSelectedIdx].w,(u32)resModes[resSelectedIdx].h); else sFormat(resBuf, sizeof(resBuf), "%ux%u",Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
             RenderUIImage(476,710,16,16,overRes ? 1119 : 1077); RenderTextL(200,710,overRes ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"RESOLUTION %s",resBuf);
@@ -322,7 +322,7 @@ void RenderMenu() {
             if (UI_Button(UI_ID_MENU_TOGGLE_MONITOR,588,760, 210,30, &overChgM, 9) || (MenuEnter() && currentMenuItem == 9)) { CycleToNextMonitor(); }
             overChgM = overChgM || currentMenuItem == 9; RenderTextL(602,735,overChgM ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,/*"CHANGE MONITOR"*/Sys_Text.stringTable[1025]);
             RenderUIImage(588,690, 210,30, 1079);/*Apply button background*/
-            if (UI_Button(UI_ID_MENU_RES_APPLY,588,720, 210,30, &overApply, 10) || (MenuEnter() && currentMenuItem == 10)) { ApplyStagedWindowedSize(); GatherResolutionModes(); currentMenuItem = 10; }
+            if (UI_Button(UI_ID_MENU_RES_APPLY,588,720, 210,30, &overApply, 10) || (MenuEnter() && currentMenuItem == 10)) { ApplyStagedWindowedSize(); GatherResolutionModesFor(GetCurrentMonitorIndex()); currentMenuItem = 10; }
             overApply = overApply || currentMenuItem == 10; RenderTextL(602,695,overApply ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"APPLY");
         } else if (currentMenuTab == 1) {
             i8 cfgIdxOf[64]; u8 inCount=0; for (int c=0;c<CONFIG_CNT && inCount<64;++c) if (configTable[c].type==SETTING_INPUT) cfgIdxOf[inCount++]=(i8)c;
@@ -1029,7 +1029,7 @@ void DrawSensaroundQuad(i16 x, i16 y, i16 w, i16 h, u8 camViewIdx) {// Draw the 
     glUniform1ui(32,0);      /*useFontAtlas*/
     i32 wasCull=0,wasDepth=0,wasBlend=0; glGetIntegerv(GL_CULL_FACE,&wasCull); glGetIntegerv(GL_DEPTH_TEST,&wasDepth); glGetIntegerv(GL_BLEND,&wasBlend);
     glDisable(GL_CULL_FACE); glDisable(GL_DEPTH_TEST); glDisable(GL_BLEND);/*blend off for the blit only: the camview target is already opaque, and the chunk shader's unlit path emits a straight alpha that would otherwise blend against the HUD*/
-    glDrawArrays(0x0004/*GL_TRIANGLES*/,0,6); drawCalls++; uiDrawCalls++; vertsRendered += 6;
+    glDrawArrays(0x4/*GL_TRIANGLES*/,0,6); drawCalls++; uiDrawCalls++; vertsRendered += 6;
     if (wasCull) glEnable(GL_CULL_FACE); if (wasDepth) glEnable(GL_DEPTH_TEST); if (wasBlend) glEnable(GL_BLEND);
     glBindVertexArray(0); glBindBuffer(GL_ARRAY_BUFFER,0);
 }
@@ -1578,9 +1578,9 @@ static void RenderUI() {
         u32 avgmax = globalframe > AVG_CPU_TAPS ? AVG_CPU_TAPS : globalframe;
         for (u32 i=0;i<avgmax;++i) avgCPU += avgCPUt[i];
         avgCPU /= (double)avgmax;
-        RenderTextL(16 + 100, debugTextStartY - lineSpacing,timingColor,FONT_NORMAL,1.0f,"CPU avg %.2f",avgCPU); avgCPU = 0;
+        RenderTextL(16 + 110, debugTextStartY - lineSpacing,timingColor,FONT_NORMAL,1.0f,"CPU avg %.2f",avgCPU); avgCPU = 0;
         RenderTextL(16, debugTextStartY - lineSpacing, timingColor,FONT_NORMAL,1.0f,"ms: %.2f",World.thisFrameTime);
-        RenderTextL(16 + 250, debugTextStartY - lineSpacing,T_WHITE,FONT_NORMAL,1.0f,"(FPS:%d),Drwclls:%d [G:%d UI:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u",globalframesPerLastSecond,drawCalls,drawCallsNormal,uiDrawCalls,shadDrawCalls,vertsRendered,Cheats.editMode,World.menuActive,World.paused);
+        RenderTextL(16 + 260, debugTextStartY - lineSpacing,T_WHITE,FONT_NORMAL,1.0f,"(FPS:%d),Drwclls:%d [G:%d UI:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u",globalframesPerLastSecond,drawCalls,drawCallsNormal,uiDrawCalls,shadDrawCalls,vertsRendered,Cheats.editMode,World.menuActive,World.paused);
     }
     if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused) {
         RenderUIImage((i16)(World.cursorPos_x - 20),(i16)(World.cursorPos_y - 20),40,40,GetCursorTexture());

@@ -105,7 +105,7 @@ static u32 totalPixels, totalPaletteColors;
 void PngArenaInit(PngArena* arena) { if (!arena->base) { arena->base = OS_Alloc(16777216); arena->cursor = arena->base; arena->end = arena->base + 16777216; } }
 void* PngArenaAlloc(PngArena* a, size_t s) { s=(s + 15) & ~(size_t)15;/*Keep every allocation 16-byte aligned*/ if (!a->base || a->cursor + s > a->end) { DualLogError("PngArena overflow\n"); OS_Exit(1); } void* p = a->cursor; a->cursor += s; return p; }
 static u32 PngGet32be(PngContext* s) { if (s->img_buffer + 4 > s->img_buffer_end) { s->img_error = 1; return 0; } const u8* p = s->img_buffer; s->img_buffer += 4; return ((u32)p[0] << 24) | ((u32)p[1] << 16) | ((u32)p[2] << 8) | p[3]; }
-static i32 BitReverse(i32 n, i32 b) { n = ((n & 0xAAAA) >> 1) | ((n & 0x5555) << 1); n = ((n & 0xCCCC) >> 2) | ((n & 0x3333) << 2); n = ((n & 0xF0F0) >> 4) | ((n & 0x0F0F) << 4); n = ((n & 0xFF00) >> 8) | ((n & 0x00FF) << 8); return n >> (16 - b); }
+static i32 BitReverse(i32 n, i32 b) { n = ((n & 0xAAAA) >> 1) | ((n & 0x5555) << 1); n = ((n & 0xCCCC) >> 2) | ((n & 0x3333) << 2); n = ((n & 0xF0F0) >> 4) | ((n & 0xF0F) << 4); n = ((n & 0xFF00) >> 8) | ((n & 0xFF) << 8); return n >> (16 - b); }
 static i32 PngHuf(PngHuffman* z, const u8* sl, i32 num) {
     i32 i, k=0, code=0, nc[16], sz[17] = {0};
     mset(z->fast, 0, sizeof(z->fast));
@@ -412,42 +412,25 @@ void LoadTextures() {
     size_t ringpal_size = (size_t)VIDEO_RING * 256 * sizeof(u32), ringidx_size = (size_t)VIDEO_RING * VIDEO_MAXFRAME;
     size_t offsets_size = (texCnt + VIDEO_RING) * sizeof(u32), palettes_size = totalPaletteColors * sizeof(u32), indices_size = totalPixels;
     size_t arena_size = offsets_size + palettes_size + indices_size;
-    void* arena = OS_AllocateRAM(arena_size, 0x1|0x2, 0x20|0x02|0x08000, INVALID_FHANDLE);
+    void* arena = OS_Alloc(arena_size);
     u8* cur = (u8*)arena;
-    u32* textureOffsets = (u32*)cur;
-    cur += offsets_size;
+    u32* textureOffsets  = (u32*)cur; cur += offsets_size;
+    u32* texturePalettes = (u32*)cur; cur += palettes_size;
+    u8* all_indices = cur;
     i32* textureSizes          = OS_AllocScratch((texCnt + VIDEO_RING) * 2 * sizeof(i32));
     u32* texturePaletteOffsets = OS_AllocScratch((texCnt + VIDEO_RING) * sizeof(u32));
-    u32* texturePalettes = (u32*)cur;
-    cur += palettes_size;
-    u8* all_indices = cur;
     g_vidRingBuf = OS_Alloc(ringidx_size + ringpal_size);
     u32* ringPalettes = (u32*)((u8*)g_vidRingBuf + ringidx_size);
-    g_vidTexBase = (u32)ringidx_size;
-    for (u32 r=0;r<VIDEO_RING;++r) { u16 si = (u16)(texCnt + r); g_vidPalOffs[r] = totalPaletteColors + r*256; g_vidIdxOffs[r] = r * VIDEO_MAXFRAME; textureOffsets[si] = g_vidIdxOffs[r]; texturePaletteOffsets[si] = g_vidPalOffs[r]; textureSizes[si*2] = 0; textureSizes[si*2+1] = 0; g_vidSlotTex[r] = si; }
-    g_vidSizesCPU = OS_Alloc(VIDEO_RING * 2 * sizeof(i32));
-    for (u32 r=0;r<VIDEO_RING;++r) { g_vidSlot[r].idx = (u8*)g_vidRingBuf + (size_t)r*VIDEO_MAXFRAME; g_vidSlot[r].pal = ringPalettes + (size_t)r*256; }
-    
+    g_vidTexBase = (u32)ringidx_size;                       for (u32 r=0;r<VIDEO_RING;++r) { u16 si = (u16)(texCnt + r); g_vidPalOffs[r] = totalPaletteColors + r*256; g_vidIdxOffs[r] = r * VIDEO_MAXFRAME; textureOffsets[si] = g_vidIdxOffs[r]; texturePaletteOffsets[si] = g_vidPalOffs[r]; textureSizes[si*2] = 0; textureSizes[si*2+1] = 0; g_vidSlotTex[r] = si; }
+    g_vidSizesCPU = OS_Alloc(VIDEO_RING * 2 * sizeof(i32)); for (u32 r=0;r<VIDEO_RING;++r) { g_vidSlot[r].idx = (u8*)g_vidRingBuf + (size_t)r*VIDEO_MAXFRAME; g_vidSlot[r].pal = ringPalettes + (size_t)r*256; }
     u32 pixel_base = 0, color_base = 0;
     for (u16 i=0;i<texCnt;++i) {
-        if (!texResults[i].indices) { continue; }
-        
-        u32 numP = (u32)texResults[i].w * texResults[i].h;
-        u32 palS = texResults[i].palSize;
-        textureOffsets[i] = g_vidTexBase + pixel_base;
-        texturePaletteOffsets[i] = color_base;
-        textureSizes[i * 2]     = texResults[i].w;
-        textureSizes[i * 2 + 1] = texResults[i].h;
-        mcpy(all_indices+pixel_base,texResults[i].indices,numP); 
-        mcpy(texturePalettes + color_base, texResults[i].palette, palS * sizeof(u32));
-        pixel_base += numP;
-        color_base += palS;
-        OS_Free(texResults[i].indices, numP);
-        OS_Free(texResults[i].palette, palS * sizeof(u32));
+        if (!texResults[i].indices) { continue; } u32 numP = (u32)texResults[i].w * texResults[i].h; textureOffsets[i] = g_vidTexBase + pixel_base; texturePaletteOffsets[i] = color_base;
+        textureSizes[i*2] = texResults[i].w; textureSizes[i*2 + 1] = texResults[i].h; mcpy(all_indices+pixel_base,texResults[i].indices,numP); mcpy(texturePalettes + color_base, texResults[i].palette, texResults[i].palSize * sizeof(u32)); pixel_base += numP; color_base += texResults[i].palSize; OS_Free(texResults[i].indices,numP); OS_Free(texResults[i].palette,texResults[i].palSize * sizeof(u32));
     }
     DualLog("total palette colors: %u, total pixels: %u....", totalPaletteColors, totalPixels);
     i32 packed_size = ((i32)totalPixels + 3) / 4 * sizeof(u32);
-    if (packed_size > (i32)MAX_TOTAL_PIXELS || indices_size + ringidx_size > MAX_TOTAL_PIXELS) { DualLogError("colorBufferID too small: need %zu B (textures %zu + video ring %zu), MAX_TOTAL_PIXELS is %u\n",packed_size,(size_t)indices_size,ringidx_size,MAX_TOTAL_PIXELS); OS_Exit(1); } /*colorBufferID is allocated at exactly MAX_TOTAL_PIXELS, an under-sized value makes glBufferSubData fail with GL_INVALID_VALUE and silently leaves every texture unwritten*/
+    if (packed_size > (i32)MAX_TOTAL_PIXELS || indices_size + ringidx_size > MAX_TOTAL_PIXELS) { DualLogError("colorBufferID too small: need %zu B (textures %zu + video ring %zu), MAX_TOTAL_PIXELS is %u\n",packed_size,(size_t)indices_size,ringidx_size,MAX_TOTAL_PIXELS); OS_Exit(1); }
     glBindBuffer(GL_SSBO, colorBufferID);
     glBufferSubData(GL_SSBO, g_vidTexBase, packed_size, all_indices);
     glBindBuffer(GL_SSBO, texPalID);         glBufferData(GL_SSBO, (totalPaletteColors + VIDEO_RING*256) * sizeof(u32), NULL, GL_STATIC_DRAW); glBufferSubData(GL_SSBO, 0, palettes_size, texturePalettes); glBufferSubData(GL_SSBO, totalPaletteColors * sizeof(u32), ringpal_size, ringPalettes);
@@ -462,9 +445,7 @@ void LoadTextures() {
     u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize, fp, WIN_ICON);
     OS_Close(fp); PngArenaInit(&png_arena_main);
     int w = 1, h = 1;
-    u8* pixels = PngLoad(file_buffer, windowIconFileSize, &w, &h, &png_arena_main);
-    if (!pixels) { DualLogError("Failed to load icon: %s\n", WIN_ICON); OS_Exit(1); }
-    
+    u8* pixels = PngLoad(file_buffer, windowIconFileSize, &w, &h, &png_arena_main); if (!pixels) { DualLogError("Failed to load icon: %s\n", WIN_ICON); OS_Exit(1); }
     WinSysIcon image = (WinSysIcon){w, h, pixels};
     SetWindowIcon(&image);
     OS_Free(file_buffer, windowIconFileSize);
@@ -472,13 +453,9 @@ void LoadTextures() {
     OS_Free(arena, arena_size);
     png_arena_main.base = NULL;
     OS_FreeInitPhase();
-
     DualLog("took %.6f secs\n", get_time() - start_time);
 }
-
 typedef struct { const u16 *frames;  u8 length; const u16 *glowFrames; u8 glowLength; const char* name; float period; } TextureAnimClip;
-
-
 static const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS] = {
     /*0*/{(const u16[]){1310,1311,1312,1313,1313,1312,1311,1310},8,NULL,0,"Bridge11",0.35f},
     /*1*/{(const u16[]){1115,1116},2,(const u16[]){1117,1118},2,"BrokenClock",0.5f},
@@ -530,81 +507,26 @@ static const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS] = {
     /*47*/{(const u16[]){1523,1524,1525,1526,1527,1528,1529,1530,1531,1532,1533,1534,1535,1536,1537,1538,1539,1540,1541,1542,1543,1544,1545,1546,1547,1548,1549,1550,1551,1552,1553,1554,1555,1556,1557,1558,1559,1560,1561,1562,1563,1564,1565,1566,1567,1568,1569,1570,1571,1572,1573,1574,1575,1576},54,NULL,0,"ZeroGMutant",0.04166f},
     /*48*/{(const u16[]){1561,1562,1563,1564,1565,1566,1567,1568,1569,1570,1571,1572,1573,1574,1575,1576},16,NULL,0,"ZeroGMutantDeath",0.04166f},
 };
-
 INLINE u16 ScreenCodeTexture(u8 digit) { return textureAnimClips[41].frames[digit%10u]; }
 void CodeScreenShowDigit(u16 self, u8 digit) { Entity* e = &World.instances[self]; e->textureAnimating = false; e->texAnimRandom = false; e->texIndex = ScreenCodeTexture(digit); }
-
-
 void TextureSequenceInit(u16 self, char* trimmed_value) {
-    Entity* e=&World.instances[self];
-    if (trimmed_value[0] == '\0') { e->textureAnimating = false; e->modelIndex = EDefs[e->index].modelIndex; return;}
-    
-    e->textureAnimating = true;
-    e->texAnimLight = e->texAnimLight2 = U16_MAX;
-    e->texFrame = e->texGlowFrame = 0;
-    if (sEqual(trimmed_value,"ScreenDestroyed")) { World.instances[self].texAnimClip = NUM_TEXTURE_CLIPS - 1; return; }
-    
-    {
-        size_t vlen=slen(trimmed_value);
-        size_t d=vlen;
-        while(d>0&&trimmed_value[d-1]>='0'&&trimmed_value[d-1]<='9'){--d;}
-        if(vlen - d >= 1 && vlen - d <= 2 && d >= 7 && sCompUpToLen(trimmed_value + d - 7,"CamView",7) == 0) {
-            int cvn = 0;
-            for (size_t k=d;k<vlen;++k) { cvn = cvn * 10 + (trimmed_value[k] - '0'); }
-            if (cvn >= 1 && cvn <= 64) { e->textureAnimating = false; e->camView = (u8)(cvn - 1); return;} /*<prefix>CamView<N>, e.g. SecCamView3: show this level's camera N - 1*/
-        }
-    }
-    
-    for(int i=0;i<NUM_TEXTURE_CLIPS;++i){
-        if (sEqual(trimmed_value,textureAnimClips[i].name)) { World.instances[self].texAnimClip = i; return; }
-    }
-    
-    e->textureAnimating = false; // Couldn't find match, just don't animate.
+    Entity* e=&World.instances[self]; if (trimmed_value[0] == '\0') { e->textureAnimating = false; e->modelIndex = EDefs[e->index].modelIndex; return;} e->textureAnimating = true; e->texAnimLight = e->texAnimLight2 = U16_MAX; e->texFrame = e->texGlowFrame = 0; if (sEqual(trimmed_value,"ScreenDestroyed")) { World.instances[self].texAnimClip = NUM_TEXTURE_CLIPS - 1; return; }
+    size_t vlen = slen(trimmed_value); size_t d = vlen; while (d > 0 && trimmed_value[d - 1] >= '0' && trimmed_value[d - 1] <= '9') { --d; } if(vlen - d >= 1 && vlen - d <= 2 && d >= 7 && sCompUpToLen(trimmed_value + d - 7,"CamView",7) == 0) { int cvn = 0; for (size_t k=d;k<vlen;++k) { cvn = cvn * 10 + (trimmed_value[k] - '0'); } if (cvn >= 1 && cvn <= 64) { e->textureAnimating = false; e->camView = (u8)(cvn - 1); return;} }
+    for (int i=0;i<NUM_TEXTURE_CLIPS;++i) { if (sEqual(trimmed_value,textureAnimClips[i].name)) { World.instances[self].texAnimClip = i; return; } } e->textureAnimating = false; /*Couldn't find match, just don't animate.*/
 }
-
 void TextureSequenceStart(u16 self, u8 clipIndex) {
-    Entity* e = &World.instances[self];
-    if (clipIndex >= NUM_TEXTURE_CLIPS) return;
-    
-    const TextureAnimClip* clip = &textureAnimClips[clipIndex];
-    e->texAnimClip = clipIndex;
-    e->texFrame = e->texGlowFrame = 0;
-    e->textureAnimating = e->texAnimStopsAtDie = true;
-    e->texAnimRandom = e->texAnimInReverse = false;
-    e->texIndex=clip->frames[0];
-    if (clip->glowLength && clip->glowFrames) e->glowIndex = clip->glowFrames[0];
-    e->tickFinished = World.pauseRelativeTime+clip->period;
+    Entity* e = &World.instances[self]; if (clipIndex >= NUM_TEXTURE_CLIPS) return; 
+    const TextureAnimClip* clip = &textureAnimClips[clipIndex]; e->texAnimClip = clipIndex; e->texFrame = e->texGlowFrame = 0; e->textureAnimating = e->texAnimStopsAtDie = true; e->texAnimRandom = e->texAnimInReverse = false; e->texIndex = clip->frames[0]; if (clip->glowLength && clip->glowFrames) e->glowIndex = clip->glowFrames[0]; e->tickFinished = World.pauseRelativeTime + clip->period;
 }
-
 void TextureSequenceUpdate(u16 self) {
     Entity* e = &World.instances[self];
     if (e->texAnimClip >= NUM_TEXTURE_CLIPS) { e->textureAnimating = false; }
     else {
-        const TextureAnimClip* clip = &textureAnimClips[e->texAnimClip];
-        bool stopAtDie = e->texAnimStopsAtDie && e->health <= 0.0f;
-        e->tickFinished = World.pauseRelativeTime+clip->period;
-        if (e->texAnimRandom && (!stopAtDie)) {
-            e->texFrame = random_range_u32(0,clip->length-1);
-            if (clip->glowLength) { e->texGlowFrame=random_range_u32(0,clip->glowLength-1); }
-        } else if (e->texAnimInReverse) {
-            if (stopAtDie) { if (e->texFrame > 0) e->texFrame--; } else e->texFrame = (e->texFrame == 0) ? clip->length-1 : e->texFrame-1;
-            if (clip->glowLength) { e->texGlowFrame = (e->texGlowFrame == 0) ? clip->glowLength - 1 : e->texGlowFrame - 1;}
-        } else {
-            if (stopAtDie) {
-                if (e->texFrame < clip->length - 1) { e->texFrame++; }
-            } else e->texFrame = (e->texFrame+1) % clip->length;
-            
-            if (clip->glowLength) { e->texGlowFrame = (e->texGlowFrame + 1) % clip->glowLength;}
-        }
-        
-        if (stopAtDie && e->texFrame >= clip->length - 1) {
-            e->textureAnimating=false;
-            if(e->texAnimLight  < World.loadedLights){flag_set(&World.lights[e->texAnimLight].lflags,LIGHTON,false);}
-            if(e->texAnimLight2 < World.loadedLights){flag_set(&World.lights[e->texAnimLight2].lflags,LIGHTON,false);}
-        }
-        
-        e->texIndex = clip->frames[e->texFrame];
-        if (clip->glowLength && clip->glowFrames) { e->glowIndex = clip->glowFrames[e->texGlowFrame]; }
-        if (e->index == 279 && !clip->glowLength) { e->glowIndex = e->texIndex; }
+        const TextureAnimClip* clip = &textureAnimClips[e->texAnimClip]; bool stopAtDie = e->texAnimStopsAtDie && e->health <= 0.0f; e->tickFinished = World.pauseRelativeTime+clip->period;
+             if (e->texAnimRandom && (!stopAtDie)) { e->texFrame = random_range_u32(0,clip->length-1); if (clip->glowLength) { e->texGlowFrame=random_range_u32(0,clip->glowLength-1); } }
+        else if (e->texAnimInReverse) { if (stopAtDie) { if (e->texFrame > 0) e->texFrame--; } else e->texFrame = (e->texFrame == 0) ? clip->length-1 : e->texFrame-1; if (clip->glowLength) { e->texGlowFrame = (e->texGlowFrame == 0) ? clip->glowLength - 1 : e->texGlowFrame - 1;} }
+        else { if (stopAtDie) { if (e->texFrame < clip->length - 1) { e->texFrame++; } } else e->texFrame = (e->texFrame+1) % clip->length; if (clip->glowLength) { e->texGlowFrame = (e->texGlowFrame + 1) % clip->glowLength;} }
+        if (stopAtDie && e->texFrame >= clip->length - 1) { e->textureAnimating=false; if(e->texAnimLight < World.loadedLights){flag_set(&World.lights[e->texAnimLight].lflags,LIGHTON,false);} if(e->texAnimLight2 < World.loadedLights){flag_set(&World.lights[e->texAnimLight2].lflags,LIGHTON,false);} }
+        e->texIndex = clip->frames[e->texFrame]; if (clip->glowLength && clip->glowFrames) { e->glowIndex = clip->glowFrames[e->texGlowFrame]; } if (e->index == 279 && !clip->glowLength) { e->glowIndex = e->texIndex; }
     }
 }

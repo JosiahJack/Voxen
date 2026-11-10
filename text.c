@@ -11,12 +11,10 @@ INLINE size_t GetLineLength(const u8* data, size_t total_size, size_t start_dp, 
     else       { while (dp     < total_size) { u8  c  = data[dp]; if (c == '\r' || c == '\n') {  if ( c == '\r' && dp + 1 < total_size && data[dp + 1] == '\n') dp++; dp++; break; } dp++; } }
     return dp - start_dp;
 }
-
 INLINE const char* DecodeUTF8(const char* p, u32* out_cp) { const u8* s = (const u8*)p; 
-    if (*s < 0x80) { *out_cp=*s++; } else if ((*s & 0xE0) == 0xC0) { if (!s[1]) return p; *out_cp = (*s & 0x1F) << 6 | (s[1] & 0x3F); s += 2; } else if ((*s & 0xF0) == 0xE0) { if (!s[1] || !s[2]) return p; *out_cp = (*s & 0x0F) << 12 | (s[1] & 0x3F) << 6 | (s[2] & 0x3F); s += 3; }
-    else if ((*s & 0xF8) == 0xF0) { if (!s[1] || !s[2] || !s[3]) return p; *out_cp = (*s & 0x07) << 18 | (s[1] & 0x3F) << 12 | (s[2] & 0x3F) << 6 | (s[3] & 0x3F); s += 4; } else { s++; *out_cp = 0; } return (const char*)s;
+    if (*s < 0x80) { *out_cp=*s++; } else if ((*s & 0xE0) == 0xC0) { if (!s[1]) return p; *out_cp = (*s & 0x1F) << 6 | (s[1] & 0x3F); s += 2; } else if ((*s & 0xF0) == 0xE0) { if (!s[1] || !s[2]) return p; *out_cp = (*s & 0xF) << 12 | (s[1] & 0x3F) << 6 | (s[2] & 0x3F); s += 3; }
+    else if ((*s & 0xF8) == 0xF0) { if (!s[1] || !s[2] || !s[3]) return p; *out_cp = (*s & 0x7) << 18 | (s[1] & 0x3F) << 12 | (s[2] & 0x3F) << 6 | (s[3] & 0x3F); s += 4; } else { s++; *out_cp = 0; } return (const char*)s;
 }
-
 static u32 _find_table(u8*d,u32 fs,const char*tag){i32 n=ttUSHORT(d+fs+4);u32 td=fs+12;for(i32 i=0;i<n;++i){u32 l=td+16*i;if(((d+l+0)[0]==(tag[0]) && (d+l+0)[1]==(tag[1]) && (d+l+0)[2]==(tag[2]) && (d+l+0)[3]==(tag[3])))return ttULONG(d+l+8);}return 0;}
 static int font_InitFont_internal(font_fontinfo* info, u8* data, int fs) {
     u32 cmap,t,i,nt; info->data = data; info->fontstart = fs; 
@@ -24,26 +22,22 @@ static int font_InitFont_internal(font_fontinfo* info, u8* data, int fs) {
     if (info->glyf) { if (!info->loca) return 0; } else { return 0; }
     t=_find_table(data,fs,"maxp"); info->numGlyphs = t ? ttUSHORT(data+t+4) : 0xffff; nt=ttUSHORT(data+cmap+2);info->index_map=0; for(i=0;i<nt;++i){u32 er=cmap+4+8*i;switch(ttUSHORT(data+er)){case 3:switch(ttUSHORT(data+er+2)){case 1:case 10:info->index_map=cmap+ttULONG(data+er+4);}break;case 0:info->index_map=cmap+ttULONG(data+er+4);break;}} if(!info->index_map)return 0; info->indexToLocFormat=ttUSHORT(data+info->head+50);return 1;
 }
-
-int _font_offset(u8*d,int idx){ if(((d)[0]=='1'&&d[1]==0&&d[2]==0&&d[3]==0)||((d)[0]==0&&d[1]==1&&d[2]==0&&d[3]==0)||(d[0]==(u8)'t'&&d[1]==(u8)'r'&&d[2]==(u8)'u'&&d[3]==(u8)'e')){return idx==0?0:-1;} if(d[0]==(u8)'t'&&d[1]==(u8)'t'&&d[2]==(u8)'c'&&d[3]==(u8)'f'&&(ttULONG(d+4)==0x00010000||ttULONG(d+4)==0x00020000)){i32 n=((i32)d[8]<<24)|((i32)d[9]<<16)|((i32)d[10]<<8)|d[11]; if(idx>=n){return -1;} return ttULONG(d+12+idx*4); } return -1; }
+int _font_offset(u8*d,int idx){ if(((d)[0]=='1'&&d[1]==0&&d[2]==0&&d[3]==0)||((d)[0]==0&&d[1]==1&&d[2]==0&&d[3]==0)||(d[0]==(u8)'t'&&d[1]==(u8)'r'&&d[2]==(u8)'u'&&d[3]==(u8)'e')){return idx==0?0:-1;} if(d[0]==(u8)'t'&&d[1]==(u8)'t'&&d[2]==(u8)'c'&&d[3]==(u8)'f'&&(ttULONG(d+4)==0x10000||ttULONG(d+4)==0x20000)){i32 n=((i32)d[8]<<24)|((i32)d[9]<<16)|((i32)d[10]<<8)|d[11]; if(idx>=n){return -1;} return ttULONG(d+12+idx*4); } return -1; }
 int font_FindGlyphIndex(const font_fontinfo*info,int cp){
     u8*d=info->data;u32 im=info->index_map;u16 fmt=ttUSHORT(d+im);
     if(fmt==0) { i32 b=ttUSHORT(d+im+2); return cp<b-6 ? (*(u8*)(d+im+6+cp)) : 0; }
     if(fmt==6) { u32 f=ttUSHORT(d+im+6),n=ttUSHORT(d+im+8); return(u32)cp>=f&&(u32)cp<f+n?ttUSHORT(d+im+10+(cp-f)*2):0;}
-    if(fmt==2)return 0;
-    if(fmt==4){
+    if(fmt==2) return 0;
+    if (fmt==4) {
         u16 sc=ttUSHORT(d+im+6)>>1,sr=ttUSHORT(d+im+8)>>1,es=ttUSHORT(d+im+10),rs=ttUSHORT(d+im+12)>>1; u32 ec=im+14,s=ec;if(cp>0xffff)return 0;
         if (cp>=ttUSHORT(d+s+rs*2)) s+=rs*2;s-=2;
         while(es) { sr>>=1; u16 e=ttUSHORT(d+s+sr*2); if(cp>e) {s+=sr*2;} --es; }
         s+=2;{u16 it=(u16)((s-ec)>>1),st=ttUSHORT(d+im+14+sc*2+2+2*it),la=ttUSHORT(d+ec+2*it); if(cp<st||cp>la)return 0;u16 off=ttUSHORT(d+im+14+sc*6+2+2*it);
         return off?ttUSHORT(d+off+(cp-st)*2+im+14+sc*6+2+2*it):(u16)(cp+ttSHORT(d+im+14+sc*4+2+2*it));}
     }
-    if(fmt==12||fmt==13){u32 ng=ttULONG(d+im+12);i32 lo=0,hi=(i32)ng;
-        while(lo<hi){i32 m=lo+((hi-lo)>>1);u32 sc=ttULONG(d+im+16+m*12),ec=ttULONG(d+im+16+m*12+4);
-        if((u32)cp<sc)hi=m;else if((u32)cp>ec)lo=m+1;else{u32 sg=ttULONG(d+im+16+m*12+8);return fmt==12?sg+cp-sc:sg;}}return 0;}
+    if (fmt==12||fmt==13){ u32 ng=ttULONG(d+im+12);i32 lo=0,hi=(i32)ng; while(lo<hi){i32 m=lo+((hi-lo)>>1);u32 sc=ttULONG(d+im+16+m*12),ec=ttULONG(d+im+16+m*12+4); if((u32)cp<sc)hi=m;else if((u32)cp>ec)lo=m+1;else{u32 sg=ttULONG(d+im+16+m*12+8);return fmt==12?sg+cp-sc:sg;}}return 0; } 
     return 0;
 }
-
 INLINE void _sv(font_vertex*v,u8 t,i32 x,i32 y,i32 cx,i32 cy){v->type=t;v->x=(i16)x;v->y=(i16)y;v->cx=(i16)cx;v->cy=(i16)cy;}
 static int _glyf_off(const font_fontinfo*info,int gi){ if(gi>=info->numGlyphs||info->indexToLocFormat>=2){return-1;} int g1,g2;if(info->indexToLocFormat==0){g1=info->glyf+ttUSHORT(info->data+info->loca+gi*2)*2;g2=info->glyf+ttUSHORT(info->data+info->loca+gi*2+2)*2;} else{g1=info->glyf+ttULONG(info->data+info->loca+gi*4);g2=info->glyf+ttULONG(info->data+info->loca+gi*4+4);} return g1==g2?-1:g1; }
 static int _close_shape(font_vertex*v,int n,int wo,int so,i32 sx,i32 sy,i32 scx,i32 scy,i32 cx,i32 cy){ if (so) { if (wo) _sv(&v[n++],FONT_vcurve,(cx + scx) >> 1,(cy + scy) >> 1,cx,cy); _sv(&v[n++],FONT_vcurve,sx,sy,scx,scy); } else { if (wo) _sv(&v[n++],FONT_vcurve,sx,sy,cx,cy); else _sv(&v[n++],FONT_vline,sx,sy,0,0);} return n; }
@@ -83,26 +77,15 @@ static int font_GetGlyphShape(const font_fontinfo *info, int gi, font_vertex **p
     *pv = verts;
     return nv;
 }
-
 typedef struct tt_heapchk{ struct tt_heapchk* next; }tt_heapchk;
 typedef struct{ tt_heapchk* head; void* first_free; int remaining; }font__hheap;
 static void* _hha(font__hheap* hh,size_t sz) { if(hh->first_free){void*p=hh->first_free;hh->first_free=*(void**)p;return p;} if(!hh->remaining) {int c=sz<32?2000:sz<128?800:100;tt_heapchk*ck=(tt_heapchk*)OS_AllocScratch(sizeof(*ck)+sz*c); if(!ck){return NULL;} ck->next=hh->head; hh->head=ck; hh->remaining=c;} --hh->remaining; return(char*)hh->head+sizeof(tt_heapchk)+sz*hh->remaining; }
 static void _hhf(font__hheap* hh,void*p) { *(void**)p=hh->first_free;hh->first_free=p; }
 typedef struct{ float x0,y0,x1,y1; int invert; }font__edge; typedef struct font__active_edge{ struct font__active_edge*next; float fx,fdx,fdy,direction,sy,ey; }font__active_edge;
-static void _hce(float*sl,int x,font__active_edge*e,float x0,float y0,float x1,float y1){
-    if(y0==y1||y0>e->ey||y1<e->sy)return;if(y0<e->sy){x0+=(x1-x0)*(e->sy-y0)/(y1-y0);y0=e->sy;}if(y1>e->ey){x1+=(x1-x0)*(e->ey-y1)/(y1-y0);y1=e->ey;}
-    if(x0<=x&&x1<=x)sl[x]+=e->direction*(y1-y0);else if(x0>=x+1&&x1>=x+1);else sl[x]+=e->direction*(y1-y0)*(1.0f-((x0-(float)x)+(x1-(float)x))/2.0f);
-}
-
+static void _hce(float*sl,int x,font__active_edge*e,float x0,float y0,float x1,float y1){ if(y0==y1||y0>e->ey||y1<e->sy)return;if(y0<e->sy){x0+=(x1-x0)*(e->sy-y0)/(y1-y0);y0=e->sy;}if(y1>e->ey){x1+=(x1-x0)*(e->ey-y1)/(y1-y0);y1=e->ey;} if(x0<=x&&x1<=x)sl[x]+=e->direction*(y1-y0);else if(x0>=x+1&&x1>=x+1);else sl[x]+=e->direction*(y1-y0)*(1.0f-((x0-(float)x)+(x1-(float)x))/2.0f); }
 INLINE float _ptz(float h,float t0,float t1,float b0,float b1){ return ((t1-t0)+(b1-b0))/2.0f*h; }
 static void _add_pt(V2*p,int n,float x,float y){if(p){p[n].x=x;p[n].y=y;}}
-static void _tess_c(V2*pts,int*np,float x0,float y0,float x1,float y1,float x2,float y2,float fsq,int n) {
-    float mx = (x0 + 2*x1 + x2) / 4, my = (y0 + 2*y1 + y2) / 4, dx = (x0 + x2) / 2 - mx, dy = (y0 + y2) / 2 - my; if (n > 16 || dx*dx + dy*dy <= fsq) { _add_pt(pts,(*np)++,x2,y2); return; }
-    
-    _tess_c(pts,np,x0,y0,(x0 + x1) / 2,(y0 + y1) / 2,mx,my,fsq,n + 1);
-    _tess_c(pts,np,mx,my,(x1 + x2) / 2,(y1 + y2) / 2,x2,y2,fsq,n + 1);
-}
-
+static void _tess_c(V2*pts,int*np,float x0,float y0,float x1,float y1,float x2,float y2,float fsq,int n) { float mx = (x0 + 2*x1 + x2) / 4, my = (y0 + 2*y1 + y2) / 4, dx = (x0 + x2) / 2 - mx, dy = (y0 + y2) / 2 - my; if (n > 16 || dx*dx + dy*dy <= fsq) { _add_pt(pts,(*np)++,x2,y2); return; } _tess_c(pts,np,x0,y0,(x0 + x1) / 2,(y0 + y1) / 2,mx,my,fsq,n + 1); _tess_c(pts,np,mx,my,(x1 + x2) / 2,(y1 + y2) / 2,x2,y2,fsq,n + 1); }
 static int edge_compare(const void* a, const void* b) { float ya = ((const font__edge*)a)->y0, yb = ((const font__edge*)b)->y0; return (ya > yb) - (ya < yb); }
 static void font_MakeGlyphBitmapSubpixel(const font_fontinfo* font, u8* dst, int ow, int oh, int ostr, float sx, float sy, int g, int precomputed_ix0, int precomputed_iy0) {
     font_vertex *v; int ix0 = precomputed_ix0, iy0 = precomputed_iy0, nv = font_GetGlyphShape(font, g, &v);
@@ -140,7 +123,6 @@ static void font_MakeGlyphBitmapSubpixel(const font_fontinfo* font, u8* dst, int
                 V2* p = win + m; m += wl[i]; int j = wl[i] - 1;
                 for (int k = 0; k < wl[i]; j = k++) {
                     int a = k, b = j; if (p[j].y == p[k].y) continue;
-                    
                     e[n_edges].invert = 0;
                     if (inv ? p[j].y > p[k].y : p[j].y < p[k].y) { e[n_edges].invert = 1; a = j; b = k; }
                     e[n_edges].x0 = p[a].x * sx;
@@ -159,18 +141,13 @@ static void font_MakeGlyphBitmapSubpixel(const font_fontinfo* font, u8* dst, int
                 while(j<oh){float syt=(float)y,syb=(float)y+1;font__active_edge**step=&active;
                     mset(sl,0,(size_t)ow*sizeof(sl[0]));mset(sl2,0,((size_t)ow+1)*sizeof(sl[0]));
                     while(*step){font__active_edge*z=*step;if(z->ey<=syt){*step=z->next;z->direction=0;_hhf(&hh,z);}else step=&(*step)->next;}
-                    while(ep->y0<=syb){
-                        if(ep->y0!=ep->y1){
-                            font__active_edge*z=(font__active_edge*)_hha(&hh,sizeof(*z));
-                            if(z){float dxdy=(ep->x1-ep->x0)/(ep->y1-ep->y0);z->fdx=dxdy;z->fdy=dxdy?1.0f/dxdy:0;z->fx=ep->x0+dxdy*(syt-ep->y0)-(float)ix0;z->direction=ep->invert?1.0f:-1.0f;z->sy=ep->y0;z->ey=ep->y1;if(j==0&&iy0!=0&&z->ey<syt)z->ey=syt;z->next=active;active=z;}
-                        }++ep;
-                    }
+                    while(ep->y0<=syb){ if(ep->y0!=ep->y1){ font__active_edge*z=(font__active_edge*)_hha(&hh,sizeof(*z)); if(z){float dxdy=(ep->x1-ep->x0)/(ep->y1-ep->y0);z->fdx=dxdy;z->fdy=dxdy?1.0f/dxdy:0;z->fx=ep->x0+dxdy*(syt-ep->y0)-(float)ix0;z->direction=ep->invert?1.0f:-1.0f;z->sy=ep->y0;z->ey=ep->y1;if(j==0&&iy0!=0&&z->ey<syt)z->ey=syt;z->next=active;active=z;} } ++ep; }
                     for(font__active_edge*ae=active;ae;ae=ae->next){
                         if(ae->fdx==0){float x0=ae->fx;if(x0<ow){if(x0>=0){_hce(sl,(int)x0,ae,x0,syt,x0,syb);_hce(sl2,(int)x0+1,ae,x0,syt,x0,syb);}else _hce(sl2,0,ae,x0,syt,x0,syb);}}
                         else{float x0=ae->fx,dx=ae->fdx,dy=ae->fdy,xb=x0+dx,xt,xbt,sy0,sy1;
-                            if(ae->sy>syt){xt=x0+dx*(ae->sy-syt);sy0=ae->sy;}else{xt=x0;sy0=syt;}
-                            if(ae->ey<syb){xbt=x0+dx*(ae->ey-syt);sy1=ae->ey;}else{xbt=xb;sy1=syb;}
-                            if(xt>=0&&xbt>=0&&xt<ow&&xbt<ow){
+                            if (ae->sy>syt) { xt = x0 + dx*(ae->sy - syt); sy0 = ae->sy; } else { xt = x0; sy0 = syt; }
+                            if (ae->ey<syb) { xbt = x0 + dx*(ae->ey - syt); sy1 = ae->ey; } else { xbt = xb; sy1 = syb; }
+                            if (xt>=0&&xbt>=0&&xt<ow&&xbt<ow) {
                                 if((int)xt==(int)xbt){int x=(int)xt;float h=(sy1-sy0)*ae->direction;sl[x]+=_ptz(h,xt,(float)x+1.0f,xbt,(float)x+1.0f);sl2[x+1]+=h;}
                                 else{float yc,yf,stp,sign,area;
                                     if(xt>xbt){float t;sy0=syb-(sy0-syt);sy1=syb-(sy1-syt);t=sy0;sy0=sy1;sy1=t;t=xbt;xbt=xt;xt=t;dx=-dx;dy=-dy;t=x0;x0=xb;xb=t;}
@@ -179,7 +156,8 @@ static void font_MakeGlyphBitmapSubpixel(const font_fontinfo* font, u8* dst, int
                                     if(yf>syb){yf=syb;dy=(yf-yc)/((float)x2-(float)(x1+1));}
                                     stp=sign*dy;for(int x=x1+1;x<x2;++x){sl[x]+=area+stp/2;area+=stp;}
                                     sl[x2]+=area+sign*_ptz(sy1-yf,(float)x2,(float)x2+1.0f,xbt,(float)x2+1.0f);sl2[x2+1]+=sign*(sy1-sy0);}
-                            }else{for(int x=0;x<ow;++x){float y0=syt,x1f=(float)x,x2f=(float)(x+1),x3=xb,y3=syb;float y1=((float)x-x0)/dx+syt,y2=((float)(x+1)-x0)/dx+syt;
+                            } else {
+                                for(int x=0;x<ow;++x){float y0=syt,x1f=(float)x,x2f=(float)(x+1),x3=xb,y3=syb;float y1=((float)x-x0)/dx+syt,y2=((float)(x+1)-x0)/dx+syt;
                                 if(x0<x1f&&x3>x2f){_hce(sl,x,ae,x0,y0,x1f,y1);_hce(sl,x,ae,x1f,y1,x2f,y2);_hce(sl,x,ae,x2f,y2,x3,y3);}
                                 else if(x3<x1f&&x0>x2f){_hce(sl,x,ae,x0,y0,x2f,y2);_hce(sl,x,ae,x2f,y2,x1f,y1);_hce(sl,x,ae,x1f,y1,x3,y3);}
                                 else if((x0<x1f&&x3>x1f)||(x3<x1f&&x0>x1f)){_hce(sl,x,ae,x0,y0,x1f,y1);_hce(sl,x,ae,x1f,y1,x3,y3);}
@@ -188,24 +166,14 @@ static void font_MakeGlyphBitmapSubpixel(const font_fontinfo* font, u8* dst, int
                         }
                     }
                     {float sum=0;for(i=0;i<ow;++i){sum+=sl2[i];float cov=(float)vabs(sl[i]+sum)*255.0f+0.5f;int px=(int)cov;if(px>255)px=255; dst[j*ostr+i]=(u8)px;}}
-                    step=&active;while(*step){font__active_edge*z=*step;z->fx+=z->fdx;step=&(*step)->next;}++y;++j;}
-                for(tt_heapchk*c=hh.head,*hp;c;c=hp){hp=c->next;}
+                    step=&active;while(*step){font__active_edge*z=*step;z->fx+=z->fdx;step=&(*step)->next;}++y;++j;
+                } for(tt_heapchk*c=hh.head,*hp;c;c=hp){hp=c->next;}
             }
         }
     }
 }
-
 typedef struct {u16 x0,y0,x1,y1; float xoff,yoff,xadvance,xoff2,yoff2;} font_packedchar;
-INLINE void _pre(u8 *p, int w, int h, int str, u32 kw, int v) {
-    int out = v ? w : h, in = v ? h : w, os = v ? 1 : str, is = v ? str : 1;
-    for (int j=0;j<out;++j,p+=os) {
-        u8 buf[8] = {0}; int tot = 0;
-        for (int i=0;i<in;++i) {
-            if (i <= in - (int)kw) { tot += p[i * is] - buf[i & 7]; buf[(i + kw) & 7] = p[i * is]; } else { tot -= buf[i & 7]; }
-            p[i * is] = (u8)(tot / kw);
-        }
-    }
-}
+INLINE void _pre(u8 *p, int w, int h, int str, u32 kw, int v) { int out = v ? w : h, in = v ? h : w, os = v ? 1 : str, is = v ? str : 1; for (int j=0;j<out;++j,p+=os) { u8 buf[8] = {0}; int tot = 0; for (int i=0;i<in;++i) { if (i <= in - (int)kw) { tot += p[i * is] - buf[i & 7]; buf[(i + kw) & 7] = p[i * is]; } else { tot -= buf[i & 7]; } p[i * is] = (u8)(tot / kw); } } }
 // Font Loading System
 static int numPackedGlyphs=0,numPackedGlyphsStopD=0; extern u32 textVAO,textVBO,textSP;
 u32 fontAtlasTex,fontAtlasTexStopD;
@@ -214,16 +182,16 @@ static float fixedNumberAdvanceWidth=0.0f,fixedNumberAdvanceWidthStopD=0.0f;
 static const char* fallbackFontPaths[]={"./Fonts/FreeSerifBold.ttf","./Fonts/cambriab.ttf","./Fonts/NotoSansCJK-Subset.ttf"}, *fontPaths[]={"./Fonts/SystemShockText.ttf","./Fonts/StopD.ttf"};
 static font_fontinfo fontInfo[5]; static u8 *fontData[5]; static char uiTextBuffer[T_BUFFER_SIZE];
 static u16 cpPackedIndex[2][65536]; // Codepoint -> packed glyph index per atlas; 0 = blank(space)
-static const u16 packCodepoints[]={/*1303 codepoints used by Data/text_*.txt and Data/logs_*.txt; generated by Tools/gen_pack_codepoints.py*/
-    0x0020/* */,0x0021/*!*/,0x0022/*"*/,0x0023/*#*/,0x0024/*$*/,0x0025/*%*/,0x0026/*&*/,0x0027/*'*/,0x0028/*(*/,0x0029/*)*/,0x002A/* * */,0x002B/*+*/,0x002C/*,*/,0x002D/*-*/,0x002E/*.*/,0x002F/*/*/,0x0030/*0*/,0x0031/*1*/,0x0032/*2*/,0x0033/*3*/,0x0034/*4*/,0x0035/*5*/,0x0036/*6*/,0x0037/*7*/,
-    0x0038/*8*/,0x0039/*9*/,0x003A/*:*/,0x003B/*;*/,0x003C/*<*/,0x003D/*=*/,0x003E/*>*/,0x003F/*?*/,0x0040/*@*/,0x0041/*A*/,0x0042/*B*/,0x0043/*C*/,0x0044/*D*/,0x0045/*E*/,0x0046/*F*/,0x0047/*G*/,0x0048/*H*/,0x0049/*I*/,0x004A/*J*/,0x004B/*K*/,0x004C/*L*/,0x004D/*M*/,0x004E/*N*/,0x004F/*O*/,
-    0x0050/*P*/,0x0051/*Q*/,0x0052/*R*/,0x0053/*S*/,0x0054/*T*/,0x0055/*U*/,0x0056/*V*/,0x0057/*W*/,0x0058/*X*/,0x0059/*Y*/,0x005A/*Z*/,0x005B/*[*/,0x005C/*\*/,0x005D/*]*/,0x005E/*^*/,0x005F/*_*/,0x0061/*a*/,0x0062/*b*/,0x0063/*c*/,0x0064/*d*/,0x0065/*e*/,0x0066/*f*/,0x0067/*g*/,0x0068/*h*/,
-    0x0069/*i*/,0x006A/*j*/,0x006B/*k*/,0x006C/*l*/,0x006D/*m*/,0x006E/*n*/,0x006F/*o*/,0x0070/*p*/,0x0071/*q*/,0x0072/*r*/,0x0073/*s*/,0x0074/*t*/,0x0075/*u*/,0x0076/*v*/,0x0077/*w*/,0x0078/*x*/,0x0079/*y*/,0x007A/*z*/,0x00A1/*¡*/,0x00AB/*«*/,0x00B0/*°*/,0x00BA/*º*/,0x00BB/*»*/,0x00BF/*¿*/,
-    0x00C0/*À*/,0x00C1/*Á*/,0x00C2/*Â*/,0x00C3/*Ã*/,0x00C4/*Ä*/,0x00C7/*Ç*/,0x00C8/*È*/,0x00C9/*É*/,0x00CA/*Ê*/,0x00CC/*Ì*/,0x00CD/*Í*/,0x00CE/*Î*/,0x00D1/*Ñ*/,0x00D3/*Ó*/,0x00D4/*Ô*/,0x00D5/*Õ*/,0x00D6/*Ö*/,0x00DA/*Ú*/,0x00DC/*Ü*/,0x00DF/*ß*/,0x00E0/*à*/,0x00E1/*á*/,0x00E2/*â*/,0x00E3/*ã*/,
-    0x00E4/*ä*/,0x00E7/*ç*/,0x00E8/*è*/,0x00E9/*é*/,0x00EA/*ê*/,0x00EC/*ì*/,0x00ED/*í*/,0x00EE/*î*/,0x00EF/*ï*/,0x00F1/*ñ*/,0x00F2/*ò*/,0x00F3/*ó*/,0x00F4/*ô*/,0x00F5/*õ*/,0x00F6/*ö*/,0x00F9/*ù*/,0x00FA/*ú*/,0x00FB/*û*/,0x00FC/*ü*/,0x0153/*œ*/,0x0401/*Ё*/,0x0410/*А*/,0x0411/*Б*/,0x0412/*В*/,
-    0x0413/*Г*/,0x0414/*Д*/,0x0415/*Е*/,0x0416/*Ж*/,0x0417/*З*/,0x0418/*И*/,0x0419/*Й*/,0x041A/*К*/,0x041B/*Л*/,0x041C/*М*/,0x041D/*Н*/,0x041E/*О*/,0x041F/*П*/,0x0420/*Р*/,0x0421/*С*/,0x0422/*Т*/,0x0423/*У*/,0x0424/*Ф*/,0x0425/*Х*/,0x0426/*Ц*/,0x0427/*Ч*/,0x0428/*Ш*/,0x0429/*Щ*/,0x042A/*Ъ*/,
-    0x042B/*Ы*/,0x042C/*Ь*/,0x042D/*Э*/,0x042E/*Ю*/,0x042F/*Я*/,0x0430/*а*/,0x0431/*б*/,0x0432/*в*/,0x0433/*г*/,0x0434/*д*/,0x0435/*е*/,0x0436/*ж*/,0x0437/*з*/,0x0438/*и*/,0x0439/*й*/,0x043A/*к*/,0x043B/*л*/,0x043C/*м*/,0x043D/*н*/,0x043E/*о*/,0x043F/*п*/,0x0440/*р*/,0x0441/*с*/,0x0442/*т*/,
-    0x0443/*у*/,0x0444/*ф*/,0x0445/*х*/,0x0446/*ц*/,0x0447/*ч*/,0x0448/*ш*/,0x0449/*щ*/,0x044A/*ъ*/,0x044B/*ы*/,0x044C/*ь*/,0x044D/*э*/,0x044E/*ю*/,0x044F/*я*/,0x0451/*ё*/,0x2014/*—*/,0x2019/*’*/,0x2026/*…*/,0x2116/*№*/,0x3001/*、*/,0x3002/*。*/,0x3005/*々*/,0x300C/*「*/,0x300D/*」*/,0x300E/*『*/,
+static const u16 packCodepoints[]={/*1303 codepoints used by Data/text_*.txt and Data/logs_*.txt*/
+    0x20/* */,0x21/*!*/,0x22/*"*/,0x23/*#*/,0x24/*$*/,0x25/*%*/,0x26/*&*/,0x27/*'*/,0x28/*(*/,0x29/*)*/,0x2A/***/,0x2B/*+*/,0x2C/*,*/,0x2D/*-*/,0x2E/*.*/,0x2F/*/*/,0x30/*0*/,0x31/*1*/,0x32/*2*/,0x33/*3*/,0x34/*4*/,0x35/*5*/,0x36/*6*/,0x37/*7*/,
+    0x38/*8*/,0x39/*9*/,0x3A/*:*/,0x3B/*;*/,0x3C/*<*/,0x3D/*=*/,0x3E/*>*/,0x3F/*?*/,0x40/*@*/,0x41/*A*/,0x42/*B*/,0x43/*C*/,0x44/*D*/,0x45/*E*/,0x46/*F*/,0x47/*G*/,0x48/*H*/,0x49/*I*/,0x4A/*J*/,0x4B/*K*/,0x4C/*L*/,0x4D/*M*/,0x4E/*N*/,0x4F/*O*/,
+    0x50/*P*/,0x51/*Q*/,0x52/*R*/,0x53/*S*/,0x54/*T*/,0x55/*U*/,0x56/*V*/,0x57/*W*/,0x58/*X*/,0x59/*Y*/,0x5A/*Z*/,0x5B/*[*/,0x5C/*\*/,0x5D/*]*/,0x5E/*^*/,0x5F/*_*/,0x61/*a*/,0x62/*b*/,0x63/*c*/,0x64/*d*/,0x65/*e*/,0x66/*f*/,0x67/*g*/,0x68/*h*/,
+    0x69/*i*/,0x6A/*j*/,0x6B/*k*/,0x6C/*l*/,0x6D/*m*/,0x6E/*n*/,0x6F/*o*/,0x70/*p*/,0x71/*q*/,0x72/*r*/,0x73/*s*/,0x74/*t*/,0x75/*u*/,0x76/*v*/,0x77/*w*/,0x78/*x*/,0x79/*y*/,0x7A/*z*/,0xA1/*¡*/,0xAB/*«*/,0xB0/*°*/,0xBA/*º*/,0xBB/*»*/,0xBF/*¿*/,
+    0xC0/*À*/,0xC1/*Á*/,0xC2/*Â*/,0xC3/*Ã*/,0xC4/*Ä*/,0xC7/*Ç*/,0xC8/*È*/,0xC9/*É*/,0xCA/*Ê*/,0xCC/*Ì*/,0xCD/*Í*/,0xCE/*Î*/,0xD1/*Ñ*/,0xD3/*Ó*/,0xD4/*Ô*/,0xD5/*Õ*/,0xD6/*Ö*/,0xDA/*Ú*/,0xDC/*Ü*/,0xDF/*ß*/,0xE0/*à*/,0xE1/*á*/,0xE2/*â*/,0xE3/*ã*/,
+    0xE4/*ä*/,0xE7/*ç*/,0xE8/*è*/,0xE9/*é*/,0xEA/*ê*/,0xEC/*ì*/,0xED/*í*/,0xEE/*î*/,0xEF/*ï*/,0xF1/*ñ*/,0xF2/*ò*/,0xF3/*ó*/,0xF4/*ô*/,0xF5/*õ*/,0xF6/*ö*/,0xF9/*ù*/,0xFA/*ú*/,0xFB/*û*/,0xFC/*ü*/,0x153/*œ*/,0x401/*Ё*/,0x410/*А*/,0x411/*Б*/,0x412/*В*/,
+    0x413/*Г*/,0x414/*Д*/,0x415/*Е*/,0x416/*Ж*/,0x417/*З*/,0x418/*И*/,0x419/*Й*/,0x41A/*К*/,0x41B/*Л*/,0x41C/*М*/,0x41D/*Н*/,0x41E/*О*/,0x41F/*П*/,0x420/*Р*/,0x421/*С*/,0x422/*Т*/,0x423/*У*/,0x424/*Ф*/,0x425/*Х*/,0x426/*Ц*/,0x427/*Ч*/,0x428/*Ш*/,0x429/*Щ*/,0x42A/*Ъ*/,
+    0x42B/*Ы*/,0x42C/*Ь*/,0x42D/*Э*/,0x42E/*Ю*/,0x42F/*Я*/,0x430/*а*/,0x431/*б*/,0x432/*в*/,0x433/*г*/,0x434/*д*/,0x435/*е*/,0x436/*ж*/,0x437/*з*/,0x438/*и*/,0x439/*й*/,0x43A/*к*/,0x43B/*л*/,0x43C/*м*/,0x43D/*н*/,0x43E/*о*/,0x43F/*п*/,0x440/*р*/,0x441/*с*/,0x442/*т*/,
+    0x443/*у*/,0x444/*ф*/,0x445/*х*/,0x446/*ц*/,0x447/*ч*/,0x448/*ш*/,0x449/*щ*/,0x44A/*ъ*/,0x44B/*ы*/,0x44C/*ь*/,0x44D/*э*/,0x44E/*ю*/,0x44F/*я*/,0x451/*ё*/,0x2014/*—*/,0x2019/*’*/,0x2026/*…*/,0x2116/*№*/,0x3001/*、*/,0x3002/*。*/,0x3005/*々*/,0x300C/*「*/,0x300D/*」*/,0x300E/*『*/,
     0x300F/*』*/,0x301C/*〜*/,0x3042/*あ*/,0x3044/*い*/,0x3046/*う*/,0x3048/*え*/,0x304A/*お*/,0x304B/*か*/,0x304C/*が*/,0x304D/*き*/,0x304E/*ぎ*/,0x304F/*く*/,0x3050/*ぐ*/,0x3051/*け*/,0x3052/*げ*/,0x3053/*こ*/,0x3054/*ご*/,0x3055/*さ*/,0x3056/*ざ*/,0x3057/*し*/,0x3058/*じ*/,0x3059/*す*/,0x305A/*ず*/,0x305B/*せ*/,
     0x305C/*ぜ*/,0x305D/*そ*/,0x305E/*ぞ*/,0x305F/*た*/,0x3060/*だ*/,0x3061/*ち*/,0x3063/*っ*/,0x3064/*つ*/,0x3065/*づ*/,0x3066/*て*/,0x3067/*で*/,0x3068/*と*/,0x3069/*ど*/,0x306A/*な*/,0x306B/*に*/,0x306C/*ぬ*/,0x306D/*ね*/,0x306E/*の*/,0x306F/*は*/,0x3070/*ば*/,0x3071/*ぱ*/,0x3072/*ひ*/,0x3073/*び*/,0x3075/*ふ*/,
     0x3076/*ぶ*/,0x3078/*へ*/,0x3079/*べ*/,0x307B/*ほ*/,0x307C/*ぼ*/,0x307E/*ま*/,0x307F/*み*/,0x3080/*む*/,0x3081/*め*/,0x3082/*も*/,0x3083/*ゃ*/,0x3084/*や*/,0x3086/*ゆ*/,0x3087/*ょ*/,0x3088/*よ*/,0x3089/*ら*/,0x308A/*り*/,0x308B/*る*/,0x308C/*れ*/,0x308D/*ろ*/,0x308F/*わ*/,0x3092/*を*/,0x3093/*ん*/,0x30A1/*ァ*/,
@@ -269,73 +237,42 @@ static const u16 packCodepoints[]={/*1303 codepoints used by Data/text_*.txt and
     0x9280/*銀*/,0x9285/*銅*/,0x92FC/*鋼*/,0x9320/*錠*/,0x9332/*録*/,0x9375/*鍵*/,0x9396/*鎖*/,0x9577/*長*/,0x9580/*門*/,0x9589/*閉*/,0x958B/*開*/,0x9593/*間*/,0x95A2/*関*/,0x95C7/*闇*/,0x95D8/*闘*/,0x9632/*防*/,0x963B/*阻*/,0x964D/*降*/,0x9650/*限*/,0x9662/*院*/,0x9664/*除*/,0x9678/*陸*/,0x967A/*険*/,0x9685/*隅*/,
     0x968A/*隊*/,0x968E/*階*/,0x969B/*際*/,0x969C/*障*/,0x96A0/*隠*/,0x96B7/*隷*/,0x96C6/*集*/,0x96C7/*雇*/,0x96D1/*雑*/,0x96E2/*離*/,0x96E3/*難*/,0x96F7/*雷*/,0x96FB/*電*/,0x9727/*霧*/,0x9759/*静*/,0x975E/*非*/,0x9762/*面*/,0x97F3/*音*/,0x97FF/*響*/,0x9803/*頃*/,0x9805/*項*/,0x9806/*順*/,0x9810/*預*/,0x9811/*頑*/,
     0x9818/*領*/,0x982D/*頭*/,0x983C/*頼*/,0x984C/*題*/,0x9858/*願*/,0x985E/*類*/,0x98DB/*飛*/,0x98DF/*食*/,0x98F2/*飲*/,0x990A/*養*/,0x9928/*館*/,0x9952/*饒*/,0x9996/*首*/,0x99AC/*馬*/,0x99C5/*駅*/,0x9A13/*験*/,0x9AA8/*骨*/,0x9AD8/*高*/,0x9B42/*魂*/,0x9B54/*魔*/,0x9CF4/*鳴*/,0x9E7F/*鹿*/,0x9EBB/*麻*/,0x9ED2/*黒*/,
-    0xFF01/*！*/,0xFF05/*％*/,0xFF08/*（*/,0xFF09/*）*/,0xFF1A/*：*/,0xFF1B/*；*/,0xFF1F/*？*/
-};
+    0xFF01/*！*/,0xFF05/*％*/,0xFF08/*（*/,0xFF09/*）*/,0xFF1A/*：*/,0xFF1B/*；*/,0xFF1F/*？*/};
 static const i32 numPackCodepoints=sizeof(packCodepoints)/sizeof(packCodepoints[0]);
 static i32 CodepointToPackedIndex(i32 cp,int fontID) { return ((u32)cp<65536u) ? cpPackedIndex[fontID][cp] : 0; }
-void LoadFallbackFont(const char*path, int fii, int ci){
-    FHandle fd; int fsz; fontData[fii]=OS_OpenAndAllocateFileBufferReadonly(path,&fd,&fsz);
-    if (!fontData[fii]) { DualLogError("Failed to load font: %s\n",path); OS_Exit(1); }
-    int off = _font_offset((u8*)fontData[fii],ci); if (off<0) { DualLogError("Invalid collection index %d for font %s\n",ci,path); OS_Exit(1); }
-    if (!font_InitFont_internal(&fontInfo[fii],fontData[fii],off)) { DualLogError("Failed to init font at index %d in %s\n",ci,path); OS_Exit(1); }
-}
-
+void LoadFallbackFont(const char*path, int fii, int ci) { FHandle fd; int s; fontData[fii]=OS_OpenAndAllocateFileBufferReadonly(path,&fd,&s); if (!fontData[fii]) { DualLogError("Failed load: %s\n",path); OS_Exit(1); } int o = _font_offset((u8*)fontData[fii],ci); if (o<0) { DualLogError("Invalid %d for %s\n",ci,path); OS_Exit(1); } if (!font_InitFont_internal(&fontInfo[fii],fontData[fii],o)) { DualLogError("Failed %d in %s\n",ci,path); OS_Exit(1); } }
 void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp);
 u8 *fontBmp1, *fontBmp2;
 void BuildAtlasCPU(int* numPacked, font_packedchar* packedChars, float* fixedNumAdv, float baseH, int fontIdx, u8 fontID, u8* bmp, u32 sz) {
     const int S=(int)sz, lim=S-16; int cx=0,cy=0,cb=0;
     mset(bmp,0,(size_t)S*S); *numPacked=0;
     for(int i=0; i<numPackCodepoints; ++i) {
-        if(*numPacked >= MAX_GLYPHS) break;
-        u32 cp = packCodepoints[i]; 
-        int fi = fontIdx; 
-        int g = font_FindGlyphIndex(&fontInfo[fi], cp);
-        if (!g) { for (fi = 2; fi < 5; ++fi) { g = font_FindGlyphIndex(&fontInfo[fi], cp); if (g) break; } }
-        if (!g) continue;
-        
+        if (*numPacked >= MAX_GLYPHS) { break; }
+        u32 cp = packCodepoints[i]; int fi = fontIdx;
+        int g = font_FindGlyphIndex(&fontInfo[fi], cp); if (!g) { for (fi = 2; fi < 5; ++fi) { g = font_FindGlyphIndex(&fontInfo[fi], cp); if (g) break; } } if (!g) continue;
         const font_fontinfo* font = &fontInfo[fi]; const int fb = fi != fontIdx;
         float h = fb ? baseH*1.2f : baseH; int os = fb ? 2 : 3;
         float sc = h/(float)(ttSHORT(font->data+font->hhea+4)-ttSHORT(font->data+font->hhea+6)), sco = sc*os, rc = 1.0f/os, sh = -(float)(os-1)/(2.0f*(float)os);
         font_packedchar* bc = &packedChars[*numPacked]; bc->x0=bc->y0=bc->x1=bc->y1=0;
         int bx0,by0,bx1,by1, x0 = 0, y0 = 0, x1 = 0, y1 = 0, has = 0, g1 = _glyf_off(font,g);
         if (g1 >= 0) { has = 1; x0 = ttSHORT(font->data + g1 + 2); y0 = ttSHORT(font->data + g1 + 4); x1 = ttSHORT(font->data + g1 + 6); y1 = ttSHORT(font->data + g1 + 8);}
-        bx0 = has ? (int)vfloor( x0*sco) : 0;
-        by0 = has ? (int)vfloor(-y1*sco) : 0;
-        bx1 = has ? (int)vceil(  x1*sco) : 0;
-        by1 = has ? (int)vceil( -y0*sco) : 0;
-        if (!has) { int nhm = ttSHORT(font->data + font->hhea + 34); bc->xadvance = sc * ttSHORT(font->data + font->hmtx + 4 * (g < nhm ? g : nhm - 1)); int idx = (*numPacked)++; cpPackedIndex[fontID][cp] = (u16)idx; if (cp >= '0' && cp <= '9') *fixedNumAdv = vmax(*fixedNumAdv, bc->xadvance); continue; }
-        
+        bx0 = has ? (int)vfloor( x0*sco) : 0; by0 = has ? (int)vfloor(-y1*sco) : 0; bx1 = has ? (int)vceil(  x1*sco) : 0; by1 = has ? (int)vceil( -y0*sco) : 0; if (!has) { int nhm = ttSHORT(font->data + font->hhea + 34); bc->xadvance = sc * ttSHORT(font->data + font->hmtx + 4 * (g < nhm ? g : nhm - 1)); int idx = (*numPacked)++; cpPackedIndex[fontID][cp] = (u16)idx; if (cp >= '0' && cp <= '9') *fixedNumAdv = vmax(*fixedNumAdv, bc->xadvance); continue; }
         int rw = bx1 - bx0 + os - 1, rh = by1 - by0 + os - 1;
         if(cx+rw+16 > lim){cx=0;cy=cb;}
         if(cy+rh+16 <= lim) {
-            int rx=cx+16, ry=cy+16, nhm=ttUSHORT(font->data+font->hhea+34); u8* dst=bmp+rx+ry*S;
-            cx+=rw+16; if(cy+rh+16 > cb) cb=cy+rh+16;
-            font_MakeGlyphBitmapSubpixel(font,dst,bx1-bx0,by1-by0,S,sco,sco,g,bx0,by0);
-            _pre(dst,rw,rh,S,os,0); _pre(dst,rw,rh,S,os,1);
-            bc->x0=rx; bc->y0=ry; bc->x1=rx+rw; bc->y1=ry+rh;
-            bc->xadvance = sc*ttSHORT(font->data+font->hmtx+4*(g<nhm?g:nhm-1));
-            bc->xoff=bx0*rc+sh; bc->yoff=by0*rc+sh; bc->xoff2=(bx0+rw)*rc+sh; bc->yoff2=(by0+rh)*rc+sh;
-        }
-        int idx=(*numPacked)++; cpPackedIndex[fontID][cp]=(u16)idx; if(cp>='0' && cp<='9') *fixedNumAdv=vmax(*fixedNumAdv,bc->xadvance);
+            int rx=cx+16, ry=cy+16, nhm=ttUSHORT(font->data+font->hhea+34); u8* dst=bmp+rx+ry*S; cx+=rw+16; if (cy+rh+16 > cb) { cb=cy+rh+16; } font_MakeGlyphBitmapSubpixel(font,dst,bx1-bx0,by1-by0,S,sco,sco,g,bx0,by0); _pre(dst,rw,rh,S,os,0); _pre(dst,rw,rh,S,os,1);
+            bc->x0=rx; bc->y0=ry; bc->x1=rx+rw; bc->y1=ry+rh; bc->xadvance = sc*ttSHORT(font->data+font->hmtx+4*(g<nhm?g:nhm-1)); bc->xoff=bx0*rc+sh; bc->yoff=by0*rc+sh; bc->xoff2=(bx0+rw)*rc+sh; bc->yoff2=(by0+rh)*rc+sh;
+        } int idx=(*numPacked)++; cpPackedIndex[fontID][cp]=(u16)idx; if(cp>='0' && cp<='9') *fixedNumAdv=vmax(*fixedNumAdv,bc->xadvance);
     }
 }
-
 void InitFontAtlasses() {
-    FHandle fd1,fd2;int sz1,sz2;
-    fontData[0]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[0],&fd1,&sz1);
-    fontData[1]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[1],&fd2,&sz2);
-    if (!fontData[0] || !fontData[1]) { DualLogError("Failed to load font\n"); OS_Exit(1); }
+    FHandle fd1,fd2;int sz1,sz2; fontData[0]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[0],&fd1,&sz1); fontData[1]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[1],&fd2,&sz2); if (!fontData[0] || !fontData[1]) { DualLogError("Failed to load font\n"); OS_Exit(1); }
     if(!font_InitFont_internal(&fontInfo[0],fontData[0],0)){DualLogError("%s font init failed\n",fontPaths[0]); OS_Exit(1);}
     if(!font_InitFont_internal(&fontInfo[1],fontData[1],0)){DualLogError("%s font init failed\n",fontPaths[1]); OS_Exit(1);}
-    LoadFallbackFont(fallbackFontPaths[0],2,0);
-    LoadFallbackFont(fallbackFontPaths[1],3,0);
-    LoadFallbackFont(fallbackFontPaths[2],4,0);
-    u8* bmp = fontBmp1 = OS_AllocScratch(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
-    BuildAtlasCPU(&numPackedGlyphs,fontPackedChar,&fixedNumberAdvanceWidth,20.0f,0,FONT_NORMAL,bmp,FONT_ATLAS_SIZE);
-    u8* bmp2 = fontBmp2 = OS_AllocScratch(FONT_ATLAS_SIZE2*FONT_ATLAS_SIZE2);
-    BuildAtlasCPU(&numPackedGlyphsStopD,fontPackedCharStopD,&fixedNumberAdvanceWidthStopD,54.0f,1,FONT_STOPD,bmp2,FONT_ATLAS_SIZE2);
-    LoadTextForLanguage(Sys_Settings.Language);
-    LoadLogTextForLanguage(Sys_Settings.Language);
+    LoadFallbackFont(fallbackFontPaths[0],2,0); LoadFallbackFont(fallbackFontPaths[1],3,0); LoadFallbackFont(fallbackFontPaths[2],4,0);
+    u8* bmp = fontBmp1 = OS_AllocScratch(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);    BuildAtlasCPU(&numPackedGlyphs,fontPackedChar,&fixedNumberAdvanceWidth,20.0f,0,FONT_NORMAL,bmp,FONT_ATLAS_SIZE);
+    u8* bmp2 = fontBmp2 = OS_AllocScratch(FONT_ATLAS_SIZE2*FONT_ATLAS_SIZE2); BuildAtlasCPU(&numPackedGlyphsStopD,fontPackedCharStopD,&fixedNumberAdvanceWidthStopD,54.0f,1,FONT_STOPD,bmp2,FONT_ATLAS_SIZE2);
+    LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language);
 }
 // Localization
 size_t utf16le_to_utf8(const u8*src,size_t slen,char*dst,size_t dlen){ size_t dp=0,sp=0; while(sp<slen&&dp<dlen-4){ if(sp+1>=slen)break;u32 c=(u32)src[sp+1]<<8|src[sp];sp+=2; if(c<0x80){dst[dp++]=(char)c;} else if(c<0x800){dst[dp++]=(char)(0xC0|(c>>6));dst[dp++]=(char)(0x80|(c&0x3F));} else if(c<0x10000){dst[dp++]=(char)(0xE0|(c>>12));dst[dp++]=(char)(0x80|((c>>6)&0x3F));dst[dp++]=(char)(0x80|(c&0x3F));} else continue; } dst[dp]='\0';return dp; }
@@ -344,7 +281,6 @@ u8* LoadTextFile(const char* path, size_t* out_size, size_t* out_dp, int* out_ut
     FHandle dfd = INVALID_FHANDLE; int asz = 0; u8* data = OS_OpenAndAllocateFileBufferReadonly(path, &dfd, &asz); if(!data || asz <= 0) { DualLogError("Failed to load text file: %s\n", path); *out_size = 0; return NULL; } *out_size = (size_t)asz; *out_dp = 0; *out_utf16 = 0;
     if(asz >= 2 && data[0]==0xFF && data[1]==0xFE) { *out_dp = 2; *out_utf16 = 1; } else if(asz >= 3 && data[0]==0xEF && data[1]==0xBB && data[2]==0xBF) { *out_dp = 3; } else { int nl=0; for(size_t i=1; i<(size_t)asz && i<1024; i+=2) if(data[i]==0) nl++; if(nl*3 > asz) *out_utf16 = 1; } return data;
 }
-
 static size_t ReadTextLine(const u8* data,size_t size,size_t* dp,int utf16,char* line,size_t cap) { size_t start=*dp,len=GetLineLength(data,size,start,utf16); *dp=len ? start+len : size; if (utf16) utf16le_to_utf8(data+start,len,line,cap); else { if (len>=cap) len=cap-1; mcpy(line,data+start,len); line[len]=0; } len=slen(line); while (len && (line[len-1]=='\r' || line[len-1]=='\n')) line[--len]=0; return len; }
 void LoadTextForLanguage(u8 lang) { char line[T_LOGSTR_MAX]; size_t size,dp=0; int utf16=0,ln=0; u8* data=LoadTextFile(localizations[lang<8 ? lang : 0],&size,&dp,&utf16); while (dp<size) { size_t len=ReadTextLine(data,size,&dp,utf16,line,sizeof(line)); if (ln<T_LOGSTR_CNT) { mcpy(Sys_Text.stringTable[ln],line,len+1); ++ln; } } if (data) OS_Free(data,size); }
 INLINE int s2i32Len(const char*str,size_t len){int v=0;for(size_t i=0;i<len&&str[i]>='0'&&str[i]<='9';++i)v=v*10+(str[i]-'0');return v;}
@@ -365,7 +301,6 @@ void LoadLogTextForLanguage(u8 lang) {
         nxt:continue;}
     if (data) OS_Free(data,size);
 }
-
 static float textVertexData[TEXT_VTX_FLOATS]; extern Color textColors[]; enum {TALIGN_LEFT=0,TALIGN_CENTER=1,TALIGN_RIGHT=2};
 float MeasureLineAdvance(const char* p, u8 fontID) { float w=0; int cc=0; while (*p) { u32 cp=0; const char* q = DecodeUTF8(p, &cp); if (q == p) break; p = q; cc++; if (cp=='\n'||cc>120) break; const font_packedchar *b = (fontID ? fontPackedCharStopD : fontPackedChar) + CodepointToPackedIndex(cp,fontID); if (cp >= '0' && cp <= '9' && fontID) w = vfloor((w + b->xoff) + 0.5f) + fixedNumberAdvanceWidthStopD; else w += b->xadvance; } return w; }
 void RenderFormattedText(i16 x, i16 y, u32 color, u8 fontID, float scale, u8 align, const char* restrict format, va_list args) {
@@ -376,9 +311,8 @@ void RenderFormattedText(i16 x, i16 y, u32 color, u8 fontID, float scale, u8 ali
         u32 cp=0; const char* q = DecodeUTF8(p, &cp); if (q == p) break; p = q; cc++; if (cp=='\n'||cc>120) { xpos=(alignMul ? xUsed - MeasureLineAdvance(p,fontID)*alignMul : xUsed); ypos+=ls; cc=0; continue; } int idx=CodepointToPackedIndex(cp,fontID); const font_packedchar *b = (fontID ? fontPackedCharStopD : fontPackedChar) + idx; float qx0=vfloor((xpos+b->xoff)+0.5f),qy0=vfloor((ypos+b->yoff)+0.5f); float qs0=b->x0*invatsz, qt0=b->y0*invatsz, qs1=b->x1*invatsz, qt1=b->y1*invatsz;
         float vx0 = qx0*scale - bw, vy0 = qy0*scale - bw, vx1 = (qx0 + b->xoff2 - b->xoff)*scale + bw, vy1 = (qy0 + b->yoff2 - b->yoff)*scale + bw; float s0 = qs0 - puv, t0 = qt0 - puv, s1 = qs1 + puv, t1 = qt1 + puv, z = 0.0f; float tv[30] = { vx0,vy0,z,s0,t0, vx1,vy1,z,s1,t1, vx1,vy0,z,s1,t0, vx0,vy0,z,s0,t0, vx0,vy1,z,s0,t1, vx1,vy1,z,s1,t1 }; if (vc >= TEXT_VTX_FLOATS/30) break; mcpy(textVertexData + vc * 30,tv,sizeof(tv)); vc++;
         if (cp >= '0' && cp <= '9' && fontID == FONT_STOPD){xpos = qx0 + fixedNumberAdvanceWidthStopD;}else xpos += b->xadvance;
-    } if (vc) { glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferSubData(GL_ARRAY_BUFFER,0,vc*30*sizeof(float),textVertexData); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
+    } if (vc) { glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferSubData(GL_ARRAY_BUFFER,0,vc*30*sizeof(float),textVertexData); glDrawArrays(0x4/*GL_TRIANGLES*/,0,vc*6); }
 }
-
 void RenderTextL(i16 x, i16 y, u32 color, u8 f, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,f,scale,TALIGN_LEFT,s,a); __builtin_va_end(a); }
 void RenderTextC(i16 x, i16 y, u32 color, u8 f, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,f,scale,TALIGN_CENTER,s,a); __builtin_va_end(a); }
 void RenderText3DC(V3 worldPos, u32 color, u8 f, float scale, const char* restrict s, ...) { va_list a; __builtin_va_start(a,s); RenderFormattedText((i16)worldPos.x,(i16)worldPos.y,color,f,scale,TALIGN_CENTER,s,a); __builtin_va_end(a); }
