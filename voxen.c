@@ -4,7 +4,7 @@
 #include "Shaders/shaders.h"
 GlobalContext World = {0}; // Full game state
 double game_start_time, game_actual_start_time, shadowTime, physTime, renderTime, prePhys, gameTime, raycastMs;
-float rasterPerspectiveProjection[16],modelMatrices[INSTANCE_COUNT*16],*world_from_mdl = modelMatrices,modelBounds[MAX_MDLS],**physPos,lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16],shadowmapsPerspectiveProjection[16],sunShadowMatrix[16],berserkSeedTime;
+float rasterPerspectiveProjection[16],modelMatrices[INSTANCE_COUNT*16],*world_from_mdl = modelMatrices,modelBounds[MAX_MDLS],**physPos,lightView[MAX_SHADOWMAPS][6][4][4],lightViewProj[MAX_SHADOWMAPS][6][16],shadowmapsPerspectiveProjection[16],sunShadowMatrix[16],berserkSeedTime;
 static float shakeAmp = 0.15f,amMapScaleX,amMapScaleY,amMapOffsetX;
 static u32 globalframesPerLastSecond,inputImageID,inputUIID,inputDepthID,inputSpecID,inputNormalID,outputImageID,gBufferFBO,uiSP,depthPrepassSP,chunkSP,chunkVAO,matricesBufferID,ssrSP,rtSP,rtCopySP,imageBlitSP,quadVAO,quadVBO,rtInstanceInfoID,rtCellCountsID,rtCellListsID,rtGeomID,rtOrderBufID,gpuQ[5][5],wireVertCount,raycastPickMode;
 u32 globalframe,threadCnt = 1,*physVertCounts,*rtSrcVertCounts,uiFBO,textDecalVBO[MAX_LEVELS][INSTANCE_COUNT],textSP,textVAO,textVBO,textDecalVertexCount[MAX_LEVELS][INSTANCE_COUNT],lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,cellVisibleDataID,shadowmapsSP,shadowMapSSBO,shadowMapsIndirectionID,sunShadowFBO,sunShadowTex,shadowmapIndirectionList[LIGHT_COUNT],colorBufferID,texPalID,texPalOfsID,textureOffsetsID,textureSizesID,psysInstancesID,
@@ -16,7 +16,7 @@ char decalInlineText[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN];
 bool doubleSidedTexture[MAXTEX],transparentTexture[MAXTEX],shadowBuffersCreated,resDropdownOpen,mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause,fovSliderActive,gammaSliderActive,masterVolumeSliderActive,musicVolumeSliderActive,messageVolumeSliderActive,sfxVolumeSliderActive,enteringPlayerName;
 typedef struct { u32 nodeBase,triBase,vtxBase,uvBase,orderBase; } ModelRTInfo; typedef struct { u32 geom[4]; u32 info[4]; float iscl2[4]; } InstanceRTInfo; static InstanceRTInfo rtInstanceInfo[INSTANCE_COUNT]; static InstanceRTInfo rtPrevInfo[INSTANCE_COUNT]; static ModelRTInfo rtModelInfo[MAX_MDLS];
 V3 modelMin[MAX_MDLS], modelMax[MAX_MDLS],sunDirection={0.0f,1.0f,0.0f};
-FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6],sunShadowFrustum[6];
+FrustumPlane lightFrustumPlanes[MAX_SHADOWMAPS][6][6],playerFrustumPlanes[6],sunShadowFrustum[6];
 DecalStyle decalStyles[DECAL_STYLE_MAX];
 CamView camViews[64], levelCamViews[14][64];
 static i8 currentMenuItem,currentMenuTab, menuItemCount = 4, menuTabCount = 1, resHoverIdx = -1;
@@ -1151,11 +1151,11 @@ void AutomapBlitFullToUI() {
 #include "ui.c"
 // Lights
 static const float INVSQRT2=0.70710678118f; Quaternion cubeQuats[6] = { {0.0f,INVSQRT2,0.0f,INVSQRT2}/*+X:Right*/, {0.0f,-INVSQRT2,0.0f,INVSQRT2}/*-X:Left*/, {-INVSQRT2,0.0f,0.0f,INVSQRT2}/*+Y:Up*/, {INVSQRT2,0.0f,0.0f,INVSQRT2}/*-Y:Down*/, {0.0f,0.0f,0.0f,1.0f}/*+Z:Forward*/, {0.0f,1.0f,0.0f,0.0f}/*-Z:Backward*/ };
+static void ShadowRecomputeLight(u16 slot, V3 lightPos) { for (int j=0;j<6;++j) { mat4_lookat_from((float*)lightView[slot][j], &cubeQuats[j], lightPos); mul_mat4((float*)lightViewProj[slot][j], shadowmapsPerspectiveProjection, (float*)lightView[slot][j]); ExtractFrustumPlanes((float*)lightViewProj[slot][j], lightFrustumPlanes[slot][j]); } }
 void UpdateLights() {
     for (u16 lightIdx=0;lightIdx<World.loadedLights;++lightIdx) {
         V3 lightPos = World.lightsNewPosition[lightIdx];
         World.lights[lightIdx].pos = lightPos;
-        if (World.lights[lightIdx].lflags & LDIRTY) {/*Marked all as true at level load.*/ flag_set(&World.lights[lightIdx].lflags, LDIRTY, false); for (int j=0;j<6;++j) { mat4_lookat_from((float*)lightView[lightIdx][j], &cubeQuats[j], lightPos); mul_mat4((float*)lightViewProj[lightIdx][j], shadowmapsPerspectiveProjection, (float*)lightView[lightIdx][j]); ExtractFrustumPlanes((float*)lightViewProj[lightIdx][j], lightFrustumPlanes[lightIdx][j]); } }
     }
     if (!World.paused && !World.menuActive) {
         for (int k=0;k<World.lanimCount;++k) { // Just lerps/flickers in intensity; lanims is a compact list of the level's animated lights
@@ -1279,6 +1279,10 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     for (u16 c = 0; c < numCandidates; ++c) {
         u16 lightIdx = candidates[c];
         V3 lpos = World.lights[lightIdx].pos;
+        u16 slot = shadowSlot[lightIdx];
+        bool slotNew = false;
+        if (slot == U16_MAX) { slot = (u16)shadowNextSlot++; shadowSlot[lightIdx] = slot; slotNew = true; }
+        if (slotNew || (World.lights[lightIdx].lflags & LDIRTY)) { ShadowRecomputeLight(slot, lpos); flag_set(&World.lights[lightIdx].lflags, LDIRTY, false); }
         float effectiveRadius = vmin(World.lights[lightIdx].range,15.36f);
         V3 toLight = V3_AsubB(lpos, playerPos);
         const float addX = (pf.x >= 0.0f) ? effectiveRadius : -effectiveRadius;
@@ -1303,11 +1307,11 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         u8 faceMask = (u8)(_mm256_movemask_ps(visible) & 0x3F);
         for (u8 face = 0; face < 6; ++face) {
             if (!(faceMask & (1u << face))) {
-                if (SphereInFrustum(lightFrustumPlanes[lightIdx][face], playerPos, 0.48f)) {faceMask |= (u8)(1u << face);}
-                else { for (u8 v=0;v<camViewCount;++v) { if (camViews[v].visible && SphereInFrustum(lightFrustumPlanes[lightIdx][face], camViews[v].position, 0.48f)) { faceMask |= (u8)(1u << face); break; } } }
+                if (SphereInFrustum(lightFrustumPlanes[slot][face], playerPos, 0.48f)) {faceMask |= (u8)(1u << face);}
+                else { for (u8 v=0;v<camViewCount;++v) { if (camViews[v].visible && SphereInFrustum(lightFrustumPlanes[slot][face], camViews[v].position, 0.48f)) { faceMask |= (u8)(1u << face); break; } } }
             }
         }
-        for (u8 v=0;v<camViewCount;++v) { if (camViews[v].visible) { faceMask |= FaceMaskFromViewer(V3_AsubB(lpos, camViews[v].position), camFwds[v], effectiveRadius); } } if (faceMask == 0) continue;
+        for (u8 v=0;v<camViewCount;++v) { if (camViews[v].visible) { faceMask |= FaceMaskFromViewer(V3_AsubB(lpos, camViews[v].position), camFwds[v], effectiveRadius); } } if (faceMask == 0) { if (slotNew) { shadowSlot[lightIdx] = U16_MAX; shadowNextSlot--; } continue; }
         const __m256 lposX = _mm256_set1_ps(lpos.x); const __m256 lposY = _mm256_set1_ps(lpos.y); const __m256 lposZ = _mm256_set1_ps(lpos.z);
         const __m256 effR  = _mm256_set1_ps(effectiveRadius);
         const __m256 signMask = _mm256_set1_ps(-0.0f);
@@ -1356,13 +1360,12 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
                 if (nearbyMeshCount >= SHADOW_NEARMESH_MAX) { DualLogWarn("Shadowmapping ran out of nearMeshes at %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); break; }
             }
         }
-        if (nearbyMeshCount == 0) { shadowmapIndirectionList[lightIdx] = LIGHT_COUNT; continue; }
-        u16 slot = shadowSlot[lightIdx];
+        if (nearbyMeshCount == 0) { shadowmapIndirectionList[lightIdx] = LIGHT_COUNT; if (slotNew) { shadowSlot[lightIdx] = U16_MAX; shadowNextSlot--; } continue; }
         bool contentDirty = true;//(anyMoved || posSum != shadowPosSum[lightIdx] || idSum != shadowIdSum[lightIdx] || slot == U16_MAX);
         u8 needFaces = (u8)(faceMask & ~shadowFaces[lightIdx]);
         if (contentDirty || needFaces) {
             for (u16 j=1;j<nearbyMeshCount;++j) { SortedMesh key = localMeshes[j]; int sk = (int)j - 1; while (sk >= 0 && localMeshes[sk].sortKey > key.sortKey) { localMeshes[sk + 1] = localMeshes[sk]; --sk; } localMeshes[sk + 1] = key; }
-            if (slot == U16_MAX) { shadowSlot[lightIdx] = (u16)shadowNextSlot++; slot = shadowSlot[lightIdx]; } u32 slotOff = (u32)slot * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6);
+            u32 slotOff = (u32)slot * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6);
             glUniform3f(3, lpos.x, lpos.y, lpos.z);
             u8 renderFaces = contentDirty ? faceMask : needFaces; // Content change invalidates all faces, but viewpoint change only needs relevant faces.
             #pragma GCC unroll 6
@@ -1375,7 +1378,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
                 for (u16 j=0;j<nearbyMeshCount;++j) { if (localMeshes[j].faceMask & faceBit) { ++faceCasters; } }
                 if (faceCasters == 0) { continue; }
                 glUniform1ui(2, face);
-                glUniformMatrix4fv(1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
+                glUniformMatrix4fv(1, 1, GL_FALSE, (float*)lightViewProj[slot][face]);
                 glUniform1ui(7, slotOff + (face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE));
                 for (u16 j=0;j<nearbyMeshCount;++j) {
                     if (!(localMeshes[j].faceMask & faceBit)) { continue; }

@@ -282,22 +282,28 @@ u8* LoadTextFile(const char* path, size_t* out_size, size_t* out_dp, int* out_ut
     if(asz >= 2 && data[0]==0xFF && data[1]==0xFE) { *out_dp = 2; *out_utf16 = 1; } else if(asz >= 3 && data[0]==0xEF && data[1]==0xBB && data[2]==0xBF) { *out_dp = 3; } else { int nl=0; for(size_t i=1; i<(size_t)asz && i<1024; i+=2) if(data[i]==0) nl++; if(nl*3 > asz) *out_utf16 = 1; } return data;
 }
 static size_t ReadTextLine(const u8* data,size_t size,size_t* dp,int utf16,char* line,size_t cap) { size_t start=*dp,len=GetLineLength(data,size,start,utf16); *dp=len ? start+len : size; if (utf16) utf16le_to_utf8(data+start,len,line,cap); else { if (len>=cap) len=cap-1; mcpy(line,data+start,len); line[len]=0; } len=slen(line); while (len && (line[len-1]=='\r' || line[len-1]=='\n')) line[--len]=0; return len; }
-void LoadTextForLanguage(u8 lang) { char line[T_LOGSTR_MAX]; size_t size,dp=0; int utf16=0,ln=0; u8* data=LoadTextFile(localizations[lang<8 ? lang : 0],&size,&dp,&utf16); while (dp<size) { size_t len=ReadTextLine(data,size,&dp,utf16,line,sizeof(line)); if (ln<T_LOGSTR_CNT) { mcpy(Sys_Text.stringTable[ln],line,len+1); ++ln; } } if (data) OS_Free(data,size); }
+static char stringPool[131072]; static size_t stringPoolUsed=0;
+static char audioLogPool[131072]; static size_t audioLogPoolUsed=0;
+static const char* InternString(const char* s, size_t len) { if (stringPoolUsed + len + 1 > sizeof(stringPool)) { DualLogError("String pool exhausted!\n"); return ""; } char* dst = stringPool + stringPoolUsed; mcpy(dst, s, len); dst[len] = 0; stringPoolUsed += len + 1; return dst; }
+static const char* InternAudioLog(const char* s, size_t len) { if (audioLogPoolUsed + len + 1 > sizeof(audioLogPool)) { DualLogError("Audio log pool exhausted!\n"); return ""; } char* dst = audioLogPool + audioLogPoolUsed; mcpy(dst, s, len); dst[len] = 0; audioLogPoolUsed += len + 1; return dst; }
+void LoadTextForLanguage(u8 lang) { char line[T_LOGSTR_MAX]; size_t size,dp=0; int utf16=0,ln=0; u8* data=LoadTextFile(localizations[lang<8 ? lang : 0],&size,&dp,&utf16); stringPoolUsed=0; while (dp<size) { size_t len=ReadTextLine(data,size,&dp,utf16,line,sizeof(line)); if (ln<T_LOGSTR_CNT) { Sys_Text.stringTable[ln]=InternString(line,len); ++ln; } } while (ln<T_LOGSTR_CNT) Sys_Text.stringTable[ln++]=""; if (data) OS_Free(data,size); }
 INLINE int s2i32Len(const char*str,size_t len){int v=0;for(size_t i=0;i<len&&str[i]>='0'&&str[i]<='9';++i)v=v*10+(str[i]-'0');return v;}
 static const char* logLocalizations[8]={"./Data/logs_english.txt","./Data/logs_espanol.txt","./Data/logs_deutsch.txt","./Data/logs_francais.txt","./Data/logs_nihongo.txt","./Data/logs_russkiy.txt","./Data/logs_italiano.txt","./Data/logs_portugues.txt"};
 void LoadLogTextForLanguage(u8 lang) {
     mset(Sys_Text.audioLogImagesRefIndicesLH,0,LOGCNT*sizeof(u16));mset(Sys_Text.audioLogImagesRefIndicesRH,0,LOGCNT*sizeof(u16));mset(Sys_Text.audioLogType,0,LOGCNT*sizeof(u8));mset(Sys_Text.audioLogLevelFound,0,LOGCNT*sizeof(u8));
+    for (int i=0;i<LOGCNT;++i) { World.audiologNames[i]=""; World.audiologSenders[i]=""; World.audiologSubjects[i]=""; World.audioLogSpeech2Text[i]=""; } audioLogPoolUsed=0;
     char line[1024]; size_t dp=0,size; int utf16=0; u8* data=LoadTextFile(logLocalizations[lang<8 ? lang : 0],&size,&dp,&utf16);
+    char speechScratch[T_LOGSTR_MAX];
     while (dp<size) { if (!ReadTextLine(data,size,&dp,utf16,line,sizeof(line))) continue;
-        int li=-1,ilh=-1,irh=-1,lt=0,lf=0,fi=0;char*pos=line;
+        int li=-1,ilh=-1,irh=-1,lt=0,lf=0,fi=0;char*pos=line; size_t speechLen=0; int speechSeeded=0; speechScratch[0]=0;
         while(*pos&&fi<32){while(*pos==' ')++pos;char*st=pos;int q=(*pos=='"');if(q)++pos;while(*pos){if(*pos==','&&!q)break;if(*pos=='"'&&q){if(pos[1]==','){pos++;break;}if(pos[1]=='"'){pos+=2;continue;}}++pos;}char*en=pos;if(q&&*en=='"')--en;size_t tl=(size_t)(en-st);if(!tl){if(*pos==',')++pos;fi++;continue;}
             switch(fi){
                 case 0:  li=s2i32Len(st,tl); if (li<0||li>=LOGCNT) goto nxt; break;                 case 1:  ilh=s2i32Len(st,tl); break; case 2: irh=s2i32Len(st,tl); break;
-                case 3:  if(li>=0&&li<LOGCNT) sCpy2aSubFromb(   World.audiologNames[li],tl,st,sizeof(World.audiologNames[0]));    break; case 4: if(li>=0&&li<LOGCNT) sCpy2aSubFromb(World.audiologSenders[li],tl,st,sizeof(World.audiologSenders[0])); break;
-                case 5:  if(li>=0&&li<LOGCNT) sCpy2aSubFromb(World.audiologSubjects[li],tl,st,sizeof(World.audiologSubjects[0])); break; case 6:  lt=s2i32Len(st,tl); break;    case 7:  lf=s2i32Len(st,tl); break;
-                default: if(li>=0&&li<LOGCNT){char*d=World.audioLogSpeech2Text[li]; size_t cur=slen(d); if(cur>0&&cur<T_LOGSTR_MAX-2){d[cur++]=',';d[cur]='\0';} size_t left=T_LOGSTR_MAX-cur-1; if(left>0){size_t cl=tl>left?left:tl;sCpy2aSubFromb(d+cur,cl,st,left+1);}}break;}
+                case 3:  if(li>=0&&li<LOGCNT) World.audiologNames[li]=InternAudioLog(st,tl);    break; case 4: if(li>=0&&li<LOGCNT) World.audiologSenders[li]=InternAudioLog(st,tl); break;
+                case 5:  if(li>=0&&li<LOGCNT) World.audiologSubjects[li]=InternAudioLog(st,tl); break; case 6:  lt=s2i32Len(st,tl); break;    case 7:  lf=s2i32Len(st,tl); break;
+                default: if(li>=0&&li<LOGCNT){ if(!speechSeeded){ speechSeeded=1; const char* prev=World.audioLogSpeech2Text[li]; size_t pl=slen(prev); if(pl>0&&pl<T_LOGSTR_MAX-2){ mcpy(speechScratch,prev,pl); speechScratch[pl]=0; speechLen=pl; } } size_t cur=speechLen; if(cur>0&&cur<T_LOGSTR_MAX-2){speechScratch[cur++]=',';speechScratch[cur]='\0';} size_t left=T_LOGSTR_MAX-cur-1; if(left>0){size_t cl=tl>left?left:tl;mcpy(speechScratch+cur,st,cl);speechScratch[cur+cl]=0;speechLen=cur+cl;}}break;}
             if (*pos==',')++pos;fi++;}
-        if (li>=0&&li<LOGCNT) {Sys_Text.audioLogImagesRefIndicesLH[li]=(u16)ilh;Sys_Text.audioLogImagesRefIndicesRH[li]=(u16)irh;Sys_Text.audioLogType[li]=(u8)lt;Sys_Text.audioLogLevelFound[li]=(u8)lf;}
+        if (li>=0&&li<LOGCNT) {Sys_Text.audioLogImagesRefIndicesLH[li]=(u16)ilh;Sys_Text.audioLogImagesRefIndicesRH[li]=(u16)irh;Sys_Text.audioLogType[li]=(u8)lt;Sys_Text.audioLogLevelFound[li]=(u8)lf; World.audioLogSpeech2Text[li]=InternAudioLog(speechScratch,speechLen);}
         nxt:continue;}
     if (data) OS_Free(data,size);
 }

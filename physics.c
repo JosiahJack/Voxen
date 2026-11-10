@@ -1,70 +1,41 @@
 // physics.c - The Jack Physics Engine, By W. Josiah Jack MIT-0 -- full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
 #include "common.h"
 u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX]; static u16 triggerVolumes[128]; static u16 numTriggers; extern double game_actual_start_time; static bool ladderWalkOff = false; static float ladderTopY = 0.0f; static double ladderSFXFinished = 0.0; void DrawBoxColliderColored(u16 i, Color col); void DrawCapsuleCollider(u16 i);
-static const float PHY_EPSILON=0.0001f,PHY_NEARNUFF=0.001f,MAX_SPEED=17.0f/*m/s fastest is railgun given 5.0 impulse w/ 0.3 mass=5.0/0.3 */,MAX_STEP_SIZE=(0.12f / MAX_SPEED),MAX_ANGULAR_SPEED=8.0f/*arbitrary*/,MANIFOLD_TIE_MARGIN=0.008f,MANIFOLD_ALIGN_THRESHOLD=0.8f,MAX_BIAS_SPEED=2.0f/*m/s cap on the Baumgarte depenetration kick: positional projection does the heavy lifting, so a suddenly-revealed deep pen (settle wobble re-basing, a support that moved under a sleeper) lifts the body out instead of launching it*/;
+static const float PHY_EPSILON=0.0001f,PHY_NEARNUFF=0.001f,MAX_SPEED=17.0f/*m/s fastest is railgun given 5.0 impulse w/ 0.3 mass=5.0/0.3 */,MAX_STEP_SIZE=(0.12f / MAX_SPEED),MAX_ANGULAR_SPEED=8.0f/*arbitrary*/,MANIFOLD_TIE_MARGIN=0.008f,MANIFOLD_ALIGN_THRESHOLD=0.8f,MAX_BIAS_SPEED=2.0f;
 static const float WALK_SPEED=5.7f,PLAYER_MAX_CYBER_SPEED=10.0f,CROUCH_SPEED=2.5f,PLAYER_MAX_PRONE_SPEED=1.6f,PLAYER_BOOSTER_SPEED_BOOST=1.2f,PLAYER_CROUCH_RATIO=0.63f,PLAYER_PRONE_RATIO=0.32f,WALK_SPEED_ACCEL=3.0f,BOOST_ACCEL=1.0f,SKATE_SLIDE=5.0f,SKATE_SPEED=1.1f;
-typedef struct { V3 v[4];/*Minkowski difference verts (wA - wB)*/   V3 wA[4];/*Only A is needed to reconstruct contact points.*/ i32 n;/*Vertex count*/ } Simplex3D;
+typedef struct { V3 v[4]; V3 wA[4]; i32 n; } Simplex3D;
 typedef struct { V3 point; float pen; } ManifoldPt;
 typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
 typedef struct { u16 a,b; Manifold m; V3 rA[MANIFOLD_MAX],rB[MANIFOLD_MAX]; float targetVn[MANIFOLD_MAX],accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],invSumN[MANIFOLD_MAX]; float Ka[3][3],Kb[3][3]; float invMassA,invMassB; bool bStatic,canRotateA,canRotateB; } SolverContact;
-static SolverContact gContacts[MAX_GLOBAL_CONTACTS]; static u32 gContactCount; static float posBudget[INSTANCE_COUNT];/*Remaining |delta pos| entity may receive this substep; resets every substep in Physics().*/ static u16 dynamicEntities[512],dynamicEntityCount; static u8 grenadeImpactQueued[INSTANCE_COUNT],projectileImpactQueued[INSTANCE_COUNT],projectileContactThisFrame[INSTANCE_COUNT]; static u16 projectileImpactTarget[INSTANCE_COUNT]; static V3 projectileImpactPoint[INSTANCE_COUNT],projectileImpactNormal[INSTANCE_COUNT]; static float nextCapacityWarn[5]; static u16 gravityLiftWasInside[INSTANCE_COUNT],gravityLiftTouched[INSTANCE_COUNT],gravityLiftTopSupport[INSTANCE_COUNT],teleportWasTouching,teleportTouched; static u8 gravityLiftOverlapLevel=255;
-typedef struct { u16 a,b; u8 n; V3 pt[MANIFOLD_MAX],normal; float accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],pen[MANIFOLD_MAX],dt; u8 votes; V3 challN,posA,posB; u32 frame;/*globalframe of the last Save: entries whose pair stopped being solved (separation, sleep, level reload) expire instead of lingering forever*/ } WarmPair;
-#define WARM_PAIR_COUNT 2048 /*power of two for the hash mask*/
-static WarmPair gWarmPairs[WARM_PAIR_COUNT]; static u8 gWarmPairLevel=255;/*0xFF forces a clear on the very first Physics()*/
-INLINE u32 WarmPairHash(u16 a,u16 b) { return ((u32)a*40503u ^ (u32)b*69621u) & (WARM_PAIR_COUNT-1u); }
-INLINE WarmPair* WarmPairProbe(u16 a,u16 b) { u32 h=WarmPairHash(a,b); for (u32 p=0;p<8;++p) { WarmPair* wp=&gWarmPairs[(h+p)&(WARM_PAIR_COUNT-1u)]; if (!wp->n || (wp->a==a&&wp->b==b)) return wp; } return &gWarmPairs[h];/*saturated table: evict the hash home slot*/ }
+static SolverContact gContacts[MAX_GLOBAL_CONTACTS]; static u32 gContactCount; static float posBudget[INSTANCE_COUNT]; static u16 dynamicEntities[512],dynamicEntityCount; static u8 grenadeImpactQueued[INSTANCE_COUNT],projImpQueued[INSTANCE_COUNT],projectileContactThisFrame[INSTANCE_COUNT]; static u16 projImpTarg[INSTANCE_COUNT]; static V3 projImpPt[INSTANCE_COUNT],projImpNor[INSTANCE_COUNT]; static float nextCapacityWarn[5]; static u16 gravityLiftWasInside[INSTANCE_COUNT],gravityLiftTouched[INSTANCE_COUNT],gravityLiftTopSupport[INSTANCE_COUNT],teleportWasTouching,teleportTouched; static u8 gravityLiftOverlapLevel=255;
+typedef struct { u16 a,b; u8 n; V3 pt[MANIFOLD_MAX],normal; float accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],pen[MANIFOLD_MAX],dt; u8 votes; V3 challN,posA,posB; u32 frame; } WarmPair;
+static WarmPair gWarmPairs[2048]; static u8 gWarmPairLevel=255;
+INLINE u32 WarmPairHash(u16 a,u16 b) { return ((u32)a*40503u ^ (u32)b*69621u) & (2047u); }
+INLINE WarmPair* WarmPairProbe(u16 a,u16 b) { u32 h=WarmPairHash(a,b); for (u32 p=0;p<8;++p) { WarmPair* wp=&gWarmPairs[(h+p)&(2047u)]; if (!wp->n || (wp->a==a&&wp->b==b)) return wp; } return &gWarmPairs[h]; }
 INLINE bool WarmPairSkip(u16 a,u16 b) { return (a==PLAYER1 || b==PLAYER1 || IdxIsNPC(World.instances[a].index) || IdxIsNPC(World.instances[b].index)); }
 static void WarmPairRestore(u16 a,u16 b,const Manifold *m,float dtsub,float *accumN,float *accumT) {
-    if (WarmPairSkip(a,b)) return; WarmPair *wp=WarmPairProbe(a,b); if (!wp->n || wp->a!=a || wp->b!=b) return; if ((u32)(globalframe-wp->frame) > 2u) return;/*stale entry: the pair has not been solved for >2 frames (separated mid-bounce, either body slept, or the level was reloaded into the same slots), so the cached impulses describe a scene that no longer exists -- cold-start the solve instead of restoring them (wrap-safe unsigned delta)*/ if (V3_dot(m->normal,wp->normal) < 0.8f) return;/*basis flipped since last solve: treat as new*/
-    float scale=vclamp(dtsub/vmax(wp->dt,PHY_EPSILON),0.25f,4.0f);/*re-ramp the cached impulses when the substep length drifted; wp->dt stores the SUBSTEP length so this tracks the real per-substep support impulse even when the substep count changes between frames (a frame-dt ratio mis-scales whenever dt/substeps jumps)*/ bool used[MANIFOLD_MAX]={false};
-    for (int i=0;i<m->n;++i) { int best=-1; float bestD2=0.0025f/*5cm squared: resting contact points drift a hair between gathers*/;
-        for (int j=0;j<wp->n;++j) { if (used[j]) continue; V3 dv=V3_AsubB(m->p[i].point,wp->pt[j]); float d2=V3_dot(dv,dv); if (d2<bestD2){bestD2=d2;best=j;} }
-        if (best<0){accumN[i]=0.0f;accumT[i]=0.0f;continue;} used[best]=true; accumN[i]=wp->accumN[best]*scale; accumT[i]=wp->accumT[best]*scale; }
+    if (WarmPairSkip(a,b)) return; WarmPair *wp=WarmPairProbe(a,b); if (!wp->n || wp->a!=a || wp->b!=b) return; if ((u32)(globalframe-wp->frame) > 2u) return; if (V3_dot(m->normal,wp->normal) < 0.8f) return; float scale=vclamp(dtsub/vmax(wp->dt,PHY_EPSILON),0.25f,4.0f); bool used[MANIFOLD_MAX]={false};
+    for (int i=0;i<m->n;++i) { int best=-1; float bestD2=0.0025f; for (int j=0;j<wp->n;++j) { if (used[j]) continue; V3 dv=V3_AsubB(m->p[i].point,wp->pt[j]); float d2=V3_dot(dv,dv); if (d2<bestD2){bestD2=d2;best=j;} } if (best<0){accumN[i]=0.0f;accumT[i]=0.0f;continue;} used[best]=true; accumN[i]=wp->accumN[best]*scale; accumT[i]=wp->accumT[best]*scale; }
 }
-
-static void WarmPairSave(u16 a,u16 b,const Manifold *m,float dtsub,const float *accumN,const float *accumT) {
-    if (WarmPairSkip(a,b)) return; WarmPair *wp=WarmPairProbe(a,b); wp->a=a; wp->b=b; wp->n=(u8)m->n; wp->normal=m->normal; wp->dt=dtsub; wp->frame=globalframe;/*keep the entry alive: only pairs solved within the last 2 frames are restorable/governable*/
-    for (int i=0;i<m->n;++i) { wp->pt[i]=m->p[i].point; wp->accumN[i]=accumN[i]; wp->accumT[i]=accumT[i]; wp->pen[i]=m->p[i].pen; }
-    wp->posA=World.position[a]; wp->posB=World.position[b];
-}
-
+static void WarmPairSave(u16 a,u16 b,const Manifold *m,float dtsub,const float *accumN,const float *accumT) { if (WarmPairSkip(a,b)) return; WarmPair *wp=WarmPairProbe(a,b); wp->a=a; wp->b=b; wp->n=(u8)m->n; wp->normal=m->normal; wp->dt=dtsub; wp->frame=globalframe; for (int i=0;i<m->n;++i) { wp->pt[i]=m->p[i].point; wp->accumN[i]=accumN[i]; wp->accumT[i]=accumT[i]; wp->pen[i]=m->p[i].pen; } wp->posA=World.position[a]; wp->posB=World.position[b]; }
 static void WarmPairGovern(u16 a,u16 b,Manifold *m) {
-    if (World.col[a] != CT_CVX || WarmPairSkip(a,b)) return;
-    WarmPair *wp=WarmPairProbe(a,b); if ((wp->n==0) || wp->a!=a || wp->b!=b) return;/*no resting basis for this pair yet: Save has to seed one first*/ if ((u32)(globalframe-wp->frame) > 2u) return;/*stale basis (pair parted, slept, or the level reloaded): EPA is authoritative until Save seeds a fresh one*/
-    if (V3_dot(World.velocity[a],World.velocity[a]) > 0.0225f/*(0.15 m/s)^2, ~2x the per-substep gravity inflow of a settled body*/ || V3_dot(World.velocity[b],World.velocity[b]) > 0.0225f || V3_dot(World.angularVelocity[a],World.angularVelocity[a]) > 0.09f/*(0.3 rad/s)^2, ~6x the sleep gate*/ || V3_dot(World.angularVelocity[b],World.angularVelocity[b]) > 0.09f) { wp->votes=0; return; }/*moving pair: EPA is authoritative*/
-    V3 relMove=V3_AsubB(V3_AsubB(World.position[a],wp->posA),V3_AsubB(World.position[b],wp->posB)); float alongN=V3_dot(wp->normal,relMove);/*how far the pair drifted along the cached normal since the cached pens were measured; positive = separating, negative = re-compressing*/
-    if ((m->n > 0) && V3_dot(m->normal,wp->normal) >= MANIFOLD_ALIGN_THRESHOLD) { wp->votes=0; return; }/*fresh agrees with the resting basis: publish it and let Save keep the cache current*/
-    if (m->n > 0) { if (V3_dot(m->normal,wp->challN) >= MANIFOLD_ALIGN_THRESHOLD) wp->votes++; else { wp->votes++; wp->challN=m->normal; }/*a DIFFERENT challenger still counts as a challenge: EPA tie-flicker between candidate normals (X,Y,X,Y...) during settle-wobble used to reset the vote to 1 every gather, pinning a stale basis whose frozen points/pens no longer matched the rotated body -- the hidden pen then released as a violent bias kick when the wobble finally crossed the velocity gate.  Any misaligned gather advances the vote, so the stale basis survives at most 2 gathers*/ if (wp->votes >= 3) { wp->votes=0; return; } }/*challenger won three gathers in a row: real relocation, let the fresh basis in (Save adopts it)*/
-    else { bool separated=true; for (int i=0;i<wp->n;++i) { if (wp->pen[i]-alongN >= -0.01f) { separated=false; break; } } if (separated) { wp->votes=0; return; } }/*every cached point drifted >1cm past touching: the pair genuinely parted, the fresh empty manifold is correct*/
-    int cnt=wp->n; if (cnt>MANIFOLD_MAX) cnt=MANIFOLD_MAX; m->n=(i32)cnt; m->normal=wp->normal; m->maxPen=0.0f;
-    for (int i=0;i<cnt;++i) { float pen=wp->pen[i]-alongN; if (pen<0.0f) pen=0.0f; m->p[i].point=wp->pt[i]; m->p[i].pen=pen; if (pen>m->maxPen) m->maxPen=pen; }
+    if (World.col[a] != CT_CVX || WarmPairSkip(a,b)) return; WarmPair *wp=WarmPairProbe(a,b); if ((wp->n==0) || wp->a!=a || wp->b!=b) return; if ((u32)(globalframe-wp->frame) > 2u) return; 
+    if (V3_dot(World.velocity[a],World.velocity[a]) > 0.0225f || V3_dot(World.velocity[b],World.velocity[b]) > 0.0225f || V3_dot(World.angularVelocity[a],World.angularVelocity[a]) > 0.09f || V3_dot(World.angularVelocity[b],World.angularVelocity[b]) > 0.09f) { wp->votes=0; return; }
+    V3 relMove=V3_AsubB(V3_AsubB(World.position[a],wp->posA),V3_AsubB(World.position[b],wp->posB)); float alongN=V3_dot(wp->normal,relMove); if ((m->n > 0) && V3_dot(m->normal,wp->normal) >= MANIFOLD_ALIGN_THRESHOLD) { wp->votes=0; return; } 
+    if (m->n > 0) { if (V3_dot(m->normal,wp->challN) >= MANIFOLD_ALIGN_THRESHOLD) wp->votes++; else { wp->votes++; wp->challN=m->normal; } if (wp->votes >= 3) { wp->votes=0; return; } } else { bool separated=true; for (int i=0;i<wp->n;++i) { if (wp->pen[i]-alongN >= -0.01f) { separated=false; break; } } if (separated) { wp->votes=0; return; } }
+    int cnt=wp->n; if (cnt>MANIFOLD_MAX) cnt=MANIFOLD_MAX; m->n=(i32)cnt; m->normal=wp->normal; m->maxPen=0.0f; for (int i=0;i<cnt;++i) { float pen=wp->pen[i]-alongN; if (pen<0.0f) pen=0.0f; m->p[i].point=wp->pt[i]; m->p[i].pen=pen; if (pen>m->maxPen) m->maxPen=pen; }
 }
 static void WarnPhysicsCapacity(u8 kind,const char* message){if(kind<5&&World.pauseRelativeTime>=nextCapacityWarn[kind]){DualLogWarn("%s\n",message);nextCapacityWarn[kind]=World.pauseRelativeTime+5.0f;}}
 INLINE bool AnimWaking(u16 j) { if(j == PLAYER1){return false;} u16 an = World.instances[j].animationNum; if (!((an == 0 || an == 1 || (an >= 4 && an <= 20) || (an >= 43 && an <= 45) || an == 47 || an == 48) && an < MAXANIM && World.instances[j].clip < MAX_ANIMCLIPS)) return false; u8 fr = mdlAnimClips[an][World.instances[j].clip].framerate; return fr > 0 && (World.current_time - World.instances[j].animFinished) * (double)fr < 1.0; }
 void AddForce(u16 i, V3 f, bool imp){if(imp){World.velocity[i]=V3Add(World.velocity[i],V3_ScaleByF(f,1.0f/vmax(World.mass[i],0.001f)));}else{World.instances[i].accumulatedForce=V3Add(World.instances[i].accumulatedForce,f);} World.physSleep[i]=false;}
-
 // Trigger System
 void AddAccessCardToInventory(int index); void UseTargets(u16 activator, u16 targetIdx); void GrenadeOnCollision(u16 self);
 static bool IsImpactGrenade(u16 idx) { return idx == 370 || idx == 372 || idx == 387 || idx == 404; }
 static bool IsImpactProjectile(u16 idx) { return idx >= 481 && idx <= 495; }
-static void QueueProjectileImpact(u16 projectile,u16 other,V3 point,V3 normal) {
-    if (projectile >= World.instCount || other >= World.instCount || other == World.instances[projectile].recentMostActivator) return;
-    
-    projectileContactThisFrame[projectile] = 1;
-    if(World.instances[projectile].currentTargetIdx == (u16)(other + 1)) return;
-    
-    if(!projectileImpactQueued[projectile]){
-        projectileImpactQueued[projectile] = 1;
-        projectileImpactTarget[projectile] = other;
-        projectileImpactPoint[projectile]  = point;
-        projectileImpactNormal[projectile] = normal;
-    }
-}
-
+static void QueueProjectileImpact(u16 prj, u16 o, V3 p, V3 n) { if (prj < World.instCount && o < World.instCount && o != World.instances[prj].recentMostActivator) { projectileContactThisFrame[prj] = 1; if (World.instances[prj].currentTargetIdx != (u16)(o + 1)) { if (!projImpQueued[prj]) { projImpQueued[prj] = 1; projImpTarg[prj] = o; projImpPt[prj] = p; projImpNor[prj] = n; } } } }
 void CyberDataFragmentOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (other != PLAYER1) {return;} CenterStatusPrint("%s",Sys_Text.stringTable[(u16)e->textIndex]); }
 void CyberItemOnTriggerEnter(u16 self, u16 other) {
     if (other!=PLAYER1) { return; }
-    
     bool success = false;
     switch(World.instances[self].index) {
         case 450/*item_cyber_drill*/: if(World.invP1.isPulserNotDrill&&!(World.invP1.hasSoft&(1u<<SW_PULSER))){World.invP1.isPulserNotDrill=false;} if(World.instances[self].version>World.invP1.softVersions[SW_DRILL]){World.invP1.softVersions[SW_DRILL]=(u8)World.instances[self].version;}else{CenterStatusPrint("%s",Sys_Text.stringTable[46]);} World.invP1.hasSoft|=(1u<<SW_DRILL); play_wav(sounds[86], AppliedFXVol(1.0f), (V3){0.0f,0.0f,0.0f}, false); CenterStatusPrint("%s%d%s",Sys_Text.stringTable[444],World.invP1.softVersions[SW_DRILL],Sys_Text.stringTable[458]); success=true; break;
@@ -260,7 +231,7 @@ INLINE Manifold BoxBox(ShapeBox a, ShapeBox b) {
 
 V3 MvVert(const float* M, V3 v) { return (V3){ M[0]*v.x + M[4]*v.y + M[8]*v.z  + M[12], M[1]*v.x + M[5]*v.y + M[9]*v.z  + M[13], M[2]*v.x + M[6]*v.y + M[10]*v.z + M[14] }; }
 INLINE void MeshTri(u16 m, u32 ti, const float* mx, V3* a, V3* b, V3* c) { u32 i0=modelTriangles[m][ti*3+0],i1=modelTriangles[m][ti*3+1],i2=modelTriangles[m][ti*3+2]; *a=MvVert(mx,MeshVert(m,i0)); *b=MvVert(mx,MeshVert(m,i1)); *c=MvVert(mx,MeshVert(m,i2)); }
-INLINE V3 SphSupport(ShapeSphere b, V3 d) { float L=V3_dot(d,d); float safeL=vmax(L,PHY_EPSILON); float scale=b.rad / vsqrtf(safeL); V3 dir=V3_ScaleByF(d,scale); float mask=(L > PHY_EPSILON); return V3Add(V3_ScaleByF(dir,mask),V3_ScaleByF((V3){0,b.rad,0},1.0f - mask)); }
+INLINE V3 SphSupport(ShapeSphere b, V3 d) { float L=V3_dot(d,d); float safeL=vmax(L,PHY_EPSILON); float scale=b.rad / vsqrtf(safeL); V3 dir=V3_ScaleByF(d,scale); float mask=(L > PHY_EPSILON); return V3Add(b.ctr,V3Add(V3_ScaleByF(dir,mask),V3_ScaleByF((V3){0,b.rad,0},1.0f - mask))); }
 INLINE float copysignf(float magnitude, float sign) { union { float f; u32 i; } m, s; m.f = magnitude; s.f = sign; m.i = (m.i & 0x7FFFFFFFu) | (s.i & 0x80000000u); return m.f; }
 INLINE V3 BoxSupport(ShapeBox b, V3 d) { V3 x=quat_rot_v3(b.rot,(V3){1,0,0}), y=quat_rot_v3(b.rot,(V3){0,1,0}), z=quat_rot_v3(b.rot,(V3){0,0,1}); float kx = copysignf(1.0f, V3_dot(d, x)); float ky = copysignf(1.0f, V3_dot(d, y)); float kz = copysignf(1.0f, V3_dot(d, z)); return V3Add(V3Add(V3Add(b.ctr, V3_ScaleByF(x, kx * b.hExt.x)), V3_ScaleByF(y, ky * b.hExt.y)), V3_ScaleByF(z, kz * b.hExt.z)); }
 INLINE V3 CapsuleSupport(ShapeCapsule cap, V3 d) { float db=V3_dot(cap.base,d), dt=V3_dot(cap.tip,d); float mask=(dt > db); V3 best=V3Add(V3_ScaleByF(cap.tip,mask),V3_ScaleByF(cap.base,1.0f - mask)); float L = V3_dot(d,d); float safeL=vmax(L,PHY_EPSILON); V3 dir=V3_ScaleByF(d,cap.rad / vsqrtf(safeL)); float lmask=(L >= PHY_EPSILON); return V3Add(best,V3_ScaleByF(dir,lmask)); }
@@ -554,7 +525,7 @@ void Physics(float dt) {
     if (gravityLiftOverlapLevel!=World.curLev) { mset(gravityLiftWasInside,0,sizeof(gravityLiftWasInside)); mset(gravityLiftTopSupport,0,sizeof(gravityLiftTopSupport));teleportWasTouching=0;ladderSFXFinished=0.0;gravityLiftOverlapLevel=World.curLev; }
     if (gWarmPairLevel != World.curLev) { mset(gWarmPairs,0,sizeof(gWarmPairs));gWarmPairLevel=World.curLev; mset(World.physQuiet,0,sizeof(u8)*INSTANCE_COUNT); } /*only the current level gets warm-start cache*/
     mset(grenadeImpactQueued,0,sizeof(grenadeImpactQueued));
-    mset(projectileImpactQueued,0,sizeof(projectileImpactQueued));
+    mset(projImpQueued,0,sizeof(projImpQueued));
     mset(projectileContactThisFrame,0,sizeof(projectileContactThisFrame));
     for (u16 i=0;i<World.instCount;++i) flag_set(&World.instances[i].entflags,EF_MOVING,false);
     World.substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f),1u,(u32)40);
@@ -702,7 +673,7 @@ void Physics(float dt) {
         }
     }
     u8 collisionLevel=World.curLev; u16 collisionCount=World.instCount; for (u16 i=INSTS_1ST_IDX;i<collisionCount && World.curLev==collisionLevel;++i) if (grenadeImpactQueued[i] && (World.instances[i].entflags & EF_ACTIVE)) GrenadeOnCollision(i);
-    for(u16 i=INSTS_1ST_IDX;i<collisionCount&&World.curLev==collisionLevel;++i){if(!IsImpactProjectile(World.instances[i].index))continue;if(projectileImpactQueued[i]&&(World.instances[i].entflags&EF_ACTIVE)){u16 target=projectileImpactTarget[i];World.instances[i].currentTargetIdx=(u16)(target+1);ProjectileEffectImpactOnCollision(i,target,projectileImpactPoint[i],projectileImpactNormal[i]);}if(!projectileContactThisFrame[i])World.instances[i].currentTargetIdx=0;}
+    for(u16 i=INSTS_1ST_IDX;i<collisionCount&&World.curLev==collisionLevel;++i){if(!IsImpactProjectile(World.instances[i].index))continue;if(projImpQueued[i]&&(World.instances[i].entflags&EF_ACTIVE)){u16 target=projImpTarg[i];World.instances[i].currentTargetIdx=(u16)(target+1);ProjectileEffectImpactOnCollision(i,target,projImpPt[i],projImpNor[i]);}if(!projectileContactThisFrame[i])World.instances[i].currentTargetIdx=0;}
     if(World.invP1.radiationArea && World.instances[PLAYER1].radiation > 0.0f){AppendTextWarning(184,-1,-1,-T_WHITE,1);/*Radation Area*/}else{World.invP1.radiationArea=false; World.Sys_UI.tWrnFinished[1]=0.0;} if(World.instances[PLAYER1].radiation > 0.1f){AppendTextWarning(185,-1,186,T_RED,2);/*Radiation poisoning ##LBP*/}else{World.instances[PLAYER1].radiation=0.0f; World.Sys_UI.tWrnFinished[2]=0.0;}
 }
 
