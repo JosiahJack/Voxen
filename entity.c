@@ -954,29 +954,14 @@ void LoadAllLevels() {
 
 void CyberTimerReset(u16,int); /*citadel.c: Unity CyberTimer.Reset(difficultyCyber)*/
 void CyberGolReset(void);
-void LoadLevel(u8 curlevel, V3 pos) {
-    u8 prevLevel = World.curLev;
-    if (curlevel == LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE) { World.cyberReturnLevel = (i8)World.curLev; World.cyberReturnPos = World.position[PLAYER1]; }/*ExitCyberspace returns here*/
-    LoadPerLevelModels(curlevel); /*Bring this level's exclusive models on the GPU and reparse their CPU welded/physics data; frees the outgoing level's exclusive set. No-ops when everything needed is already resident. No GL buffer is ever deleted: the swap window is overwritten in place.*/
-    CloseSearch();
-    World.Sys_UI.tetheredKeypadKeycode=World.Sys_UI.tetheredKeypadElevator=World.Sys_UI.tetheredPGP=World.Sys_UI.tetheredPWP=U16_MAX;/*panel tethers are per-level; the entity index they point at dies with the level, so don't sever against a stale one*/
-    World.levelCurrentlyLoading = true;
-    World.paused = World.menuActive = false;
-    if (World.curLev != curlevel) { CopyPlayerState(World.curLev,curlevel); PSysClearLevel(World.curLev); World.curLev = curlevel; SetLevelPointers(curlevel); }
-    for (u16 i = PLAYER1; i < World.instCount; ++i) ComputeConvexMeshInertiaTensor(i);
-    MdlBuildLevelConvexAdjacency(curlevel);
+void LoadLevelSetup(u8 lev) {
+    MdlBuildLevelConvexAdjacency(lev);
     if (World.particles->count == 0) { PSysAddLevelLoops(); }
-    mcpy(camViews, levelCamViews[curlevel],64 * sizeof(CamView));
-    mcpy(camViewTextures, levelCamViewTextures[curlevel], 64 * sizeof(u32));
-    camViewCount = levelCamViewCount[curlevel];
+    mcpy(camViews, levelCamViews[lev],64 * sizeof(CamView));
+    mcpy(camViewTextures, levelCamViewTextures[lev], 64 * sizeof(u32));
+    camViewCount = levelCamViewCount[lev];
     for (u8 i=0;i<camViewCount;++i) { GenerateAndBindTexture(&camViewTextures[i], GL_RGBA8, camViews[i].width, camViews[i].height, GL_RGBA,GL_UNSIGNED_BYTE, 0x2600/*GL_NEAREST*/, NULL); } /*The per-level texture caches share GL names across all 14 preloaded levels; whichever level preloaded LAST leaves its dims on the shared names, so slot storage must be re-specced to camViews[i] dims here or camview copies/samples pair up with the wrong-sized texture (CopyImageSubData region overflow -> INVALID_VALUE + black screens).*/
     mset(alreadyReadLightOnOnce, 0, sizeof(alreadyReadLightOnOnce));
-    ResetLevelAudio();
-    mp3_clear();
-    World.Sys_Music.levelEntry = true;
-    World.Sys_Music.inZone = World.Sys_Music.cyberTube = false;
-    World.Sys_Music.combatImpulseFinished = get_time();
-    World.Sys_Music.combatImpulseFinished += 5.0;
     CullInit(); // Must be after level!
     glUseProgram(voxelUpdateSP);
     glUniform2f(0, World.voxMinCtrX[World.curLev], World.voxMinCtrZ[World.curLev]);
@@ -988,6 +973,25 @@ void LoadLevel(u8 curlevel, V3 pos) {
     glUniform1ui(7, SHADOW_MAP_SIZE * SHADOW_MAP_SIZE);
     for (u16 i=0;i<World.loadedLights;++i) { World.lightsNewPosition[i] = World.lights[i].pos; }
     mset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, World.loadedLights * sizeof(u32));
+}
+
+void LoadLevel(u8 curlevel, V3 pos) {
+    u8 prevLevel = World.curLev;
+    if (curlevel == LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE) { World.cyberReturnLevel = (i8)World.curLev; World.cyberReturnPos = World.position[PLAYER1]; }/*ExitCyberspace returns here*/
+    LoadPerLevelModels(curlevel); /*Bring this level's exclusive models on the GPU and reparse their CPU welded/physics data; frees the outgoing level's exclusive set. No-ops when everything needed is already resident. No GL buffer is ever deleted: the swap window is overwritten in place.*/
+    CloseSearch();
+    World.Sys_UI.tetheredKeypadKeycode=World.Sys_UI.tetheredKeypadElevator=World.Sys_UI.tetheredPGP=World.Sys_UI.tetheredPWP=U16_MAX;/*panel tethers are per-level; the entity index they point at dies with the level, so don't sever against a stale one*/
+    World.levelCurrentlyLoading = true;
+    World.paused = World.menuActive = false;
+    if (World.curLev != curlevel) { CopyPlayerState(World.curLev,curlevel); PSysClearLevel(World.curLev); World.curLev = curlevel; SetLevelPointers(curlevel); }
+    for (u16 i = PLAYER1; i < World.instCount; ++i) ComputeConvexMeshInertiaTensor(i);
+    LoadLevelSetup(curlevel);
+    ResetLevelAudio();
+    mp3_clear();
+    World.Sys_Music.levelEntry = true;
+    World.Sys_Music.inZone = World.Sys_Music.cyberTube = false;
+    World.Sys_Music.combatImpulseFinished = get_time();
+    World.Sys_Music.combatImpulseFinished += 5.0;
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
         Entity* e = &World.instances[i];
         if (IdxIsNPC(e->index) && e->enemy == PLAYER1) { e->enemy = WORLD; /*level entry: NPCs drop the player, so nothing re-aggros from the level they came from*/ }
@@ -1124,7 +1128,7 @@ void LoadGame(u8 slot) {
     if (header.compressedSize == 0 || header.compressedSize > GetMaxCompressedSize(header.uncompressedSize)) { DualLogError("Save has an implausible compressed size (%u bytes) -- treating as corrupt.\n", header.compressedSize); OS_Close(fd); return; }
     u8* b=OS_Alloc(header.compressedSize);
     if (OS_Read(fd,b,header.compressedSize) == (long)header.compressedSize) {
-        size_t result = BlowBubblesOfVoid(b,header.compressedSize,(u8*)&World,header.uncompressedSize);/*Decompress straight into the World str uct*/ if (result == header.uncompressedSize) { SetLevelPointers(World.curLev); cullVisibilityValid=false; AutomapOnLoad(); CenterStatusPrint("Loaded Game: %s", header.savename); } else { DualLogError("Decompression failed! Expected %u bytes, got %u\n", header.uncompressedSize, (u32)result); }
+        size_t result = BlowBubblesOfVoid(b,header.compressedSize,(u8*)&World,header.uncompressedSize);/*Decompress straight into the World str uct*/ if (result == header.uncompressedSize) { SetLevelPointers(World.curLev); LoadPerLevelModels(World.curLev); LoadLevelSetup(World.curLev); cullVisibilityValid=false; AutomapOnLoad(); CenterStatusPrint("Loaded Game: %s", header.savename); } else { DualLogError("Decompression failed! Expected %u bytes, got %u\n", header.uncompressedSize, (u32)result); }
     } OS_Free(b,header.compressedSize); OS_Close(fd); for (int i=0;i<World.loadedLights;++i) { flag_set(&World.lights[i].lflags,LDIRTY,true); }
 }
 

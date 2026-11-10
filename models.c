@@ -588,12 +588,6 @@ void ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
         } next: if (c < e && *c == '\r') ++c; if (c < e && *c == '\n') ++c;
     } if (cur.path[0] && cur.index != U16_MAX && cur.index < cnt) ents[cur.index] = cur; OS_Free(buf, sz);
 }
-float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist) {
-    float tmin = 0.0f, tmax = maxDist;
-    if (vabs(dir.x) < 0.00000001f) { if (origin.x < mn.x || origin.x > mx.x) return -1.0f; } else { float inv=1.0f/dir.x; float t1=(mn.x-origin.x) * inv, t2=(mx.x-origin.x) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > tmin){tmin=t1;} if(t2 < tmax){tmax=t2;} if (tmin > tmax) return -1.0f; } //X slab
-    if (vabs(dir.y) < 0.00000001f) { if (origin.y < mn.y || origin.y > mx.y) return -1.0f; } else { float inv=1.0f/dir.y; float t1=(mn.y-origin.y) * inv, t2=(mx.y-origin.y) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > tmin){tmin=t1;} if(t2 < tmax){tmax=t2;} if (tmin > tmax) return -1.0f; } //Y slab
-    if (vabs(dir.z) < 0.00000001f) { if (origin.z < mn.z || origin.z > mx.z) return -1.0f; } else { float inv=1.0f/dir.z; float t1=(mn.z-origin.z) * inv, t2=(mx.z-origin.z) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > tmin){tmin=t1;} if(t2 < tmax){tmax=t2;} if (tmin > tmax) return -1.0f; } /*Z slab*/ return tmin;
-}
 static void WeldModelPositions(u16 m, u32* weldHt, u32* weldHtUsed, u16* remap, i32 tid) {
     u32 vc = modelVertexCounts[m], tc = modelTriangleCounts[m];
     const float* src=vPos[m]; void* sub_mark=OS_SubArenaMark(tid);
@@ -640,9 +634,7 @@ static void* PhysGeomWorker(void* a) {
         BvhBuildOctree(bvhCtx,physPos[m],physTris[m],initialTris,triCount,0);
         if (bvhCtx->nodeCount > 0) {
             modelBVHNodes[m] = OS_Alloc(bvhCtx->nodeCount * sizeof(BvhNode));
-            mcpy(modelBVHNodes[m], bvhCtx->nodes, bvhCtx->nodeCount * sizeof(BvhNode));
-            modelBVHNodeCounts[m] = bvhCtx->nodeCount;
-            if (bvhCtx->triCount > 0) { modelBVHTriOrder[m] = OS_Alloc(bvhCtx->triCount * sizeof(u16)); mcpy(modelBVHTriOrder[m], bvhCtx->triOrder, bvhCtx->triCount * sizeof(u16)); modelBVHTriOrderCounts[m] = bvhCtx->triCount; }
+            mcpy(modelBVHNodes[m], bvhCtx->nodes, bvhCtx->nodeCount * sizeof(BvhNode)); modelBVHNodeCounts[m] = bvhCtx->nodeCount; if (bvhCtx->triCount > 0) { modelBVHTriOrder[m] = OS_Alloc(bvhCtx->triCount * sizeof(u16)); mcpy(modelBVHTriOrder[m], bvhCtx->triOrder, bvhCtx->triCount * sizeof(u16)); modelBVHTriOrderCounts[m] = bvhCtx->triCount; }
         }
     } return NULL;
 }
@@ -654,19 +646,7 @@ void MdlSwapWindowDisposeData(u16 m) {
     modelTriangles[m] = NULL; modelBVHNodeCounts[m] = 0; modelBVHTriOrderCounts[m] = 0; physVertCounts[m] = 0; modelVertexCounts[m] = 0; modelTriangleCounts[m] = 0; if (vPos) { vPos[m] = NULL; }
 }
 INLINE void MdlCvtHalf(half* dst, const float* verts, u32 vc) { for (u32 k = 0; k < vc; ++k) { __m256 v_in = (*(__m256_u const *)(&verts[k*8])); __m128i v_half = ((__m128i)__builtin_ia32_vcvtps2ph256((__v8sf)(__m256)v_in, (int)(0/*_MM_FROUND_TO_NEAREST_INT*/|0x8/*_MM_FROUND_NO_EXC*/))); _mm_storeu_si128((__m128i*)&dst[k*8], v_half); } }
-static u32 MdlBvhNodeBound(u32 triCount) {
-    if (triCount <= 8) return 1;
-    if (triCount <= 16) return 10;
-    if (triCount <= 32) return 20;
-    if (triCount <= 64) return 32;
-    if (triCount <= 128) return 65;
-    if (triCount <= 256) return 105;
-    if (triCount <= 512) return 252;
-    if (triCount <= 1024) return 337;
-    if (triCount <= 2048) return 421;
-    if (triCount <= 4096) return 421;
-    return 465;
-}
+static u32 MdlBvhNodeBound(u32 triCount) { if (triCount <= 8) return 1; if (triCount <= 16) return 10; if (triCount <= 32) return 20; if (triCount <= 64) return 32; if (triCount <= 128) return 65; if (triCount <= 256) return 105; if (triCount <= 512) return 252; if (triCount <= 1024) return 337; if (triCount <= 2048) return 421; if (triCount <= 4096) return 421; return 465; }
 typedef struct { u32 lo, hi; const u8* skipStamp; u32 mode; u32 winVbCap, winIbCap; u32* tvOut; u32* ttOut; } MdlLoadSet;
 static void MdlLoadModelSet(MdlLoadSet* s) {
     if (!mdlsCnt || s->hi < s->lo) return;
@@ -801,7 +781,7 @@ void LoadPerLevelModels(u8 lev) {
         double startSwapTime = get_time();
         MdlLoadSet s = { lo, hi, incStamp, 1, winVB, winIB, NULL, NULL };
         MdlLoadModelSet(&s);
-        DualLog("LoadPerLevelModels lev %u models %u took %.6f secs\n",lev,incCnt,get_time() - startSwapTime);
+        DualLog("LoadPerLevelModels lev %u models %u .......................................................took %.6f secs\n",lev,incCnt,get_time() - startSwapTime);
     }
     mdlSwapLev = lev;
     RtSwapPatchModels();
@@ -830,7 +810,7 @@ void ParseAllModels(void) {
     MdlLoadModelSet(&s);
     u32 metaV = 0, metaT = 0; for (u32 m=0;m<mdlsCnt;++m) { metaV += mdlMetaVertCounts[m]; metaT += mdlMetaTriCounts[m]; }
     OS_FreeInitPhase();
-    DualLog(" metadata verts: %u, tris: %u......................took %.6f secs\n", metaV, metaT, get_time() - startParseTime);
+    DualLog(" metadata verts: %u, tris: %u................took %.6f secs\n", metaV, metaT, get_time() - startParseTime);
 }
 void LoadModels() {
     static bool mdlPersistentsLoaded = false;

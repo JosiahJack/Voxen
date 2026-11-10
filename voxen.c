@@ -704,7 +704,6 @@ static void cmd_summon(int itemConstIndex) {
         CenterStatusPrint("Summoned object ID %d", itemConstIndex);
     } else { CenterStatusPrint("Invalid object ID: %s", itemConstIndex); }
 }
-static void cmd_select(int instanceIdx) { if (instanceIdx >= 0 && instanceIdx < World.instCount) { editModeSelection=(u16)instanceIdx; CenterStatusPrint("Selected entity instance %u (const index %u)",editModeSelection,World.instances[editModeSelection].index); } else { CenterStatusPrint("Invalid instance: %d (loaded count: %u)",instanceIdx,World.instCount); } }
 static void cmd_notarget() { Cheats.notarget = !Cheats.notarget; CenterStatusPrint("notarget: %s", Cheats.notarget ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
 static u16 showfpsSavedBioBit = 0;
 static void cmd_showfps() { Cheats.showFPS = !Cheats.showFPS; if (Cheats.showFPS) { showfpsSavedBioBit = World.invP1.hardwareIsActive & HW_BIO; World.invP1.hardwareIsActive |= HW_BIO; BioMonitorAlignCursors(); } else { World.invP1.hardwareIsActive = (World.invP1.hardwareIsActive & ~HW_BIO) | showfpsSavedBioBit; } }
@@ -725,23 +724,18 @@ static void cmd_git(const char* arg) {
     for (int i = 0; i < 16; i += 2) { if (sFindSub(arg,cmds[i])) { CenterStatusPrint(cmds[i+1]); return; } } if(sFindSub(arg,"branch") || sFindSub(arg, "-b")){ const char *last = StringFindLastChar(arg,' '); CenterStatusPrint("Created new branch %s",last ? last + 1 : "unknown");} else {CenterStatusPrint("Branch name not recognized. Contact your TriopBucket representative.");}
 }
 static void cmd_quit()      { OS_Exit(0); }
-static const ConsoleCommand consoleCmds[] = {
-    {"noclip",         {.noArg=cmd_noclip},        NOARG},{"idclip",          {.noArg=cmd_noclip},NOARG},         {"no clip",     {.noArg = cmd_noclip},NOARG},  {"showphys",      {.noArg = cmd_showphys},NOARG},  { "god",           {.noArg=cmd_god}, NOARG},       {"overwhelming",            {.noArg=cmd_god}, NOARG}, 
-    {"whosyourdaddy",  {.noArg = cmd_god},         NOARG},{"iddqd",           {.noArg=cmd_god}, NOARG},           {"notarget",    {.noArg=cmd_notarget},NOARG},  {"no target",     {.noArg = cmd_notarget},NOARG},  {"editmode",       {.noArg=cmd_edit},NOARG},       {"edit",                    {.noArg=cmd_edit},NOARG},
-    {"edit mode",      {.noArg = cmd_edit},        NOARG},{"editor",          {.noArg=cmd_edit},NOARG},           {"undo",        {.noArg=cmd_undo},    NOARG},  {"showfps",       {.noArg = cmd_showfps}, NOARG},  {"show fps",       {.noArg=cmd_showfps},NOARG},    {"showlocation",            {.noArg=cmd_showlocation},NOARG},
-    {"editsub",        {.withInt=cmd_editsub},     CMD_INT},
-    {"show location",  {.noArg = cmd_showlocation},NOARG},{"nohud",           {.noArg=cmd_nohud},NOARG},          {"no hud",      {.noArg=cmd_nohud},   NOARG},  {"bottomlessclip",{.noArg = cmd_bottomless},NOARG},{"bottomless clip",{.noArg=cmd_bottomless},NOARG}, {"load",                    {.withStr=cmd_loadlevel},CMD_STR},
-    {"loadarsenal",    {.withStr = cmd_loadarsenal},CMD_STR},{"load arsenal", {.withStr=cmd_loadarsenal},CMD_STR},{"summon_obj",  {.withInt=cmd_summon},CMD_INT},{"summonobj",     {.withInt = cmd_summon},CMD_INT},{"select",          {.withInt=cmd_select},CMD_INT},{"motherlode",     {.text="Nice try, there's no money here."},CMD_PRINT}, {"rosebud",                 {.text="Nice try, there's no money here."},CMD_PRINT},
-    {"kaching",        {.text="Nice try, there's no money here."},CMD_PRINT},{"money",{.text="Nice try, there's no money here."},CMD_PRINT}, {"dizzy",{.noArg=cmd_dizzy},NOARG},   {"help",{.text="There's no one to save you now Hacker!"},CMD_PRINT},{"ifeelthepower",  {.noArg = cmd_energy},  NOARG}, {"power",                   {.noArg=cmd_energy}, NOARG},
-    {"energy",         {.noArg=cmd_energy},        NOARG},{"i feel the power",{.noArg = cmd_energy},NOARG},       {"i am shodan", {.noArg=cmd_iamshodan},NOARG}, {"iamshodan",     {.noArg=cmd_iamshodan},   NOARG},{"mr. bean",       {.text="Nice try, there are no go carts to slow down here"},CMD_PRINT}, {"simon foster",            {.text="Nice try, nothing to paint here"},CMD_PRINT},
-    {"richard branson",{.text="Nice try, there's no money here. You do realize this isn't Rollercoaster Tycoon right?"},CMD_PRINT},{"john wardley",    {.text="WOW!"},CMD_PRINT},  {"john mace",   {.text="Nice try, there's nothing to pay double for here"},CMD_PRINT}, {"melanie warn",  {.text="I feel happy!!!"},CMD_PRINT},{"damon hill",     {.text="Nice try, there are no go carts to speed up here"},CMD_PRINT},{"michael schumacher",      {.text="Nice try, there are no go carts to give ludicrous speed here"},CMD_PRINT},
-    {"tony day",       {.text="Ok, now I want a hamburger"},CMD_PRINT},{"katie brayshaw",  {.text="Hi there! Hello! Hey! Howdy!"},CMD_PRINT},{"sudo",        {.text="Super user access granted...ERROR: access restricted by SHODAN!"},CMD_PRINT}, {"admin",         {.text="Super user access granted...ERROR: access restricted by SHODAN!"},CMD_PRINT},{"git",            {.withStr=cmd_git},CMD_STR},        {"restart",             {.text="Yeah...better not"},CMD_PRINT},
-    {"quit",           {.noArg=cmd_quit},          NOARG},{"exit",            {.noArg = cmd_quit},         NOARG},{"cd",          {.text="Attempting to access directory... already at root"},CMD_PRINT},{"./",            {.text="Attempting to access directory... already at root"},CMD_PRINT},{"kill",           {.noArg = cmd_kill},     NOARG},{"suicide",                 {.noArg=cmd_kill},NOARG},
-    {"die",{.noArg=cmd_kill},NOARG},{"justinbailey",{.text="Well, you don't have a suit already so..."},CMD_PRINT},{"woodstock",{.text="How much wood could a woodchuck chuck...there's no wood in SPACE!"},CMD_PRINT},{"quarry",{.text="There's obsidian on levels 6 and 8 if you want to feel decadent,\notherwise we are lacking in the stone department."},CMD_PRINT},{"zelda",{.text="Too late, already been to level 1"},CMD_PRINT},{"allyourbasearebelongtous",{.text="ERROR: SHODAN has overriden your command, remove SHODAN first."},CMD_PRINT},
-    {"all your base",  {.text="ERROR: SHODAN has overriden your command, remove SHODAN first."},CMD_PRINT},{"i am iron man",   {.text="That's nice dear."},CMD_PRINT},{"i am amazing",{.text="That's nice dear."},CMD_PRINT},{"i am cool",     {.text="That's nice dear."},CMD_PRINT},{"i am best",      {.text="That's nice dear."},CMD_PRINT},{"idkfa",                   {.text="I can only hold 7 weapons!! Nice try dearies!"},CMD_PRINT},
-    {"impulse 9",      {.text="I can only hold 7 weapons!! Nice try dearies!"},CMD_PRINT},{"shake",       {.noArg=cmd_shake},     NOARG},{"tired",         {.noArg=cmd_staminup},    NOARG},{"staminup",       {.noArg = cmd_staminup}, NOARG},{"grok",                    {.text="Only AI allowed around here is SHODAN"},CMD_PRINT},
-    {"chatgpt",        {.text="Only AI allowed around here is SHODAN"},CMD_PRINT},{"claude",          {.text="Only AI allowed around here is SHODAN"},CMD_PRINT},{"gemini",      {.text="Only AI allowed around here is SHODAN"},CMD_PRINT},{"shodan",{.text="In my magnificence, I shape clay, crafting new lifeforms..."},CMD_PRINT},{"animtest",{.noArg = cmd_animtest}, NOARG},{"qb_set",{.questOp=0},CMD_QUEST},
-    {"qb_clear",       {.questOp=1},CMD_QUEST},{"qb_toggle",{.questOp=2},CMD_QUEST},{"qb_list",     {.noArg=cmd_qb_list},   NOARG},{"shownpc",       {.noArg=cmd_shownpc},     NOARG},{NULL,{.noArg = NULL},NOARG}/*sizeof helper*/ };
+static const ConsoleCommand consoleCmds[] = {{"noclip",{.noArg=cmd_noclip},NOARG},{"idclip",{.noArg=cmd_noclip},NOARG},{"showphys",{.noArg = cmd_showphys},NOARG},{"god",{.noArg=cmd_god},NOARG},{"overwhelming",{.noArg=cmd_god},NOARG},{"whosyourdaddy",{.noArg = cmd_god},NOARG},{"iddqd",{.noArg=cmd_god},NOARG},{"notarget",{.noArg=cmd_notarget},NOARG},{"editmode",{.noArg=cmd_edit},NOARG},{"undo",{.noArg=cmd_undo},NOARG},{"showfps",{.noArg=cmd_showfps},NOARG},
+                                             {"showlocation",{.noArg=cmd_showlocation},NOARG},{"editsub",{.withInt=cmd_editsub},CMD_INT},{"nohud",{.noArg=cmd_nohud},NOARG},{"bottomlessclip",{.noArg = cmd_bottomless},NOARG},{"load",{.withStr=cmd_loadlevel},CMD_STR},{"loadarsenal",{.withStr = cmd_loadarsenal},CMD_STR},{"summon_obj",{.withInt=cmd_summon},CMD_INT},{"motherlode",{.text="Nice try, there's no money here."},CMD_PRINT},
+                                             {"rosebud",{.text="Nice try, there's no money here."},CMD_PRINT},{"kaching",{.text="Nice try, there's no money here."},CMD_PRINT},{"money",{.text="Nice try, there's no money here."},CMD_PRINT},{"dizzy",{.noArg=cmd_dizzy},NOARG},{"help",{.text="There's no one to save you now Hacker!"},CMD_PRINT},{"ifeelthepower",{.noArg = cmd_energy},NOARG},{"i am shodan", {.noArg=cmd_iamshodan},NOARG},
+                                             {"iamshodan",{.noArg=cmd_iamshodan},NOARG},{"mr. bean",{.text="Nice try, there are no go carts to slow down here"},CMD_PRINT},{"simon foster",{.text="Nice try, nothing to paint here"},CMD_PRINT},{"richard branson",{.text="Nice try, there's no money here. You do realize this isn't Rollercoaster Tycoon right?"},CMD_PRINT},{"john wardley",{.text="WOW!"},CMD_PRINT},
+                                             {"john mace",{.text="Nice try, there's nothing to pay double for here"},CMD_PRINT},{"melanie warn",{.text="I feel happy!!!"},CMD_PRINT},{"damon hill",{.text="Nice try, there are no go carts to speed up here"},CMD_PRINT},{"michael schumacher",{.text="Nice try, there are no go carts to give ludicrous speed here"},CMD_PRINT},{"tony day",{.text="Ok, now I want a hamburger"},CMD_PRINT},
+                                             {"katie brayshaw",{.text="Hi there! Hello! Hey! Howdy!"},CMD_PRINT},{"sudo",{.text="Super user access granted...ERROR: access restricted by SHODAN!"},CMD_PRINT},{"admin",{.text="Super user access granted...ERROR: access restricted by SHODAN!"},CMD_PRINT},{"git",{.withStr=cmd_git},CMD_STR},{"restart",{.text="Yeah...better not"},CMD_PRINT},{"quit",{.noArg=cmd_quit},NOARG},{"exit", {.noArg = cmd_quit},NOARG},
+                                             {"cd",{.text="Attempting to access directory... already at root"},CMD_PRINT},{"./",{.text="Attempting to access directory... already at root"},CMD_PRINT},{"kill",{.noArg = cmd_kill},NOARG},{"suicide",{.noArg=cmd_kill},NOARG},{"die",{.noArg=cmd_kill},NOARG},{"justinbailey",{.text="Well, you don't have a suit already so..."},CMD_PRINT},
+                                             {"woodstock",{.text="How much wood could a woodchuck chuck...there's no wood in SPACE!"},CMD_PRINT},{"quarry",{.text="There's obsidian on levels 6 and 8 if you want to feel decadent,\notherwise we are lacking in the stone department."},CMD_PRINT},{"zelda",{.text="Too late, already been to level 1"},CMD_PRINT},
+                                             {"allyourbasearebelongtous",{.text="ERROR: SHODAN has overriden your command, remove SHODAN first."},CMD_PRINT},{"all your base are belong to us",{.text="ERROR: SHODAN has overriden your command, remove SHODAN first."},CMD_PRINT},{"i am iron man",{.text="That's nice dear."},CMD_PRINT},{"i am amazing",{.text="That's nice dear."},CMD_PRINT},{"i am cool",{.text="That's nice dear."},CMD_PRINT},
+                                             {"i am best",{.text="That's nice dear."},CMD_PRINT},{"idkfa",{.text="I can only hold 7 weapons!! Nice try dearies!"},CMD_PRINT},{"impulse 9",{.text="I can only hold 7 weapons!! Nice try dearies!"},CMD_PRINT},{"shake",{.noArg=cmd_shake},NOARG},{"tired",{.noArg=cmd_staminup},NOARG},{"staminup",{.noArg = cmd_staminup},NOARG},{"grok",{.text="Only AI allowed around here is SHODAN"},CMD_PRINT},
+                                             {"chatgpt",{.text="Only AI allowed around here is SHODAN"},CMD_PRINT},{"claude",{.text="Only AI allowed around here is SHODAN"},CMD_PRINT},{"gemini",{.text="Only AI allowed around here is SHODAN"},CMD_PRINT},{"shodan",{.text="In my magnificence, I shape clay, crafting new lifeforms..."},CMD_PRINT},{"animtest",{.noArg = cmd_animtest},NOARG},{"qb_set",{.questOp=0},CMD_QUEST},{"qb_clear",{.questOp=1},CMD_QUEST},
+                                             {"qb_toggle",{.questOp=2},CMD_QUEST},{"qb_list",{.noArg=cmd_qb_list},NOARG},{"shownpc",{.noArg=cmd_shownpc},NOARG},{NULL,{.noArg = NULL},NOARG}/*sizeof helper*/ };
 void ProcessConsoleCommand(const char* c) {
     if (c == NULL || slen(c) == 0) { ToggleConsole(); return; }
     const char* ct = c;            while (*ct && cEmpty((u8)*ct)) { ct++; }
@@ -840,7 +834,12 @@ INLINE RaycastHit RayBox(V3 origin, V3 dir, ShapeBox box, float maxDist) {
     V3 ln = {0.0f, 0.0f, 0.0f}; if (axis == 0) ln.x = asign; else if (axis == 1) ln.y = asign; else ln.z = asign;
     h.hit = true; h.distance = tmin; h.point = V3Add(origin, V3_ScaleByF(dir, tmin)); h.normal = quat_rot_v3(box.rot, ln); return h;
 }
-float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist);
+float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist) {
+    float tmin = 0.0f, tmax = maxDist;
+    if (vabs(dir.x) < 0.00000001f) { if (origin.x < mn.x || origin.x > mx.x) return -1.0f; } else { float inv=1.0f/dir.x; float t1=(mn.x-origin.x) * inv, t2=(mx.x-origin.x) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > tmin){tmin=t1;} if(t2 < tmax){tmax=t2;} if (tmin > tmax) return -1.0f; } //X slab
+    if (vabs(dir.y) < 0.00000001f) { if (origin.y < mn.y || origin.y > mx.y) return -1.0f; } else { float inv=1.0f/dir.y; float t1=(mn.y-origin.y) * inv, t2=(mx.y-origin.y) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > tmin){tmin=t1;} if(t2 < tmax){tmax=t2;} if (tmin > tmax) return -1.0f; } //Y slab
+    if (vabs(dir.z) < 0.00000001f) { if (origin.z < mn.z || origin.z > mx.z) return -1.0f; } else { float inv=1.0f/dir.z; float t1=(mn.z-origin.z) * inv, t2=(mx.z-origin.z) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > tmin){tmin=t1;} if(t2 < tmax){tmax=t2;} if (tmin > tmax) return -1.0f; } /*Z slab*/ return tmin;
+}
 static u16 rayCellHeads[ARRSIZE], rayNext[INSTANCE_COUNT];
 static u32 rayGridFrame=U32_MAX;
 INLINE void RayGridRebuild(void) { rayGridFrame = globalframe; for (u32 c=0;c<ARRSIZE;++c) { rayCellHeads[c] = INSTANCE_COUNT; } for (u16 i=0;i<World.instCount;++i){ u16 c=(u16)World.instances[i].cellIndex; if (c>=ARRSIZE){ c = (u16)PosGetCellCoords(World.position[i].x, World.position[i].z); } rayNext[i] = rayCellHeads[c]; rayCellHeads[c] = i; } }
@@ -1272,15 +1271,11 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     for (i32 i=0;i<numCastersAligned;++i) { u16 j=shadowCasterIndices[i]; sc_origIdx[i]=j; sc_posX[i]=World.position[j].x; sc_posY[i]=World.position[j].y; sc_posZ[i]=World.position[j].z; sc_radius[i]=World.radius[j]; sc_shadRadius[i]=World.instances[j].shadRadius; }
     for (i32 i=numCastersAligned;i<numCasters;++i) { u16 j=shadowCasterIndices[i]; sc_posX[i]=World.position[j].x; sc_posY[i]=World.position[j].y; sc_posZ[i]=World.position[j].z; sc_radius[i]=World.radius[j]; sc_shadRadius[i]=World.instances[j].shadRadius; sc_origIdx[i]=j; }
     if (shadowLevel != (i8)World.curLev) { mset(shadowSlot, 0xFF, sizeof(shadowSlot)); mset(shadowFaces, 0, sizeof(shadowFaces)); mset(shadowPosSum, 0, sizeof(shadowPosSum)); mset(shadowIdSum, 0, sizeof(shadowIdSum)); shadowNextSlot = 0; shadowLevel = (i8)World.curLev; }
-    shadDrawCalls = 0U;
     glBindBuffer(GL_SSBO, shadowMapSSBO);
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     glUseProgram(shadowmapsSP);
-    u32 currentSortKey = 0xFFFFFFFF, currentTriCount = 0;
-    u16 currentModelType = 0xFFFF, currentTexIndex = 0xFFFF;
-    bool currentIsTransparent = false;
-    SortedMesh localMeshes[SHADOW_NEARMESH_MAX];
-    V3 camFwds[64]; for (u8 v=0;v<camViewCount;++v) { camFwds[v] = V3_Normalize(quat_rot_v3(camViews[v].rotation,(V3){0.0f,0.0f,1.0f})); } /*per-frame: sensaround slots re-orient every tick*/
+    shadDrawCalls = 0U; u32 currentSortKey = 0xFFFFFFFF, currentTriCount = 0; u16 currentModelType = 0xFFFF, currentTexIndex = 0xFFFF; bool currentIsTransparent = false; SortedMesh localMeshes[SHADOW_NEARMESH_MAX]; V3 camFwds[64];
+    for (u8 v=0;v<camViewCount;++v) { camFwds[v] = V3_Normalize(quat_rot_v3(camViews[v].rotation,(V3){0.0f,0.0f,1.0f})); } /*per-frame: sensaround slots re-orient every tick*/
     for (u16 c = 0; c < numCandidates; ++c) {
         u16 lightIdx = candidates[c];
         V3 lpos = World.lights[lightIdx].pos;
@@ -1428,13 +1423,7 @@ void RenderSunShadowmap(void) {
     V3 eye={target.x+sunDir.x*eyeDist,target.y+sunDir.y*eyeDist,target.z+sunDir.z*eyeDist};
     float view[16]={right.x,up.x,sunDir.x,0.0f, right.y,up.y,sunDir.y,0.0f, right.z,up.z,sunDir.z,0.0f, -(right.x*eye.x+right.y*eye.y+right.z*eye.z),-(up.x*eye.x+up.y*eye.y+up.z*eye.z),-(sunDir.x*eye.x+sunDir.y*eye.y+sunDir.z*eye.z),1.0f};
     float ex=right.x*eye.x+right.y*eye.y+right.z*eye.z, ey=up.x*eye.x+up.y*eye.y+up.z*eye.z;
-    /*Continuous translation, NO texel snap. The light-space basis rotates every frame here, so the old
-    '(int)(q+0.5f)' rounding of ex/ey to the texel grid snapped the whole shadowmap by whole texels dozens
-    of times per second while the sun angle advanced (the stepping the sun shadow angle showed). Sub-texel
-    drift at 4096^2 across 128 units is invisible and the PCF penumbra in chunk_frag absorbs the rest.*/
-    view[12]=-ex; view[13]=-ey;
-    const float znear=S*0.5f, zfar=S*4.0f;
-    float ortho[16]={1.0f/S,0.0f,0.0f,0.0f, 0.0f,1.0f/S,0.0f,0.0f, 0.0f,0.0f,-2.0f/(zfar-znear),0.0f, 0.0f,0.0f,-(zfar+znear)/(zfar-znear),1.0f};
+    view[12]=-ex; view[13]=-ey; const float znear=S*0.5f, zfar=S*4.0f; float ortho[16]={1.0f/S,0.0f,0.0f,0.0f, 0.0f,1.0f/S,0.0f,0.0f, 0.0f,0.0f,-2.0f/(zfar-znear),0.0f, 0.0f,0.0f,-(zfar+znear)/(zfar-znear),1.0f};
     mul_mat4(sunShadowMatrix,ortho,view); ExtractFrustumPlanes(sunShadowMatrix,sunShadowFrustum);
     glBindFramebuffer(GL_FRAMEBUFFER,sunShadowFBO); glViewport(0,0,SUN_SHADOW_SIZE,SUN_SHADOW_SIZE); glClear(GL_DEPTH_BUFFER_BIT);
     glDisable(GL_CULL_FACE);
@@ -1445,7 +1434,6 @@ void RenderSunShadowmap(void) {
         if (i == World.weaponVModelIndex) continue;
         Entity* e=&World.instances[i]; if (EntNotVisible(i,(e->entflags & EF_NO_SHADOWS))) continue;
         float radius=(e->modelIndex < MAX_MDLS ? modelBounds[e->modelIndex] : 0.0f) * 2.0f * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z); if (!SphereInFrustum(sunShadowFrustum,World.position[i],radius)) continue;
-        
         u16 modelType=(instanceIsLODArray[i]||useDetail<1u)&&e->lodIndex<mdlsCnt?e->lodIndex:e->modelIndex;
         u32 sortKey=((u32)modelType<<16)|e->texIndex;
         glUniform1ui(0,i);
@@ -1454,7 +1442,6 @@ void RenderSunShadowmap(void) {
     }
     glEnable(GL_CULL_FACE); glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
 }
-
 static DepthSort visibleInstances[INSTANCE_COUNT];
 __attribute__((pure)) i32 dsort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
 __attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (da > db) - (da < db); }
