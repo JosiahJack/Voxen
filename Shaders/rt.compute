@@ -19,6 +19,7 @@ layout(location=7) uniform vec2 worldMin;
 layout(location=9) uniform uint texCount;
 layout(std430,binding=1)  readonly buffer ModelMatrices { mat4 modelMatrices[]; };
 layout(std430,binding=16) readonly buffer RTGeom { uvec4 rtGeom4[]; };
+layout(std430,binding=20) readonly buffer MegaVerts { uvec4 megaVerts[]; };
 struct InstanceRTInfo { uvec4 geom; uvec4 info; vec4 iscl2; };
 layout(std430,binding=21) readonly buffer RTInstanceInfo { InstanceRTInfo rtInstanceInfo[]; };
 layout(std430,binding=23) readonly buffer RTCellCounts { uint rtCellCountsP[]; };      // u16 x2 per word
@@ -39,9 +40,8 @@ vec4 getTextureColorGaussian(uint texIdx, vec2 uvF, ivec2 texSize) { vec2 tc = u
 uint GetVoxelIndex(vec3 worldPos) { vec2 o = (worldPos.xz - worldMin) * 3.125; uvec2 v = uvec2(clamp(o, vec2(0.0), vec2(511.0))); return v.y * 512u + v.x; }
 float rayAABB(vec3 origin, vec3 invDir, vec3 mn, vec3 mx, float maxDist) { vec3 t0 = (mn - origin) * invDir, t1 = (mx - origin) * invDir; vec3 tmin = min(t0, t1), tmax = max(t0, t1); float tNear = max(max(tmin.x, tmin.y), tmin.z), tFar = min(min(tmax.x, tmax.y), tmax.z); if (tFar < max(0.02, tNear) || tNear > maxDist) return -1.0; return max(tNear, 0.02); }
 uint  RtCellCount(uint cell) { uint w = rtCellCountsP[cell >> 1u]; return (cell & 1u) != 0u ? (w >> 16u) : (w & 0xFFFFu); }
-uvec2 RtPair(uint w) { uvec4 v = rtGeom4[w >> 2u]; return (w & 2u) != 0u ? v.zw : v.xy; }
-vec2  RtUV(uint w)   { uvec4 v = rtGeom4[w >> 2u]; return unpackHalf2x16(v[w & 3u]); }
-vec3  RtVtxPos(uint vtxBase, uint vi) { uvec2 p = RtPair(vtxBase + vi * 2u); return vec3(unpackHalf2x16(p.x), unpackHalf2x16(p.y).x); }
+vec2  RtUV(uint base, uint vi) { return unpackHalf2x16(megaVerts[base + vi].w); }
+vec3  RtVtxPos(uint base, uint vi) { uvec4 v = megaVerts[base + vi]; return vec3(unpackHalf2x16(v.x), unpackHalf2x16(v.y).x); }
 void main() {
     uvec2 gid = gl_GlobalInvocationID.xy; if (gid.x >= screenWidth || gid.y >= screenHeight) return;
     
@@ -61,7 +61,7 @@ void main() {
     float bestDist = maxDist + 1.0;
     vec3  hitWorld = vec3(0.0);
     bool  hasHit = false;
-    uint  bestInst = 0u, bestUVBase = 0u, bestIA = 0u, bestIB = 0u, bestIC = 0u;
+    uint  bestInst = 0u, bestIA = 0u, bestIB = 0u, bestIC = 0u;
     float bestBaryU = 0.0, bestBaryV = 0.0;
     const float CELL = 2.56, INV_CELL = 0.390625, CELLXHALF = 1.28; // ---- 2D DDA over 64x64 cell grid ----
     vec2 gridOrg = worldMin - CELLXHALF;
@@ -178,7 +178,7 @@ void main() {
                 vec3 worldHitPt = c0 * hl.x + c1 * hl.y + c2 * hl.z + tr;
                 vec3 dd = worldHitPt - worldPos;
                 float wdSq = dot(dd, dd);
-                if (wdSq > 0.01 && wdSq < bestDist * bestDist) { hasHit = true; bestDist = sqrt(wdSq); hitWorld = worldHitPt; bestInst = inst; bestUVBase = instGeom.w; bestIA = hitIA; bestIB = hitIB; bestIC = hitIC; bestBaryU = hitU; bestBaryV = hitV; }
+                if (wdSq > 0.01 && wdSq < bestDist * bestDist) { hasHit = true; bestDist = sqrt(wdSq); hitWorld = worldHitPt; bestInst = inst; bestIA = hitIA; bestIB = hitIB; bestIC = hitIC; bestBaryU = hitU; bestBaryV = hitV; }
             }
         }
         if (tMaxX < tMaxZ) { cx += stepX; t = tMaxX; tMaxX += tDeltaX; } else { cz += stepZ; t = tMaxZ; tMaxZ += tDeltaZ; }
@@ -189,7 +189,8 @@ void main() {
         if (texIdx < texCount) {
             ivec2 ts = textureSizes[texIdx];
             if (ts.x > 0 && ts.y > 0) {
-                vec2 uvHit = RtUV(bestUVBase + bestIA) * (1.0 - bestBaryU - bestBaryV) + RtUV(bestUVBase + bestIB) * bestBaryU + RtUV(bestUVBase + bestIC) * bestBaryV;
+                uint vb = rtInstanceInfo[bestInst].geom.z;
+                vec2 uvHit = RtUV(vb, bestIA) * (1.0 - bestBaryU - bestBaryV) + RtUV(vb, bestIB) * bestBaryU + RtUV(vb, bestIC) * bestBaryV;
                 ivec2 tcoord = clamp(ivec2(fract(vec2(uvHit.x, 1.0 - uvHit.y)) * vec2(ts)), ivec2(0), ts - 1);
                 vec3 albedo = getTextureColor(texIdx, tcoord, ts).rgb;
                 uint glowIdx = rtInstanceInfo[bestInst].info.w; // Emissive glow sampled exactly like chunk_frag.glsl: mostly blurred, lightly crisp
@@ -202,7 +203,6 @@ void main() {
                 }
                 mat4 Mb = modelMatrices[bestInst];
                 vec4 isc = rtInstanceInfo[bestInst].iscl2;
-                uint vb = rtInstanceInfo[bestInst].geom.z;
                 vec3 pa = RtVtxPos(vb, bestIA), pb = RtVtxPos(vb, bestIB), pc = RtVtxPos(vb, bestIC);
                 vec3 ln = cross(pb - pa, pc - pa);
                 vec3 N = normalize(Mb[0].xyz * (isc.x * ln.x) + Mb[1].xyz * (isc.y * ln.y) + Mb[2].xyz * (isc.z * ln.z));

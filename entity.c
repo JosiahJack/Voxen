@@ -896,7 +896,7 @@ void LoadAllLevels() {
             u16 mi = World.instances[i].modelIndex;
             World.radius[i] = ((mi < mdlsCnt && modelBounds[mi] > 0.0f) ? modelBounds[mi] : 2.56f) * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
             World.instances[i].shadRadius = World.radius[i] * 2.00f;
-            ComputeConvexMeshInertiaTensor(i);
+            World.mass[i] *= 10.0f;
             if (World.mass[i] < 0.001f && World.col[i] != CT_NONE && World.col[i] != CT_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) { World.mass[i]=0.2f;/*At least something for movables!*/ }
         }
         for (int i=PLAYER1;i<World.instCount;++i) {
@@ -957,12 +957,14 @@ void CyberGolReset(void);
 void LoadLevel(u8 curlevel, V3 pos) {
     u8 prevLevel = World.curLev;
     if (curlevel == LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE) { World.cyberReturnLevel = (i8)World.curLev; World.cyberReturnPos = World.position[PLAYER1]; }/*ExitCyberspace returns here*/
-    SwapLevelModels(curlevel); /*Bring this level's exclusive models on the GPU and reparse their CPU welded/physics data; frees the outgoing level's exclusive set. No-ops when everything needed is already resident. No GL buffer is ever deleted: the swap window is overwritten in place.*/
+    LoadPerLevelModels(curlevel); /*Bring this level's exclusive models on the GPU and reparse their CPU welded/physics data; frees the outgoing level's exclusive set. No-ops when everything needed is already resident. No GL buffer is ever deleted: the swap window is overwritten in place.*/
     CloseSearch();
     World.Sys_UI.tetheredKeypadKeycode=World.Sys_UI.tetheredKeypadElevator=World.Sys_UI.tetheredPGP=World.Sys_UI.tetheredPWP=U16_MAX;/*panel tethers are per-level; the entity index they point at dies with the level, so don't sever against a stale one*/
     World.levelCurrentlyLoading = true;
     World.paused = World.menuActive = false;
     if (World.curLev != curlevel) { CopyPlayerState(World.curLev,curlevel); PSysClearLevel(World.curLev); World.curLev = curlevel; SetLevelPointers(curlevel); }
+    for (u16 i = PLAYER1; i < World.instCount; ++i) ComputeConvexMeshInertiaTensor(i);
+    MdlBuildLevelConvexAdjacency(curlevel);
     if (World.particles->count == 0) { PSysAddLevelLoops(); }
     mcpy(camViews, levelCamViews[curlevel],64 * sizeof(CamView));
     mcpy(camViewTextures, levelCamViewTextures[curlevel], 64 * sizeof(u32));

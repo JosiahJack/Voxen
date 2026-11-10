@@ -191,7 +191,6 @@ INLINE u32 inertia_f32bits(float f) { union { float f; u32 u; } b; b.f=f; return
 #define INERTIA_MEMO_HIT(c) ((c)->mi==mi && (c)->state && (c)->massBits==inertia_f32bits(World.mass[i]) && (c)->sxBits==inertia_f32bits(World.scale[i].x) && (c)->syBits==inertia_f32bits(World.scale[i].y) && (c)->szBits==inertia_f32bits(World.scale[i].z))
 #define INERTIA_MEMO_STORE(c,st,mag,rad) ((c)->mi=mi, (c)->massBits=inertia_f32bits(World.mass[i]), (c)->sxBits=inertia_f32bits(World.scale[i].x), (c)->syBits=inertia_f32bits(World.scale[i].y), (c)->szBits=inertia_f32bits(World.scale[i].z), (c)->state=(st), (c)->comMag=(mag), (c)->r=(rad))
 void ComputeConvexMeshInertiaTensor(u16 i) {
-    World.mass[i] *= 10.0f; // Intentional global mass scaling.  Gives better responses and robustness to small items.
     u16 mi = World.instances[i].colMeshIndex; World.invTnsrValid[i]=false; if (mi >= MAX_MDLS || !modelTriangleCounts[mi] || !modelVertexCounts[mi]) {return;}
     InertiaMemo* set = inertiaMemo[mi & 255];
     InertiaMemo* ce = NULL;

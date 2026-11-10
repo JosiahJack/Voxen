@@ -14,7 +14,7 @@ typedef struct { u16 index; bool animated; u8 animationNum; u16* frames; u32 fra
 typedef struct { ModelData* entries; u32 count; } ModelDataParser;
 u32 mdlVboOfs[MAX_MDLS], mdlIboOfs[MAX_MDLS],modelVBO = 0, modelIBO = 0,rtCapNodeWords = 0, rtCapTriWords = 0, rtCapPosWords = 0, rtCapUvWords = 0, rtCapOrderU16 = 0,rtPersistNodeWords = 0, rtPersistTriWords = 0, rtPersistPosWords = 0, rtPersistUvWords = 0, rtPersistOrderU16 = 0;
 u8 mdlPersistentSet[MAX_MDLS],mdlSwapLev = 255u; 
-static u8 mdlIsAnimFrame[MAX_MDLS]; static u16 mdlLevelBits[MAX_MDLS], **mdlPstTri = NULL; static bool mdlDerivDone = false; static u32 mdlSwapVboBase,mdlSwapIboBase,mdlPoolVbBytes,mdlPoolIbBytes,mdlSpanBase[MAX_MDLS],g_mdlDataCnt = 0; static ModelData* g_mdlData = NULL; static float** vPos; static half** mdlPstHalfV = NULL; 
+static u8 mdlIsAnimFrame[MAX_MDLS]; static u16 mdlLevelBits[MAX_MDLS], **mdlPstTri = NULL; static bool mdlDerivDone = false; static u32 mdlSwapVboBase,mdlSwapIboBase,mdlPoolVbBytes,mdlPoolIbBytes,mdlSpanBase[MAX_MDLS],g_mdlDataCnt = 0; static ModelData* g_mdlData = NULL; static float** vPos; static half** mdlPstHalfV = NULL; static u32 *mdlMetaVertCounts = NULL, *mdlMetaTriCounts = NULL;
 typedef struct { u32 base, spanLen; } AnimEntryRef; static AnimEntryRef animNumSpans[MAXANIM][8]; static u8 animNumSpanCnt[MAXANIM];
 extern const u16 wepModelIndices[16];
 INLINE void MdlMarkLevel(u16 m, u16 levBit, bool persistForced) { if (m >= mdlsCnt) return; if (persistForced) { mdlPersistentSet[m] = 1; } else { mdlLevelBits[m] |= (u16)levBit; } }
@@ -654,93 +654,115 @@ void MdlSwapWindowDisposeData(u16 m) {
     modelTriangles[m] = NULL; modelBVHNodeCounts[m] = 0; modelBVHTriOrderCounts[m] = 0; physVertCounts[m] = 0; modelVertexCounts[m] = 0; modelTriangleCounts[m] = 0; if (vPos) { vPos[m] = NULL; }
 }
 INLINE void MdlCvtHalf(half* dst, const float* verts, u32 vc) { for (u32 k = 0; k < vc; ++k) { __m256 v_in = (*(__m256_u const *)(&verts[k*8])); __m128i v_half = ((__m128i)__builtin_ia32_vcvtps2ph256((__v8sf)(__m256)v_in, (int)(0/*_MM_FROUND_TO_NEAREST_INT*/|0x8/*_MM_FROUND_NO_EXC*/))); _mm_storeu_si128((__m128i*)&dst[k*8], v_half); } }
-void SwapLevelModels(u8 lev) {
-    if (lev >= MAX_LEVELS || !mdlDerivDone || modelVBO == 0 || mdlSwapLev == lev) return;
-    u32 incCnt = 0, ic = 0;
-    for (u32 m=0; m<mdlsCnt; ++m) { if (MdlIsWinMemberSet((u16)m, lev)) ++incCnt; }
-    u16* incList = incCnt ? (u16*)OS_Alloc(incCnt * sizeof(u16)) : NULL;
-    for (u32 m=0; m<mdlsCnt; ++m) { if (MdlIsWinMemberSet((u16)m, lev) && ic < incCnt) incList[ic++] = (u16)m; }
-    u32 lo = incCnt ? incList[0] : 0, hi = incCnt ? incList[incCnt-1] : 0; u32 anyOut = (mdlSwapLev != 255u); static u8 incStamp[MAX_MDLS]; mset(incStamp,0,mdlsCnt);
-    for (u32 k=0;k<ic;++k) incStamp[incList[k]] = 1;
-    for (u32 m=0; m<mdlsCnt; ++m) { bool inc = incStamp[m] != 0; bool outg = anyOut && MdlIsWinMemberSet((u16)m, mdlSwapLev); if (!inc && !outg) continue; if (physPos[m] || modelTriangles[m] || modelVertexCounts[m]) { MdlSwapWindowDisposeData((u16)m); } mdlVboOfs[m] = mdlIboOfs[m] = 0xFFFFFFFFu; }
-    if (incCnt) {
-        size_t remap_sz = (size_t)MAX_OUTPUT_VERTS * sizeof(u32), cache_sz = ((MAX_OUTPUT_VERTS/3) * sizeof(TriSort)) * 2 + (MAX_OUTPUT_VERTS * sizeof(u16));
-        size_t bvh_nodes_sz = (size_t)BVH_MAX_NODES_PER_MDL * sizeof(BvhNode);
-        size_t bvh_u8_sz = (size_t)BVH_MAX_TRIS_PER_MDL * sizeof(u8);
-        size_t bvh_u16_sz = (size_t)BVH_MAX_TRIS_PER_MDL * sizeof(u16);
-        const size_t SUB_ARENA_SZ = (2ULL * 512 * 1024) * ((32ULL + threadCnt - 1) / threadCnt);
-        const size_t SUB_MAIN_SZ = 12ULL * 1024 * 1024; size_t slices_tot = SUB_ARENA_SZ*(size_t)threadCnt + SUB_MAIN_SZ;
-        size_t psz = MAX_VERT_ELEMENT_SIZE*3*sizeof(float), usz = MAX_OUTPUT_VERTS*8*sizeof(float);
-        size_t rawSz = (size_t)mdlsCnt;
-        size_t arena = rawSz*sizeof(RawOBJ) + 8*threadCnt*sizeof(void*) + (size_t)threadCnt * ((MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*2)*sizeof(float) + MAX_OUTPUT_VERTS*8*sizeof(float) + WELD_HASH_SIZE*sizeof(u32) + MAX_OUTPUT_VERTS*sizeof(u32) + remap_sz + cache_sz + bvh_nodes_sz + bvh_u8_sz + 3*bvh_u16_sz) + mdlsCnt*sizeof(bool) + mdlsCnt*sizeof(bool) + incCnt*sizeof(u16) + rawSz + slices_tot;
-        char* arena_base = OS_Alloc(arena + 4096); mset(arena_base,0,rawSz*sizeof(RawOBJ));
-        char* p = arena_base;
-        RawOBJ*        raw = (RawOBJ*)p;                                              p = ARENA_ALIGN(p + rawSz*sizeof(RawOBJ));
-        bool*   isGLBAnimSrc = (bool*)p; mset(isGLBAnimSrc,0,mdlsCnt*sizeof(bool));   p = ARENA_ALIGN(p + mdlsCnt*sizeof(bool));
-        bool* isGLBStaticSrc = (bool*)p; mset(isGLBStaticSrc,0,mdlsCnt*sizeof(bool)); p = ARENA_ALIGN(p + mdlsCnt*sizeof(bool));
-        u16*          bOfList = (u16*)p; u32 bOfCnt = 0;                              p = ARENA_ALIGN(p + incCnt*sizeof(u16));
-        u8*             opened = (u8*)p; mset(opened,0,rawSz);                        p = ARENA_ALIGN(p + rawSz);
-        for (u32 m=lo; m<=hi; ++m) { if (!incStamp[m]) continue; u32 b = mdlSpanBase[m]; if(!bOfCnt || bOfList[bOfCnt-1] != b) bOfList[bOfCnt++] = (u16)b; }
-        for (u32 k=0;k<bOfCnt;++k) { u32 b = bOfList[k]; FHandle d; int sz=0; raw[b].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(g_mdlData[b].path,&d,&sz); raw[b].size = sz; opened[b] = 1; }
-        for (u32 k=0;k<incCnt;++k) { u32 m = incList[k]; if (opened[m]) continue; if (g_mdlData[m].index == U16_MAX || !g_mdlData[m].path[0]) continue; FHandle d; int sz=0; raw[m].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(g_mdlData[m].path,&d,&sz); raw[m].size = sz; opened[m] = 1; }
-        for (u32 k=0;k<incCnt;++k) { u32 m = incList[k], b = mdlSpanBase[m]; if (g_mdlData[b].animated && IsGLBSourcePath(g_mdlData[b].path)) isGLBAnimSrc[m] = true; else if (IsGLBSourcePath(g_mdlData[m].path)) isGLBStaticSrc[m] = true; }
-        BvhNode **bvh_nodes_p = (BvhNode**)p; p = ARENA_ALIGN(p + threadCnt*sizeof(BvhNode*));
-        u8 **bvh_oct_p = (u8**)p;             p = ARENA_ALIGN(p + threadCnt*sizeof(u8*));
-        u16 **bvh_order_p = (u16**)p;         p = ARENA_ALIGN(p + threadCnt*sizeof(u16*));
-        u16 **bvh_scr_p = (u16**)p;           p = ARENA_ALIGN(p + threadCnt*sizeof(u16*));
-        u16 **bvh_init_p = (u16**)p;          p = ARENA_ALIGN(p + threadCnt*sizeof(u16*));
-        u8* slice_base = (u8*)p;              p = ARENA_ALIGN(p + slices_tot);
-        for (int i=0; i<(i32)threadCnt; ++i) {
-            meshScratch[i].pos=(float*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + psz);
-            meshScratch[i].nrm=(float*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + psz);
-            meshScratch[i].uv=(float*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + MAX_VERT_ELEMENT_SIZE*2*sizeof(float));
-            meshScratch[i].verts=(float*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + usz);
-            meshScratch[i].hash=(u32*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + WELD_HASH_SIZE*sizeof(u32));
-            meshScratch[i].used=(u32*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + MAX_OUTPUT_VERTS*sizeof(u32));
-            meshScratch[i].remap=(u32*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + remap_sz);
-            meshScratch[i].cache=(u8*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + cache_sz);
-            bvh_nodes_p[i]=(BvhNode*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + bvh_nodes_sz);
-            bvh_oct_p[i]=(u8*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + bvh_u8_sz);
-            bvh_order_p[i]=(u16*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + bvh_u16_sz);
-            bvh_scr_p[i]=(u16*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + bvh_u16_sz);
-            bvh_init_p[i]=(u16*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + bvh_u16_sz);
-            mset(meshScratch[i].hash, 0xFF, WELD_HASH_SIZE * sizeof(u32));
-            thrd_bvh_ctx[i]=(BvhBuildCtx){ .nodes = bvh_nodes_p[i], .triOctants = bvh_oct_p[i], .triOrder = bvh_order_p[i], .triScratch = bvh_scr_p[i], .initialTris = bvh_init_p[i], .nodeCount = 0, .triCount = 0 };
+static u32 MdlBvhNodeBound(u32 triCount) {
+    if (triCount <= 8) return 1;
+    if (triCount <= 16) return 10;
+    if (triCount <= 32) return 20;
+    if (triCount <= 64) return 32;
+    if (triCount <= 128) return 65;
+    if (triCount <= 256) return 105;
+    if (triCount <= 512) return 252;
+    if (triCount <= 1024) return 337;
+    if (triCount <= 2048) return 421;
+    if (triCount <= 4096) return 421;
+    return 465;
+}
+typedef struct { u32 lo, hi; const u8* skipStamp; u32 mode; u32 winVbCap, winIbCap; u32* tvOut; u32* ttOut; } MdlLoadSet;
+static void MdlLoadModelSet(MdlLoadSet* s) {
+    if (!mdlsCnt || s->hi < s->lo) return;
+    u32 lo = s->lo, hi = s->hi; if (hi >= mdlsCnt) hi = mdlsCnt - 1;
+    u32 setCnt = hi - lo + 1;
+    size_t remap_sz = (size_t)MAX_OUTPUT_VERTS * sizeof(u32), cache_sz = ((MAX_OUTPUT_VERTS/3) * sizeof(TriSort)) * 2 + (MAX_OUTPUT_VERTS * sizeof(u16));
+    size_t bvh_nodes_sz = (size_t)BVH_MAX_NODES_PER_MDL * sizeof(BvhNode);
+    size_t bvh_u8_sz = (size_t)BVH_MAX_TRIS_PER_MDL * sizeof(u8);
+    size_t bvh_u16_sz = (size_t)BVH_MAX_TRIS_PER_MDL * sizeof(u16);
+    const size_t SUB_ARENA_SZ = (2ULL * 512 * 1024) * ((32ULL + threadCnt - 1) / threadCnt);
+    const size_t SUB_MAIN_SZ = 12ULL * 1024 * 1024; size_t slices_tot = SUB_ARENA_SZ*(size_t)threadCnt + SUB_MAIN_SZ;
+    size_t psz = MAX_VERT_ELEMENT_SIZE*3*sizeof(float), usz = MAX_OUTPUT_VERTS*8*sizeof(float);
+    size_t rawSz = (size_t)mdlsCnt;
+    size_t arena = rawSz*sizeof(RawOBJ) + 8*threadCnt*sizeof(void*) + (size_t)threadCnt * ((MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*2)*sizeof(float) + MAX_OUTPUT_VERTS*8*sizeof(float) + WELD_HASH_SIZE*sizeof(u32) + MAX_OUTPUT_VERTS*sizeof(u32) + remap_sz + cache_sz + bvh_nodes_sz + bvh_u8_sz + 3*bvh_u16_sz) + mdlsCnt*sizeof(bool) + mdlsCnt*sizeof(bool) + setCnt*sizeof(u16) + rawSz + slices_tot;
+    char* arena_base = OS_Alloc(arena + 4096); mset(arena_base,0,rawSz*sizeof(RawOBJ));
+    char* p = arena_base;
+    RawOBJ*        raw = (RawOBJ*)p;                                              p = ARENA_ALIGN(p + rawSz*sizeof(RawOBJ));
+    bool*   isGLBAnimSrc = (bool*)p; mset(isGLBAnimSrc,0,mdlsCnt*sizeof(bool));   p = ARENA_ALIGN(p + mdlsCnt*sizeof(bool));
+    bool* isGLBStaticSrc = (bool*)p; mset(isGLBStaticSrc,0,mdlsCnt*sizeof(bool)); p = ARENA_ALIGN(p + mdlsCnt*sizeof(bool));
+    u16*          bOfList = (u16*)p; u32 bOfCnt = 0;                              p = ARENA_ALIGN(p + setCnt*sizeof(u16));
+    u8*             opened = (u8*)p; mset(opened,0,rawSz);                        p = ARENA_ALIGN(p + rawSz);
+    for (u32 m=lo; m<=hi; ++m) { if (s->skipStamp && !s->skipStamp[m]) continue; u32 b = mdlSpanBase[m]; if (!g_mdlData[b].path[0]) continue; if(!bOfCnt || bOfList[bOfCnt-1] != b) bOfList[bOfCnt++] = (u16)b; }
+    for (u32 k=0;k<bOfCnt;++k) { u32 b = bOfList[k]; FHandle d; int sz=0; raw[b].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(g_mdlData[b].path,&d,&sz); raw[b].size = sz; opened[b] = 1; }
+    for (u32 m=lo; m<=hi; ++m) { if (s->skipStamp && !s->skipStamp[m]) continue; if (opened[m]) continue; if (g_mdlData[m].index == U16_MAX || !g_mdlData[m].path[0]) continue; FHandle d; int sz=0; raw[m].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(g_mdlData[m].path,&d,&sz); raw[m].size = sz; opened[m] = 1; }
+    for (u32 m=lo; m<=hi; ++m) { if (s->skipStamp && !s->skipStamp[m]) continue; u32 b = mdlSpanBase[m]; if (g_mdlData[b].animated && IsGLBSourcePath(g_mdlData[b].path)) isGLBAnimSrc[m] = true; else if (IsGLBSourcePath(g_mdlData[m].path)) isGLBStaticSrc[m] = true; }
+    BvhNode **bvh_nodes_p = (BvhNode**)p; p = ARENA_ALIGN(p + threadCnt*sizeof(BvhNode*));
+    u8 **bvh_oct_p = (u8**)p;             p = ARENA_ALIGN(p + threadCnt*sizeof(u8*));
+    u16 **bvh_order_p = (u16**)p;         p = ARENA_ALIGN(p + threadCnt*sizeof(u16*));
+    u16 **bvh_scr_p = (u16**)p;           p = ARENA_ALIGN(p + threadCnt*sizeof(u16*));
+    u16 **bvh_init_p = (u16**)p;          p = ARENA_ALIGN(p + threadCnt*sizeof(u16*));
+    u8* slice_base = (u8*)p;              p = ARENA_ALIGN(p + slices_tot);
+    for (int i=0; i<(i32)threadCnt; ++i) {
+        meshScratch[i].pos=(float*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + psz);
+        meshScratch[i].nrm=(float*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + psz);
+        meshScratch[i].uv=(float*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + MAX_VERT_ELEMENT_SIZE*2*sizeof(float));
+        meshScratch[i].verts=(float*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + usz);
+        meshScratch[i].hash=(u32*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + WELD_HASH_SIZE*sizeof(u32));
+        meshScratch[i].used=(u32*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + MAX_OUTPUT_VERTS*sizeof(u32));
+        meshScratch[i].remap=(u32*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + remap_sz);
+        meshScratch[i].cache=(u8*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + cache_sz);
+        bvh_nodes_p[i]=(BvhNode*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + bvh_nodes_sz);
+        bvh_oct_p[i]=(u8*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + bvh_u8_sz);
+        bvh_order_p[i]=(u16*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + bvh_u16_sz);
+        bvh_scr_p[i]=(u16*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + bvh_u16_sz);
+        bvh_init_p[i]=(u16*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + bvh_u16_sz);
+        mset(meshScratch[i].hash, 0xFF, WELD_HASH_SIZE * sizeof(u32));
+        thrd_bvh_ctx[i]=(BvhBuildCtx){ .nodes = bvh_nodes_p[i], .triOctants = bvh_oct_p[i], .triOrder = bvh_order_p[i], .triScratch = bvh_scr_p[i], .initialTris = bvh_init_p[i], .nodeCount = 0, .triCount = 0 };
+    }
+    for (u32 si=0; si<threadCnt; ++si) OS_SubArenaSliceInit(si, slice_base + si*SUB_ARENA_SZ, SUB_ARENA_SZ);
+    OS_SubArenaSliceInit(SUB_MAIN, slice_base + threadCnt*SUB_ARENA_SZ, SUB_MAIN_SZ);
+    poolThreadCnt=poolReady=poolStop=poolGen=poolJobNext=poolJobDone=poolPending=0; poolJobCount=0;
+    poolSkipStamp = s->skipStamp;
+    if (threadCnt >= 2) { for (u32 i=0;i<threadCnt && i<32;++i) { if(OS_ThreadCreate(&poolThreads[i],PoolWorker,NULL)!=0) break; ++poolThreadCnt; } while((u32)__atomic_load_n(&poolReady,__ATOMIC_ACQUIRE) < poolThreadCnt) __asm__ __volatile__("pause"); }
+    ModelParseTask tasks[32]; PhysGeomTask ptasks[32]; PoolJob pjobs[32];
+    LoadGLBAnimatedSources(g_mdlData, g_mdlDataCnt, raw);
+    if (s->mode == 2) {
+        for (u32 k=0;k<glb_TaskCount;++k) { u32 mi = glb_Tasks[k].modelIndex; if (mi >= mdlsCnt) continue; GltfMesh* gm = glb_Tasks[k].mesh; u32 vc = 0, tc = 0; if (gm->isTrAnim) { for (u32 q=0;q<gm->submshCnt;++q) { vc += gm->subVertCnt[q]; tc += gm->subTriCount[q]; } } else { vc = gm->vertCount; tc = gm->triCount; } mdlMetaVertCounts[mi] = vc; mdlMetaTriCounts[mi] = tc; }
+    }
+    u32 vrun = 0, irun = 0;
+    for (u32 sub = lo; sub <= hi; ) {
+        u32 subEnd = sub + 32u; if (subEnd > hi+1) subEnd = hi+1;
+        void* wmarks[32]; for (u32 si=0; si<threadCnt; ++si) { wmarks[si] = OS_SubArenaMark(si); }
+        u32 wcnt = subEnd - sub; u32 chunk = (wcnt + threadCnt - 1) / threadCnt; if (!chunk) chunk = 1;
+        for (int i=0;i<(i32)threadCnt;++i) { tasks[i] = (ModelParseTask){sub + (u32)i*chunk, ((u32)i+1)*chunk > wcnt ? subEnd : sub + ((u32)i+1)*chunk, raw, isGLBAnimSrc, isGLBStaticSrc, i}; pjobs[i] = (PoolJob){ModelParsingWorker,&tasks[i]}; }
+        PoolRun(pjobs, threadCnt);
+        if (s->mode == 2) {
+            for (u32 m = sub; m < subEnd; ++m) { if (s->skipStamp && !s->skipStamp[m]) continue; if (!modelVertexCounts[m]) continue; mdlMetaVertCounts[m] = modelVertexCounts[m]; mdlMetaTriCounts[m] = modelTriangleCounts[m]; modelVertexCounts[m] = 0; modelTriangleCounts[m] = 0; vPos[m] = NULL; modelTriangles[m] = NULL; }
+            for (u32 si=0; si<threadCnt; ++si) { OS_SubArenaRelease(si, wmarks[si]); }
+            sub = subEnd; continue;
         }
-        for (u32 si=0; si<threadCnt; ++si) OS_SubArenaSliceInit(si, slice_base + si*SUB_ARENA_SZ, SUB_ARENA_SZ);
-        OS_SubArenaSliceInit(SUB_MAIN, slice_base + threadCnt*SUB_ARENA_SZ, SUB_MAIN_SZ);
-        poolThreadCnt=poolReady=poolStop=poolGen=poolJobNext=poolJobDone=poolPending=0; poolJobCount=0;
-        poolSkipStamp = incStamp;
-        if (threadCnt >= 2) { for (u32 i=0;i<threadCnt && i<32;++i) { if(OS_ThreadCreate(&poolThreads[i],PoolWorker,NULL)!=0) break; ++poolThreadCnt; } while((u32)__atomic_load_n(&poolReady,__ATOMIC_ACQUIRE) < poolThreadCnt) __asm__ __volatile__("pause"); }
-        ModelParseTask tasks[32]; PhysGeomTask ptasks[32]; PoolJob pjobs[32];
-        LoadGLBAnimatedSources(g_mdlData, g_mdlDataCnt, raw);
-        u32 vrun = 0, irun = 0;
-        u32 winVB = mdlPoolVbBytes - mdlSwapVboBase, winIB = mdlPoolIbBytes - mdlSwapIboBase;
-        for (u32 sub = lo; sub <= hi; ) {
-            u32 subEnd = sub + 32u; if (subEnd > hi+1) subEnd = hi+1;
-            void* wmarks[32]; for (u32 si=0; si<threadCnt; ++si) { wmarks[si] = OS_SubArenaMark(si); }
-            u32 wcnt = subEnd - sub; u32 chunk = (wcnt + threadCnt - 1) / threadCnt; if (!chunk) chunk = 1;
-            for (int i=0;i<(i32)threadCnt;++i) { tasks[i] = (ModelParseTask){sub + (u32)i*chunk, ((u32)i+1)*chunk > wcnt ? subEnd : sub + ((u32)i+1)*chunk, raw, isGLBAnimSrc, isGLBStaticSrc, i}; pjobs[i] = (PoolJob){ModelParsingWorker,&tasks[i]}; }
-            PoolRun(pjobs, threadCnt);
-            if (glb_TaskCount) {
-                u32 t0 = glb_TaskCount, t1 = glb_TaskCount;
-                for (u32 k= 0;k<glb_TaskCount;++k) { if(glb_Tasks[k].modelIndex >= sub)    { t0=k; break; } }
-                for (u32 k=t0;k<glb_TaskCount;++k) { if(glb_Tasks[k].modelIndex >= subEnd) { t1=k; break; } }
-                u32 cnt = t1 - t0;
-                if (cnt) {
-                    GltfFrameTask ftmp[64]; u32 fcnum = 0;
-                    for (u32 k=t0;k<t1;++k) { if (incStamp[glb_Tasks[k].modelIndex] && fcnum < 64) ftmp[fcnum++] = glb_Tasks[k]; }
-                    if (fcnum) { GltfBakeTask btasks[32]; PoolJob bjobs[32]; u32 chk=(fcnum+threadCnt-1)/threadCnt; for (int t=0;t<(i32)threadCnt;++t) { u32 s = (u32)t*chk, e = ((u32)t + 1)*chk > fcnum ? fcnum : ((u32)t + 1) * chk; btasks[t] = (GltfBakeTask){ftmp,s,e,t}; bjobs[t] = (PoolJob){GltfBakeWorker,&btasks[t]}; } PoolRun(bjobs,threadCnt); }
-                }
+        if (glb_TaskCount) {
+            u32 t0 = glb_TaskCount, t1 = glb_TaskCount;
+            for (u32 k= 0;k<glb_TaskCount;++k) { if(glb_Tasks[k].modelIndex >= sub)    { t0=k; break; } }
+            for (u32 k=t0;k<glb_TaskCount;++k) { if(glb_Tasks[k].modelIndex >= subEnd) { t1=k; break; } }
+            u32 cnt = t1 - t0;
+            if (cnt) {
+                GltfFrameTask ftmp[64]; u32 fcnum = 0;
+                for (u32 k=t0;k<t1;++k) { if ((!s->skipStamp || s->skipStamp[glb_Tasks[k].modelIndex]) && fcnum < 64) ftmp[fcnum++] = glb_Tasks[k]; }
+                if (fcnum) { GltfBakeTask btasks[32]; PoolJob bjobs[32]; u32 chk=(fcnum+threadCnt-1)/threadCnt; for (int t=0;t<(i32)threadCnt;++t) { u32 ss = (u32)t*chk, e = ((u32)t + 1)*chk > fcnum ? fcnum : ((u32)t + 1) * chk; btasks[t] = (GltfBakeTask){ftmp,ss,e,t}; bjobs[t] = (PoolJob){GltfBakeWorker,&btasks[t]}; } PoolRun(bjobs,threadCnt); }
             }
-            for (int i=0;i<(i32)threadCnt;++i) { ptasks[i] = (PhysGeomTask){sub + (u32)i*chunk, ((u32)i+1)*chunk > wcnt ? subEnd : sub + ((u32)i+1)*chunk, i}; pjobs[i] = (PoolJob){PhysGeomWorker,&ptasks[i]}; }
-            PoolDispatch(pjobs, threadCnt);
+        }
+        for (int i=0;i<(i32)threadCnt;++i) { ptasks[i] = (PhysGeomTask){sub + (u32)i*chunk, ((u32)i+1)*chunk > wcnt ? subEnd : sub + ((u32)i+1)*chunk, i}; pjobs[i] = (PoolJob){PhysGeomWorker,&ptasks[i]}; }
+        PoolDispatch(pjobs, threadCnt);
+        if (s->mode == 0) {
+            for (u32 i = sub; i < subEnd; ++i) {
+                if (!modelVertexCounts[i]) { continue; } if (s->tvOut) *s->tvOut += modelVertexCounts[i]; if (s->ttOut) *s->ttOut += modelTriangleCounts[i];
+                rtSrcVertCounts[i] = modelVertexCounts[i];
+                if (s->skipStamp && s->skipStamp[i]) { mdlPstHalfV[i] = OS_Alloc((size_t)modelVertexCounts[i] * VRT_ATT_SZ); MdlCvtHalf(mdlPstHalfV[i], vPos[i], modelVertexCounts[i]); mdlPstTri[i] = OS_Alloc((size_t)modelTriangleCounts[i]*6 + 4); mcpy(mdlPstTri[i], modelTriangles[i], (size_t)modelTriangleCounts[i]*6); mset((u8*)mdlPstTri[i] + (size_t)modelTriangleCounts[i]*6, 0, 4); }
+            }
+        } else {
             for (u32 m = sub; m < subEnd; ++m) {
-                if (!incStamp[m] || m >= mdlsCnt || !modelVertexCounts[m] || !rtSrcVertCounts[m]) continue;
+                if ((s->skipStamp && !s->skipStamp[m]) || m >= mdlsCnt || !modelVertexCounts[m]) continue;
+                rtSrcVertCounts[m] = modelVertexCounts[m];
                 u32 vb = MdlVbBytesRaw((u16)m), ib = MdlIbBytesRaw((u16)m);
                 u32 vOfs = ((vrun + 255u) & ~255u), iOfs = ((irun + 255u) & ~255u);
-                if (vOfs + vb > winVB || iOfs + ib > winIB) { DualLogError("Model swap %u exceeds window cap (v %u/%u, i %u/%u): leaving model %u CPU-only (it degrades to the resident fallback)\n",lev,vOfs+vb,winVB,iOfs+ib,winIB,m); continue; }
-                rtSrcVertCounts[m] = modelVertexCounts[m];
+                if (vOfs + vb > s->winVbCap || iOfs + ib > s->winIbCap) { DualLogError("Model swap exceeds window cap (v %u/%u, i %u/%u): leaving model %u CPU-only (it degrades to the resident fallback)\n",vOfs+vb,s->winVbCap,iOfs+ib,s->winIbCap,m); continue; }
                 mdlVboOfs[m] = mdlSwapVboBase + vOfs; mdlIboOfs[m] = mdlSwapIboBase + iOfs;
                 vrun = ((vrun + 255u) & ~255u) + vb; irun = ((irun + 255u) & ~255u) + ib;
                 glBindBuffer(GL_ARRAY_BUFFER, modelVBO); half* mpv = (half*)glMapBufferRange(GL_ARRAY_BUFFER, (intptr_t)mdlVboOfs[m], vb, 0x2/*GL_MAP_WRITE_BIT*/|0x4/*GL_MAP_INVALIDATE_RANGE_BIT*/);
@@ -751,33 +773,48 @@ void SwapLevelModels(u8 lev) {
             }
             glBindBuffer(GL_ARRAY_BUFFER,0);
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
-            glFinish(); // Force driver to dump its copies.
-            if(poolPending) { u32 d; while((d=__atomic_load_n(&poolJobDone,__ATOMIC_ACQUIRE)) < poolThreadCnt) OS_FutexWait(&poolJobDone,d); poolPending=0; }
-            for (u32 m = sub; m < subEnd; ++m) { if (incStamp[m] && vPos[m] && physPos[m]) { vPos[m]=physPos[m]; modelTriangles[m]=physTris[m]; modelVertexCounts[m]=physVertCounts[m]; } }
-            for (u32 si=0; si<threadCnt; ++si) { OS_SubArenaRelease(si, wmarks[si]); }
-            sub = subEnd;
+            glFinish();
         }
-        if(poolThreadCnt) { poolJobCount=0; __atomic_store_n(&poolStop,1,__ATOMIC_RELEASE); __atomic_fetch_add(&poolGen,1,__ATOMIC_RELEASE); OS_FutexWakeAll(&poolGen); for(u32 i=0;i<poolThreadCnt;++i) OS_ThreadJoin(&poolThreads[i]); poolThreadCnt=0; }
-        for (u32 k=0;k<rawSz;++k) { if (opened && opened[k] && raw[k].data) { OS_Free((void*)raw[k].data, raw[k].size); } }
-        OS_Free(arena_base, arena + 4096);
-        OS_Free(incList, incCnt*sizeof(u16));
-        glb_Tasks = NULL;
-        poolSkipStamp = NULL;
+        if(poolPending) { u32 d; while((d=__atomic_load_n(&poolJobDone,__ATOMIC_ACQUIRE)) < poolThreadCnt) OS_FutexWait(&poolJobDone,d); poolPending=0; }
+        for (u32 m = sub; m < subEnd; ++m) { if ((!s->skipStamp || s->skipStamp[m]) && vPos[m] && physPos[m]) { vPos[m]=physPos[m]; modelTriangles[m]=physTris[m]; modelVertexCounts[m]=physVertCounts[m]; } }
+        for (u32 si=0; si<threadCnt; ++si) { OS_SubArenaRelease(si, wmarks[si]); }
+        sub = subEnd;
+    }
+    if(poolThreadCnt) { poolJobCount=0; __atomic_store_n(&poolStop,1,__ATOMIC_RELEASE); __atomic_fetch_add(&poolGen,1,__ATOMIC_RELEASE); OS_FutexWakeAll(&poolGen); for(u32 i=0;i<poolThreadCnt;++i) OS_ThreadJoin(&poolThreads[i]); poolThreadCnt=0; }
+    for (u32 k=0;k<rawSz;++k) { if (opened && opened[k] && raw[k].data) { OS_Free((void*)raw[k].data, raw[k].size); } }
+    OS_Free(arena_base, arena + 4096);
+    glb_Tasks = NULL;
+    poolSkipStamp = NULL;
+}
+void LoadPerLevelModels(u8 lev) {
+    if (lev >= MAX_LEVELS || !mdlDerivDone || modelVBO == 0 || mdlSwapLev == lev) return;
+    u32 incCnt = 0, ic = 0;
+    for (u32 m=0; m<mdlsCnt; ++m) { if (MdlIsWinMemberSet((u16)m, lev)) ++incCnt; }
+    u16* incList = incCnt ? (u16*)OS_Alloc(incCnt * sizeof(u16)) : NULL;
+    for (u32 m=0; m<mdlsCnt; ++m) { if (MdlIsWinMemberSet((u16)m, lev) && ic < incCnt) incList[ic++] = (u16)m; }
+    u32 lo = incCnt ? incList[0] : 0, hi = incCnt ? incList[incCnt-1] : 0; u32 anyOut = (mdlSwapLev != 255u); static u8 incStamp[MAX_MDLS]; mset(incStamp,0,mdlsCnt);
+    for (u32 k=0;k<ic;++k) incStamp[incList[k]] = 1;
+    for (u32 m=0; m<mdlsCnt; ++m) { bool inc = incStamp[m] != 0; bool outg = anyOut && MdlIsWinMemberSet((u16)m, mdlSwapLev); if (!inc && !outg) continue; if (physPos[m] || modelTriangles[m] || modelVertexCounts[m]) { MdlSwapWindowDisposeData((u16)m); } mdlVboOfs[m] = mdlIboOfs[m] = 0xFFFFFFFFu; }
+    if (incList) OS_Free(incList, incCnt*sizeof(u16));
+    if (incCnt) {
+        u32 winVB = mdlPoolVbBytes - mdlSwapVboBase, winIB = mdlPoolIbBytes - mdlSwapIboBase;
+        double startSwapTime = get_time();
+        MdlLoadSet s = { lo, hi, incStamp, 1, winVB, winIB, NULL, NULL };
+        MdlLoadModelSet(&s);
+        DualLog("LoadPerLevelModels lev %u models %u took %.6f secs\n",lev,incCnt,get_time() - startSwapTime);
     }
     mdlSwapLev = lev;
     RtSwapPatchModels();
 }
-void LoadModels() {
-    double startModelTime = get_time();
+void ParseAllModels(void) {
+    double startParseTime = get_time();
     ModelDataParser mp = {0}; ParseModelData(&mp,MAX_MDLS,"./Data/models.txt");
     u32 maxid = 0, totalActual = 0;
-    for (u32 i=0;i<mp.count;++i) { if (mp.entries[i].index == U16_MAX){continue;} totalActual++; if (mp.entries[i].index > maxid) { maxid = mp.entries[i].index; } if (mp.entries[i].animated && IsGLBSourcePath(mp.entries[i].path)) { u32 blockMax = mp.entries[i].index + (mp.entries[i].frameCount > 0 ? (mp.entries[i].frameCount - 1) : 0); if(blockMax > maxid) { maxid=blockMax; } } }    
-    DualLog("Loading   models ( %d) ...",totalActual);
+    for (u32 i=0;i<mp.count;++i) { if (mp.entries[i].index == U16_MAX){continue;} totalActual++; if (mp.entries[i].index > maxid) { maxid = mp.entries[i].index; } if (mp.entries[i].animated && IsGLBSourcePath(mp.entries[i].path)) { u32 blockMax = mp.entries[i].index + (mp.entries[i].frameCount > 0 ? (mp.entries[i].frameCount - 1) : 0); if(blockMax > maxid) { maxid=blockMax; } } }
+    DualLog("Parsing   models ( %d) ...",totalActual);
     mdlsCnt = (u16)maxid + 1; if ((u16)maxid >= MAX_MDLS){DualLogError("Too many models!  Exceeds %u!\n",MAX_MDLS); OS_Exit(1);}
     DeriveResidentModelSets(mp.entries, mp.count);
-    mdlPstHalfV = OS_AllocScratch(mdlsCnt * sizeof(void*)); mset(mdlPstHalfV,0,mdlsCnt*sizeof(void*));
-    mdlPstTri   = OS_AllocScratch(mdlsCnt * sizeof(void*)); mset(mdlPstTri,0,mdlsCnt*sizeof(void*));
-    vPos = OS_Alloc(/*vpos*/mdlsCnt*sizeof(float*) + /*modelTriangles*/mdlsCnt*sizeof(u16*) + /*modelBVHNodes*/mdlsCnt*sizeof(BvhNode*) + /*modelBVHTriOrder*/mdlsCnt*sizeof(u16*) + /*physPos*/mdlsCnt*sizeof(float*) + /*physTris*/mdlsCnt*sizeof(u16*) + /*physVertCounts*/mdlsCnt*sizeof(u32) + /*rtSrcVertCounts*/(size_t)mdlsCnt*sizeof(u32));
+    vPos = OS_Alloc(mdlsCnt*sizeof(float*) + mdlsCnt*sizeof(u16*) + mdlsCnt*sizeof(BvhNode*) + mdlsCnt*sizeof(u16*) + mdlsCnt*sizeof(float*) + mdlsCnt*sizeof(u16*) + mdlsCnt*sizeof(u32) + (size_t)mdlsCnt*sizeof(u32) + mdlsCnt*sizeof(u32) + (size_t)mdlsCnt*sizeof(u32));
     modelTriangles = (u16**)((u8*)vPos + mdlsCnt * sizeof(float*));
     modelBVHNodes = (BvhNode**)((u8*)modelTriangles + mdlsCnt * sizeof(u16*));
     modelBVHTriOrder = (u16**)((u8*)modelBVHNodes + (mdlsCnt * sizeof(BvhNode*)));
@@ -785,94 +822,30 @@ void LoadModels() {
     physTris = (u16**)((u8*)physPos + mdlsCnt*sizeof(float*));
     physVertCounts = (u32*)((u8*)physTris + mdlsCnt*sizeof(u16*));
     rtSrcVertCounts = (u32*)((u8*)physVertCounts + mdlsCnt*sizeof(u32)); mset(rtSrcVertCounts,0,(size_t)mdlsCnt*sizeof(u32));
-    size_t remap_sz = (size_t)MAX_OUTPUT_VERTS * sizeof(u32), cache_sz = ((MAX_OUTPUT_VERTS/3) * sizeof(TriSort)) * 2 + (MAX_OUTPUT_VERTS * sizeof(u16));
-    size_t bvh_nodes_sz = (size_t)BVH_MAX_NODES_PER_MDL * sizeof(BvhNode);
-    size_t bvh_u8_sz = (size_t)BVH_MAX_TRIS_PER_MDL * sizeof(u8);
-    size_t bvh_u16_sz = (size_t)BVH_MAX_TRIS_PER_MDL * sizeof(u16);
-    size_t arena = mdlsCnt*sizeof(RawOBJ) + 8*threadCnt*sizeof(void*) + (size_t)threadCnt * ((MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*2)*sizeof(float) + MAX_OUTPUT_VERTS*8*sizeof(float) + WELD_HASH_SIZE*sizeof(u32) + MAX_OUTPUT_VERTS*sizeof(u32) + remap_sz + cache_sz + bvh_nodes_sz + bvh_u8_sz + 3*bvh_u16_sz);
-    void* arena_base = OS_AllocScratch(arena + 4096);
-    char* p = arena_base;
-    RawOBJ* raw = (RawOBJ*)p; p = ARENA_ALIGN(p + mdlsCnt*sizeof(RawOBJ));
-    for (u32 i=0; i<mp.count; ++i) { if(mp.entries[i].index != U16_MAX){ FHandle d; int sz=0; raw[i].data=(const char*)OS_OpenAndAllocateFileBufferReadonly(mp.entries[i].path,&d,&sz); raw[i].size=sz;} }
-    bool* isGLBAnimSrc = OS_AllocScratch(mdlsCnt * sizeof(bool));
-    bool* isGLBStaticSrc = OS_AllocScratch(mdlsCnt * sizeof(bool));
-    for (u32 i=0; i<mp.count; ++i) { if (mp.entries[i].index == U16_MAX || !IsGLBSourcePath(mp.entries[i].path)){continue;} if (mp.entries[i].animated) isGLBAnimSrc[mp.entries[i].index] = true; else isGLBStaticSrc[mp.entries[i].index] = true; }
-    BvhNode **bvh_nodes_p = (BvhNode**)p; p = ARENA_ALIGN(p + threadCnt*sizeof(BvhNode*));
-    u8 **bvh_oct_p = (u8**)p;             p = ARENA_ALIGN(p + threadCnt*sizeof(u8*));
-    u16 **bvh_order_p = (u16**)p;         p = ARENA_ALIGN(p + threadCnt*sizeof(u16*));
-    u16 **bvh_scr_p = (u16**)p;           p = ARENA_ALIGN(p + threadCnt*sizeof(u16*));
-    u16 **bvh_init_p = (u16**)p;          p = ARENA_ALIGN(p + threadCnt*sizeof(u16*));
-    size_t psz = MAX_VERT_ELEMENT_SIZE*3*sizeof(float), usz = MAX_OUTPUT_VERTS*8*sizeof(float);
-    for (int i=0; i<(i32)threadCnt; ++i) {
-        meshScratch[i].pos=(float*)ARENA_ALIGN(p);           p = ARENA_ALIGN(p + psz);
-        meshScratch[i].nrm = (float*)ARENA_ALIGN(p);         p = ARENA_ALIGN(p + psz);
-        meshScratch[i].uv = (float*)ARENA_ALIGN(p);          p = ARENA_ALIGN(p + MAX_VERT_ELEMENT_SIZE*2*sizeof(float));
-        meshScratch[i].verts=(float*)ARENA_ALIGN(p);            p = ARENA_ALIGN(p + usz);
-        meshScratch[i].hash=(u32*)ARENA_ALIGN(p);              p = ARENA_ALIGN(p + WELD_HASH_SIZE*sizeof(u32));
-        meshScratch[i].used = (u32*)ARENA_ALIGN(p);       p = ARENA_ALIGN(p + MAX_OUTPUT_VERTS*sizeof(u32));
-        meshScratch[i].remap=(u32*)ARENA_ALIGN(p);       p = ARENA_ALIGN(p + remap_sz);
-        meshScratch[i].cache=(u8*)ARENA_ALIGN(p);        p = ARENA_ALIGN(p + cache_sz);
-        bvh_nodes_p[i]=(BvhNode*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + bvh_nodes_sz);
-        bvh_oct_p[i]=(u8*)ARENA_ALIGN(p);        p = ARENA_ALIGN(p + bvh_u8_sz);
-        bvh_order_p[i]=(u16*)ARENA_ALIGN(p);     p = ARENA_ALIGN(p + bvh_u16_sz);
-        bvh_scr_p[i]=(u16*)ARENA_ALIGN(p);       p = ARENA_ALIGN(p + bvh_u16_sz);
-        bvh_init_p[i]=(u16*)ARENA_ALIGN(p);      p = ARENA_ALIGN(p + bvh_u16_sz);
-        mset(meshScratch[i].hash, 0xFF, WELD_HASH_SIZE * sizeof(u32));
-        thrd_bvh_ctx[i]=(BvhBuildCtx){ .nodes = bvh_nodes_p[i], .triOctants = bvh_oct_p[i], .triOrder = bvh_order_p[i], .triScratch = bvh_scr_p[i], .initialTris = bvh_init_p[i], .nodeCount = 0, .triCount = 0 };
-    }
-    const size_t SUB_ARENA_SZ = (2ULL * 512 * 1024) * ((32ULL + threadCnt - 1) / threadCnt);
-    const size_t SUB_MAIN_SZ = 12ULL * 1024 * 1024; size_t slices_tot = SUB_ARENA_SZ * (size_t)threadCnt + SUB_MAIN_SZ; size_t slice_room = (size_t)(scratch_end - scratch_cur) - 4096;
-    if (slices_tot > slice_room) { DualLogError("Not enough scratch room for model sub-arenas: need %u MB, %u MB free!\n", (u32)(slices_tot >> 20),(u32)(slice_room >> 20)); OS_Exit(1); }
-    u8* slice_base = OS_AllocScratch(slices_tot);
-    for (u32 si = 0; si < threadCnt; ++si) OS_SubArenaSliceInit(si, slice_base + si * SUB_ARENA_SZ, SUB_ARENA_SZ);
-    OS_SubArenaSliceInit(SUB_MAIN, slice_base + threadCnt * SUB_ARENA_SZ, SUB_MAIN_SZ);
-    ModelParseTask tasks[32]; PhysGeomTask ptasks[32]; PoolJob pjobs[32]; u32 tv=0,tt=0;
-    LoadGLBAnimatedSources(mp.entries,mp.count,raw);
-    u32 validCount=totalActual;
-    u32* valid = OS_AllocScratch(validCount * sizeof(u32));
-    validCount = 0;
-    for (u32 i = 0; i < mp.count; ++i) if (mp.entries[i].index != U16_MAX) valid[validCount++] = i;
-    const u32 WAVE_FILES_SZ = 32; const u32 SUB_MODELS_SZ = 32; 
-    poolThreadCnt=poolReady=poolStop=poolGen=0;
-    if (threadCnt >= 2) { for(u32 i=0;i<threadCnt && i<32;++i) { if(OS_ThreadCreate(&poolThreads[i],PoolWorker,NULL)!=0) break; ++poolThreadCnt; } while(__atomic_load_n(&poolReady,__ATOMIC_ACQUIRE) < poolThreadCnt) __asm__ __volatile__("pause"); }
-    u32 prevEnd = 0;
-    for (u32 w0 = 0; w0 < validCount; ) {
-        u32 waveStart = mp.entries[valid[w0]].index;
-        if (waveStart < prevEnd) waveStart = prevEnd;
-        u32 w1 = w0, files = 0, waveEnd = waveStart;
-        while (w1 < validCount) { ModelData* e = &mp.entries[valid[w1]]; if (files >= WAVE_FILES_SZ && e->index >= waveEnd) { break; } u32 span = (e->animated && e->frameCount) ? e->frameCount : 1; u32 end = e->index + span; if (end > waveEnd) waveEnd = end; ++w1; ++files; }
-        if (waveEnd > mdlsCnt) waveEnd = mdlsCnt; if (waveStart >= waveEnd) { w0 = w1; continue; }
-        for (u32 sub = waveStart; sub < waveEnd; ) {
-            u32 subEnd = sub + SUB_MODELS_SZ; if (subEnd > waveEnd) subEnd = waveEnd;
-            void* wmarks[32]; for (u32 si = 0; si < threadCnt; ++si) { wmarks[si] = OS_SubArenaMark(si); }
-            u32 wcnt = subEnd - sub; u32 chunk = (wcnt + threadCnt - 1) / threadCnt;
-            for (int i=0;i<(i32)threadCnt;++i) { tasks[i] = (ModelParseTask){sub + (u32)i*chunk, ((u32)i+1)*chunk > wcnt ? subEnd : sub + ((u32)i+1)*chunk,raw,isGLBAnimSrc,isGLBStaticSrc,i}; pjobs[i] = (PoolJob){ModelParsingWorker,&tasks[i]}; }
-            PoolRun(pjobs, threadCnt);
-            if (glb_TaskCount) {
-                u32 t0 = glb_TaskCount; for (u32 k= 0;k<glb_TaskCount;++k) { if(glb_Tasks[k].modelIndex >= sub)    { t0=k; break;} }
-                u32 t1 = glb_TaskCount; for (u32 k=t0;k<glb_TaskCount;++k) { if(glb_Tasks[k].modelIndex >= subEnd) { t1=k; break;} }
-                u32 cnt = t1 - t0;
-                if (cnt) { GltfBakeTask btasks[32]; PoolJob bjobs[32]; u32 chk=(cnt+threadCnt-1)/threadCnt; for (int t=0;t<(i32)threadCnt;++t) { u32 s = t0 +(u32)t*chk, e = t0 + ((u32)t + 1)*chk > t1 ? t1 : t0 + ((u32)t + 1) * chk; btasks[t] = (GltfBakeTask){glb_Tasks,s,e,t}; bjobs[t] = (PoolJob){GltfBakeWorker,&btasks[t]}; } PoolRun(bjobs,threadCnt); }
-            }
-            for (int i=0;i<(i32)threadCnt;++i) { ptasks[i] = (PhysGeomTask){sub + (u32)i*chunk, ((u32)i+1)*chunk > wcnt ? subEnd : sub + ((u32)i+1)*chunk,i}; pjobs[i] = (PoolJob){PhysGeomWorker,&ptasks[i]}; }
-            PoolDispatch(pjobs, threadCnt); /*Sneak the physics deduplication passes underneath the pool upload ;)*/
-            for (u32 i = sub; i < subEnd; ++i) {
-                if (!modelVertexCounts[i]) { continue; } tv += modelVertexCounts[i]; tt += modelTriangleCounts[i];
-                rtSrcVertCounts[i] = modelVertexCounts[i];
-                if (mdlPersistentSet[i]) { mdlPstHalfV[i] = OS_AllocScratch((size_t)modelVertexCounts[i] * VRT_ATT_SZ); MdlCvtHalf(mdlPstHalfV[i], vPos[i], modelVertexCounts[i]); mdlPstTri[i] = OS_AllocScratch((size_t)modelTriangleCounts[i]*6 + 4); mcpy(mdlPstTri[i], modelTriangles[i], (size_t)modelTriangleCounts[i]*6); mset((u8*)mdlPstTri[i] + (size_t)modelTriangleCounts[i]*6, 0, 4); }
-            }
-            if(poolPending) { u32 d; while((d=__atomic_load_n(&poolJobDone,__ATOMIC_ACQUIRE)) < poolThreadCnt) OS_FutexWait(&poolJobDone,d); poolPending=0; }
-            for (u32 m = sub; m < subEnd; ++m) { if (vPos[m]) { vPos[m]=physPos[m]; modelTriangles[m]=physTris[m]; modelVertexCounts[m]=physVertCounts[m]; } }
-            for (u32 si = 0; si < threadCnt; ++si) { OS_SubArenaRelease(si, wmarks[si]); }
-            sub = subEnd;
-        }
-        for (u32 i=waveStart;i<waveEnd;++i) { if (raw[i].data) { OS_Free((void*)raw[i].data,raw[i].size); } }
-        prevEnd = waveEnd;
-        w0 = w1;
-    }
-    if(poolThreadCnt) { poolJobCount=0; __atomic_store_n(&poolStop,1,__ATOMIC_RELEASE); __atomic_fetch_add(&poolGen,1,__ATOMIC_RELEASE); OS_FutexWakeAll(&poolGen); for(u32 i=0;i<poolThreadCnt;++i) OS_ThreadJoin(&poolThreads[i]); poolThreadCnt=0; }
-    poolSkipStamp = NULL;
-    u32 vrun = 0, irun = 0, batch = 0;
+    mdlMetaVertCounts = (u32*)((u8*)rtSrcVertCounts + mdlsCnt*sizeof(u32)); mset(mdlMetaVertCounts,0,(size_t)mdlsCnt*sizeof(u32));
+    mdlMetaTriCounts = (u32*)((u8*)mdlMetaVertCounts + mdlsCnt*sizeof(u32)); mset(mdlMetaTriCounts,0,(size_t)mdlsCnt*sizeof(u32));
+    g_mdlDataCnt = mp.count; g_mdlData = OS_Alloc((size_t)mp.count * sizeof(ModelData)); mset(g_mdlData,0,(size_t)mp.count*sizeof(ModelData));
+    for (u32 i=0;i<mp.count;++i) { if (mp.entries[i].index == U16_MAX) continue; g_mdlData[i] = mp.entries[i]; if (mp.entries[i].animated && mp.entries[i].frameCount) { u16* nf = OS_Alloc((size_t)mp.entries[i].frameCount * sizeof(u16)); mcpy(nf, mp.entries[i].frames, (size_t)mp.entries[i].frameCount*sizeof(u16)); g_mdlData[i].frames = nf; } }
+    MdlLoadSet s = { 0, mdlsCnt - 1, NULL, 2, 0, 0, NULL, NULL };
+    MdlLoadModelSet(&s);
+    u32 metaV = 0, metaT = 0; for (u32 m=0;m<mdlsCnt;++m) { metaV += mdlMetaVertCounts[m]; metaT += mdlMetaTriCounts[m]; }
+    OS_FreeInitPhase();
+    DualLog(" metadata verts: %u, tris: %u......................took %.6f secs\n", metaV, metaT, get_time() - startParseTime);
+}
+void LoadModels() {
+    static bool mdlPersistentsLoaded = false;
+    if (mdlPersistentsLoaded) return;
+    double startModelTime = get_time();
+    u32 lo = mdlsCnt, hi = 0, pstCnt = 0;
+    for (u32 m=0; m<mdlsCnt; ++m) { if (mdlPersistentSet[m]) { ++pstCnt; if (m < lo) lo = m; if (m > hi) hi = m; } }
+    DualLog("Loading   models ( %d persistent) ...",pstCnt);
+    if (lo > hi) { mdlPersistentsLoaded = true; return; }
+    mdlPstHalfV = OS_Alloc(mdlsCnt * sizeof(void*)); mset(mdlPstHalfV,0,mdlsCnt*sizeof(void*));
+    mdlPstTri   = OS_Alloc(mdlsCnt * sizeof(void*)); mset(mdlPstTri,0,mdlsCnt*sizeof(void*));
+    u32 tv=0, tt=0;
+    MdlLoadSet s = { lo, hi, mdlPersistentSet, 0, 0, 0, &tv, &tt };
+    MdlLoadModelSet(&s);
+    u32 vrun = 0, irun = 0;
     for (u32 m=0; m<mdlsCnt; ++m) { if (!mdlPersistentSet[m] || !mdlPstHalfV[m]) continue; mdlVboOfs[m] = (vrun + 255u) & ~255u; vrun = mdlVboOfs[m] + MdlVbBytesRaw((u16)m); mdlIboOfs[m] = (irun + 255u) & ~255u; irun = mdlIboOfs[m] + MdlIbBytesRaw((u16)m); }
     mdlSwapVboBase = (vrun + 255u) & ~255u; mdlSwapIboBase = (irun + 255u) & ~255u;
     u32 pOrdU16 = 0, pNodeSlW = 0, pTriW = 0, pUvW = 0;
@@ -880,13 +853,15 @@ void LoadModels() {
     u32 wvbMax=0, wibMax=0, wOrdMax=0, wNodeMax=0, wTriMax=0, wVtxMax=0;
     for (u8 lev=0; lev<MAX_LEVELS; ++lev) {
         u32 vb = 0, ib = 0, ord = 0, nsl = 0, tri = 0, vtx = 0;
-        for (u32 m=0; m<mdlsCnt; ++m) { if (!(MdlIsWinMemberSet((u16)m,lev) && m < mdlsCnt && modelVertexCounts[m] && rtSrcVertCounts[m])) continue; vb = ((vb + 255u) & ~255u) + MdlVbBytesRaw((u16)m); ib = ((ib + 255u) & ~255u) + MdlIbBytesRaw((u16)m); if (BvhHasBVH((u16)m)) { nsl += modelBVHNodeCounts[m]; tri += modelBVHTriOrderCounts[m]; ord = (ord + 1u) & ~1u; ord += modelBVHTriOrderCounts[m]; } vtx += rtSrcVertCounts[m]; }
+        for (u32 m=0; m<mdlsCnt; ++m) { if (!MdlIsWinMemberSet((u16)m,lev)) continue; vb = ((vb + 255u) & ~255u) + mdlMetaVertCounts[m]*VRT_ATT_SZ; ib = ((ib + 255u) & ~255u) + mdlMetaTriCounts[m]*6u + 4u; if (mdlMetaTriCounts[m]) { nsl += MdlBvhNodeBound(mdlMetaTriCounts[m]); tri += mdlMetaTriCounts[m]; ord = (ord + 1u) & ~1u; ord += mdlMetaTriCounts[m]; } vtx += mdlMetaVertCounts[m]; }
         if (vb > wvbMax) wvbMax = vb; if (ib > wibMax) wibMax = ib; if (ord > wOrdMax) wOrdMax = ord; if (nsl > wNodeMax) wNodeMax = nsl; if (tri > wTriMax) wTriMax = tri; if (vtx > wVtxMax) wVtxMax = vtx;
     }
-    rtCapNodeWords = (pNodeSlW + wNodeMax) * 16u; rtCapTriWords  = (pTriW + wTriMax) * 2u; rtCapPosWords  = pUvW * 2u + wVtxMax * 2u; rtCapUvWords   = pUvW + wVtxMax; rtCapOrderU16  = pOrdU16 + wOrdMax + 2u; rtPersistNodeWords = pNodeSlW * 16u; rtPersistTriWords = pTriW * 2u; rtPersistPosWords = pUvW * 2u; rtPersistUvWords = pUvW; rtPersistOrderU16 = pOrdU16;
-    mdlPoolVbBytes = mdlSwapVboBase + wvbMax; mdlPoolIbBytes = mdlSwapIboBase + wibMax;
+    u32 wvbMarg = wvbMax + (wvbMax + 49u) / 50u; u32 wVtxMarg = wVtxMax + (wVtxMax + 49u) / 50u;
+    rtCapNodeWords = (pNodeSlW + wNodeMax) * 16u; rtCapTriWords  = (pTriW + wTriMax) * 2u; rtCapPosWords  = pUvW * 2u + wVtxMarg * 2u; rtCapUvWords   = pUvW + wVtxMarg; rtCapOrderU16  = pOrdU16 + wOrdMax + 2u; rtPersistNodeWords = pNodeSlW * 16u; rtPersistTriWords = pTriW * 2u; rtPersistPosWords = pUvW * 2u; rtPersistUvWords = pUvW; rtPersistOrderU16 = pOrdU16;
+    mdlPoolVbBytes = mdlSwapVboBase + wvbMarg; mdlPoolIbBytes = mdlSwapIboBase + wibMax;
     glGenBuffers(1, &modelVBO); glBindBuffer(GL_ARRAY_BUFFER, modelVBO); glBufferData(GL_ARRAY_BUFFER, mdlPoolVbBytes, NULL, GL_STATIC_DRAW);
     glGenBuffers(1, &modelIBO); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, modelIBO); glBufferData(GL_ELEMENT_ARRAY_BUFFER, mdlPoolIbBytes, NULL, GL_STATIC_DRAW);
+    u32 batch = 0;
     for (u32 m=0; m<mdlsCnt; ++m) {
         u32 vb, ib;
         if (!mdlPersistentSet[m] || !mdlPstHalfV[m]) continue;
@@ -902,10 +877,10 @@ void LoadModels() {
     if (batch) { glFinish(); }
     glBindBuffer(GL_ARRAY_BUFFER,0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
-    g_mdlDataCnt = mp.count; g_mdlData = OS_Alloc((size_t)mp.count * sizeof(ModelData)); mset(g_mdlData,0,(size_t)mp.count*sizeof(ModelData));
-    for (u32 i=0;i<mp.count;++i) { if (mp.entries[i].index == U16_MAX) continue; g_mdlData[i] = mp.entries[i]; if (mp.entries[i].animated && mp.entries[i].frameCount) { u16* nf = OS_Alloc((size_t)mp.entries[i].frameCount * sizeof(u16)); mcpy(nf, mp.entries[i].frames, (size_t)mp.entries[i].frameCount*sizeof(u16)); g_mdlData[i].frames = nf; } }
-    OS_FreeInitPhase();
+    for (u32 m=0; m<mdlsCnt; ++m) { if (mdlPstHalfV[m]) OS_Free(mdlPstHalfV[m], (size_t)rtSrcVertCounts[m]*VRT_ATT_SZ); if (mdlPstTri[m]) OS_Free(mdlPstTri[m], (size_t)modelTriangleCounts[m]*6+4); }
+    OS_Free(mdlPstHalfV, mdlsCnt*sizeof(void*)); OS_Free(mdlPstTri, mdlsCnt*sizeof(void*)); mdlPstHalfV = NULL; mdlPstTri = NULL;
     DualLog(" vertices: %u, tris: %u......................took %.6f secs\n", tv, tt, get_time() - startModelTime);
+    mdlPersistentsLoaded = true;
 }
 AnimationClip mdlAnimClips[MAXANIM][MAX_ANIMCLIPS] = { // speed, frameStart, frameEnd, frameStartModelIndex, framerate
     [0]={[A_IDLE_CLOSED]={1.0f,2,2,699,24},[A_OPENING]={1.0f,2,11,699,24},[A_IDLE_OPEN]={1.0f,11,11,708,24},[A_CLOSING]={1.0f,12,21,709,24}},/*doorB (door2)*/                  [1]={[A_IDLE_CLOSED]={1.0f,2,2,719,24},[A_OPENING]={1.0f,2,12,719,24},[A_IDLE_OPEN]={1.0f,12,12,729,24},[A_CLOSING]={1.0f,14,24,731,24}},/*doorA (door1)*/

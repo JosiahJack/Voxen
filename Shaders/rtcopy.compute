@@ -1,12 +1,8 @@
 // rtcopy.compute - Builds the raytracing geometry triangle/position/UV sections for one model entirely on the GPU from that model's already-uploaded render buffers, so raytraced reflections need no CPU-side duplicates.
 layout(local_size_x = 256) in;
-layout(std430, binding = 17) readonly buffer SrcVerts { uvec4 srcVerts[]; };
 layout(std430, binding = 18) readonly buffer SrcTris { uint srcWords[]; };
 layout(std430, binding = 19) readonly buffer SrcOrder { uint orderWords[]; };
 layout(std430, binding = 16) buffer RTGeom { uint rtWords[]; };
-layout(location = 0) uniform uint vertCount;
-layout(location = 1) uniform uint vtxWordBase;
-layout(location = 2) uniform uint uvWordBase;
 layout(location = 3) uniform uint triCount;
 layout(location = 4) uniform uint triWordBase;
 layout(location = 5) uniform uint orderBase;
@@ -14,6 +10,5 @@ uint U16At(uint i) { return (srcWords[i >> 1u] >> ((i & 1u) << 4)) & 0xFFFFu; }
 uint OrderAt(uint i) { uint j = orderBase + i; return (orderWords[j >> 1u] >> ((j & 1u) << 4)) & 0xFFFFu; }
 void main() {
     uint i = gl_GlobalInvocationID.x;
-    if (i < vertCount) { uvec4 v = srcVerts[i]; rtWords[vtxWordBase + i * 2u] = v.x; rtWords[vtxWordBase + i * 2u + 1u] = v.y & 0xFFFFu; rtWords[uvWordBase + i] = v.w; }
     if (i < triCount) { uint t = OrderAt(i) * 3u; rtWords[triWordBase + i * 2u] = U16At(t) | (U16At(t + 1u) << 16); rtWords[triWordBase + i * 2u + 1u] = U16At(t + 2u); }
 }
