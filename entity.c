@@ -815,7 +815,7 @@ void LoadAllLevels() {
     BuildTextDecalMeshes();
     DualLog("Load all levels.....................................................................took %.6f secs\n",get_time() - start_time);
 }
-void CyberTimerReset(u16,int),CyberGolReset();
+void CyberTimerReset(u16,int); extern u8 cyberGolBuilt;
 void LoadLevelSetup(u8 lev) {
     MdlBuildLevelConvexAdjacency(lev);
     if (World.particles->count == 0) { PSysAddLevelLoops(); }
@@ -844,7 +844,7 @@ void LoadLevel(u8 curlevel, V3 pos) {
     World.position[PLAYER1] = pos; World.velocity[PLAYER1] = (V3){0.0f,0.0f,0.0f};
     World.invP1.lastVelY = 0.0f; World.invP1.wasGrounded = true; World.invP1.ladderState = 0; World.invP1.noiseFinished=World.pauseRelativeTime - 1.0;
     if (curlevel == LEVEL_CYBERSPACE) {
-        World.cyberspaceRecallPoint = World.position[PLAYER1]; World.col[PLAYER1] = CT_SPH; World.colliderSize[PLAYER1] = (V3){0.48f,0.48f,0.48f}; World.colliderCenter[PLAYER1] = (V3){0.0f,0.0f,0.0f}; World.radius[PLAYER1] = 0.48f; World.instances[PLAYER1].hasGrav = false; if (prevLevel != LEVEL_CYBERSPACE) { play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false); CyberTimerReset(PLAYER1,World.diffCyb); CyberGolReset();
+        World.cyberspaceRecallPoint = World.position[PLAYER1]; World.col[PLAYER1] = CT_SPH; World.colliderSize[PLAYER1] = (V3){0.48f,0.48f,0.48f}; World.colliderCenter[PLAYER1] = (V3){0.0f,0.0f,0.0f}; World.radius[PLAYER1] = 0.48f; World.instances[PLAYER1].hasGrav = false; if (prevLevel != LEVEL_CYBERSPACE) { play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false); CyberTimerReset(PLAYER1,World.diffCyb); cyberGolBuilt = 0;
         World.instances[PLAYER1].timerFinished = World.pauseRelativeTime + 1.0; }
     } else {
         World.col[PLAYER1] = CT_CAP; World.colliderSize[PLAYER1] = (V3){0.48f,2.0f * World.invP1.currentCrouchRatio,1.0f}; World.colliderCenter[PLAYER1].y = -PLYR_CAM_OFS_Y + (2.0f - World.colliderSize[PLAYER1].y) * 0.5f; World.instances[PLAYER1].hasGrav = true;
@@ -894,7 +894,7 @@ void LoadGame(u8 slot) {
         size_t result = BlowBubblesOfVoid(b,header.compressedSize,(u8*)&World,header.uncompressedSize);/*Decompress straight into the World str uct*/
         if (result == header.uncompressedSize) {
             SetLevelPointers(World.curLev); WarmPairsClear(); for (u8 l=0;l<MAX_LEVELS;++l) World.levelParticles[l].count=0; LoadPerLevelModels(World.curLev); LoadLevelSetup(World.curLev); LoadLogTextForLanguage(Sys_Settings.Language); ResetLevelAudio(); mset(targetIDText,0,sizeof(targetIDText)); mset(targetIDTextFinished,0,sizeof(targetIDTextFinished)); mset(targetIDAttachedFinished,0,sizeof(targetIDAttachedFinished));
-            mset(targetIDAttached,0,sizeof(targetIDAttached)); wfx.pendingMeleeFinished=0.0; if (World.curLev == LEVEL_CYBERSPACE) CyberGolReset(); cullVisibilityValid=false; AutomapOnLoad(); CenterStatusPrint("Loaded Game: %s", header.savename);
+            mset(targetIDAttached,0,sizeof(targetIDAttached)); wfx.pendingMeleeFinished=0.0; if (World.curLev == LEVEL_CYBERSPACE) { cyberGolBuilt = 0; } cullVisibilityValid=false; AutomapOnLoad(); CenterStatusPrint("Loaded Game: %s", header.savename);
         } else { DualLogError("Decompression failed! Expected %u bytes, got %u\n", header.uncompressedSize, (u32)result); }
     } OS_Free(b,header.compressedSize); OS_Close(fd); for (int i=0;i<World.loadedLights;++i) { flag_set(&World.lights[i].lflags,LDIRTY,true); }
 }

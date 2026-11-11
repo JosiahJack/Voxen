@@ -1,7 +1,7 @@
 // citadel.c - Game logic.
 #include "common.h"
 __attribute__((used, visibility("default"))) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; /*Must be always visible for AutoSplitter tools to find it.*/
-void PatchDisableAll(),BiomonitorEnergyPulse(float),BioMonitorClearGraphs(),TextureSequenceInit(u16,char*),GrenadeActivate(u16); bool RecentLog(); extern double lerpStartTime; extern V3 queuedLevelPos; extern u8 queuedLevelToLoad; extern u16 editModeSelection;
+void PatchDisableAll(),BiomonitorEnergyPulse(float),BioMonitorClearGraphs(),TextureSequenceInit(u16,char*); bool RecentLog(); extern double lerpStartTime; extern V3 queuedLevelPos; extern u8 queuedLevelToLoad; extern u16 editModeSelection;
 V3 ScreenPointToRay(V3 fwd, V3 rt) {
     float px=World.inventoryMode?(float)World.cursorPos_x:(float)UI_W*0.5f, py=World.inventoryMode?(float)World.cursorPos_y:(float)UI_H*0.5f;
     float tanFov=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),aspect=(float)Sys_Settings.ScreenWidth/(float)Sys_Settings.ScreenHeight;
@@ -9,18 +9,17 @@ V3 ScreenPointToRay(V3 fwd, V3 rt) {
     V3 view=V3_Normalize((V3){ndcX*aspect*tanFov,ndcY*tanFov,-1.0f}),flipForward=(V3){-fwd.x,-fwd.y,-fwd.z}; V3 up=V3_Normalize(V3_Cross(rt,flipForward));
     return (V3){view.x*rt.x+view.y*up.x+view.z*flipForward.x,view.x*rt.y+view.y*up.y+view.z*flipForward.y,view.x*rt.z+view.y*up.z+view.z*flipForward.z};
 }
-
 static i16 GrenadeTypeFromConst(u16 idx) { switch(idx) { case 370:return 7; case 372:return 8; case 387:return 9; case 389:return 10; case 402:return 11; case 403:return 12; case 404:return 13; default:return -1; } }
 bool IsLiveGrenade(u16 idx) { return GrenadeTypeFromConst(idx) >= 7; }
 static const float grenadeDamage[7]={150,325,80,375,230,200,150},grenadePenetration[7]={20,35,100,50,35,25,100},grenadeOffense[7]={3,6,3,6,5,3,3},grenadeRadius[7]={4,7,6,7.5f,5.1f,5.12f,4}; static const AttType grenadeAttackType[7]={Att_HitS,Att_HitS,Att_Magn,Att_HitS,Att_HitS,Att_HitS,Att_Gas};
 void GrenadeInit(u16 self) { i16 idx=GrenadeTypeFromConst(World.instances[self].index)-7; if(idx<0||idx>=7)return; Entity* e=&World.instances[self]; if(e->damage<=0.0f)e->damage=grenadeDamage[idx]; if(e->strength<=0.0f)e->strength=grenadePenetration[idx]; if(e->speed<=0.0f)e->speed=grenadeOffense[idx]; if(e->attackType==Att_None)e->attackType=grenadeAttackType[idx]; }
+void GrenadeActivate(u16 s) { Entity* e = &World.instances[s]; i16 i = GrenadeTypeFromConst(e->index); if (i == 10) { World.invP1.earthShakerTimeSetting = vclamp((float)World.invP1.earthShakerTimeSetting,4.0f,60.0f); } else if (i == 12) { World.invP1.nitroTimeSetting = vclamp((float)World.invP1.nitroTimeSetting,2.0f,60.0f); } e->timerFinished = World.pauseRelativeTime + ((i == 10) ? World.invP1.earthShakerTimeSetting : World.invP1.nitroTimeSetting); }
 void ResetHeldItem() { World.invP1.heldObjectIndex=World.invP1.heldObjectCustIdx=U16_MAX; World.invP1.heldAmmo=World.invP1.heldAmmo2=0; World.invP1.heldObjectLoadedAlternate=World.invP1.holdingObject=World.invP1.grenActive=false; }
 void DropHeldItem() {
     if (World.invP1.heldObjectIndex >= World.instCount) { ResetHeldItem(); return; }    if (World.invP1.dropFinished > World.pauseRelativeTime) {return;} World.invP1.dropFinished = World.pauseRelativeTime + 0.2;/*Prevent immediate re-grab at high fps*/ u16 n = AddInstance(World.invP1.heldObjectIndex,World.position[PLAYER1]);
     Entity* e = &World.instances[n]; e->customIndex = World.invP1.heldObjectCustIdx; e->ammo = World.invP1.heldAmmo; e->ammo2 = World.invP1.heldAmmo2; e->heldObjectLoadedAlternate = World.invP1.heldObjectLoadedAlternate;
     flag_set(&e->entflags,EF_RIGIDBODY,true); bool liveGrenade=IsLiveGrenade(e->index); if(liveGrenade){World.layer[n]=L_PlayerBullets; e->recentMostActivator=PLAYER1; GrenadeInit(n);} V3 tossDir = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right); World.position[n] = V3Add(World.position[PLAYER1],V3_ScaleByF(tossDir,0.48f)); World.velocity[n] = V3_ScaleByF(tossDir,10.0f); if(liveGrenade)GrenadeActivate(n); ResetHeldItem();
 }
-
 void PatchUse(int patchSlot) {
     if (patchSlot < 0 || patchSlot > 6) return; if (World.invP1.patchCounts[patchSlot] <= 0) { CenterStatusPrint("%s", Sys_Text.stringTable[324]); return; } if (patchSlot == 3 && World.instances[PLAYER1].health >= 255.0f) { CenterStatusPrint("%s", Sys_Text.stringTable[304]); return; }
     World.invP1.patchCounts[patchSlot]--; World.invP1.patchActive |= (u16)(1u << patchSlot);
@@ -33,20 +32,15 @@ void PatchUse(int patchSlot) {
         case 5: if(World.invP1.sightFinishedTime > World.pauseRelativeTime) World.invP1.sightFinishedTime += 40.0; else { World.invP1.sightFinishedTime = World.pauseRelativeTime + 40.0; World.invP1.sightSideEffectFinishedTime = -1.0; } break;
         case 6: if(World.invP1.staminupFinishedTime > World.pauseRelativeTime) World.invP1.staminupFinishedTime += 60.0; else World.invP1.staminupFinishedTime = World.pauseRelativeTime + 60.0; World.invP1.staminupActive = true; World.invP1.fatigue = 0.0f; break;
     }
-    bool depleted = World.invP1.patchCounts[patchSlot] <= 0;
-    if (depleted) { for (int i = 0; i < 7; i++) { if (World.invP1.patchCounts[i] > 0) { World.invP1.patchCur = (i8)i; break; } } }
-    if (depleted) CenterStatusPrint("%s%s%s",Sys_Text.stringTable[590],Sys_Text.stringTable[340+patchSlot],Sys_Text.stringTable[589]);
-    else CenterStatusPrint("%s%s",Sys_Text.stringTable[340+patchSlot],Sys_Text.stringTable[589]);
+    if (World.invP1.patchCounts[patchSlot] <= 0) { for (int i = 0; i < 7; i++) { if (World.invP1.patchCounts[i] > 0) { World.invP1.patchCur = (i8)i; break; } } CenterStatusPrint("%s%s%s",Sys_Text.stringTable[590],Sys_Text.stringTable[340+patchSlot],Sys_Text.stringTable[589]); } else CenterStatusPrint("%s%s",Sys_Text.stringTable[340+patchSlot],Sys_Text.stringTable[589]);
     play_wav(sounds[89],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);
 }
-
 void WeaponFireStartWeaponDip(float t) { if (t <= 0.0f) { World.invP1.reloadFinished = 0.0; return; } World.invP1.reloadFinished = World.pauseRelativeTime + (double)t; lerpStartTime = World.pauseRelativeTime; }
 bool InventoryHasAccessCard(AccCardType card) { return (World.invP1.accessCardOwned & (1u << card)) != 0; }
 const char* AccessCardCodeForType(AccCardType a) { // Called by ItemTabManager
     switch(a) {case ACC_Std: return "STD"; case ACC_Med: return "MED"; case ACC_Sci: return "SCI";  case ACC_Admin:return "ADM"; case ACC_Grp1: return "Group-1"; case ACC_Grp2:return "Group-2"; case ACC_Grp3:return "Group-3"; case ACC_Grp4:return "Group-4"; case ACC_GrpA:return "Group-A"; case ACC_GrpB:return "Group-B";
                case ACC_Stor:return "STO"; case ACC_Eng: return "ENG"; case ACC_Maint:return "MTN"; case ACC_Security:return "SEC"; case ACC_Per1:return "PER-1"; case ACC_Per2:return "PER-2";   case ACC_Per3:return "PER-3";   case ACC_Per4:return "PER-4";   case ACC_Per5:return "PER-5"; } return "Group-2";
 }
-
 void AddAccessCardToInventory(int index) {
     AccCardType card; if (!World.Sys_UI.firstGeneral){World.Sys_UI.firstGeneral=true; World.Sys_UI.mfdTab[0]=3;}
     switch(index) {case 34:card=ACC_Admin; break; case 81:card=ACC_Std;  break; case 83:card=ACC_Grp1; break; case  84:card=ACC_Sci;  break; case 85:card=ACC_Eng; break; case 86:card=ACC_GrpB; break; case 87:card=ACC_Security; break; case 88:card=ACC_Per5; break; case 89:card=ACC_Med;   break; case 90:card=ACC_Grp3; break; case 91:card=ACC_Grp4; break; case 110:card=ACC_Per1; break;
@@ -55,32 +49,26 @@ void AddAccessCardToInventory(int index) {
         if(InventoryHasAccessCard(ACC_Stor) && InventoryHasAccessCard(ACC_Security) && InventoryHasAccessCard(ACC_Maint)){CenterStatusPrint("%s%s",Sys_Text.stringTable[44],AccessCardCodeForType(card)); return;} World.invP1.accessCardOwned|=(1u<<ACC_Stor)|(1u<<ACC_Security)|(1u<<ACC_Maint); CenterStatusPrint("%s%s, %s, %s",Sys_Text.stringTable[45],AccessCardCodeForType(ACC_Stor),AccessCardCodeForType(ACC_Security),AccessCardCodeForType(ACC_Maint)); return;
     } if (InventoryHasAccessCard(card)) { CenterStatusPrint("%s%s",Sys_Text.stringTable[44],AccessCardCodeForType(card)); return; } World.invP1.accessCardOwned |= (1u << card); CenterStatusPrint("%s%s",Sys_Text.stringTable[45],AccessCardCodeForType(card));
 }
-
 void AddHardwareToInventory(int index,int hwversion) {
-    if (!World.Sys_UI.firstHardware){World.Sys_UI.firstHardware=true; World.Sys_UI.mfdTab[0]=2;} if((int)World.invP1.hwVers[index]==0 && index==1){*(World.Sys_UI.lastAutomapSideRH?&World.Sys_UI.mfdTab[2]:&World.Sys_UI.mfdTab[1])=3;}/*nav unit pickup raises the automap on the player's preferred automap side (right by default)*/ if (hwversion > 0 && hwversion <= (int)World.invP1.hwVers[index]) { CenterStatusPrint("%s",Sys_Text.stringTable[46]);/*THAT WARE IS OBSOLETE. DISCARDED.*/ return; }
+    if (!World.Sys_UI.firstHardware){World.Sys_UI.firstHardware=true; World.Sys_UI.mfdTab[0]=2;} if((int)World.invP1.hwVers[index]==0 && index==1){*(World.Sys_UI.lastAutomapSideRH?&World.Sys_UI.mfdTab[2]:&World.Sys_UI.mfdTab[1])=3;} if (hwversion > 0 && hwversion <= (int)World.invP1.hwVers[index]) { CenterStatusPrint("%s",Sys_Text.stringTable[46]);/*THAT WARE IS OBSOLETE. DISCARDED.*/ return; }
     static const u8 textIdx[12] = {21,22,23,24,25,26,27,28,29,30,31,32}; World.invP1.hasHardware |= (u16)(1u << index); World.invP1.hwVers[index] = (u8)hwversion; World.invP1.hwVersSetting[index]= hwversion > 0 ? (u8)(hwversion - 1) : 0; CenterStatusPrint("%s v%d",Sys_Text.stringTable[textIdx[index] + 326],hwversion);
 }
-
 bool AddGeneralObjectToInventory(int index, int custIdx){
     if (!World.Sys_UI.firstGeneral){World.Sys_UI.firstGeneral=true; World.Sys_UI.mfdTab[0]=3;}
     for (i8 i=1;i<14;++i) { if (World.invP1.genInvIdxRef[i]==-1) { if (!World.invP1.accessCardOwned && World.invP1.generalInvCurrent == 0 /*First slot is always access cards.*/) { World.invP1.generalInvCurrent = i; } World.invP1.genInvIdxRef[i] = index; World.invP1.generalInvCustIdx[i] = (i16)custIdx; World.Sys_UI.generalClickSlot = -1; CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[31]); return true; } }
     return false;
 }
-
 void CheckForUnreadLogs() { int e=0,l=0; for (int i=0;i<LOGCNT;++i) if (World.invP1.hasLog[i] && !World.invP1.readLog[i]) *(Sys_Text.audioLogType[i] == AudioLogType_Email ? &e : &l)=1; World.invP1.hasNewEmail=e; World.invP1.hasNewLogs=l; }
 static int FindNextUnreadLog() { for (int i = LOGCNT-1; i >= 0; i--) { if(World.invP1.hasLog[i] && !World.invP1.readLog[i]){return i;} } return -1; }
 static u8 VmailClipForLog(int logIndex) { switch(logIndex){case 119: return 0; case 116: return 1; case 117: return 2; case 110: return 3; case 114: return 4; case 120: return 5;} return 0xFF;} /*0 BetaJettison, 1 BridgeSeparation, 2 CitadelSelfDestruct, 3 GeneralStatus, 4 LaserDestroyed, 5 ShieldsUp*/
 void MFD_OpenAudioLog(int);
 void PlayLog(int logIndex) {if(logIndex<0||logIndex>=LOGCNT||!(World.invP1.hasHardware&HW_ERD)){return;} const char* lp=AudioLogPath(logIndex); if (lp && lp[0]) play_message(lp);/*text-only logs have no mp3: skip playback instead of erroring on ./Audio/.mp3*/ World.invP1.readLog[logIndex]=true; u8 vmailClip=VmailClipForLog(logIndex); if(vmailClip!=0xFF) PlayVmail(vmailClip); CenterStatusPrint("%s%s",Sys_Text.stringTable[1020],World.audiologNames[logIndex]); MFD_OpenAudioLog(logIndex); }
 void AddAudioLogToInventory(int index) {
-    if (index < 0 || index >= LOGCNT) { DualLogError("BUG: Audio log index %d out of range (%d)\n",index,LOGCNT); return; }
-    if (index == 128) { CenterStatusPrint("%s",Sys_Text.stringTable[309]); return; }/*Trioptimum Funpack*/
-        
+    if (index < 0 || index >= LOGCNT) { DualLogError("BUG: Audio log index %d out of range (%d)\n",index,LOGCNT); return; } if (index == 128) { CenterStatusPrint("%s",Sys_Text.stringTable[309]); return; }/*Trioptimum Funpack*/
     World.invP1.hasLog[index]  = true; World.invP1.lastAddedIndex = index; World.invP1.numLogsFromLevel[Sys_Text.audioLogLevelFound[index]]++;
     if(Sys_Text.audioLogType[index] == AudioLogType_Email)World.invP1.hasNewEmail = true; else if(Sys_Text.audioLogType[index] == AudioLogType_Normal)World.invP1.hasNewLogs = true;
     if (World.invP1.hasHardware & HW_ERD) { char keyStr[8]; sFormat(keyStr,sizeof(keyStr),"%s", Sys_Settings.InputCodeSettings[20] ? "U" : "?"); CenterStatusPrint("%s%s%s %s",Sys_Text.stringTable[36],World.audiologNames[index],Sys_Text.stringTable[38],keyStr); } else { CenterStatusPrint("%s%s%s",Sys_Text.stringTable[36],World.audiologNames[index],Sys_Text.stringTable[310]); }
 }
-
 INLINE void ItemAdd(u8 *cur, u8 *counts, int idx, int uIdx, int sysIdx) { if (!counts[*cur]) {*cur=(i8)idx;} counts[idx]++; CenterStatusPrint("%s%s", Sys_Text.stringTable[ItemStringIdx(uIdx)], Sys_Text.stringTable[sysIdx]); }
 void AddGrenadeToInventory(int i, int u) { if (i >= 0){if (!World.Sys_UI.firstMain){World.Sys_UI.firstMain=true; World.Sys_UI.mfdTab[0]=1;} World.invP1.grenConstIndex[i]=(i16)u; ItemAdd(&World.invP1.grenCur,World.invP1.grenAmmo,i,u,34);} }
 void   AddPatchToInventory(int i, int u) { if (i >= 0){if (!World.Sys_UI.firstMain){World.Sys_UI.firstMain=true; World.Sys_UI.mfdTab[0]=1;} ItemAdd(&World.invP1.patchCur,World.invP1.patchCounts,i,u,35);} }
@@ -91,40 +79,32 @@ static i8 GetExistingCyberItemIndex() { if (World.invP1.softVersions[SW_TURBO]  
 static void UseTurbo() {if(World.invP1.softVersions[SW_TURBO]<=0){World.invP1.hasSoft&=(u8)~(1u << SW_TURBO); return;} if(--World.invP1.softVersions[SW_TURBO]==0)World.invP1.hasSoft&=(u8)~(1u << SW_TURBO); if(World.invP1.turboFinished > World.pauseRelativeTime){World.invP1.turboFinished+=World.invP1.turboCyberTime;}else{World.invP1.turboFinished=World.invP1.turboCyberTime+World.pauseRelativeTime;}}
 void CyberDecoySetTarget(u16);
 static void UseDecoy() {
-    if (World.decoyActive) { CenterStatusPrint("%s",Sys_Text.stringTable[537]); return; }
-    if (World.invP1.softVersions[SW_DECOY] <= 0) { World.invP1.hasSoft &= (u8)~(1u << SW_DECOY); return; }
-    
-    if (--World.invP1.softVersions[SW_DECOY] == 0) World.invP1.hasSoft &= (u8)~(1u << SW_DECOY);
-    u16 decoyIdx = SpawnDynamicObject(553u);
-    Entity* e = &World.instances[decoyIdx]; World.position[decoyIdx]=World.position[PLAYER1]; World.velocity[decoyIdx]=(V3){0}; flag_set(&e->entflags,EF_RIGIDBODY,false); e->active = true; e->doSelfAfterList = true; e->despawnInstead = true; e->timerFinished = World.pauseRelativeTime + 15.0f; World.decoyActive=true; World.decoyInstance = decoyIdx; CyberDecoySetTarget(decoyIdx);
+    if (World.decoyActive) { CenterStatusPrint("%s",Sys_Text.stringTable[537]); return; } if (World.invP1.softVersions[SW_DECOY] <= 0) { World.invP1.hasSoft &= (u8)~(1u << SW_DECOY); return; }
+    if (--World.invP1.softVersions[SW_DECOY] == 0) { World.invP1.hasSoft &= (u8)~(1u << SW_DECOY); }
+    u16 decoyIdx = SpawnDynamicObject(553u); Entity* e = &World.instances[decoyIdx]; World.position[decoyIdx]=World.position[PLAYER1]; World.velocity[decoyIdx]=(V3){0}; flag_set(&e->entflags,EF_RIGIDBODY,false); e->active = e->doSelfAfterList = e->despawnInstead = World.decoyActive = true; e->timerFinished = World.pauseRelativeTime + 15.0f; World.decoyInstance = decoyIdx; CyberDecoySetTarget(decoyIdx);
 }
 static void UseRecall() { if (World.invP1.softVersions[SW_RECALL] <= 0) {return;} if (--World.invP1.softVersions[SW_RECALL] == 0) {World.invP1.hasSoft &= (u8)~(1u << SW_RECALL);} World.position[PLAYER1] = World.cyberspaceRecallPoint; }
 void UseCyberspaceItem() {
     if (World.invP1.cyberItemIndex <= 0) { World.invP1.cyberItemIndex = GetExistingCyberItemIndex(); if (World.invP1.cyberItemIndex < 0) { CenterStatusPrint("%s",Sys_Text.stringTable[473]); return; } }
     switch(World.invP1.cyberItemIndex) {case 0: if (!World.invP1.softVersions[SW_TURBO])  { World.invP1.cyberItemIndex = GetExistingCyberItemIndex(); return; } UseTurbo();  break; case 1: if (!World.invP1.softVersions[SW_DECOY])  { World.invP1.cyberItemIndex = GetExistingCyberItemIndex(); return; } UseDecoy();  break; case 2: if (!World.invP1.softVersions[SW_RECALL]) { World.invP1.cyberItemIndex = GetExistingCyberItemIndex(); return; } UseRecall(); break;}
 }
-
 void UseCyberspaceItemByIndex(int idx) { World.invP1.cyberItemIndex = (i8)idx; UseCyberspaceItem(); }
 static void CycleCyberSpaceItem(int step) { int next=World.invP1.cyberItemIndex+step; if (next<0) next=2; if (next>2) next=0; for (int c=0;c<3;++c,next=(next+step+3)%3) if (World.invP1.hasSoft&(1u<<(SW_TURBO+next))) { World.invP1.cyberItemIndex=(i8)next; return; } World.invP1.cyberItemIndex=-1; }
 void CompleteWeaponChange();
 void RemoveWeapon(i32 slot) {
-    if (slot < 0 || slot >= 7 || World.invP1.wepInvIndices[slot] < 0) return;
-    if (World.invP1.holdingObject) return;
-    
+    if (slot < 0 || slot >= 7 || World.invP1.wepInvIndices[slot] < 0 || World.invP1.holdingObject) { return; }
     World.invP1.heldAmmo = World.invP1.currentMagazineAmount[slot]; World.invP1.heldAmmo2 = World.invP1.currentMagazineAmount2[slot]; World.invP1.heldObjectLoadedAlternate = World.invP1.wepLoadedWithAlternate[slot];
     World.invP1.heldObjectCustIdx = U16_MAX; World.invP1.heldObjectIndex = (u16)World.invP1.wepInvIndices[slot]; World.invP1.grenActive = false; World.invP1.holdingObject = true;
     for (i32 i=slot;i<6;++i) { World.invP1.wepInvIndices[i]=World.invP1.wepInvIndices[i+1]; World.invP1.wepInvAmIndices[i]=World.invP1.wepInvAmIndices[i+1]; World.invP1.currentMagazineAmount[i]=World.invP1.currentMagazineAmount[i+1]; World.invP1.currentMagazineAmount2[i]=World.invP1.currentMagazineAmount2[i+1]; World.invP1.wepLoadedWithAlternate[i]=World.invP1.wepLoadedWithAlternate[i+1]; World.invP1.curWepHeat[i]=World.invP1.curWepHeat[i+1]; }
     World.invP1.wepInvIndices[6]=World.invP1.wepInvAmIndices[6]=-1; World.invP1.currentMagazineAmount[6]=World.invP1.currentMagazineAmount2[6]=0; World.invP1.wepLoadedWithAlternate[6]=false; World.invP1.curWepHeat[6]=0.0f;
     if (slot <= World.invP1.wepCur && World.invP1.wepCur > 0) World.invP1.wepCur--;
-    if (World.invP1.wepCur < 0) World.invP1.wepCur = 0;
+    if (World.invP1.wepCur < 0) { World.invP1.wepCur = 0; }
     World.invP1.wepCurPending = World.invP1.wepCur;
     World.invP1.weaponIndexPending = (World.invP1.wepCur >= 0 && World.invP1.wepInvIndices[World.invP1.wepCur] >= 0) ? (i16)World.invP1.wepInvIndices[World.invP1.wepCur] : -1;
-    u8 numweapons = 0; for (int i = 0; i < 7; i++) if (World.invP1.wepInvIndices[i] >= 0) numweapons++;
-    World.invP1.numweapons = numweapons;
-    if (!numweapons) { for (int i = 0; i < 7; i++) World.invP1.currentMagazineAmount[i] = World.invP1.currentMagazineAmount2[i] = 0; }
+    World.invP1.numweapons = 0; for (int i = 0; i < 7; i++) if (World.invP1.wepInvIndices[i] >= 0) { World.invP1.numweapons++; }
+    if (!World.invP1.numweapons) { for (int i = 0; i < 7; i++) World.invP1.currentMagazineAmount[i] = World.invP1.currentMagazineAmount2[i] = 0; }
     if (World.invP1.weaponIndexPending < 0) { World.instances[World.weaponVModelIndex].modelIndex = MAX_MDLS; World.invP1.wepCurPending = World.invP1.weaponIndexPending = -1; ForceInventoryMode(); return; } /* no valid weapon selected: hide the view model */
-    CompleteWeaponChange();
-    ForceInventoryMode();
+    CompleteWeaponChange(); ForceInventoryMode();
 }
 static float DefaultEnergySettingForWeapon(int wep16Index) { return (wep16Index == 4) ? 5.0f : (wep16Index == 10) ? 13.0f : (wep16Index == 14) ? 2.0f : 3.0f; }
 __attribute__((noinline)) void AddAmmoToInventory(int index,int constIndex,int amount,bool isSecondary) { if(index < 0){return;} if(isSecondary){World.invP1.wepAmmoSecondary[index]+=(u16)amount;} else {World.invP1.wepAmmo[index]+=(u16)amount;} CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(constIndex)],Sys_Text.stringTable[630]); }
@@ -136,7 +116,6 @@ bool AddWeaponToInventory(int index,int ammo1,int ammo2,bool loadedAlt) {
         CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[33]); World.invP1.numweapons=0; for (i32 j=0;j<7;j++) { if(World.invP1.wepInvIndices[j] >= 0){World.invP1.numweapons++;} } return true;
     } return false;
 }
-
 static const u8 grenadeSlots[7]={0,3,1,6,4,5,2};
 void UseGrenade(int index) {
     static const u16 live[7]={370,372,387,389,402,403,404};
@@ -146,7 +125,6 @@ void UseGrenade(int index) {
     World.invP1.heldObjectIndex=live[index-314]; RemoveGrenade(grenadeSlots[index-314]);
     World.invP1.heldObjectCustIdx = U16_MAX; World.invP1.heldAmmo = 0; World.invP1.heldAmmo2 = 0; World.invP1.heldObjectLoadedAlternate = false; World.invP1.holdingObject = true;
 }
-
 void InventoryUpdate() {
     if (Grenade()) { if (World.curLev == LEVEL_CYBERSPACE){UseCyberspaceItem();} else if (World.invP1.grenCur >= 0 && World.invP1.grenCur < 7 && World.invP1.grenAmmo[World.invP1.grenCur] > 0){UseGrenade(World.invP1.grenConstIndex[World.invP1.grenCur]);} else {CenterStatusPrint("%s",Sys_Text.stringTable[322]);/*Out of grenades.*/} }
     if (GrenCycUp())  { if (World.curLev == LEVEL_CYBERSPACE) CycleCyberSpaceItem(1); else GrenadeCycle(Sys_Settings.InvertInventoryCycling ? -1 : 1); } if (GrenCycDn()){ if (World.curLev == LEVEL_CYBERSPACE) CycleCyberSpaceItem(-1); else GrenadeCycle(Sys_Settings.InvertInventoryCycling ? 1 : -1); }
@@ -154,7 +132,6 @@ void InventoryUpdate() {
         if(World.invP1.lastAddedIndex>=0){int temp=World.invP1.lastAddedIndex; PlayLog(temp); World.invP1.lastAddedIndex=FindNextUnreadLog(); if(World.invP1.lastAddedIndex==temp)World.invP1.lastAddedIndex=-1; CheckForUnreadLogs(); }else{int temp=World.invP1.lastAddedIndex; World.invP1.lastAddedIndex=FindNextUnreadLog(); if(World.invP1.lastAddedIndex==temp){World.invP1.lastAddedIndex=-1;} CheckForUnreadLogs(); CenterStatusPrint("%s",Sys_Text.stringTable[1019]);/*Log playback stopped.*/}
     } if (Patch()) { if (World.invP1.patchCur >= 0 && World.invP1.patchCur < 7 && World.invP1.patchCounts[World.invP1.patchCur] > 0){PatchUse(World.invP1.patchCur);} else {CenterStatusPrint("%s",Sys_Text.stringTable[324]); /*Out of patches.*/} } if (PatchCycUp()){PatchCycle(Sys_Settings.InvertInventoryCycling ? -1 : 1);} else if (PatchCycDown()){PatchCycle(Sys_Settings.InvertInventoryCycling ? 1 : -1);}
 }
-
 void AddItemFail(int index) { DropHeldItem(); CenterStatusPrint("%s%s%s", Sys_Text.stringTable[32],Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[318]);/*Inventory full.*/ }
 extern u8 magazinePitchCountForWeapon[16],magazinePitchCountForWeapon2[16];
 void AddItemToInventory(int index, int custIdx) {
@@ -164,76 +141,36 @@ void AddItemToInventory(int index, int custIdx) {
     else {
         switch (index) {
             case 314 ... 320: AddGrenadeToInventory(grenadeSlots[index-314],index); break;
-            case 321: case 322: case 323: case 324: case 325: case 326: case 327: AddPatchToInventory(index-321,index); break;
+            case 321 ... 327: AddPatchToInventory(index-321,index); break;
             case 367 ... 386: {
                 static const struct { u8 weapon; bool alt; } ammo[]={[0]={13,false},[6]={3,false},[7]={3,true},[8]={10,false},[9]={10,true},[10]={8,false},[11]={8,true},[12]={1,false},[13]={1,true},[14]={4,false},[15]={4,true},[16]={12,false},[17]={14,false},[18]={14,true},[19]={9,false}};
-                u8 w=ammo[index-367].weapon; if (!w) return; --w; bool alt=ammo[index-367].alt; AddAmmoToInventory(w,index,alt ? magazinePitchCountForWeapon2[w] : magazinePitchCountForWeapon[w],alt); break;
+                u8 w = ammo[index-367].weapon; if (!w) return; --w; bool alt = ammo[index-367].alt; AddAmmoToInventory(w,index,alt ? magazinePitchCountForWeapon2[w] : magazinePitchCountForWeapon[w],alt); break;
             } default: return;
         }
     } play_wav(sounds[87], AppliedFXVol(1.0f), (V3){0}, false);
 }
-
 void CyberTimerInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; e->cyberTimer = 600.0f; e->timerFinished = World.pauseRelativeTime + 1.0; }
 void CyberTimerReset(u16 self, int diff) { Entity* e = &World.instances[self]; switch (diff) { case 0: e->cyberTimer = 600.0f; break; case 1: e->cyberTimer = 300.0f; break; case 2: e->cyberTimer = 240.0f; break; case 3: e->cyberTimer = 180.0f; break; } }
-void ExitCyberspace();
+void ExitCyberspace() { if (World.curLev != LEVEL_CYBERSPACE) return; if (World.instances[PLAYER1].cyberHealth <= 0.0f) World.instances[PLAYER1].cyberHealth = 1.0f; play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false); LoadLevel((World.cyberReturnLevel >= 0 && (u8)World.cyberReturnLevel < MAX_LEVELS) ? (u8)World.cyberReturnLevel : (World.startLevel < MAX_LEVELS ? World.startLevel : 0), World.cyberReturnPos); }
 void CyberTimerUpdate(u16 self) { if(World.curLev != LEVEL_CYBERSPACE){return;} Entity* e = &World.instances[self]; if (e->timerFinished >= World.pauseRelativeTime) { return; } e->cyberTimer-=1.0f; e->timerFinished = World.pauseRelativeTime + 1.0; if (e->cyberTimer <= 0.0f) { ExitCyberspace(); return; } }
 float cyberWallFade[INSTANCE_COUNT]; static u8 cyberWallWasTouching[INSTANCE_COUNT];
 typedef struct { V3 ctr, tip, base; float rad, bound; u8 isCap; } CyberWallToucher; static CyberWallToucher cyberWallTouchers[128]; static u16 cyberWallToucherCount;
 static void CyberWallTouchersBuild() { cyberWallToucherCount = 0; for (u16 i = INSTS_1ST_IDX; i < World.instCount && cyberWallToucherCount < 128; ++i) { Entity* e = &World.instances[i]; if (!(e->entflags & EF_ACTIVE) || (e->entflags & EF_DEAD)) continue; u16 ci = e->index; if (!IdxIsNPC(ci) && !(World.layer[i] & L_NPCBullet) && !((World.layer[i] & L_PlayerBullets) && (ci == 492 || ci == 495))) continue; CyberWallToucher* t = &cyberWallTouchers[cyberWallToucherCount++]; ShapeSphere sph = Entity_GetSph(i); t->ctr = sph.ctr; t->rad = sph.rad; t->bound = World.radius[i] + 0.06f; t->isCap = (World.col[i] == CT_CAP); if (t->isCap) { ShapeCapsule cap = Entity_GetCap(i); t->tip = cap.tip; t->base = cap.base; } } }
 static bool CyberWallToucherTouches(CyberWallToucher* t, ShapeBox panelBox, V3 panelPos, float panelRadius) { float reach = panelRadius + t->bound; if (V3_SqDist(panelPos, t->ctr) >= reach * reach) return false; if (t->isCap) return CapsuleTouchesOBB(t->tip, t->rad + 0.06f, panelBox) || CapsuleTouchesOBB(t->base, t->rad + 0.06f, panelBox) || CapsuleTouchesOBB(t->ctr, t->rad + 0.06f, panelBox); return CapsuleTouchesOBB(t->ctr, t->rad + 0.06f, panelBox); }
-#define CYBER_GOL_GENERATION_INTERVAL 1.0f
-#define CYBER_GOL_FADE_RATE 0.49f
-#define CYBER_GOL_PLANAR_NY 0.95f
-#define CYBER_GOL_VOLUME_ON 1.0f
-#define CYBER_GOL_VOLUME_OFF 0.02f
-static u8 cyberGolOpen[ARRSIZE];
-static u8 cyberGolCur[ARRSIZE];
-static u8 cyberGolNext[ARRSIZE];
-static u8 cyberGolBuilt;
+static u8 cyberGolOpen[ARRSIZE],cyberGolCur[ARRSIZE],cyberGolNext[ARRSIZE]; u8 cyberGolBuilt;
 static float cyberGolTimer;
-void CyberGolReset(void) { cyberGolBuilt = 0; }
-static bool CyberGolIsPlanar(u16 self) { V3 wn = quat_rot_v3(World.rotation[self], (V3){0.0f, -1.0f, 0.0f}); return vabs(wn.y) > CYBER_GOL_PLANAR_NY; }
-static void CyberGolOpenBuild(void) {
-    mset(cyberGolOpen, 0, sizeof(cyberGolOpen));
-    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
-        Entity* e = &World.instances[i];
-        u16 ci = e->index;
-        if (ci != 21 && ci != 22) continue;
-        cyberGolOpen[PosGetCellCoords(World.position[i].x, World.position[i].z)] = 1;
-        if (CyberGolIsPlanar(i)) cyberWallFade[i] = CYBER_GOL_VOLUME_ON;
-    }
-    mcpy(cyberGolCur, cyberGolOpen, ARRSIZE);
-    cyberGolTimer = 0.0f;
-    cyberGolBuilt = 1;
-}
+static bool CyberGolIsPlanar(u16 self) { V3 wn = quat_rot_v3(World.rotation[self], (V3){0.0f, -1.0f, 0.0f}); return vabs(wn.y) > 0.95f; }
+static void CyberGolOpenBuild(void) { mset(cyberGolOpen, 0, sizeof(cyberGolOpen)); for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { Entity* e = &World.instances[i]; u16 ci = e->index; if (ci != 21 && ci != 22) { continue; } cyberGolOpen[PosGetCellCoords(World.position[i].x,World.position[i].z)] = 1; if (CyberGolIsPlanar(i)) cyberWallFade[i] = 1.0f; } mcpy(cyberGolCur, cyberGolOpen, ARRSIZE); cyberGolTimer = 0.0f; cyberGolBuilt = 1; }
 static void CyberGolStep(void) {
     for (u32 c = 0; c < ARRSIZE; ++c) {
         if (!cyberGolOpen[c]) { cyberGolNext[c] = 0; continue; }
-        u32 x = c % WORLDX;
-        u32 z = c / WORLDX;
-        u32 n = 0;
-        for (i32 dz = -1; dz <= 1; ++dz) for (i32 dx = -1; dx <= 1; ++dx) {
-            if (!dx && !dz) continue;
-            i32 nx = (i32)x + dx;
-            i32 nz = (i32)z + dz;
-            if (nx < 0 || nx >= WORLDX || nz < 0 || nz >= WORLDX) continue;
-            n += cyberGolCur[(u32)nz * WORLDX + (u32)nx];
-        }
-        if (cyberGolCur[c]) cyberGolNext[c] = (n == 2 || n == 3) ? 1 : 0;
-        else cyberGolNext[c] = (n == 3) ? 1 : 0;
-    }
-    mcpy(cyberGolCur, cyberGolNext, ARRSIZE);
+        u32 x = c % WORLDX; u32 z = c / WORLDX; u32 n = 0;
+        for (i32 dz = -1; dz <= 1; ++dz) for (i32 dx = -1; dx <= 1; ++dx) { if (!dx && !dz) { continue; } i32 nx = (i32)x + dx; i32 nz = (i32)z + dz; if (nx < 0 || nx >= WORLDX || nz < 0 || nz >= WORLDX) { continue; } n += cyberGolCur[(u32)nz * WORLDX + (u32)nx]; }
+        if (cyberGolCur[c]) { cyberGolNext[c] = (n == 2 || n == 3) ? 1 : 0; } else { cyberGolNext[c] = (n == 3) ? 1 : 0; }
+    } mcpy(cyberGolCur, cyberGolNext, ARRSIZE);
 }
-static void CyberGolUpdate(void) {
-    if (!cyberGolBuilt) CyberGolOpenBuild();
-    cyberGolTimer += vclamp((float)World.dt, 0.0f, 0.1f);
-    if (cyberGolTimer >= CYBER_GOL_GENERATION_INTERVAL) {
-        cyberGolTimer -= CYBER_GOL_GENERATION_INTERVAL;
-        CyberGolStep();
-    }
-}
-void CyberWallUpdate(u16 self) { Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE)) return; bool gol = false; u32 cell = 0; if (cyberGolBuilt) { if (CyberGolIsPlanar(self)) { cell = PosGetCellCoords(World.position[self].x, World.position[self].z); gol = cyberGolOpen[cell] != 0; } } if (gol) { float target = cyberGolCur[cell] ? CYBER_GOL_VOLUME_ON : CYBER_GOL_VOLUME_OFF; float step = CYBER_GOL_FADE_RATE * vclamp((float)World.dt, 0.0f, 0.1f); if (cyberWallFade[self] < target) { cyberWallFade[self] += step; if (cyberWallFade[self] > target) cyberWallFade[self] = target; } else if (cyberWallFade[self] > target) { cyberWallFade[self] -= step; if (cyberWallFade[self] < target) cyberWallFade[self] = target; } } else if (cyberWallFade[self] > 0.02f) { cyberWallFade[self] -= 0.49f * vclamp((float)World.dt, 0.0f, 0.1f); if (cyberWallFade[self] < 0.02f) cyberWallFade[self] = 0.02f; } ShapeBox panelBox = Entity_GetBox(self); ShapeSphere sph = Entity_GetSph(PLAYER1); float reach = World.radius[self] + 1.86f; bool touching = false; if (V3_SqDist(World.position[self], sph.ctr) < reach * reach) touching = CapsuleTouchesOBB(sph.ctr, sph.rad + 0.06f, panelBox); for (u16 k = 0; k < cyberWallToucherCount && !touching; ++k) touching = CyberWallToucherTouches(&cyberWallTouchers[k], panelBox, World.position[self], World.radius[self]); if (touching && !cyberWallWasTouching[self]) { cyberWallFade[self] = 1.0f; if (gol) cyberGolCur[cell] = 1; } cyberWallWasTouching[self] = touching; }
-void ExitCyberspace();
+static void CyberGolUpdate(void) { if (!cyberGolBuilt) CyberGolOpenBuild(); cyberGolTimer += vclamp((float)World.dt, 0.0f, 0.1f); if (cyberGolTimer >= 1.0f) { cyberGolTimer -= 1.0f; CyberGolStep(); } }
+void CyberWallUpdate(u16 self) { Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE)) return; bool gol = false; u32 cell = 0; if (cyberGolBuilt) { if (CyberGolIsPlanar(self)) { cell = PosGetCellCoords(World.position[self].x, World.position[self].z); gol = cyberGolOpen[cell] != 0; } } if (gol) { float target = cyberGolCur[cell] ? 1.0f : 0.02f; float step = 0.49f * vclamp((float)World.dt, 0.0f, 0.1f); if (cyberWallFade[self] < target) { cyberWallFade[self] += step; if (cyberWallFade[self] > target) cyberWallFade[self] = target; } else if (cyberWallFade[self] > target) { cyberWallFade[self] -= step; if (cyberWallFade[self] < target) cyberWallFade[self] = target; } } else if (cyberWallFade[self] > 0.02f) { cyberWallFade[self] -= 0.49f * vclamp((float)World.dt, 0.0f, 0.1f); if (cyberWallFade[self] < 0.02f) cyberWallFade[self] = 0.02f; } ShapeBox panelBox = Entity_GetBox(self); ShapeSphere sph = Entity_GetSph(PLAYER1); float reach = World.radius[self] + 1.86f; bool touching = false; if (V3_SqDist(World.position[self], sph.ctr) < reach * reach) touching = CapsuleTouchesOBB(sph.ctr, sph.rad + 0.06f, panelBox); for (u16 k = 0; k < cyberWallToucherCount && !touching; ++k) touching = CyberWallToucherTouches(&cyberWallTouchers[k], panelBox, World.position[self], World.radius[self]); if (touching && !cyberWallWasTouching[self]) { cyberWallFade[self] = 1.0f; if (gol) cyberGolCur[cell] = 1; } cyberWallWasTouching[self] = touching; }
 void CyberItemUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f){ CyberItemOnTriggerEnter(self,PLAYER1); } }
 void CyberMineUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f){ CyberMineOnTriggerEnter(self,PLAYER1); } }
 void CyberExitUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(World.curLev != LEVEL_CYBERSPACE)return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 2.0f){ ExitCyberspace(); } }
@@ -250,7 +187,6 @@ void FuncWallUpdateInner(u16 self) {
     float distanceLeft = V3_Mag(delta), total = V3_Dist(e->startPosition,e->targetPosition), dist = e->speed * (float)World.dt * World.timeScale; if (distanceLeft <= dist || e->tickFinished < World.pauseRelativeTime) { World.position[self]=goal; e->funcState=doneState; e->percentMoved=doneState == FStat_Target ? 1.0f : 0.0f; return; }
     if (distanceLeft > 0.0001f) World.position[self]=V3Add(World.position[self],V3_ScaleByF(V3_Normalize(delta),dist)); if (total > 0.0001f) e->percentMoved = V3_Dist(e->startPosition,World.position[self]) / total;
 }
-
 void FuncWallUpdate(u16 self) { V3 prev = World.position[self]; FuncWallUpdateInner(self); FuncWallShiftChildren(self,V3_AsubB(World.position[self],prev)); }
 void ForceBridgeActivate(u16 s, bool silent){Entity* e=&World.instances[s]; if(e->active){return;} if(!silent){play_wav(sounds[102], AppliedFXVol(1.0f), World.position[s], true);} flag_set(&e->entflags,EF_ACTIVE,true); e->modelIndex=78; World.col[s]=CT_BOX; e->active=e->lerping=true; World.scale[s]=(V3){ e->forceFieldDirectionX ? 0.1f : e->activatedScale.x,e->forceFieldDirectionY ? 0.1f : e->activatedScale.y,e->forceFieldDirectionZ ? 0.1f : e->activatedScale.z };}
 void ForceBridgeDeactivate(u16 self, bool silent) { Entity* e = &World.instances[self]; if (!e->active) {return;} if (!silent) {play_wav(sounds[102], AppliedFXVol(1.0f), World.position[self], true);} e->active = false; e->lerping = true; }
@@ -262,7 +198,6 @@ void ForceBridgeUpdate(u16 self) {
         World.scale[self]=(V3){sx,sy,sz}; if(vabs(e->activatedScale.x - sx) < 0.08f && vabs(e->activatedScale.y - sy) < 0.08f && vabs(e->activatedScale.z - sz) < 0.08f){World.scale[self]=e->activatedScale; e->lerping=false;}
     } else if (e->lerping) {float sx=e->forceFieldDirectionX ? lerp(World.scale[self].x,0.0f,0.1f) : World.scale[self].x, sy=e->forceFieldDirectionY ? lerp(World.scale[self].y,0.0f,0.1f) : World.scale[self].y, sz=e->forceFieldDirectionZ ? lerp(World.scale[self].z,0.0f,0.1f) : World.scale[self].z; World.scale[self]=(V3){sx,sy,sz}; if (sx < 0.08f || sy < 0.08f || sz < 0.08f) { e->modelIndex = MAX_MDLS; World.col[self] = CT_NONE; e->lerping=false;}}
 }
-
 void TriggerCounterTarget(u16 self, u16 activator) { UseTargets(activator,World.instances[self].targetIdx); }
 void TriggerCounterDelayedTarget(u16 self, u16 act) { Entity* e=&World.instances[self]; e->recentMostActivator = act; e->delayFinished = World.pauseRelativeTime + e->delay; e->deferredIoflags = World.targetIOActive ? World.targetIOActivatorIoflags : (act<World.instCount?World.instances[act].ioflags:0u); e->deferredIoflagsHi = World.targetIOActive ? World.targetIOActivatorIoflagsHi : (act<World.instCount?World.instances[act].ioflagsHi:0u); }/*Capture the activating bits now, while the activator is still resolvable.*/
 void TriggerCounterUpdate(u16 self) { Entity* e=&World.instances[self]; if (e->delayFinished <= 0.0 || e->delayFinished >= World.pauseRelativeTime) {return;} e->delayFinished = 0.0; u32 sf=World.targetIOActivatorIoflags,sfh=World.targetIOActivatorIoflagsHi; bool wa=World.targetIOActive; World.targetIOActive=true; World.targetIOActivatorIoflags=e->deferredIoflags; World.targetIOActivatorIoflagsHi=e->deferredIoflagsHi; UseTargets(e->recentMostActivator,e->targetIdx); World.targetIOActivatorIoflags=sf; World.targetIOActivatorIoflagsHi=sfh; World.targetIOActive=wa; }/*Marking the chain active stops UseTargets re-seeding from World.instances[activator], which by now points at the player's level.*/
@@ -273,59 +208,30 @@ void SpawnManagerActivate(u16 self, bool alerted) { Entity* e=&World.instances[s
 static bool SpawnPointIsClear(u16 spot) { V3 p=World.position[spot]; if(World.curLev>=LEVEL_CYBERSPACE||PositionVisibleFromPlayerCell(p.x,p.z)) { ShapeCapsule ball={.tip=p,.base=p,.rad=0.48f}; return AreaHasClearance(ball,ball,0.0f,LMASK_NPC_COLLIDESWITH,0xFFFFu); } return false; }
 void AIAlert(u16);
 void SpawnManagerUpdate(u16 self) {
-    Entity* e=&World.instances[self]; if (World.paused || World.menuActive || !e->active) {return;}
-    
+    Entity* e = &World.instances[self]; if (World.paused || World.menuActive || !e->active) { return; } 
     u16 levelNpcs = 0, count = 0;
-    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
-        Entity* n = &World.instances[i]; if(!IdxIsNPC(n->index)){continue;}
-        ++levelNpcs; if(!(n->entflags&EF_ACTIVE) || (n->health <= 0.0f && n->cyberHealth <= 0.0f)) {continue;}
-        if(e->countOnlySameIndex && n->index!=e->spawnIndex) {continue;}
-        
-        ++count;
-    }
-    if (levelNpcs > 300) {return;}
-    if (e->numberActive != count) {e->numberActive = count;} if (e->numberActive >= e->numberToSpawn) {return;}
-    if (e->delayFinished >= World.pauseRelativeTime) {return;}
-    
+    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { Entity* n = &World.instances[i]; if (!IdxIsNPC(n->index)) { continue; } ++levelNpcs; if(!(n->entflags&EF_ACTIVE) || (n->health <= 0.0f && n->cyberHealth <= 0.0f)) { continue; } if(e->countOnlySameIndex && n->index!=e->spawnIndex) { continue; } ++count; }
+    if (levelNpcs > 300) { return; }
+    if (e->numberActive != count) {e->numberActive = count;} if (e->numberActive >= e->numberToSpawn) { return; }
+    if (e->delayFinished >= World.pauseRelativeTime) { return; }
     e->delayFinished = World.pauseRelativeTime + (double)random_range(e->minDelayBetweenSpawns, e->maxDelayBetweenSpawns);
-    if (World.diffCbt == 0) {return;}
+    if (World.diffCbt == 0) { return; }
     u16 spots = 0;
-    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { if(World.instances[i].index == 715u){++spots;} } if (!spots) {return;}
-
+    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { if(World.instances[i].index == 715u){++spots;} } if (!spots) { return; }
     u16 spot = 0, valid = 0;
-    for (u8 shot=0;shot<10;++shot) {
-        u16 want = (u16)random_range_u32(0,spots - 1), cand = 0;
-        for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { if(World.instances[i].index != 715u) {continue;} if(want--==0){cand=i;break;} }
-        if (!cand || !SpawnPointIsClear(cand)) {continue;}
-        
-        spot=cand;
-        if (++valid > 8) break;
-    }
-    if (!valid) {return;}
-    u16 npc = SpawnDynamicObject(e->spawnIndex); if (!EntIdxIsValid(npc)) {return;}
-    World.position[npc]=World.position[spot]; World.scale[npc]=(V3){1.0f,1.0f,1.0f}; if (!e->alertEnemiesOnAwake) { flag_set(&World.instances[npc].entflags, EF_WANDERING, true); return; } 
-    
-    AIAlert(npc);
-    if (count + 1 >= e->numberToSpawn) { e->delayFinished = World.pauseRelativeTime + (double)e->allSpawnedResetDelay; }
+    for (u8 shot=0;shot<10;++shot) { u16 want = (u16)random_range_u32(0,spots - 1), cand = 0; for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { if (World.instances[i].index != 715u) { continue; } if (want-- == 0) { cand = i; break; } } if (!cand || !SpawnPointIsClear(cand)) { continue; } spot=cand; if (++valid > 8) break; }
+    if (!valid) {return;} u16 npc = SpawnDynamicObject(e->spawnIndex); if (!EntIdxIsValid(npc)) {return;}
+    World.position[npc]=World.position[spot]; World.scale[npc]=(V3){1.0f,1.0f,1.0f}; if (!e->alertEnemiesOnAwake) { flag_set(&World.instances[npc].entflags, EF_WANDERING, true); return; } AIAlert(npc); if (count + 1 >= e->numberToSpawn) { e->delayFinished = World.pauseRelativeTime + (double)e->allSpawnedResetDelay; }
 }
 void TextureChangerToggle(u16 self) {
-    Entity* e = &World.instances[self]; u16 alt = 0, glowAlt = 0;
-         if (e->index == 538) { alt = 1118; glowAlt = 1116; }
-    else if (e->index == 689) { alt =  841; glowAlt =  840; }
-    else if (e->index == 690) { alt =  844; glowAlt =  843; }
-    else if (e->index == 695) { alt =  858; glowAlt =  857; } else return;
-    
+    Entity* e = &World.instances[self]; u16 alt = 0, glowAlt = 0; if (e->index == 538) { alt = 1118; glowAlt = 1116; } else if (e->index == 689) { alt =  841; glowAlt =  840; } else if (e->index == 690) { alt =  844; glowAlt =  843; } else if (e->index == 695) { alt =  858; glowAlt =  857; } else return;
     if (e->curTex) { e->texIndex = EDefs[e->index].texIndex; e->glowIndex = EDefs[e->index].glowIndex; } else { e->texIndex = alt; e->glowIndex = glowAlt; } e->curTex = !e->curTex;
 }
-
 static u16 NearestGravityLiftForVisual(u16 visual) { u16 n = U16_MAX; float nd = 64.0f; for (u16 lift=INSTS_1ST_IDX;lift<World.instCount;++lift) { if (World.instances[lift].index != 596) continue; float dx=World.position[visual].x-World.position[lift].x; float dy=World.position[visual].y-World.position[lift].y; float dz=World.position[visual].z-World.position[lift].z; float dd=dx*dx+dy*dy+dz*dz; if (dd < nd) { n = lift; nd = dd; } } return n; }
 void GravityLiftSyncVisuals(u16 lift) {
-    if (lift < INSTS_1ST_IDX || lift >= World.instCount || World.instances[lift].index != 596) return;
-    
-    bool active=World.instances[lift].active; u16 texture=active ? 1246 : 1248, glow=active ? 1247 : 1249;
+    if (lift < INSTS_1ST_IDX || lift >= World.instCount || World.instances[lift].index != 596) { return; } bool active=World.instances[lift].active; u16 texture=active ? 1246 : 1248, glow=active ? 1247 : 1249;
     for (u16 visual=INSTS_1ST_IDX;visual<World.instCount;++visual) { if (World.instances[visual].index == 112 && NearestGravityLiftForVisual(visual) == lift) { World.instances[visual].texIndex=texture; World.instances[visual].glowIndex=glow; } }
 }
-
 void GravityLiftSyncAllVisuals() { for (u16 v=INSTS_1ST_IDX;v<World.instCount;++v) { if (World.instances[v].index != 112) continue; if (World.instances[v].texIndex == 1248) { World.instances[v].glowIndex=1249; continue; } u16 lift=NearestGravityLiftForVisual(v); if (lift != U16_MAX) { bool active=World.instances[lift].active; World.instances[v].texIndex=active ? 1246 : 1248; World.instances[v].glowIndex=active ? 1247 : 1249; } } }
 void LogicTimerUseTargets(u16 self) { UseTargets(self,World.instances[self].targetIdx); }
 void LogicTimerUpdate(u16 self) { Entity* e=&World.instances[self]; if(!e->active || e->intervalFinished >= World.pauseRelativeTime){return;} e->intervalFinished=World.pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval); LogicTimerUseTargets(self); }
@@ -339,27 +245,33 @@ static __attribute__((noinline)) void EntitySetLocked(Entity* e, bool locked) { 
 u8 GetCurrentLevelSecurity() { return (World.diffMis < 1 || Cheats.superoverride) ? 0u : World.levelSecurity[World.curLev]; }
 typedef struct { u16 constIndex, sfxIndex; } ButtonSwitchSFXDef;
 static const ButtonSwitchSFXDef buttonSwitchSFX[] = {{688,44},{689,40},{690,44},{691,41},{692,41},{694,45},{695,40}};
-static void ButtonSwitchPlaySFX(u16 self) {
-    const Entity* e=&World.instances[self]; for (size_t i=0;i<sizeof(buttonSwitchSFX)/sizeof(buttonSwitchSFX[0]);++i) if (buttonSwitchSFX[i].constIndex==e->index) { if (buttonSwitchSFX[i].sfxIndex < SOUNDS_COUNT) play_wav(sounds[buttonSwitchSFX[i].sfxIndex], AppliedFXVol(1.0f), World.position[self], true); return; }
-}
+static void ButtonSwitchPlaySFX(u16 self) { const Entity* e=&World.instances[self]; for (size_t i=0;i<sizeof(buttonSwitchSFX)/sizeof(buttonSwitchSFX[0]);++i) if (buttonSwitchSFX[i].constIndex==e->index) { if (buttonSwitchSFX[i].sfxIndex < SOUNDS_COUNT) play_wav(sounds[buttonSwitchSFX[i].sfxIndex], AppliedFXVol(1.0f), World.position[self], true); return; } }
 void ButtonSwitchUse(u16 self, u16 activator) {
-    Entity* e = &World.instances[self]; if(Cheats.superoverride || World.diffMis == 0){EntitySetLocked(e,false);} else if(GetCurrentLevelSecurity() > UsableOrDef((float)e->securityThreshold,100.0f)){UIBlockedBySecurity(World.position[self]); return;}
+    Entity* e = &World.instances[self]; if (Cheats.superoverride || World.diffMis == 0) { EntitySetLocked(e,false); } else if (GetCurrentLevelSecurity() > UsableOrDef((float)e->securityThreshold,100.0f)) { UIBlockedBySecurity(World.position[self]); return;  }
     if ((e->entflags & EF_LOCKED) != 0) { if (e->lockedMessageLingdex >= 0 && e->lockedMessageLingdex < T_LOGSTR_CNT) CenterStatusPrint("%s",Sys_Text.stringTable[e->lockedMessageLingdex]); if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXLockedIndex], AppliedFXVol(1.0f), World.position[self], true); return; }
     ButtonSwitchPlaySFX(self);
     if (e->messageIndex >= 0 && e->messageIndex < T_LOGSTR_CNT) CenterStatusPrint("%s",Sys_Text.stringTable[e->messageIndex]); if (e->delay > 0.0f) { e->recentMostActivator = activator; e->delayFinished = World.pauseRelativeTime + e->delay; } else ButtonSwitchUseTargets(self);
 }
-
 void ButtonSwitchUpdate(u16 self) { double t=World.pauseRelativeTime; Entity* e=&World.instances[self]; if (e->switchAnimFinished > 0.0 && e->switchAnimFinished <= t){ ButtonSwitchHoldPose(e); } if (e->delayFinished > 0.0 && e->delayFinished < t){e->delayFinished=0.0; ButtonSwitchUseTargets(self);} if (e->index == 689 && e->active && e->tickFinished < t) { TextureChangerToggle(self); e->tickFinished=t+1.5f; } }
 void HealingBedUse(u16 self, u16 owner) { Entity* e=&World.instances[self]; if (GetCurrentLevelSecurity() <= UsableOrDef(e->minSecurityLevel,100.0f)) { if(!e->broken){HealthManagerHealingBed(PLAYER1,UsableOrDef(e->amount,170.0f)); World.instances[PLAYER1].radiation=0.0f; World.invP1.radiationArea=false; CenterStatusPrint("%s",Sys_Text.stringTable[23],owner); play_wav(sounds[103], AppliedFXVol(1.0f), World.position[self], false);} else {CenterStatusPrint("%s",Sys_Text.stringTable[24],owner);} } else UIBlockedBySecurity(World.position[self]); }
-int GeneralInvItem(int slot);
-bool GeneralInvCanVaporize(int slot);
-void GeneralInvRemove(int slot);
+int GeneralInvItem(int slot) { if (slot<0 || slot>=14) return -1; if (!slot) return 81; int item=World.invP1.genInvIdxRef[slot]; if (item<0) return -1; item=UseableFromConst(item); return IdxIsGenericItem(item + 307) ? item : -1; }
+bool GeneralInvCanVaporize(int slot) { int item=GeneralInvItem(slot); return slot>0 && item>=0 && (item<6 || item==33 || item==35 || item==58 || item==62); }
+void GeneralInvRemove(int slot) {
+    if (slot<=0 || slot>=14) { return; } for (int i=slot;i<13;++i) { World.invP1.genInvIdxRef[i]=World.invP1.genInvIdxRef[i+1]; World.invP1.generalInvCustIdx[i]=World.invP1.generalInvCustIdx[i+1]; } World.invP1.genInvIdxRef[13] = -1; World.invP1.generalInvCustIdx[13] = U16_MAX; World.Sys_UI.generalClickSlot = -1;
+    if (World.invP1.generalInvCurrent==slot) { if (GeneralInvItem(slot) < 0) { World.invP1.generalInvCurrent = 0; for (int i=13;i>=0;--i) { if (GeneralInvItem(i) >= 0) { World.invP1.generalInvCurrent = (u8)i; break; } } } } else if (World.invP1.generalInvCurrent>slot) World.invP1.generalInvCurrent--;
+}
 void VaporizeClick() {int slot=World.invP1.generalInvCurrent; if(!GeneralInvCanVaporize(slot))return; GeneralInvRemove(slot); play_wav(sounds[89],AppliedFXVol(1.0f),(V3){0},false);}
 void CyborgConversionToggleTargetted() {bool active=(World.ressurectionActiveLevels>>World.curLev)&1u; flag_setu16(&World.ressurectionActiveLevels,(1u<<World.curLev),!active); if(World.curLev==6)flag_setu16(&World.ressurectionActiveLevels,(1u<<10|1u<<11|1u<<12),!active);/*Set groves 10,11,12 when 6 toggled, shared*/ active=!active; play_wav(sounds[active ? 183 : 184], AppliedFXVol(1.0f), (V3){0.0f,0.0f,0.0f}, false);/*"vox_cybconvcancelled" : "vox_cybconvenabled"*/ CenterStatusPrint("%s",Sys_Text.stringTable[active ? 591 : 592]);}
-bool PlayerInElevatorCell(); bool FindElevatorKeypadPos(u8 level,V3* outPos);
-extern u16 elevatorDestinations[MAX_LEVELS][MAX_ELEV_DESTS_PER_LEVEL];
-extern u8 elevatorDestCounts[MAX_LEVELS];
-bool GetElevatorDestinationPos(u8 lev,u8 nth,V3* outPos) { if (lev>=MAX_LEVELS || nth>=elevatorDestCounts[lev]) return false; u16 idx=elevatorDestinations[lev][nth]; if (idx<INSTS_1ST_IDX || idx>=World.levelInstCount[lev]) return false; if (World.levelInstances[lev][idx].index!=706) return false; *outPos=World.levelPosition[lev][idx]; return true; }
+extern u16 elevatorDestinations[MAX_LEVELS][MAX_ELEV_DESTS_PER_LEVEL]; extern u8 elevatorDestCounts[MAX_LEVELS];
+typedef struct { i8 label; bool darkened; } ElevBtnDef;
+static const ElevBtnDef elevLayouts[12][8] = {{{1,0},{2,0},{3,1},{6,1},{7,1},{8,1},{-1,0},{-1,0}},/*0: 1 to 2*/ {{0,0},{1,1},{2,0},{3,0},{6,1},{7,1},{8,1},{-1,0}},/*1: 2 to 3*/ {{3,0},{4,0},{5,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*2: 3 to 4*/ {{1,1},{2,1},{3,0},{6,0},{7,1},{8,1},{-1,0},{-1,0}},/*3: 3 to 6*/ {{5,0},{6,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*4: 5 to 6*/ {{6,0},{10,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*5: 6 to G1*/
+                                              {{6,0},{11,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*6: 6 to G2*/ {{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*7: 6 to G3 (all hidden)*/ {{6,0},{12,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*8: 6 to G4*/ {{1,1},{2,1},{3,1},{6,0},{7,0},{8,1},{-1,0},{-1,0}},/*9: 6 to 7*/ {{1,1},{2,1},{3,1},{6,1},{7,0},{8,0},{-1,0},{-1,0}},/*10: 7 to 8*/ 
+                                              {{1,1},{2,1},{3,1},{6,1},{8,0},{9,0},{-1,0},{-1,0}},/*11: 8 to 9*/};
+static const struct { u8 level; float x,y,z; u8 layout; } elevPanelMap[] = { {0,9.97f,-55.08f,39.40f,1},{1,49.88f,-44.58f,-18.0f,0}, {2,52.47f,-27.94f,-25.62f,1},{2,3.79f,-27.94f,33.30f,1}, {3,15.27f,-14.91f,-11.50f,1},{3,1.17f,-15.09f,12.75f,2},{3,6.32f,-15.09f,-20.52f,3}, {4,-1.33f,1.64f,3.88f,2}, {5,-15.31f,14.26f,-39.68f,4},{5,8.94f,13.16f,-7.61f,2},
+                                                                             {6,-0.62f,34.09f,-69.24f,8},{6,-58.26f,34.14f,-39.71f,5},{6,-5.81f,36.02f,43.52f,6},{6,85.10f,34.14f,-37.09f,7},{6,-0.63f,34.10f,-46.09f,4},{6,60.81f,32.22f,35.84f,9},{6,-13.43f,34.14f,-30.73f,3}, {7,16.27f,51.38f,56.23f,10},{7,26.57f,48.82f,-10.34f,9}, {8,11.33f,97.46f,-41.43f,11},{8,3.58f,59.06f,20.01f,10}, {9,3.57f,107.16f,-38.31f,11},
+                                                                             {10,42.46f,136.38f,-7.83f,5},{11,9.91f,168.94f,-23.22f,6},{12,19.09f,196.14f,18.14f,8}};
+bool FindElevatorKeypadPos(u8 level,V3* outPos) { for (u32 m=0;m<sizeof(elevPanelMap)/sizeof(elevPanelMap[0]);++m) { if (elevPanelMap[m].level == level) { outPos->x = elevPanelMap[m].x; outPos->y = elevPanelMap[m].y; outPos->z = elevPanelMap[m].z; return true; } } return false; }
+bool GetElevatorDestinationPos(u8 lev,u8 nth,V3* outPos) { if (lev>=MAX_LEVELS || nth>=elevatorDestCounts[lev]) { return false; } u16 idx = elevatorDestinations[lev][nth]; if (idx<INSTS_1ST_IDX || idx>=World.levelInstCount[lev]) return false; if (World.levelInstances[lev][idx].index != 706) { return false; } *outPos = World.levelPosition[lev][idx]; return true; }
 bool ElevatorDefaultDestinationPos(u8 lev, V3* outPos) { V3 panel; if (FindElevatorKeypadPos(lev,&panel)) { V3 best; float bd = 0.0f; bool found = false; for (u8 n=0;n<MAX_LEVELS;++n) { V3 p; if (!GetElevatorDestinationPos(lev,n,&p)) { break; } V3 d = V3_AsubB(p,panel); float sq = V3_dot(d,d); if (!found || sq < bd) { best = p; bd = sq;found = true; } } if (found) { *outPos = best; return true; } } return GetElevatorDestinationPos(lev,0,outPos); }
 void EmailTargetted(u16 self) { Entity* e=&World.instances[self]; u16 idx=e->emailIndex; if(idx>=LOGCNT){return;} if(World.invP1.hasLog[idx]){return;} World.invP1.hasLog[idx]=World.invP1.hasNewEmail=true; World.invP1.lastAddedIndex=idx; if(Sys_Text.audioLogType[idx] == AudioLogType_Email){World.invP1.beepDone=true;/*TODO actually play beep sound 3 times when new unread email received*/} if (e->autoPlayEmail) { PlayLog(idx); World.invP1.lastAddedIndex = -1; } }
 u8 OverloadButtonVisualState() { if (World.invP1.curWepHeat[World.invP1.wepCur] > 25.0f) {return 2;} if (World.invP1.overloadEnabled) {return 1;} return 0; }
@@ -367,154 +279,73 @@ void OverloadButtonAction() {
     static double overloadClickFinished = 0.0; if (overloadClickFinished >= World.pauseRelativeTime){return;} overloadClickFinished = World.pauseRelativeTime + 0.4; if (World.invP1.curWepHeat[World.invP1.wepCur] > 25.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[12]);/*Weapon too hot*/ return; }
     if (World.invP1.overloadEnabled) { CenterStatusPrint("%s",Sys_Text.stringTable[13]);/*Overload disabled*/ World.invP1.overloadEnabled = false; } else { CenterStatusPrint("%s",Sys_Text.stringTable[17]);/*Overload enabled*/ World.invP1.overloadEnabled = true; }
 }
-
 i16 targetIDText[INSTANCE_COUNT]; double targetIDTextFinished[INSTANCE_COUNT],targetIDAttachedFinished[INSTANCE_COUNT]; bool targetIDAttached[INSTANCE_COUNT];
 float TargetIDGetSensingRange(bool manual) { u8 ver=World.invP1.hwVers[HW_TID_IDX]; if(manual)return ver==0?12.0f:ver>=4?18.0f:13.0f; return ver==0?12.0f:ver<=2?0.0f:ver==3?13.0f:20.0f; }
 float TargetIDGetTetherRange() { return World.invP1.hwVers[HW_TID_IDX]>=4?22.0f:15.0f; }
 bool TargetIDInPlayerPVS(u16 npc) { if (unlikely(npc>=World.instCount))return false; if (unlikely(World.curLev >= LEVEL_CYBERSPACE)) return true;/*Culling is disabled in cyberspace (CullCore early-outs), so never gate there.*/ return gridCellStates[World.instances[npc].cellIndex] & CELL_VISIBLE; }
 void TargetIDSendDamageReceive(u16 self,float damage,AttType attackType) {
-    if(self>=World.instCount||!IdxIsNPC(World.instances[self].index))return; if(!TargetIDInPlayerPVS(self))return;/*out of PVS: never latch sensing state*/ Entity* npc=&World.instances[self];
-    if(attackType==Att_Trnq){targetIDText[self]=536;targetIDTextFinished[self]=World.pauseRelativeTime;}
-    else{float mh=npcTable[npc->index-419].health;targetIDText[self]=damage>mh*.75f?514:damage>mh*.50f?515:damage>mh*.25f?513:damage>0.0f?512:511;targetIDTextFinished[self]=World.pauseRelativeTime+(damage==0.0f?1.0:2.5);}
+    if (self >= World.instCount || !IdxIsNPC(World.instances[self].index)) { return; } if (!TargetIDInPlayerPVS(self)) { return; } Entity* npc = &World.instances[self];
+    if (attackType == Att_Trnq) { targetIDText[self] = 536; targetIDTextFinished[self] = World.pauseRelativeTime; } else { float mh = npcTable[npc->index - 419].health; targetIDText[self] = damage > mh * 0.75f ? 514 : damage > mh * 0.50f ? 515 : damage > mh * 0.25f ? 513 : damage > 0.0f ? 512 : 511; targetIDTextFinished[self] = World.pauseRelativeTime + (damage == 0.0f ? 1.0 : 2.5); }
 }
-
 bool TargetIDShouldRender(u16 npc) {
-    if(npc>=World.instCount||!IdxIsNPC(World.instances[npc].index))return false; Entity* e=&World.instances[npc];
-    if(!(e->entflags&EF_ACTIVE)||(e->entflags&EF_DEAD)||e->health<=0.0f)return false;
-    if(!TargetIDInPlayerPVS(npc))return false;/*NPC left the PVS after acquiring: stop sensing and stop drawing.*/
-    i16 textIdx=TargetIDGetText(npc);
-    bool hw=(World.invP1.hasHardware&HW_TID)!=0; u8 ver=World.invP1.hwVers[HW_TID_IDX]; bool sufficientHw=hw&&(ver==0||ver>=3);
-    if(textIdx==511)return true;/*NO DAMAGE always displays, regardless of hardware ownership/version/distance.*/
-    if(textIdx>=512&&textIdx<=515&&sufficientHw)return true;/*Damage status bypasses distance with sufficient Target Identifier hardware.*/
-    if(V3_Dist(World.position[npc],World.position[PLAYER1])>10.0f)return false;
-    if(targetIDAttached[npc]&&targetIDAttachedFinished[npc]<World.pauseRelativeTime)targetIDAttached[npc]=false;
-    if(sufficientHw)return true;
+    if (npc >= World.instCount || !IdxIsNPC(World.instances[npc].index)) { return false; } Entity* e = &World.instances[npc]; if (!(e->entflags&EF_ACTIVE) || (e->entflags&EF_DEAD) || e->health <= 0.0f || !TargetIDInPlayerPVS(npc)) { return false; }
+    i16 textIdx = TargetIDGetText(npc); bool hw = (World.invP1.hasHardware & HW_TID); u8 ver = World.invP1.hwVers[HW_TID_IDX]; bool sufficientHw = hw && (ver == 0 || ver >= 3);
+    if (textIdx == 511) { return true;/*NO DAMAGE always displays, regardless of has hardware/version/distance.*/ }
+    if (textIdx >= 512 && textIdx <= 515 && sufficientHw) { return true;/*Damage status bypasses distance with sufficient Target Identifier hardware.*/ }
+    if (V3_Dist(World.position[npc],World.position[PLAYER1]) > 10.0f) { return false; }
+    if (targetIDAttached[npc] && targetIDAttachedFinished[npc] < World.pauseRelativeTime) { targetIDAttached[npc] = false; } if (sufficientHw) { return true; }
     return targetIDAttached[npc];
 }
-
 i16 TargetIDGetText(u16 npc) { if(npc>=World.instCount)return -1; Entity* e=&World.instances[npc]; if(e->tranquilizeFinished>World.pauseRelativeTime)return 536; if(targetIDText[npc]&&targetIDTextFinished[npc]<=World.pauseRelativeTime)targetIDText[npc]=0; return targetIDText[npc]?targetIDText[npc]:-1; }
 void CreateTargetIDInstance(float damage,u16 hitIdx,float tranq) {
-    if(hitIdx==WORLD||hitIdx>=World.instCount)return; Entity* npc=&World.instances[hitIdx]; if(!(npc->entflags&EF_ACTIVE)||!IdxIsNPC(npc->index)||npc->health<=0.0f)return;
-    if(!TargetIDInPlayerPVS(hitIdx))return;/*acquire is PVS-gated, not just rendering*/
-    bool hw=(World.invP1.hasHardware&HW_TID)!=0; if(!hw&&tranq<=0.0f&&damage>0.0f)return; if(V3_Dist(World.position[hitIdx],World.position[PLAYER1])>TargetIDGetTetherRange())return;
-    targetIDAttached[hitIdx]=true; targetIDAttachedFinished[hitIdx]=World.pauseRelativeTime+(hw?9999999.0:vmax(1.0f,tranq));
-    if(tranq>0.0f){targetIDText[hitIdx]=536;targetIDTextFinished[hitIdx]=World.pauseRelativeTime+tranq;} else if(damage>=0.0f)TargetIDSendDamageReceive(hitIdx,damage,Att_None);
+    if (hitIdx == WORLD || hitIdx >= World.instCount) { return; } Entity* npc = &World.instances[hitIdx]; if (!(npc->entflags & EF_ACTIVE) || !IdxIsNPC(npc->index) || npc->health <= 0.0f || !TargetIDInPlayerPVS(hitIdx)) { return; }
+    bool hw = (World.invP1.hasHardware&HW_TID) != 0; if (!hw && tranq <= 0.0f && damage > 0.0f) { return; } if (V3_Dist(World.position[hitIdx],World.position[PLAYER1]) > TargetIDGetTetherRange()) { return; }
+    targetIDAttached[hitIdx] = true; targetIDAttachedFinished[hitIdx] = World.pauseRelativeTime + (hw ? 9999999.0 : vmax(1.0f,tranq)); if (tranq > 0.0f) { targetIDText[hitIdx] = 536; targetIDTextFinished[hitIdx] = World.pauseRelativeTime + tranq; } else if (damage >= 0.0f) { TargetIDSendDamageReceive(hitIdx,damage,Att_None); }
 }
 // PlayerEnergy
 static const float  hwDrain[12][4] = {[3]={0.0921f,0.20478f,0.15354f,0.0f},[5]={0.24576f,0.61434f,0.28333f,0.30714f},[6]={0.010236f,0.0f,0.0f,0.0f},[7]={0.15354f,0.25596f,0.30714f,0.0f},[9]={0.0f,0.28333f,0.2125f,0.0f},[11]={0.51198f,0.51198f,0.51198f,0.51198f},};
 static const u16 hwDrainJPM[12][4] = {[3]={9,20,15,0},[5]={24,60,105,30},[6]={1,0,0,0},[7]={15,25,30,0},[9]={0,16,12,0},[11]={50,50,50,50},};
 static void DeactivateHardwareOnEnergyDepleted() { World.invP1.hardwareIsActive = 0; }
 void TakeEnergy(float take) { if (World.invP1.energy <= 0.0f || Cheats.redbull) {return;} World.invP1.energy -= take; if (World.invP1.energy <= 0.0f) { World.invP1.energy = 0.0f; play_wav(sounds[84],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);/*energy_gone*/ CenterStatusPrint("%s",Sys_Text.stringTable[314]); /*Power supply exhausted.*/ DeactivateHardwareOnEnergyDepleted(); } }
-void GiveEnergy(float give,EnergyType type) { World.invP1.energy += give; if (World.invP1.energy > 255.0f) {World.invP1.energy = 255.0f;} if (type == EnergyType_Battery){play_wav(sounds[79],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);/*batteryuse*/} else if (type == EnergyType_ChargeStation){play_wav(sounds[100],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);/*chargingstation*/} }
+void GiveEnergy(float give,EnergyType type) { World.invP1.energy += give; if (World.invP1.energy > 255.0f) {World.invP1.energy = 255.0f;} if (type == EnergyType_Battery){play_wav(sounds[79],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);/*batteryuse*/ } else if (type == EnergyType_ChargeStation){play_wav(sounds[100],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);/*chargingstation*/} }
 bool PlayerIsMoving() { return V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1]) > 0.1f; }
 void PlayerEnergyUpdate() {
     if (World.invP1.energyDrainTickFinished > World.pauseRelativeTime) return; World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1; bool anyDrain = false; u8 ver; World.invP1.drainJPM = 0;
-    for (int hw=3;hw<=11;++hw) { u16 bit=(u16)(1u << hw); if (!(World.invP1.hardwareIsActive & bit) || hw == 4 || hw == 8 || hw == 10) continue;/*No energy usage*/ if (hw==9 && World.invP1.ladderState>0) continue;/*Booster boost is ignored on a ladder*/ if (hw==9 && !PlayerIsMoving()) continue;/*...and only burns energy while the player is actually moving*/ ver=World.invP1.hwVersSetting[hw]; float drain=hwDrain[hw][ver];  World.invP1.drainJPM += hwDrainJPM[hw][ver]; if (drain > 0.0f) { TakeEnergy(drain); anyDrain = true; } }
-    if (anyDrain && World.invP1.energy <= 0.0f) { DeactivateHardwareOnEnergyDepleted(); World.invP1.drainJPM = 0; } // Depleted
+    for (int hw=3;hw<=11;++hw) { u16 bit=(u16)(1u << hw); if (!(World.invP1.hardwareIsActive & bit) || hw == 4 || hw == 8 || hw == 10) { continue;/*No energy usage*/ } if (hw==9 && World.invP1.ladderState>0) { continue; } if (hw==9 && !PlayerIsMoving()) { continue; } ver=World.invP1.hwVersSetting[hw]; float drain = hwDrain[hw][ver];  World.invP1.drainJPM += hwDrainJPM[hw][ver]; if (drain > 0.0f) { TakeEnergy(drain); anyDrain = true; } }
+    if (anyDrain && World.invP1.energy <= 0.0f) { DeactivateHardwareOnEnergyDepleted(); World.invP1.drainJPM = 0; } /*Depleted*/
 }
 void ChargeStationUse(u16 self, u16 owner) {
-    Entity* e=&World.instances[self];
-    if (GetCurrentLevelSecurity() > UsableOrDef(e->minSecurityLevel,100.0f)) { UIBlockedBySecurity(World.position[self]); return; }
+    Entity* e=&World.instances[self]; if (GetCurrentLevelSecurity() > UsableOrDef(e->minSecurityLevel,100.0f)) { UIBlockedBySecurity(World.position[self]); return; }
     if (e->rechargeFinished < World.pauseRelativeTime) {
         if (World.invP1.energy >= 255.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[303]); return; }
         GiveEnergy(UsableOrDef(e->amount,170.0f),EnergyType_ChargeStation);
-        if (e->damage > 0.0f) { DamageData dd={0}; dd.damage = vmin(e->damage,World.instances[PLAYER1].health - 1.0f); if (dd.damage > 0.0f) TakeDamage(PLAYER1,dd); } /*zap, never lethal*/
-        if (e->usedMsgLingdex < T_LOGSTR_CNT) CenterStatusPrint("%s",Sys_Text.stringTable[e->usedMsgLingdex]);
-        if (e->requireRecharge) e->rechargeFinished = World.pauseRelativeTime + UsableOrDef(e->resetTime,150.0f);
-        UseTargets(owner,e->targetIdx);
+        if (e->damage > 0.0f) { DamageData dd={0}; dd.damage = vmin(e->damage,World.instances[PLAYER1].health - 1.0f); /*zap, never lethal*/ if (dd.damage > 0.0f) TakeDamage(PLAYER1,dd); } if (e->usedMsgLingdex < T_LOGSTR_CNT) { CenterStatusPrint("%s",Sys_Text.stringTable[e->usedMsgLingdex]); } if (e->requireRecharge) { e->rechargeFinished = World.pauseRelativeTime + UsableOrDef(e->resetTime,150.0f); } UseTargets(owner,e->targetIdx);
     } else if (e->rechargeMsgLingdex < T_LOGSTR_CNT) CenterStatusPrint("%s",Sys_Text.stringTable[e->rechargeMsgLingdex]);
 }
-// GeneralInventory
 void MFD_ShowGeneralItem();
-int GeneralInvItem(int slot) { if (slot<0 || slot>=14) return -1; if (!slot) return 81; int item=World.invP1.genInvIdxRef[slot]; if (item<0) return -1; item=UseableFromConst(item); return IdxIsGenericItem(item + 307) ? item : -1; }
 bool GeneralInvCanUse(int slot) { int item=GeneralInvItem(slot); return slot>0 && (item==52 || item==53 || item==55); }
-bool GeneralInvCanVaporize(int slot) { int item=GeneralInvItem(slot); return slot>0 && item>=0 && (item<6 || item==33 || item==35 || item==58 || item==62); }
-void GeneralInvRemove(int slot) {
-    if (slot<=0 || slot>=14) return;
-
-    for (int i=slot;i<13;++i) { World.invP1.genInvIdxRef[i]=World.invP1.genInvIdxRef[i+1]; World.invP1.generalInvCustIdx[i]=World.invP1.generalInvCustIdx[i+1]; }
-    World.invP1.genInvIdxRef[13] = -1;
-    World.invP1.generalInvCustIdx[13] = U16_MAX;
-    World.Sys_UI.generalClickSlot = -1;
-    if (World.invP1.generalInvCurrent==slot) {
-        if (GeneralInvItem(slot) < 0) {
-            World.invP1.generalInvCurrent = 0;
-            for (int i=13;i>=0;--i) {
-                if (GeneralInvItem(i) >= 0) { World.invP1.generalInvCurrent = (u8)i; break; }
-            }
-        }
-    } else if (World.invP1.generalInvCurrent>slot) World.invP1.generalInvCurrent--;
-}
-
 void GeneralInvClick(int buttonIdx) { int item = GeneralInvItem(buttonIdx); if (item < 0) return; World.invP1.generalInvCurrent = (u8)buttonIdx; World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true; MFD_ShowGeneralItem(); }
-void GeneralInvApply(int buttonIdx) {
-    if (!GeneralInvCanUse(buttonIdx) || World.invP1.holdingObject) return;
-    
-    int item = GeneralInvItem(buttonIdx);
-    if ((item == 55 ? World.instances[PLAYER1].health : World.invP1.energy) >= 255.0f) { CenterStatusPrint("%s", Sys_Text.stringTable[303]); return; }
-    if (item == 55) World.instances[PLAYER1].health = 255.0f;
-    else            GiveEnergy(item == 52 ? 83.0f : 255.0f, EnergyType_Battery);
-    GeneralInvRemove(buttonIdx);
-}
-
-bool GeneralInvTake(int slot) {
-    int item=GeneralInvItem(slot); if (slot<=0 || item<0 || World.invP1.holdingObject) return false;
-    
-    ResetHeldItem();
-    World.invP1.heldObjectIndex = (u16)(item+307);
-    World.invP1.heldObjectCustIdx = World.invP1.generalInvCustIdx[slot];
-    World.invP1.holdingObject = true;
-    GeneralInvRemove(slot);
-    ForceInventoryMode();
-    CenterStatusPrint("%s%s",Sys_Text.stringTable[item+326],Sys_Text.stringTable[319]); return true;
-}
-
+void GeneralInvApply(int buttonIdx) { if (!GeneralInvCanUse(buttonIdx) || World.invP1.holdingObject) { return; } int item = GeneralInvItem(buttonIdx); if ((item == 55 ? World.instances[PLAYER1].health : World.invP1.energy) >= 255.0f) { CenterStatusPrint("%s", Sys_Text.stringTable[303]); return; } if (item == 55) { World.instances[PLAYER1].health = 255.0f; } else { GiveEnergy(item == 52 ? 83.0f : 255.0f,EnergyType_Battery); } GeneralInvRemove(buttonIdx); }
+bool GeneralInvTake(int slot) { int item = GeneralInvItem(slot); if (slot <= 0 || item < 0 || World.invP1.holdingObject) return false; ResetHeldItem(); World.invP1.heldObjectIndex = (u16)(item + 307); World.invP1.heldObjectCustIdx = World.invP1.generalInvCustIdx[slot]; World.invP1.holdingObject = true; GeneralInvRemove(slot); ForceInventoryMode(); CenterStatusPrint("%s%s",Sys_Text.stringTable[item+326],Sys_Text.stringTable[319]); return true; }
 static bool GrenadeIsNPCMine(u16 self) { return World.layer[self] != L_PlayerBullets; }
 void ApplyImpactForce(u16 target, float vel, V3 normal, V3 pt) {
-    if (target == WORLD || target >= World.instCount || vel <= 0.0f){return;}
-    Entity* e = &World.instances[target]; if((e->entflags & EF_DEAD) || (!(e->entflags & EF_RIGIDBODY) && target != PLAYER1)){return;}
-    
+    if (target == WORLD || target >= World.instCount || vel <= 0.0f) { return; } Entity* e = &World.instances[target]; if((e->entflags & EF_DEAD) || (!(e->entflags & EF_RIGIDBODY) && target != PLAYER1)) { return; }
     V3 n = V3_Normalize(normal); if (V3_Mag(n) < 0.0001f) {n = (V3){0.0f,1.0f,0.0f};/*At least make it pop off the floor*/} AddForce(target,V3_ScaleByF(n,vel),true); V3 lever = V3_AsubB(pt, World.position[target]); World.angularVelocity[target].x += lever.y * vel * 0.05f; World.angularVelocity[target].z += -lever.x * vel * 0.05f; // torque applied relative to point lever arm
 }
-
 void ApplyImpactForceWithSound(u16 target, float vel, V3 normal, V3 pt) { ApplyImpactForce(target, vel, normal, pt); if (vel > 2.0f) play_wav_ext(sounds[523], AppliedFXVol((vel / 10.0f) * 0.3f), pt, true, random_range(-3.8631f,3.1564f)); }
 void ApplyImpactForceSphere(DamageData* dd, V3 center, float radius, float baseVel) { 
     if (radius <= 0.0f || baseVel <= 0.0f) return; float r2 = radius * radius; float origDamage = dd ? dd->damage : 0.0f;
     float damageScale = vmin(origDamage / 100.0f, 2.0f);
     for (u16 i = PLAYER1; i < World.instCount; i++) {
-        Entity* e = &World.instances[i]; if (!(e->entflags & EF_ACTIVE) || (e->entflags & EF_DEAD)) { if (!IdxIsNPC(e->index) || !(World.layer[i] & L_Corpse)) continue; }
-        if (!(e->entflags & EF_RIGIDBODY) && !IdxIsNPC(e->index) && i != PLAYER1 && !IsDamageable(e)) continue;
-        float sqd = V3_SqDist(World.position[i], center); if (sqd > r2) continue;
+        Entity* e = &World.instances[i]; if (!(e->entflags & EF_ACTIVE) || (e->entflags & EF_DEAD)) { if (!IdxIsNPC(e->index) || !(World.layer[i] & L_Corpse)) continue; } if (!(e->entflags & EF_RIGIDBODY) && !IdxIsNPC(e->index) && i != PLAYER1 && !IsDamageable(e)) { continue; } float sqd = V3_SqDist(World.position[i], center); if (sqd > r2) { continue; }
         float dist = vsqrtf(sqd); if (dist >= 4.0f) { RaycastHit sight = Raycast(center, V3_ScaleByF(V3_AsubB(World.position[i],center), 1.0f / dist), radius + 0.02f, LMASK_EXPLOSION); if (!(sight.hit && sight.hitInstanceIndex == i)) continue; }
-        
-        float distPenalty = (radius - dist) / radius; if (distPenalty < 0.0f) distPenalty = 0.0f;
-        V3 normal; if(dist > 0.0001f){normal=V3_ScaleByF(V3_AsubB(World.position[i],center), 1.0f / dist);}else{normal = (V3){0.0f,1.0f,0.0f};}
-        float impactVel = baseVel * distPenalty;
-        if (dd && origDamage > 0.0f && i != dd->owner) {
-            DamageData splash=*dd;
-            if (i == PLAYER1) splash.damage *= 0.5f; /*halve for player*/
-            splash.damage *= distPenalty;
-            float saturation = origDamage * 0.33f;
-            if (splash.damage < saturation) splash.damage = saturation;
-            splash.impactVelocity = impactVel;
-            splash.hitpoint = World.position[i];
-            splash.attacknormal = normal;
-            TakeDamage(i,splash);
-        }
-        if (World.layer[i] & L_NPC) impactVel *= 0.5f;
-        ApplyImpactForce(i,vmin(impactVel,(0.5f + 5.0f * EntMass(i)) * damageScale),normal,World.position[i]);
+        float distPenalty = (radius - dist) / radius; if (distPenalty < 0.0f) distPenalty = 0.0f; V3 normal; if(dist > 0.0001f){normal=V3_ScaleByF(V3_AsubB(World.position[i],center), 1.0f / dist);}else{normal = (V3){0.0f,1.0f,0.0f};} float impactVel = baseVel * distPenalty;
+        if (dd && origDamage > 0.0f && i != dd->owner) { DamageData splash=*dd; if (i == PLAYER1) { splash.damage *= 0.5f;/*halve for player*/ } splash.damage *= distPenalty; float saturation = origDamage * 0.33f; if (splash.damage < saturation) { splash.damage = saturation; } splash.impactVelocity = impactVel; splash.hitpoint = World.position[i]; splash.attacknormal = normal; TakeDamage(i,splash); }
+        if (World.layer[i] & L_NPC) { impactVel *= 0.5f; } ApplyImpactForce(i,vmin(impactVel,(0.5f + 5.0f * EntMass(i)) * damageScale),normal,World.position[i]);
     }
 }
-
 static void SpawnExplosionPreset(u16 type,V3 pos) { const PSysDef* preset=PSysTypeGet(type); if(!preset)return; PSysDef def=*preset; def.pos=pos; PSysAddInternal(&def,U16_MAX,U16_MAX); }
-void SpawnExplosionEffect(V3 pos, int explosionType) {
-    switch (explosionType) {
-        case 3:  SpawnExplosionPreset(165,pos); SpawnExplosionPreset(168,pos); break;/*GasExplosions*/
-        case 4:  SpawnExplosionPreset(162,pos); SpawnExplosionPreset(163,pos); SpawnExplosionPreset(164,pos); break;/*GrenadeEMPExplosions*/
-        default: SpawnExplosionPreset(  5,pos); SpawnExplosionPreset(  6,pos); break;/*GrenadeFragExplosions*/
-    }
-}
-
+void SpawnExplosionEffect(V3 pos, int explosionType) { switch (explosionType) { case 3:  SpawnExplosionPreset(165,pos); SpawnExplosionPreset(168,pos); break;/*GasExplosions*/ case 4:  SpawnExplosionPreset(162,pos); SpawnExplosionPreset(163,pos); SpawnExplosionPreset(164,pos); break;/*GrenadeEMPExplosions*/ default: SpawnExplosionPreset(  5,pos); SpawnExplosionPreset(  6,pos); break;/*GrenadeFragExplosions*/ } }
 void GrenadeExplode(u16 self) {
     if(self>=World.instCount)return; Entity* e = &World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; flag_set(&e->entflags,EF_ACTIVE,false);
     DamageData dd={.damage=e->damage,.penetration=e->strength,.offense=e->speed,.defense=0.0f,.impactVelocity=e->damage*1.5f,.attacknormal=(V3){0.0f,1.0f,0.0f},.hitpoint=World.position[self],.attackType=e->attackType,.owner=e->recentMostActivator,.isOtherNPC=false,.berserkActive=(World.invP1.patchActive & PATCH_BERSERK) != 0};
@@ -522,57 +353,23 @@ void GrenadeExplode(u16 self) {
     switch (idx) {case 7: case 11: soundIndex = 64; World.fogFac += 5; explosionType = 1; break;/*frag, mine*/ case 8: case 10: soundIndex = 60; World.fogFac += 7; explosionType = 2; break;/*conc, earth*/ case 9:  soundIndex = 67; explosionType = 4; break;/*emp*/ case 12: soundIndex = 60; World.fogFac += 6;  explosionType = 2; break;/*nitro*/ case 13: soundIndex = 63; World.fogFac += 10; explosionType = 3; break;/*gas*/}
     play_wav(SoundPath(soundIndex), AppliedFXVol(1.0f), World.position[self], true); SpawnExplosionEffect(World.position[self],explosionType); ScreenShake(); DeleteInstance(self);
 }
-
-void GrenadeActivate(u16 self) {
-    if (self >= World.instCount) return;
-    
-    Entity* e = &World.instances[self];
-    i16 idx = GrenadeTypeFromConst(e->index);
-         if (idx == 10) { World.invP1.earthShakerTimeSetting = vclamp((float)World.invP1.earthShakerTimeSetting,4.0f,60.0f); e->timerFinished = World.pauseRelativeTime + World.invP1.earthShakerTimeSetting;}
-    else if (idx == 12) { World.invP1.nitroTimeSetting       = vclamp((float)World.invP1.nitroTimeSetting,      2.0f,60.0f); e->timerFinished = World.pauseRelativeTime + World.invP1.nitroTimeSetting;}
-}
-
 void GrenadeUpdate(u16 self) { Entity* e = &World.instances[self]; i16 idx=GrenadeTypeFromConst(e->index); if(idx == 14){GrenadeExplode(self); return;} /*Plastique*/ if((idx == 10 || idx == 12) && e->timerFinished <= World.pauseRelativeTime) { GrenadeExplode(self); return; } if (idx == 11) { V3 origin = World.position[self]; float pr=1.451f;  bool npcMine = GrenadeIsNPCMine(self);  for (u16 i = PLAYER1; i < World.instCount; i++) { Entity* o = &World.instances[i]; if (i == self || !(o->entflags & EF_ACTIVE) || (o->entflags & EF_DEAD)) continue; if (npcMine ? (i != PLAYER1) : (i == PLAYER1 || !IdxIsNPC(o->index))) continue; float rr = pr + ((World.col[i] == CT_CAP || World.col[i] == CT_SPH) ? World.colliderSize[i].x : 0.0f); if (V3_SqDist(World.position[i], origin) < (rr * rr)) { GrenadeExplode(self); return; } } } }
 void GrenadeOnCollision(u16 self) { i16 idx=GrenadeTypeFromConst(World.instances[self].index); if ((idx >= 7 && idx <= 9) || idx == 13) GrenadeExplode(self); }
-float GetDamageTakeAmount(DamageData* dd) {
-    if (!dd) return 0.0f; float take = dd->damage; if (take <= 0.0f) return 0.0f;
-    if (dd->isOtherNPC) { float crit = dd->offense - dd->defense; if (crit > 0.0f && random_range(0.0f, 1.0f) < (crit / 6.0f) && random_range(0.0f, 1.0f) < 0.2f) { take *= (1.0f + crit); } }
-    take *= random_range(0.9f, 1.1f);
-    if (dd->berserkActive) take *= 4.0f/*Quad Damage!*/;
-    if (take < 0.0f) take = 0.0f; return take;
-}
-
+float GetDamageTakeAmount(DamageData* dd) { float take = dd->damage; if (!dd || take <= 0.0f) { return 0.0f; } if (dd->isOtherNPC) { float crit = dd->offense - dd->defense; if (crit > 0.0f && random_range(0.0f, 1.0f) < (crit / 6.0f) && random_range(0.0f, 1.0f) < 0.2f) { take *= (1.0f + crit); } } take *= random_range(0.9f, 1.1f); if (dd->berserkActive) { take *= 4.0f/*Quad Damage!*/; } if (take < 0.0f) { take = 0.0f; } return take; }
 void SpawnImpactEffect(u16 impactType, V3 pos) { if (impactType == 0 || impactType == U16_MAX) return; u16 fx = SpawnDynamicObject(impactType); if (!EntIdxIsValid(fx)) return; World.position[fx] = pos; Entity* e = &World.instances[fx]; flag_set(&e->entflags, EF_ACTIVE, true); if (e->itemLifeTime <= 0.0f) e->itemLifeTime = 1.0f; e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
-void ExitCyberspace() { if (World.curLev != LEVEL_CYBERSPACE) return; if (World.instances[PLAYER1].cyberHealth <= 0.0f) World.instances[PLAYER1].cyberHealth = 1.0f; play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false); LoadLevel((World.cyberReturnLevel >= 0 && (u8)World.cyberReturnLevel < MAX_LEVELS) ? (u8)World.cyberReturnLevel : (World.startLevel < MAX_LEVELS ? World.startLevel : 0), World.cyberReturnPos); }
 void ReduceCurrentLevelSecurity(SecurityType stype) {
     static const u32 score[3]={4u,10u,27u}; u8 lev = World.curLev; if (lev >= MAX_LEVELS || stype == SecurityType_None) return;
-    
     u8* tot[3] = { &World.levelCameraCount[lev],   &World.levelSmallNodeCount[lev],   &World.levelLargeNodeCount[lev]};
     u8* dcd[3] = { &World.levCamDestroyedCnt[lev], &World.levSmNodeDestroyedCnt[lev], &World.levNodeDestroyedCnt[lev]};
-    u32 t=(u32)stype-1u;
-    if (*dcd[t] < 255u) (*dcd[t])++;
-    u32 total=0u, dead=0u;
-    for (u32 i=0u;i<3u;++i) { total += (u32)*tot[i]*score[i]; dead += (u32)*dcd[i]*score[i]; }
-    if (!total) return;
-    
-    u8 before = World.levelSecurity[lev], after;
-    after = dead >= total ? 0u : (u8)(((total-dead)*100u + total-1u) / total);
-    if (after > 100u) after = 100u;
-    if (after >= before && before) after = before > 1u ? (u8)(before-1u) : before;
-    World.levelSecurity[lev] = after;
+    u32 t = (u32)stype - 1u, total=0u, dead=0u; if (*dcd[t] < 255u) { (*dcd[t])++; } 
+    for (u32 i=0u;i<3u;++i) { total += (u32)*tot[i]*score[i]; dead += (u32)*dcd[i]*score[i]; }    if (!total) { return; }
+    u8 before = World.levelSecurity[lev], after; after = dead >= total ? 0u : (u8)(((total - dead)*100u + total - 1u) / total); if (after > 100u) after = 100u; if (after >= before && before) after = before > 1u ? (u8)(before - 1u) : before; World.levelSecurity[lev] = after;
     CenterStatusPrint("%s%d%s", Sys_Text.stringTable[306], (int)World.levelSecurity[lev], Sys_Text.stringTable[307]);
 }
-
 static void CodeScreensSetForLevel(u8 lev) {
-    if (lev < 1 || lev > 6) return;
-
-    i8 *code = &World.lev1SecCode; if (code[lev-1] < 0) { code[lev-1] = (i8)random_range_u8(0u,9u); }
-    u8 digit = (u8)code[lev-1];
-    u8 entryLevel = World.curLev;
-    for (u8 l=0;l<MAX_LEVELS;++l) { if (l != World.curLev) SetLevelPointers(l); for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { Entity* s = &World.instances[i]; if (s->index != 551 || !s->codeScreen) continue; CodeScreenShowDigit(i, digit); } }
-    if (World.curLev != entryLevel) SetLevelPointers(entryLevel);
+    if (lev < 1 || lev > 6) { return; } i8 *code = &World.lev1SecCode; if (code[lev - 1] < 0) { code[lev - 1] = (i8)random_range_u8(0u,9u); } u8 digit = (u8)code[lev-1], entryLevel = World.curLev; 
+    for (u8 l=0;l<MAX_LEVELS;++l) { if (l != World.curLev) SetLevelPointers(l); for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { Entity* s = &World.instances[i]; if (s->index != 551 || !s->codeScreen) { continue; } CodeScreenShowDigit(i,digit); } } if (World.curLev != entryLevel) { SetLevelPointers(entryLevel); }
 }
-
 static bool CPUNodesRemainOnLevel() { for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { const Entity* n = &World.instances[i]; if ((n->index == 478 || n->index == 479) && !(n->entflags & EF_DEAD_CHECKS_DONE)) return true; } return false; }
 void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNormal) {
     if(self>=World.instCount||hitIdx>=World.instCount)return; Entity* e = &World.instances[self]; if (hitIdx == e->recentMostActivator) return; e->counter++;
@@ -586,16 +383,12 @@ void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNorm
         if (e->counter < e->countToTrigger) dd.damage *= 0.85f;/*per-hit falloff*/ dd.impactVelocity = dd.damage * 1.5f; if (e->counter > 0) dd.impactVelocity /= 3.0f; float dmgFinal = TakeDamage(hitIdx,dd); float tranq=-1.0f;
         if (dd.isOtherNPC) {
             if (!(hit->entflags & EF_ASLEEP)) { World.invP1.justFired = World.pauseRelativeTime; }
-            if (dd.attackType == Att_Trnq) {
-                float stunAmount = vclamp(3.0f + (World.invP1.weaponEnergySetting[15] / 100.0f) * 7.0f, 3.0f, 10.0f);
-                tranq = Tranquilize(hitIdx, stunAmount, true);
-            }
+            if (dd.attackType == Att_Trnq) { float stunAmount = vclamp(3.0f + (World.invP1.weaponEnergySetting[15] / 100.0f) * 7.0f, 3.0f, 10.0f); tranq = Tranquilize(hitIdx, stunAmount, true); }
         }
         if (dmgFinal < 0.0f) { dmgFinal = 0.0f; }
         CreateTargetIDInstance(dmgFinal, hitIdx, tranq);
     }
-    if (World.curLev != LEVEL_CYBERSPACE && !hostIsNPC) { ApplyImpactForceWithSound(hitIdx,dd.impactVelocity,dd.attacknormal,hitPos); }
-    if(e->countToTrigger<1)e->countToTrigger=1; if (e->counter >= e->countToTrigger) { if (e->despawnInstead){DeleteInstance(self);}else{flag_set(&e->entflags,EF_ACTIVE,false);} }
+    if (World.curLev != LEVEL_CYBERSPACE && !hostIsNPC) { ApplyImpactForceWithSound(hitIdx,dd.impactVelocity,dd.attacknormal,hitPos); } if (e->countToTrigger<1)e->countToTrigger=1; if (e->counter >= e->countToTrigger) { if (e->despawnInstead) { DeleteInstance(self); } else { flag_set(&e->entflags,EF_ACTIVE,false); } }
 }
 void ProjectileEffectImpactInitAfterLoad(u16 self) { if(self>=World.instCount)return;Entity* e=&World.instances[self]; e->counter=0;e->currentTargetIdx=0;e->lookUpIndex=(e->index==484||e->index==491)?5:0;if(e->countToTrigger<1){e->countToTrigger=e->index==485?5:(e->index==495?2:1);} }
  // None  Melee  MelEn  EnBm   Mag    Proj   Needle ProjEB ProjLn Gas    Tranq  Drill
@@ -605,104 +398,53 @@ static bool IsCyberEntity(u16 self) { if (World.curLev == LEVEL_CYBERSPACE){retu
 static float ApplyAttTypeAdjustments(u16 self,float take,AttType at) { if (!IdxIsNPC(World.instances[self].index) || World.instances[self].health <= 0.0f){return take;} NPCType t = npcTable[World.instances[self].index - 419].type; if (at >= 12){return take;} return take * attackTypeMult[t][at]; }
 static void UseDeathTargets(u16 self) { if(self == PLAYER1){return;} if (World.instances[self].targetOnDeathIdx != IO_NONE) UseTargets(self,World.instances[self].targetOnDeathIdx); }
 static void TeleportAway(u16 self) { const PSysDef* dgo = &particleTypeDefs[189]; PSysDef d = *dgo; d.pos = World.position[self]; d.rotation = World.rotation[self]; PSysAddInternal(&d,self,U16_MAX); World.col[self] = CT_NONE; World.instances[self].hasGrav = false; World.velocity[self] = World.angularVelocity[self] = (V3){0}; World.instances[self].modelIndex = U16_MAX; play_wav(sounds[106]/*misc/teleport*/,AppliedFXVol(1.0f),World.position[self],false); }
-static void DropSearchables(u16 self) {
-    for (int i=0;i<4;i++) {
-        if(World.instances[self].contents[i]<=-1){continue;}
-        
-        u16 spawned=SpawnDynamicObject(World.instances[self].contents[i]+307);
-        if(EntIdxIsValid(spawned)){World.position[spawned] = World.position[self]; World.instances[spawned].custIdx[0] = World.instances[self].custIdx[i];}
-        else{CenterStatusPrint("BUG: Failed to make search obj.");}
-        
-        World.instances[self].contents[i]=World.instances[self].custIdx[i] = -1;}
-}
-
+static void DropSearchables(u16 self) { for (int i=0;i<4;i++) { if (World.instances[self].contents[i]<=-1) { continue; } u16 spawned=SpawnDynamicObject(World.instances[self].contents[i]+307); if (EntIdxIsValid(spawned)) { World.position[spawned] = World.position[self]; World.instances[spawned].custIdx[0] = World.instances[self].custIdx[i];} World.instances[self].contents[i]=World.instances[self].custIdx[i] = -1;} }
 static void CreateDeathEffects(u16 self,u16 fxPoolType) { if (fxPoolType == 0) {return; /*PoolType_None*/} if (!IdxInBounds((int)fxPoolType) || IdxIsGeometry((int)fxPoolType)) { return; } V3 pos = World.position[self]; if (World.col[self] != CT_NONE) { pos = V3Add(pos,World.colliderCenter[self]); } SpawnImpactEffect(fxPoolType, pos); }
 static void HideSelf(u16 self) { if (World.instances[self].index == 279) {return; /*tv screens keep mesh visible*/} World.instances[self].modelIndex = MAX_MDLS; World.instances[self].hasGrav = false; }
 static void SpawnSecCpuNodeGibs(u16 self) {
-    if (World.instances[self].index != 478) return;
-    
-    V3 pos = World.position[self]; Quaternion rot = World.rotation[self];
-    for (u16 gibConst = 840; gibConst <= 853; ++gibConst) {
-        u16 gib = SpawnDynamicObject(gibConst); if (!EntIdxIsValid(gib) || gib == self) continue;
-        
-        World.position[gib] = pos; World.rotation[gib] = rot; World.velocity[gib] = (V3){0.0f, World.velocity[self].y, 0.0f}; World.instances[gib].hasGrav = true; World.layer[gib] = L_Corpse;
-    }
+    if (World.instances[self].index != 478) { return; } V3 p = World.position[self]; Quaternion r = World.rotation[self]; for (u16 gibConst = 840; gibConst <= 853; ++gibConst) { u16 gib = SpawnDynamicObject(gibConst); if (!EntIdxIsValid(gib) || gib == self) { continue; } World.position[gib] = p; World.rotation[gib] = r; World.velocity[gib] = (V3){0.0f, World.velocity[self].y, 0.0f}; World.instances[gib].hasGrav = true; World.layer[gib] = L_Corpse; }
 }
-static void SpawnDeathEffectAt(u16 type,V3 pos);
+static void SpawnDeathEffectAt(u16 type, V3 pos) { const PSysDef* preset = PSysTypeGet(type); if (!preset) return; PSysDef def = *preset; def.pos = pos; PSysAddInternal(&def,U16_MAX,U16_MAX); }
 static void NPCDeath(u16 self) { if (World.instances[self].entflags & EF_DEAD_CHECKS_DONE) {return;} flag_set(&World.instances[self].entflags,EF_DEAD_CHECKS_DONE,true); CreateDeathEffects(self,World.instances[self].deathBurst); if (World.instances[self].index == 419) play_wav(sounds[64], AppliedFXVol(1.0f), World.position[self], true);/*npc_autobomb: explosion1*/ if (npcTable[World.instances[self].index - 419].type == NPCType_Cyber) { SpawnDeathEffectAt(190,World.position[self]); SpawnDeathEffectAt(191,World.position[self]); DeleteInstance(self); } }
 static void ObjectDeath(u16 self) {
     Entity* e = &World.instances[self]; if (World.instances[self].entflags & EF_DEAD_CHECKS_DONE) return;
-    
     if (World.instances[self].entflags & EF_DEATH_BURST_DONE) { CreateDeathEffects(self,World.instances[self].deathBurst); DropSearchables(self); if (World.instances[self].index != 279){World.col[self]=CT_NONE;} HideSelf(self); } else { World.col[self] = CT_NONE; DropSearchables(self); CreateDeathEffects(self,World.instances[self].deathBurst); }
     flag_set(&World.instances[self].entflags,EF_DEAD_CHECKS_DONE,true);
     { SecurityType stype = SecurityType_None; if(World.instances[self].index == 477){stype=SecurityType_Camera;}else if(World.instances[self].index == 479){stype=SecurityType_NodeSmall;} else if(World.instances[self].index == 478){stype=SecurityType_NodeLarge;} if(stype != SecurityType_None){ReduceCurrentLevelSecurity(stype);} }
     if ((World.instances[self].index == 478 || World.instances[self].index == 479) && !CPUNodesRemainOnLevel()) CodeScreensSetForLevel(World.curLev);
     u16 idx = World.instances[self].index; SpawnSecCpuNodeGibs(self); play_wav(SoundPath((idx < 527 && objectDeathSound[idx] != 0) ? objectDeathSound[idx] : 62/*crate_break*/), AppliedFXVol(1.0f), World.position[self], true); if(e->deathBurst != 0){HideSelf(self);}
 }
-
 static void ScreenDeath(u16 self) { Entity* e=&World.instances[self]; if(e->entflags & EF_DEAD_CHECKS_DONE){return;} flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true); play_wav(sounds[69], AppliedFXVol(1.0f), World.position[self], true);/*screen_destroy*/ if (e->entflags & EF_DEATH_BURST_DONE) ObjectDeath(self);/*gib path*/ }
 INLINE bool IsGrenade(u16 i) { return ((i >= 314 && i <= 320) || i == 370 || i == 372 || i == 387 || i == 389 || (i >= 402 && i <= 404)); }
 static bool CanVaporize(u16 self) { Entity* e=&World.instances[self]; if (e->index == 477/*sec_camera*/ || IsGrenade(e->index)) {return false;} if (IdxIsNPC(e->index)) {return ai_has_search_collider((u16)(e->index - 419));} return true; }
-static void SpawnDeathEffectAt(u16 type, V3 pos) { const PSysDef* preset = PSysTypeGet(type); if (!preset) return; PSysDef def = *preset; def.pos = pos; PSysAddInternal(&def,U16_MAX,U16_MAX); }
 static void VaporizeCorpse(u16 self,bool energyVaporized) {
-    Entity* e=&World.instances[self]; if (!CanVaporize(self)) {return;}
-    
-    DropSearchables(self);
-    V3 pos = World.position[self];
-    if (World.col[self] != CT_NONE) { pos = V3Add(pos,World.colliderCenter[self]); }
-    if (e->deathBurst != 0 && IdxInBounds((int)e->deathBurst) && !IdxIsGeometry((int)e->deathBurst)) { CreateDeathEffects(self,e->deathBurst); }
-    else { SpawnDeathEffectAt(energyVaporized ? 188 : 187, pos); }
-    e->modelIndex=MAX_MDLS;
-    if (IdxIsNPC(e->index) || IdxIsSearchable(e->index)) DeleteInstance(self);
+    Entity* e=&World.instances[self]; if (!CanVaporize(self)) { return; } DropSearchables(self); V3 pos = World.position[self]; if (World.col[self] != CT_NONE) { pos = V3Add(pos,World.colliderCenter[self]); }
+    if (e->deathBurst != 0 && IdxInBounds((int)e->deathBurst) && !IdxIsGeometry((int)e->deathBurst)) { CreateDeathEffects(self,e->deathBurst); } else { SpawnDeathEffectAt(energyVaporized ? 188 : 187, pos); }
+    e->modelIndex=MAX_MDLS; if (IdxIsNPC(e->index) || IdxIsSearchable(e->index)) DeleteInstance(self);
 }
-// Death and Ressurection: when player dies on a level with resurrection active, teleport back to the ressurection point.
 static void Death(u16 self,bool energyVaporized) {
     Entity* e = &World.instances[self];
-    if (e->entflags & EF_DEAD_CHECKS_DONE) {
-        if (!IdxIsNPC(e->index) || !(World.layer[self] & L_Corpse) || self == PLAYER1 || IsGrenade(e->index) || (e->entflags & (EF_TELEPORT_ON_DEATH | EF_ACT_AS_CORPSE_ONLY))) return;
-        VaporizeCorpse(self, energyVaporized); return;
-    }
+    if (e->entflags & EF_DEAD_CHECKS_DONE) { if (!IdxIsNPC(e->index) || !(World.layer[self] & L_Corpse) || self == PLAYER1 || IsGrenade(e->index) || (e->entflags & (EF_TELEPORT_ON_DEATH | EF_ACT_AS_CORPSE_ONLY))) { return; } VaporizeCorpse(self, energyVaporized); return; }
     UseDeathTargets(self); bool isNPC = IdxIsNPC(e->index); bool isObj = IdxIsDynamicObject(e->index); if (e->entflags & EF_ACT_AS_CORPSE_ONLY) { e->entflags |= EF_DEAD_CHECKS_DONE; return; }
-    if (e->index == 477) { e->deathBurst = 725; ObjectDeath(self); DeleteInstance(self); return; }
-    if (e->index == 478 || e->index == 479) { ObjectDeath(self); DeleteInstance(self); return; }
-    
+    if (e->index == 477) { e->deathBurst = 725; ObjectDeath(self); DeleteInstance(self); return; } if (e->index == 478 || e->index == 479) { ObjectDeath(self); DeleteInstance(self); return; }
     bool vaporize = IdxIsCorpse(e->index), isGrenade = IsGrenade(e->index), doTeleport = (e->entflags & EF_TELEPORT_ON_DEATH) != 0;
     if (e->iceActive) World.col[self] = CT_NONE;
-         if (vaporize && e->index != 477/*sec_camera*/ && !isGrenade) VaporizeCorpse(self,energyVaporized);
-    else if (isObj && !isNPC) ObjectDeath(self);
-    else if (e->index == 279/*screen*/) ScreenDeath(self);
-    else if (doTeleport) TeleportAway(self);
-    else if (isGrenade) GrenadeExplode(self);
-
+    if (vaporize && e->index != 477/*sec_camera*/ && !isGrenade) VaporizeCorpse(self,energyVaporized); else if (isObj && !isNPC) ObjectDeath(self); else if (e->index == 279/*screen*/) ScreenDeath(self); else if (doTeleport) TeleportAway(self); else if (isGrenade) GrenadeExplode(self);
          if (isNPC && !doTeleport) NPCDeath(self);
     else if (self == PLAYER1) {
         World.deaths++;
         if (((World.ressurectionActiveLevels >> World.curLev) & 1u)) {
-            V3 spot=(V3){0.0f,0.0f,0.0f};
-            if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) { spot=ressurectionLocations[6]; spot.y -= (1.0f - PLYR_CAM_OFS_Y); LoadLevel(6, spot); }
-            else if (World.curLev < 13) { spot=ressurectionLocations[World.curLev]; spot.y -= (1.0f - PLYR_CAM_OFS_Y); World.position[PLAYER1] = spot; }
-            PlayTrack(TT_Revive, MT_Override);
-            World.invP1.ressurectingFinished = World.pauseRelativeTime + 3.0;
-            World.instances[PLAYER1].health = 211.0f;
-            World.ressurections++;
-            World.invP1.fatigue = 0.0f;
-            World.instances[PLAYER1].radiation = 0.0f;
-            World.invP1.radiationArea = false;
+            V3 spot=(V3){0.0f,0.0f,0.0f}; if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) { spot=ressurectionLocations[6]; spot.y -= (1.0f - PLYR_CAM_OFS_Y); LoadLevel(6, spot); } else if (World.curLev < 13) { spot=ressurectionLocations[World.curLev]; spot.y -= (1.0f - PLYR_CAM_OFS_Y); World.position[PLAYER1] = spot; }
+            PlayTrack(TT_Revive, MT_Override); World.invP1.ressurectingFinished = World.pauseRelativeTime + 3.0; World.instances[PLAYER1].health = 211.0f; World.ressurections++; World.invP1.fatigue = 0.0f; World.instances[PLAYER1].radiation = 0.0f; World.invP1.radiationArea = false;
         } else { e->health = 211.0f; GameDeathSequence(); }
     }
     if (self != PLAYER1) flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
 }
-
 float TakeDamage(u16 self,DamageData dd) {
-    if (Cheats.god && self == PLAYER1) return 0.0f;
-    if (self < World.instCount && World.instances[self].index == 553u) return 0.0f;
-    
-    u16 selfIdx = World.instances[self].index;
-    bool isCyber = IsCyberEntity(self), isNPC = IdxIsNPC(selfIdx), isPlayer = (self == PLAYER1), isGrenade = IsGrenade(selfIdx);
-    float* hp = isCyber ? &World.instances[self].cyberHealth : &World.instances[self].health;
+    if ((Cheats.god && self == PLAYER1) || (self < World.instCount && World.instances[self].index == 553u)) { return 0.0f; }
+    u16 selfIdx = World.instances[self].index; bool isCyber = IsCyberEntity(self), isNPC = IdxIsNPC(selfIdx), isPlayer = (self == PLAYER1), isGrenade = IsGrenade(selfIdx); float* hp = isCyber ? &World.instances[self].cyberHealth : &World.instances[self].health;
     if (isCyber) { if (dd.attackType == Att_Drill && isNPC){return 0.0f;} if (dd.attackType != Att_Drill && World.instances[self].iceActive){return 0.0f;} }
     if (*hp <= 0.0f) { bool allowPost = (isNPC || World.instances[self].iceActive || isPlayer || isGrenade || selfIdx == 279/*chunk_screen*/ || selfIdx == 477/*sec_camera*/); if (!allowPost) return 0.0f; }
-    
     float take = dd.damage;
     if (isPlayer) {
         float absorb = 0.0f;
@@ -716,10 +458,9 @@ float TakeDamage(u16 self,DamageData dd) {
         }
     }
     if (isCyber) { World.instances[self].cyberHealth -= take; if (isPlayer) { World.damageReceived += take; if (World.instances[self].cyberHealth <= 0.0f) { ExitCyberspace(); return 0.0f; } } if (dd.owner == PLAYER1){World.damageDealt += take;} }
-    else { if(selfIdx == 477/*Camera constIndex 477 gets one-shot by tranq*/ && dd.attackType == Att_Trnq){take=World.instances[self].health + 1.0f;} take=ApplyAttTypeAdjustments(self,take,dd.attackType); if(!isPlayer)DualLog("TakeDamage inst %u ci %u hp %.3f->%.3f take %.3f att %d owner %u\n",(u32)self,(u32)selfIdx,World.instances[self].health,World.instances[self].health-take,take,(int)dd.attackType,(u32)dd.owner); World.instances[self].health-=take; if (isPlayer) { World.damageReceived+=take; World.invP1.justFired = World.pauseRelativeTime; } if (dd.owner == PLAYER1){World.damageDealt+=take;} }
+    else { if(selfIdx == 477/*Camera gets oneshot by all*/ && dd.attackType == Att_Trnq){take=World.instances[self].health + 1.0f;} take=ApplyAttTypeAdjustments(self,take,dd.attackType); World.instances[self].health-=take; if (isPlayer) { World.damageReceived+=take; World.invP1.justFired = World.pauseRelativeTime; } if (dd.owner == PLAYER1){World.damageDealt+=take;} }
     if (isNPC && !(World.instances[self].entflags & (EF_DYING|EF_DEAD)) && (World.instances[self].health > 0.0f || (isCyber && World.instances[self].cyberHealth > 0.0f))) { if (npcTable[selfIdx - 419].timeBetweenPain > 0.0f) flag_set(&World.instances[self].entflags,EF_GO_INTO_PAIN,true); World.instances[self].recentMostActivator = dd.owner; TargetIDSendDamageReceive(self,take,dd.attackType); AICheckPain(self); }
-    if (!isCyber && (World.instances[self].entflags & EF_DEAD_CHECKS_DONE) && (World.layer[self] & L_Corpse)
-        && (dd.attackType == Att_Beam || dd.attackType == Att_PjBm)) { VaporizeCorpse(self,true); return take; }
+    if (!isCyber && (World.instances[self].entflags & EF_DEAD_CHECKS_DONE) && (World.layer[self] & L_Corpse) && (dd.attackType == Att_Beam || dd.attackType == Att_PjBm)) { VaporizeCorpse(self,true); return take; }
     if (isCyber) { if (World.instances[self].cyberHealth <= 0.0f) { if (!World.instances[self].iceActive && isNPC && !(World.instances[self].entflags & EF_DEAD_CHECKS_DONE)) {World.cyberkills++;} Death(self,false); } } else { if (World.instances[self].health <= 0.0f) { if (isNPC && !(World.instances[self].entflags & EF_DEAD_CHECKS_DONE)) {World.kills++;} Death(self,dd.attackType == Att_Beam || dd.attackType == Att_PjBm); } }    return take;
 }
 // Hardware
@@ -729,10 +470,7 @@ void HardwareUpdate() {
     bool sightOn = (World.invP1.patchActive & PATCH_SIGHT) && World.invP1.sightFinishedTime != -1.0;
     if (lanternOn || infraredOn || sightOn) {
         V3 ppos = World.position[PLAYER1]; lanternPos = (V3){ppos.x + 0.04f,ppos.y + 0.24f,ppos.z + 0.04f}; float intensity = 0.0f, range = 0.0f;
-        if (infraredOn) { intensity += 0.8f; range = vmax(range,50.35f); }
-        if (lanternOn) { intensity += lanternVersionBrightness[vclamp(World.invP1.hwVersSetting[7],0,2)]; range = vmax(range,11.52f); }
-        if (sightOn) { intensity += SIGHT_LIGHT_INTENSITY; range = vmax(range,SIGHT_LIGHT_RANGE); }
-        UpdateLight(headmountedLanternLight,lanternPos,lantCol,range,intensity,intensity,0.0f,0.0f,QUAT_IDENTITY,true,true);
+        if (infraredOn) { intensity += 0.8f; range = vmax(range,50.35f); } if (lanternOn) { intensity += lanternVersionBrightness[vclamp(World.invP1.hwVersSetting[7],0,2)]; range = vmax(range,11.52f); } if (sightOn) { intensity += SIGHT_LIGHT_INTENSITY; range = vmax(range,SIGHT_LIGHT_RANGE); } UpdateLight(headmountedLanternLight,lanternPos,lantCol,range,intensity,intensity,0.0f,0.0f,QUAT_IDENTITY,true,true);
     } else UpdateLight(headmountedLanternLight,lanternPos,lantCol,11.52f,0.0f,0.0f,0.0f,0.0f,QUAT_IDENTITY,false,false);
 }
 // Dermal Patches
@@ -740,7 +478,6 @@ void PatchDisableAll(){
     World.invP1.berserkFinished = World.invP1.berserkIncTime = World.invP1.detoxFinished = World.invP1.geniusFinished = World.invP1.mediFinished = World.invP1.reflexFinishedTime = World.invP1.sightFinishedTime = World.invP1.sightSideEffectFinishedTime = World.invP1.staminupFinishedTime = -1.0;
     World.invP1.mediPatchPulseFinished = 0.0; World.invP1.mediPatchPulseCount = 0; World.invP1.staminupActive = World.geniusActive = false; World.invP1.fatigue = 0.0f; World.invP1.berserkIncrement = World.invP1.patchActive = 0; World.timeScale = 1.0;
 }
-
 void PatchUpdate() {
     if (World.invP1.patchActive & PATCH_DETOX) { if (World.invP1.detoxFinished < World.pauseRelativeTime) World.invP1.patchActive -= PATCH_DETOX; else World.instances[PLAYER1].radiation = 0.0f; }
     if (World.invP1.patchActive & PATCH_MEDI) { // Medi
@@ -752,8 +489,7 @@ void PatchUpdate() {
         if (World.invP1.reflexFinishedTime < World.pauseRelativeTime && World.invP1.reflexFinishedTime != -1.0) { World.invP1.patchActive -= PATCH_REFLEX; World.invP1.reflexFinishedTime = -1.0; World.timeScale = 1.0; } else { World.timeScale = 0.25; }
     } else { if(World.timeScale != 1.0){World.timeScale = 1.0;}}
     if (World.invP1.patchActive & PATCH_BERSERK) { // Berserk
-        if (World.invP1.berserkFinished < World.pauseRelativeTime) { World.invP1.berserkIncrement = 0; World.invP1.patchActive -= PATCH_BERSERK; }
-        else if (World.invP1.berserkIncTime < World.pauseRelativeTime) { World.invP1.berserkIncrement++; if (World.invP1.berserkIncrement > 6) World.invP1.berserkIncrement = 6; World.invP1.berserkIncTime = World.pauseRelativeTime + 4.0; }
+        if (World.invP1.berserkFinished < World.pauseRelativeTime) { World.invP1.berserkIncrement = 0; World.invP1.patchActive -= PATCH_BERSERK; } else if (World.invP1.berserkIncTime < World.pauseRelativeTime) { World.invP1.berserkIncrement++; if (World.invP1.berserkIncrement > 6) World.invP1.berserkIncrement = 6; World.invP1.berserkIncTime = World.pauseRelativeTime + 4.0; }
     }
     if (World.invP1.patchActive & PATCH_GENIUS) { if(World.invP1.geniusFinished < World.pauseRelativeTime){World.invP1.patchActive -= PATCH_GENIUS; World.geniusActive=false;}else{World.geniusActive=true;} } // Genius
     if (World.invP1.patchActive & PATCH_SIGHT) { // Sight
@@ -791,7 +527,7 @@ void DoorForceClose(u16 self) { if (World.instances[self].doorOpen == DoorState_
 void DoorActuate(u16 self) {
     Entity* e = &World.instances[self];
     AnimationClip o=mdlAnimClips[e->animationNum][A_OPENING], c=mdlAnimClips[e->animationNum][A_CLOSING];
-         if (e->doorOpen == DoorState_Opening && e->clip == A_OPENING && e->frame >= o.frameEnd) { e->doorOpen = e->doorState = DoorState_Open; ChangeAnim(e,A_IDLE_OPEN); }
+         if (e->doorOpen == DoorState_Opening && e->clip == A_OPENING && e->frame >= o.frameEnd) { e->doorOpen = e->doorState = DoorState_Open; ChangeAnim(e,A_IDLE_OPEN); } 
     else if (e->doorOpen == DoorState_Closing && e->clip == A_CLOSING && e->frame >= c.frameEnd) { e->doorOpen = e->doorState = DoorState_Closed; ChangeAnim(e,A_IDLE_CLOSED); }
     if (e->doorOpen == DoorState_Open) { DoorClose(self); return; } if (e->doorOpen == DoorState_Closed) { DoorOpen(self); return; } bool op = e->doorOpen == DoorState_Opening;
     if (op || e->doorOpen == DoorState_Closing) {
@@ -799,37 +535,26 @@ void DoorActuate(u16 self) {
         AnimationClip srcClip = mdlAnimClips[e->animationNum][src], dstClip = mdlAnimClips[e->animationNum][dst];
         u32 f = e->frame; if (f < srcClip.frameStart) f = srcClip.frameStart; if (f > srcClip.frameEnd) f = srcClip.frameEnd;
         float p = (srcClip.frameEnd > srcClip.frameStart) ? (float)(f - srcClip.frameStart) / (float)(srcClip.frameEnd - srcClip.frameStart) : 1.0f;
-        u16 newFrm = DoorFrameFromProgress(dstClip,1.0f - p); // Direct frame assignment (mid-anim reversal): clip + frame + matching model.
+        u16 newFrm = DoorFrameFromProgress(dstClip,1.0f - p);
         e->clip = dst; e->frame = newFrm; e->currentFrameFinished = 0.0; e->modelIndex = dstClip.frameStartModelIndex + (u16)(newFrm - dstClip.frameStart); e->doorOpen = e->doorState = op ? DoorState_Closing : DoorState_Opening;
         if (!op) e->waitBefClose = World.pauseRelativeTime + e->delay; if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex], AppliedFXVol(1.0f), World.position[self], true);
     }
 }
-
 void DoorUse(u16 self, u16 activator) {
     if (activator == WORLD) return; Entity* e = &World.instances[self]; if (GetCurrentLevelSecurity() > UsableOrDef((float)e->securityThreshold,100.0f)) { UIBlockedBySecurity(World.position[self]); return; } if (Cheats.superoverride || World.diffMis <= 0) { EntitySetLocked(e,false); e->requiredAccessCard = ACC_None; }
     if (World.diffMis <= 1) { e->requiredAccessCard = ACC_None; } if (e->useFinished >= World.pauseRelativeTime) return; e->useFinished = World.pauseRelativeTime + 0.15f;
     if (e->requiredAccessCard != ACC_None) { if (!DoorInventoryHasAccessCard(e->requiredAccessCard)) {CenterStatusPrint("%s%s",AccessCardCodeForType(e->requiredAccessCard),Sys_Text.stringTable[2]); play_wav(sounds[467], AppliedFXVol(0.7f), World.position[self], true); return;} else {e->requiredAccessCard = ACC_None;}}
     if ((e->entflags & EF_LOCKED) != 0) { CenterStatusPrint("%s",Sys_Text.stringTable[e->lockedMessageLingdex]); play_wav(sounds[467], AppliedFXVol(0.55f), World.position[self], true); return; }  if ((e->onlyTargetOnce && !e->targetAlreadyDone) || !e->onlyTargetOnce) { e->targetAlreadyDone = true; UseTargets(self,e->targetIdx); } if (e->ajar) e->ajar = false; DoorActuate(self);
 }
-
 void DoorTargetted(u16 self, u16 activator) { if ((World.instances[self].entflags & EF_LOCKED) != 0) EntitySetLocked(&World.instances[self],false); if (!World.instances[self].targettingOnlyUnlocks) DoorUse(self,activator); }
-static void DoorLayerUpdate(u16 self, Entity* e) {
-    if (!IdxIsLayerDoor(e->index)) return;
-    u32 want = (e->doorState == DoorState_Closed) ? L_Door : L_InterDebris;
-    if (World.layer[self] != want) World.layer[self] = want;
-}
-
+static void DoorLayerUpdate(u16 self, Entity* e) { if (!IdxIsLayerDoor(e->index)) { return; } u32 want = (e->doorState == DoorState_Closed) ? L_Door : L_InterDebris; if (World.layer[self] != want) World.layer[self] = want; }
 void DoorUpdate(u16 self) {
     Entity* e = &World.instances[self]; if(e->ajar){return;} AnimationClip opening=mdlAnimClips[e->animationNum][A_OPENING], closing=mdlAnimClips[e->animationNum][A_CLOSING];
     if (e->doorOpen == DoorState_Opening && e->clip == A_OPENING && e->frame >= opening.frameEnd) { e->doorOpen = e->doorState = DoorState_Open; ChangeAnim(e,A_IDLE_OPEN); } else if (e->doorOpen == DoorState_Closing && e->clip == A_CLOSING && e->frame >= closing.frameEnd) { e->doorOpen = e->doorState = DoorState_Closed; ChangeAnim(e,A_IDLE_CLOSED); } if (World.pauseRelativeTime > e->waitBefClose && e->doorOpen == DoorState_Open && !e->stayOpen && !e->startOpen) DoorClose(self);
     DoorLayerUpdate(self, e);
 }
-
-u16 SpawnDynamicObject(int val) {
-    if (!IdxInBounds(val)) { DualLogWarn("Const index out of bounds: %u", val); return WORLD; } if (IdxIsGeometry(val) && !Cheats.editMode) { CenterStatusPrint("Indices 0 to 306 (level chunks)\nnot possible when not on edit mode!"); return WORLD; }
-    if (World.instCount >= INSTANCE_COUNT) { DualLogWarn("Failed to spawn constIndex %u: instance table full (%u/%u)",val,World.instCount,INSTANCE_COUNT); return WORLD; } return AddInstance((u16)val,(V3){0});
-}
-// TargetIO: Full game cross-level target handling.  Iterates all loaded levels, temporarily swaps active pointers via SetLevelPointers(), finds matching targetname(s), and calls Targetted().  Activator from cur level. Recursion is safe via targetIOActive flag.
+u16 SpawnDynamicObject(int val) { if (!IdxInBounds(val)) { DualLogWarn("idx oob: %u",val); return WORLD; } if (IdxIsGeometry(val) && !Cheats.editMode) { CenterStatusPrint("Idx 0 to 306(chunks)\nnot possible outside edit mode!"); return WORLD; } if (World.instCount >= INSTANCE_COUNT) { DualLogWarn("Spawn fail idx %u: instances at %u/%u",val,World.instCount,INSTANCE_COUNT); return WORLD; } return AddInstance((u16)val,(V3){0}); }
+// TargetIO
 void TriggerTargetted(u16 self, u16 activator) { UseTargets(activator, World.instances[self].targetIdx); }
 bool QuestBitIsSet(u8 qb) { return (qb < QB_COUNT) && ((World.missionBits >> qb) & 1u); }
 void QuestBitSet(u8 qb)    { if (qb < QB_COUNT && !QuestBitIsSet(qb)) { World.missionBits |=  (1u << qb); QuestBitNoteSideEffects(qb, true); } }
@@ -843,11 +568,7 @@ void Targetted(u16 activator, u16 self) {
         if (!(aioflags & TARG_IOFLAGS_BRANCH_FLIPONLY)) { if (e->relayEnabled && e->currentTargetIdx != IO_NONE) { u32 savedFlags = World.targetIOActivatorIoflags, savedFlagsHi = World.targetIOActivatorIoflagsHi; World.targetIOActivatorIoflags = e->ioflags; World.targetIOActivatorIoflagsHi = e->ioflagsHi; UseTargets(activator,e->currentTargetIdx); World.targetIOActivatorIoflags = savedFlags; World.targetIOActivatorIoflagsHi = savedFlagsHi; e->branchOnSecond = !e->branchOnSecond; e->currentTargetIdx = e->branchOnSecond ? e->target2Idx : e->targetIdx; } }
         if (aioflags & (TARG_IOFLAGS_BRANCH_FLIP | TARG_IOFLAGS_BRANCH_FLIPONLY)) { e->branchOnSecond = !e->branchOnSecond; e->currentTargetIdx = e->branchOnSecond ? e->target2Idx : e->targetIdx; }   return;
     }
-    if (e->index == 710 && e->questBitID != QB_None) {
-        if (aioflags & TARG_IOFLAGS_MISSION_BIT_ON) QuestBitSet(e->questBitID);
-        if (aioflags & TARG_IOFLAGS_MISSION_BIT_OFF) QuestBitClear(e->questBitID);
-        if (aioflags & TARG_IOFLAGS_MISSION_BIT_TOGGLE) QuestBitToggle(e->questBitID);
-    }
+    if (e->index == 710 && e->questBitID != QB_None) { if (aioflags & TARG_IOFLAGS_MISSION_BIT_ON) { QuestBitSet(e->questBitID); } if (aioflags & TARG_IOFLAGS_MISSION_BIT_OFF) { QuestBitClear(e->questBitID); } if (aioflags & TARG_IOFLAGS_MISSION_BIT_TOGGLE) { QuestBitToggle(e->questBitID); } }
     if (e->questBitID != QB_None) {
         u8 tm = e->questTestMode; if (!tm && activator != WORLD) tm = World.targetIOQuestTestMode;/*1==testQuestBitIsOn, 2==testQuestBitIsOff; snapshot, not World.instances[activator]: UseTargets iterates levels via SetLevelPointers, so the live array is the target's level, not the activator's*/
         if (tm) { bool bitOn = QuestBitIsSet(e->questBitID); u32 savedFlags = World.targetIOActivatorIoflags, savedFlagsHi = World.targetIOActivatorIoflagsHi; World.targetIOActivatorIoflags = e->ioflags; World.targetIOActivatorIoflagsHi = e->ioflagsHi; UseTargets(activator, (tm == 1) == bitOn ? e->targetIdx : e->targetIfFalseIdx); World.targetIOActivatorIoflags = savedFlags; World.targetIOActivatorIoflagsHi = savedFlagsHi; }
@@ -865,30 +586,18 @@ void Targetted(u16 activator, u16 self) {
     if (aioflagsHi & TARG_IOFLAGHI_CYBORG_CONVERSION) CyborgConversionToggleTargetted();
     if ((aioflags & TARG_IOFLAGS_ENEMY_ALERT) && IdxIsNPC(e->index)) AIAlert(self);
 }
-
-extern char ioNames[MAX_IO_NAMES][TARG_STRLEN];
-INLINE V3 ScreenPointToRayOffset(V3 f,V3 r,float dx,float dy); extern u16 ioNameCount;
+extern char ioNames[MAX_IO_NAMES][TARG_STRLEN]; INLINE V3 ScreenPointToRayOffset(V3 f,V3 r,float dx,float dy); extern u16 ioNameCount;
 void TargetLight(u16 activator, u16 lightIdx) {
-    if (!World.lightTargetnames || lightIdx >= World.loadedLights) return;
-    
-    u32 aioflags = World.targetIOActive ? World.targetIOActivatorIoflags : World.instances[activator].ioflags;
-    u32 a = aioflags & (TARG_IOFLAGS_LIGHT_ON|TARG_IOFLAGS_LIGHT_OFF|TARG_IOFLAGS_LIGHT_TOGGLE); if (!a) return;
-    
-    bool on = (World.lights[lightIdx].lflags & LIGHTON) != 0;
-         if (a & TARG_IOFLAGS_LIGHT_ON)  on = true;
-    else if (a & TARG_IOFLAGS_LIGHT_OFF) on = false;
-    else                                 on = !on;
-    flag_set(&World.lights[lightIdx].lflags, LIGHTON, on);
-    World.lights[lightIdx].intensity = on ? World.lights[lightIdx].maxIntensity : World.lights[lightIdx].minIntensity;
+    if (!World.lightTargetnames || lightIdx >= World.loadedLights) { return; }
+    u32 aioflags = World.targetIOActive ? World.targetIOActivatorIoflags : World.instances[activator].ioflags; u32 a = aioflags & (TARG_IOFLAGS_LIGHT_ON|TARG_IOFLAGS_LIGHT_OFF|TARG_IOFLAGS_LIGHT_TOGGLE); if (!a) { return; }
+    bool on = (World.lights[lightIdx].lflags & LIGHTON) != 0; if (a & TARG_IOFLAGS_LIGHT_ON) { on = true; } else if (a & TARG_IOFLAGS_LIGHT_OFF) { on = false; } else { on = !on; } flag_set(&World.lights[lightIdx].lflags, LIGHTON, on); World.lights[lightIdx].intensity = on ? World.lights[lightIdx].maxIntensity : World.lights[lightIdx].minIntensity;
 }
-
 void UseTargets(u16 activator, u16 targetIdx) {
-    if(targetIdx==IO_NONE){return;}
-    static bool tioTargetInFlight[MAX_IO_NAMES]; static u32 tioNestDepth = 0;
-    if (targetIdx < (u16)MAX_IO_NAMES && tioTargetInFlight[targetIdx]) { return; }
+    if (targetIdx==IO_NONE) { return; }
+    static bool tioTargetInFlight[MAX_IO_NAMES]; static u32 tioNestDepth = 0; if (targetIdx < (u16)MAX_IO_NAMES && tioTargetInFlight[targetIdx]) { return; }
     if (tioNestDepth >= 64) { DualLogWarn("Target IO cascade nested %u deep (target %s): suppressed\n",tioNestDepth,(targetIdx<ioNameCount)?ioNames[targetIdx]:"?"); return; }/*Backstop so no other data cycle, however indirect, can exhaust the stack.*/
     bool wasActive=World.targetIOActive,succeeded=false; u8 entryLevel=World.curLev; if(!wasActive){World.targetIOActive=true; mset(tioTargetInFlight,0,sizeof(tioTargetInFlight)); World.targetIOQuestTestMode=World.instances[activator].questTestMode; World.targetIOActivatorIoflagsHi=World.instances[activator].ioflagsHi; World.targetIOActivatorIoflags=World.instances[activator].ioflags;} const char* targetname=(targetIdx<ioNameCount) ? ioNames[targetIdx] : "";
-    tioNestDepth++; if (targetIdx < (u16)MAX_IO_NAMES) tioTargetInFlight[targetIdx]=true;
+    tioNestDepth++; if (targetIdx < (u16)MAX_IO_NAMES) tioTargetInFlight[targetIdx] = true;
     for (u8 lev=0;lev<MAX_LEVELS;++lev) { if (World.curLev != lev) SetLevelPointers(lev); for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (World.instances[i].targetnameIdx != targetIdx) {continue;} Targetted(activator,i); succeeded=true; } if (World.lightTargetnames) { for (u16 l = 0; l < World.loadedLights; ++l) { if (World.lightTargetnames[l] != targetIdx) {continue;} TargetLight(activator,l); succeeded=true; } } }
     if (World.curLev != entryLevel) {SetLevelPointers(entryLevel);} if (!succeeded) {DualLogWarn("No target found: %s\n",targetname);} if (targetIdx < (u16)MAX_IO_NAMES) tioTargetInFlight[targetIdx]=false;/*Cleared unconditionally: deferred trigger paths (TriggerTrippedUpdate etc.) mark targetIOActive true before calling in, so wasActive alone cannot be trusted to know when a bit was set.*/ tioNestDepth--; if (!wasActive) {World.targetIOActive=false;}
 }
@@ -902,14 +611,8 @@ static bool IsPuzzleWirePanel(u16 index) { return index>=741&&index<=745; }
 static bool IsElevatorPanel(u16 index) { return index>=604&&index<=607; }
 static bool IsFrobUsableSpecial(u16 index) { return index==574||index==546||index==608||index==614||index==602||index==603/*us_paperlog*/||index==556/*prop_cyberport*/||IsElevatorPanel(index)||IsPuzzleGridPanel(index)||IsPuzzleWirePanel(index); }/*546 prop_charge_station; 614 us_relaypanel, 602 us_isotopepanel: InteractablePanel; 603 us_paperlog: PaperLog*/
 typedef struct { u16 constIndex; i8 tgtL[7],tgtR[7]; bool wireOn[7]; u8 wireColor[7]; u8 rowsActive[7]; } WirePuzzleDef;
-static const WirePuzzleDef wirePuzzleDefs[] = {
-    /*741 blue  */{741,{1,2,5,-1,-1,-1,-1},{1,3,4,-1,-1,-1,-1},{true,true,true,false,false,false,false},{0,5,4,0,0,0,0},{1,1,1,1,1,1,0}},
-    /*742 brown */{742,{1,3,2,-1,-1,-1,-1},{2,4,3,-1,-1,-1,-1},{true,true,true,false,false,false,false},{1,5,6,2,2,2,2},{1,1,1,1,1,1,0}},
-    /*743 gray  */{743,{1,2,5,-1,-1,-1,-1},{1,3,4,-1,-1,-1,-1},{true,true,true,false,false,false,false},{0,5,4,0,0,0,0},{1,1,1,1,1,1,0}},
-    /*744 red   */{744,{2,1,-1,-1,-1,-1,-1},{2,1,-1,-1,-1,-1,-1},{true,true,false,false,false,false,false},{0,5,0,0,0,0,0},{1,1,1,1,0,0,0}},
-    /*745 teal  */{745,{0,1,2,3,-1,-1,-1},{2,4,5,0,-1,-1,-1},{true,true,true,true,false,false,false},{4,4,4,4,4,4,4},{1,1,1,1,1,1,0}},
-};
-
+static const WirePuzzleDef wirePuzzleDefs[] = {/*741 blue  */{741,{1,2,5,-1,-1,-1,-1},{1,3,4,-1,-1,-1,-1},{true,true,true,false,false,false,false},{0,5,4,0,0,0,0},{1,1,1,1,1,1,0}}, /*742 brown */{742,{1,3,2,-1,-1,-1,-1},{2,4,3,-1,-1,-1,-1},{true,true,true,false,false,false,false},{1,5,6,2,2,2,2},{1,1,1,1,1,1,0}}, /*743 gray  */{743,{1,2,5,-1,-1,-1,-1},{1,3,4,-1,-1,-1,-1},{true,true,true,false,false,false,false},{0,5,4,0,0,0,0},{1,1,1,1,1,1,0}},
+                                               /*744 red   */{744,{2,1,-1,-1,-1,-1,-1},{2,1,-1,-1,-1,-1,-1},{true,true,false,false,false,false,false},{0,5,0,0,0,0,0},{1,1,1,1,0,0,0}}, /*745 teal  */{745,{0,1,2,3,-1,-1,-1},{2,4,5,0,-1,-1,-1},{true,true,true,true,false,false,false},{4,4,4,4,4,4,4},{1,1,1,1,1,1,0}}};
 static const WirePuzzleDef* WirePuzzleDefFor(u16 constIndex) { for (u32 i=0;i<sizeof(wirePuzzleDefs)/sizeof(wirePuzzleDefs[0]);++i) if (wirePuzzleDefs[i].constIndex==constIndex) return &wirePuzzleDefs[i]; return NULL; }
 static void WireLoadInstance(u16 self, const WirePuzzleDef* def) {
     Entity* e=&World.instances[self];
@@ -917,7 +620,6 @@ static void WireLoadInstance(u16 self, const WirePuzzleDef* def) {
     for (u8 w=0;w<7;++w) { int l=(int)e->wireCurL[w], r=(int)e->wireCurR[w]; if (w<7 && l>=0 && l<7) World.Sys_UI.pw_curL[l]=(i8)w; if (w<7 && r>=0 && r<7) World.Sys_UI.pw_curR[r]=(i8)w; }/*All seven slots, not just the first three: 745 teal runs four wires and level5's teal instance saves currentPositionsRight[3..5], so a w<3 guard dropped its fourth wire and left that panel unsolvable.*/
     for (u8 w=0;w<7;++w) { World.Sys_UI.pw_tgtL[w]=def->tgtL[w]; World.Sys_UI.pw_tgtR[w]=def->tgtR[w]; World.Sys_UI.pw_wireOn[w]=def->wireOn[w]; World.Sys_UI.pw_rowActive[w]=def->rowsActive[w]!=0; World.Sys_UI.pw_wireColor[w]=def->wireColor[w];/*raw HUDColor, as PuzzleWire.wireColors holds it*/ }
 }
-
 typedef struct { V3 pos; u8 gridType, theme, security; const char* target; u8 cellType[35]; } GridPuzzleDef;
 static const GridPuzzleDef gridPuzzleDefs[] = {
     /*0 R.ReactorLevel       teal   levRmedbeddoor*/{{-4.4910f,-54.6630f,30.3431f},4,2,100,"levRmedbeddoor",{0,0,0,0,1,1,1,1,1,1,0,1,0,1,1,0,3,1,1,0,3,1,1,1,0,1,0,1,0,0,0,0,1,1,1}},
@@ -932,66 +634,34 @@ static const GridPuzzleDef gridPuzzleDefs[] = {
     /*7 7.EngineeringLevel   brown  lev7antennafield1*/{{4.6211f,50.6000f,54.9166f},5,0,100,"lev7antennafield1",{0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,1,1,1,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
     /*7 7.EngineeringLevel   gray   lev7antennafield1*/{{3.3831f,50.8220f,56.1656f},5,0,100,"lev7antennafield1",{1,1,1,0,3,1,2,0,0,1,0,3,0,1,1,1,1,0,1,3,3,1,0,0,0,1,1,1,1,1,1,1,1,1,1}},
 };
-
-static const GridPuzzleDef* GridPuzzleDefFor(V3 pos) {
-    for (u32 i=0;i<sizeof(gridPuzzleDefs)/sizeof(gridPuzzleDefs[0]);++i) {
-        const GridPuzzleDef* d=&gridPuzzleDefs[i];
-        if (vabs(pos.x-d->pos.x)<0.05f && vabs(pos.y-d->pos.y)<0.05f && vabs(pos.z-d->pos.z)<0.05f) return d;
-    }
-    return NULL;
-}
-
+static const GridPuzzleDef* GridPuzzleDefFor(V3 pos) { for (u32 i=0;i<sizeof(gridPuzzleDefs)/sizeof(gridPuzzleDefs[0]);++i) { const GridPuzzleDef* d=&gridPuzzleDefs[i]; if (vabs(pos.x-d->pos.x)<0.05f && vabs(pos.y-d->pos.y)<0.05f && vabs(pos.z-d->pos.z)<0.05f) return d; } return NULL; }
 static void GridLoadInstance(u16 self) {
     Entity* e=&World.instances[self];
     const GridPuzzleDef* def=GridPuzzleDefFor(World.position[self]);
     World.Sys_UI.pg_width=7; World.Sys_UI.pg_height=5; World.Sys_UI.pg_source=14; World.Sys_UI.pg_output=20;
     if (def) { if (def->target) e->targetIdx=IOInternName(def->target); e->securityThreshold=def->security; }
-    
     if (def) { World.Sys_UI.pg_gridType=(PuzzleGridType)def->gridType; World.Sys_UI.pg_theme=def->theme; mcpy(World.Sys_UI.pg_type,def->cellType,sizeof(def->cellType)); }
     else     { World.Sys_UI.pg_gridType=PuzzleGridType_King; World.Sys_UI.pg_theme=HUDColor_Gray; mset(World.Sys_UI.pg_type,PuzzleCellType_Standard,sizeof(World.Sys_UI.pg_type)); }
-    
     for (int k=0;k<35;++k) World.Sys_UI.pg_cell[k]=Entity_GetGridCell(e,k);
     World.Sys_UI.pg_solved=e->puzzleSolved; World.Sys_UI.pg_fired=e->puzzleFired;
     PGEvalPuzzle();
 }
-
 static void PuzzlePanelUse(u16 i) {
     Entity* e=&World.instances[i];
     if(GetCurrentLevelSecurity()>UsableOrDef((float)e->securityThreshold,100.0f)){UIBlockedBySecurity(World.position[i]);return;}
     if(e->entflags&EF_LOCKED){CenterStatusPrint("%s",Sys_Text.stringTable[302]);return;}
     World.Sys_UI.objectInUsePos=World.position[i]; ForceInventoryMode();
-    if (IsPuzzleGridPanel(e->index)) {
-        if(!e->panelOpen){
-            e->panelOpen=true;
-            ChangeAnim(e,A_OPENING);
-            play_wav(sounds[91],AppliedFXVol(1.0f),World.position[i],true);
-        }
-        bool initialize=World.Sys_UI.tetheredPGP!=i||World.Sys_UI.pg_width==0||World.Sys_UI.pg_height==0;
-        World.Sys_UI.tetheredPGP=i;
-        if(initialize){ GridLoadInstance(i); }
-        MFD_OpenData(World.Sys_UI.lastDataSideRH,3);
-    } else {
-        const WirePuzzleDef* def=WirePuzzleDefFor(e->index);
-        World.Sys_UI.tetheredPWP=i; World.Sys_UI.pw_selectedWire=-1; World.Sys_UI.pw_solved=false;
-        if(def) WireLoadInstance(i,def);
-        else { for(u8 c=0;c<7;++c){World.Sys_UI.pw_curL[c]=(i8)c;World.Sys_UI.pw_curR[c]=(i8)c;World.Sys_UI.pw_tgtL[c]=(i8)c;World.Sys_UI.pw_tgtR[c]=(i8)c;World.Sys_UI.pw_wireOn[c]=true;World.Sys_UI.pw_rowActive[c]=true;World.Sys_UI.pw_wireColor[c]=HUDC_YELLOW;} }
-
+    if (IsPuzzleGridPanel(e->index)) { if (!e->panelOpen) { e->panelOpen = true; ChangeAnim(e,A_OPENING); play_wav(sounds[91],AppliedFXVol(1.0f),World.position[i],true); } bool initialize = World.Sys_UI.tetheredPGP != i || World.Sys_UI.pg_width == 0 || World.Sys_UI.pg_height == 0; World.Sys_UI.tetheredPGP = i; if (initialize) { GridLoadInstance(i); } MFD_OpenData(World.Sys_UI.lastDataSideRH,3); }
+    else {
+        const WirePuzzleDef* def = WirePuzzleDefFor(e->index); World.Sys_UI.tetheredPWP = i; World.Sys_UI.pw_selectedWire = -1; World.Sys_UI.pw_solved = false; if (def) { WireLoadInstance(i,def); } else { for(u8 c=0;c<7;++c){World.Sys_UI.pw_curL[c]=(i8)c;World.Sys_UI.pw_curR[c]=(i8)c;World.Sys_UI.pw_tgtL[c]=(i8)c;World.Sys_UI.pw_tgtR[c]=(i8)c;World.Sys_UI.pw_wireOn[c]=true;World.Sys_UI.pw_rowActive[c]=true;World.Sys_UI.pw_wireColor[c]=HUDC_YELLOW;} }
         MFD_OpenData(World.Sys_UI.lastDataSideRH,4);
-    }
-    CenterStatusPrint("%s",Sys_Text.stringTable[190]);
+    } CenterStatusPrint("%s",Sys_Text.stringTable[190]);
 }
-
 static bool PanelUseAllowed(u16 i) {
-    Entity* e=&World.instances[i];
-    if(GetCurrentLevelSecurity()>UsableOrDef((float)e->securityThreshold,100.0f)){UIBlockedBySecurity(World.position[i]);return false;}
-    if(e->entflags&EF_LOCKED){
-        u16 msg=(u16)e->lockedMessageLingdex;if(msg<T_LOGSTR_CNT&&msg!=0)CenterStatusPrint("%s",Sys_Text.stringTable[msg]);else CenterStatusPrint("%s",Sys_Text.stringTable[302]);
-        if(e->lockedTargetIdx!=IO_NONE)UseTargets(i,e->lockedTargetIdx);
-        return false;
-    }
+    Entity* e = &World.instances[i]; if (GetCurrentLevelSecurity() > UsableOrDef((float)e->securityThreshold,100.0f)) { UIBlockedBySecurity(World.position[i]); return false; }
+    if(e->entflags & EF_LOCKED) { u16 msg = (u16)e->lockedMessageLingdex; if (msg < T_LOGSTR_CNT&&msg!=0)CenterStatusPrint("%s",Sys_Text.stringTable[msg]);else CenterStatusPrint("%s",Sys_Text.stringTable[302]); if(e->lockedTargetIdx!=IO_NONE)UseTargets(i,e->lockedTargetIdx); return false; }
     return true;
 }
-
 typedef enum { PanelInstallFrame, PanelInstallEntity, PanelInstallAnim } PanelInstallKind;
 typedef struct { const char* name; u8 item; u16 itemConst; PanelInstallKind kind; u16 msgOpen,msgInst,msgWrong,msgAlready; i16 sfxOpen,sfxInst,sfxAlready; const char* target; bool blowUp; u16 wreckTex; } RelayPanelScript;
 static const RelayPanelScript relayPanelScripts[] = {
@@ -1004,40 +674,26 @@ static const RelayPanelScript relayPanelScripts[] = {
     {"panelIsolinear",  64,  371,      PanelInstallEntity, 151, 211, 210,  212,     91,  42,  166, "lev9isolinearactivated", false, 0     },/*level 9: isolinear chipset placed on the panel*/
     {"panelIsotope",    61,  0,        PanelInstallAnim,   285, 283, 282,  284,     91, 235,  235, "levRinstallisotope",     false, 0     },/*level 0 reactor "isotope panel": X-22 goes in via A_INSTALL then A_INSTALLED*/
 };
-
 extern char ioNames[MAX_IO_NAMES][TARG_STRLEN];
-static const RelayPanelScript* RelayPanelScriptFor(const Entity* e) {
-    if (!e->targetnameIdx || e->targetnameIdx>=MAX_IO_NAMES) return NULL;
-    for (u32 i=0;i<sizeof(relayPanelScripts)/sizeof(relayPanelScripts[0]);++i) if (sEqual(ioNames[e->targetnameIdx],relayPanelScripts[i].name)) return &relayPanelScripts[i];
-    return NULL;
-}
-
+static const RelayPanelScript* RelayPanelScriptFor(const Entity* e) { if (!e->targetnameIdx || e->targetnameIdx>=MAX_IO_NAMES) { return NULL; } for (u32 i=0;i<sizeof(relayPanelScripts)/sizeof(relayPanelScripts[0]);++i) if (sEqual(ioNames[e->targetnameIdx],relayPanelScripts[i].name)) { return &relayPanelScripts[i]; } return NULL; }
 static void RelayPanelMsg(u16 msg) { if (msg>0 && msg<T_LOGSTR_CNT) CenterStatusPrint("%s",Sys_Text.stringTable[msg]); }
 static void RelayPanelSfx(i16 sfx, V3 pos) { if (sfx>0 && sfx<SOUNDS_COUNT) play_wav(sounds[sfx],AppliedFXVol(1.0f),pos,true); }
 static void RelayPanelUse(u16 self) {
-    Entity* e=&World.instances[self]; if(!PanelUseAllowed(self))return;
-    
+    Entity* e = &World.instances[self]; if (!PanelUseAllowed(self)) { return; }
     const RelayPanelScript* sc = RelayPanelScriptFor(e);
     i16 held = (World.invP1.holdingObject && World.invP1.heldObjectIndex>=INSTS_1ST_IDX) ? (i16)(World.invP1.heldObjectIndex-307) : -1;
     if (!e->panelOpen) { e->panelOpen=true; ChangeAnim(e,A_OPENING); RelayPanelSfx(sc?sc->sfxOpen:91,World.position[self]); RelayPanelMsg(sc?sc->msgOpen:0); return; }
     if (e->panelInstalled && held<0) { RelayPanelMsg(sc?sc->msgAlready:0); return; }
-    
     if (sc && held==(i16)sc->item) {
         if (e->panelInstalled) { RelayPanelSfx(sc->sfxAlready,World.position[self]); return; }
-        
         e->panelInstalled=true;
-        if (sc->kind==PanelInstallFrame) ChangeAnim(e,A_INSTALLED);
-        else if (sc->kind==PanelInstallAnim) ChangeAnim(e,A_INSTALL);
-        else if (sc->itemConst) { u16 it=AddInstance(sc->itemConst,e->panelItemPos); if (it) World.rotation[it]=e->panelItemRot; }
-        RelayPanelSfx(sc->sfxInst?sc->sfxInst:42,World.position[self]); RelayPanelMsg(sc->msgInst);
-        ResetHeldItem();
-        if (sc->target && *sc->target) UseTargets(self,IOInternName(sc->target));
+        if (sc->kind==PanelInstallFrame) { ChangeAnim(e,A_INSTALLED); } else if (sc->kind==PanelInstallAnim) { ChangeAnim(e,A_INSTALL); } else if (sc->itemConst) { u16 it=AddInstance(sc->itemConst,e->panelItemPos); if (it) World.rotation[it]=e->panelItemRot; }
+        RelayPanelSfx(sc->sfxInst?sc->sfxInst:42,World.position[self]); RelayPanelMsg(sc->msgInst); ResetHeldItem(); if (sc->target && *sc->target) { UseTargets(self,IOInternName(sc->target)); }
         if (sc->blowUp) { e->panelArmed=true; e->panelTimer = World.pauseRelativeTime + (e->delay>0.0f?(double)e->delay:15.0); }
         return;
     }
     play_wav(sounds[43]/*button_deny, aaaahhh!! Try again*/,AppliedFXVol(1.0f),World.position[self],true); RelayPanelMsg(sc?sc->msgWrong:0);
 }
-
 static void PuzzlePanelUpdate(u16 self) { Entity* e=&World.instances[self]; if (e->clip==A_IDLE_CLOSED && e->panelOpen) ChangeAnim(e,A_IDLE_OPEN); if (e->panelOpen && e->clip==A_OPENING) { AnimationClip c=mdlAnimClips[e->animationNum][A_OPENING]; if (c.frameEnd<=c.frameStart || e->frame>=c.frameEnd) ChangeAnim(e,A_IDLE_OPEN); } }
 static void RelayPanelUpdate(u16 self) {
     Entity* e=&World.instances[self];
@@ -1046,7 +702,6 @@ static void RelayPanelUpdate(u16 self) {
     if (e->panelOpen && e->clip==A_INSTALL) { AnimationClip c=mdlAnimClips[e->animationNum][A_INSTALL]; if (c.frameEnd<=c.frameStart || e->frame>=c.frameEnd) ChangeAnim(e,A_INSTALLED); }
     if (e->panelArmed && World.pauseRelativeTime>=e->panelTimer) { e->panelArmed=false; V3 p=World.position[self]; play_wav(sounds[64]/*explosion1*/,AppliedFXVol(1.0f),p,true); SpawnExplosionEffect(p,1); ScreenShake(); World.fogFac += 5.0f; const RelayPanelScript* sc=RelayPanelScriptFor(e); if (sc && sc->wreckTex) e->texIndex=sc->wreckTex; }
 }
-
 static bool HeldItemIsFrobUser(i16 item) { return item==54||item==56||item==57||item==61||item==64||item==92||item==93||item==94; }
 bool FrobHeldItemIntoPanel(V3 p, V3 f, V3 r) {
     if (!World.invP1.holdingObject) return false;
@@ -1056,57 +711,31 @@ bool FrobHeldItemIntoPanel(V3 p, V3 f, V3 r) {
     u16 idx=h.hitInstanceIndex; u16 pidx=World.instances[idx].index;
     if (item==54 && (IsPuzzleGridPanel(pidx) || IsPuzzleWirePanel(pidx))) {
         Entity* e=&World.instances[idx];
-        bool gated=(GetCurrentLevelSecurity()>UsableOrDef((float)e->securityThreshold,100.0f))||(e->entflags&EF_LOCKED);
+        bool gated = (GetCurrentLevelSecurity() > UsableOrDef((float)e->securityThreshold,100.0f)) || (e->entflags & EF_LOCKED);
         PuzzlePanelUse(idx);
-        if (gated) return true;
-        
+        if (gated) { return true; }
         if (IsPuzzleGridPanel(pidx)) {
             SystemUI* s=&World.Sys_UI;
             if (s->pg_solved) { if (s->pg_fired) CenterStatusPrint("%s",Sys_Text.stringTable[312]); return true; }
-            for (int k=0;k<35;++k) if (s->pg_type[k]==PuzzleCellType_Standard) s->pg_cell[k]=true;
-            PGEvalPuzzle();
-            s->pg_solved=true;
-            for (int k=0;k<35;++k) if (s->pg_type[k]==PuzzleCellType_Standard) s->pg_powered[k]=true;
+            for (int k=0;k<35;++k) if (s->pg_type[k]==PuzzleCellType_Standard) s->pg_cell[k] = true;
+            PGEvalPuzzle(); s->pg_solved = true;
+            for (int k=0;k<35;++k) if (s->pg_type[k]==PuzzleCellType_Standard) s->pg_powered[k] = true;
             for (int k=0;k<35;++k) Entity_SetGridCell(e,k,s->pg_cell[k]);
-            e->puzzleSolved=true; s->pg_fired=true; e->puzzleFired=true;
-            play_wav(sounds[46],AppliedFXVol(1.0f),(V3){0},false);
-            UseTargets(idx,e->targetIdx);
-            if (e->messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[e->messageLingdex]);
-        } else {
-            if (e->puzzleSolved) return true;
-            World.Sys_UI.pw_solved=true; e->puzzleSolved=true;
-            play_wav(sounds[46],AppliedFXVol(1.0f),(V3){0},false);
-            UseTargets(idx,e->targetIdx);
-            if (e->messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[e->messageLingdex]);
-        }
-        ResetHeldItem();
-        return true;
+            e->puzzleSolved = s->pg_fired = e->puzzleFired = true; play_wav(sounds[46],AppliedFXVol(1.0f),(V3){0},false); UseTargets(idx,e->targetIdx); if (e->messageLingdex) { CenterStatusPrint("%s",Sys_Text.stringTable[e->messageLingdex]); }
+        } else { if (e->puzzleSolved) { return true; } World.Sys_UI.pw_solved = true; e->puzzleSolved = true; play_wav(sounds[46],AppliedFXVol(1.0f),(V3){0},false); UseTargets(idx,e->targetIdx); if (e->messageLingdex) { CenterStatusPrint("%s",Sys_Text.stringTable[e->messageLingdex]); } }
+        ResetHeldItem(); return true;
     }
     if (World.instances[idx].index!=614 && World.instances[idx].index!=602) return false;
     RelayPanelUse(idx); return true;
 }
-
-typedef struct { i8 label; bool darkened; } ElevBtnDef;
-static const ElevBtnDef elevLayouts[12][8] = {{{1,0},{2,0},{3,1},{6,1},{7,1},{8,1},{-1,0},{-1,0}},/*0: 1 to 2*/ {{0,0},{1,1},{2,0},{3,0},{6,1},{7,1},{8,1},{-1,0}},/*1: 2 to 3*/ {{3,0},{4,0},{5,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*2: 3 to 4*/ {{1,1},{2,1},{3,0},{6,0},{7,1},{8,1},{-1,0},{-1,0}},/*3: 3 to 6*/ {{5,0},{6,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*4: 5 to 6*/ {{6,0},{10,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*5: 6 to G1*/
-                                              {{6,0},{11,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*6: 6 to G2*/ {{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*7: 6 to G3 (all hidden)*/ {{6,0},{12,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*8: 6 to G4*/ {{1,1},{2,1},{3,1},{6,0},{7,0},{8,1},{-1,0},{-1,0}},/*9: 6 to 7*/ {{1,1},{2,1},{3,1},{6,1},{7,0},{8,0},{-1,0},{-1,0}},/*10: 7 to 8*/ 
-                                              {{1,1},{2,1},{3,1},{6,1},{8,0},{9,0},{-1,0},{-1,0}},/*11: 8 to 9*/};
-static const struct { u8 level; float x,y,z; u8 layout; } elevPanelMap[] = { {0,9.97f,-55.08f,39.40f,1},{1,49.88f,-44.58f,-18.0f,0}, {2,52.47f,-27.94f,-25.62f,1},{2,3.79f,-27.94f,33.30f,1}, {3,15.27f,-14.91f,-11.50f,1},{3,1.17f,-15.09f,12.75f,2},{3,6.32f,-15.09f,-20.52f,3}, {4,-1.33f,1.64f,3.88f,2}, {5,-15.31f,14.26f,-39.68f,4},{5,8.94f,13.16f,-7.61f,2},
-                                                                             {6,-0.62f,34.09f,-69.24f,8},{6,-58.26f,34.14f,-39.71f,5},{6,-5.81f,36.02f,43.52f,6},{6,85.10f,34.14f,-37.09f,7},{6,-0.63f,34.10f,-46.09f,4},{6,60.81f,32.22f,35.84f,9},{6,-13.43f,34.14f,-30.73f,3}, {7,16.27f,51.38f,56.23f,10},{7,26.57f,48.82f,-10.34f,9}, {8,11.33f,97.46f,-41.43f,11},{8,3.58f,59.06f,20.01f,10}, {9,3.57f,107.16f,-38.31f,11},
-                                                                             {10,42.46f,136.38f,-7.83f,5},{11,9.91f,168.94f,-23.22f,6},{12,19.09f,196.14f,18.14f,8}};
 static u8 ElevLabelToLevel(i8 labelIdx) { if (labelIdx>=1 && labelIdx<=9) return (u8)labelIdx; if (labelIdx==10) return 10; if (labelIdx==11) return 11; if (labelIdx==12) return 12; if (labelIdx==0) return 0;/*R*/ return 255; }
 bool PlayerInElevatorCell() {
     V3 pp=World.position[PLAYER1]; pp.y-=PLYR_CAM_OFS_Y;
-    for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {
-        Entity* e=&World.instances[i]; if(e->index!=706||!(e->entflags&EF_ACTIVE)){continue;}
-        V3 c=World.colliderCenter[i],s=World.colliderSize[i],p=World.position[i];
-        V3 rc=quat_rot_v3(World.rotation[i],c);
-        float x0=p.x+rc.x-s.x*0.5f,x1=p.x+rc.x+s.x*0.5f,z0=p.z+rc.z-s.z*0.5f,z1=p.z+rc.z+s.z*0.5f;
-        float y0=p.y+rc.y-s.y*0.5f,y1=p.y+rc.y+s.y*0.5f;
-        if (pp.x>=x0&&pp.x<=x1&&pp.y>=y0&&pp.y<=y1&&pp.z>=z0&&pp.z<=z1) return true;
+    for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) { 
+        Entity* e=&World.instances[i]; if(e->index!=706||!(e->entflags&EF_ACTIVE)){continue;} V3 c=World.colliderCenter[i],s=World.colliderSize[i],p=World.position[i]; V3 rc=quat_rot_v3(World.rotation[i],c); float x0=p.x+rc.x-s.x*0.5f,x1=p.x+rc.x+s.x*0.5f,z0=p.z+rc.z-s.z*0.5f,z1=p.z+rc.z+s.z*0.5f; float y0=p.y+rc.y-s.y*0.5f,y1=p.y+rc.y+s.y*0.5f; if (pp.x>=x0&&pp.x<=x1&&pp.y>=y0&&pp.y<=y1&&pp.z>=z0&&pp.z<=z1) return true;
     }
     return false;
 }
-
 static void ElevatorPanelUse(u16 i) {
     if(!PanelUseAllowed(i))return;
     World.Sys_UI.tetheredKeypadElevator=i; World.Sys_UI.linkedElevatorDoor=U16_MAX; World.Sys_UI.objectInUsePos=World.position[i];
@@ -1119,80 +748,35 @@ static void ElevatorPanelUse(u16 i) {
     for (int b=0;b<8;++b) { World.Sys_UI.elevButtonLabelIdx[b]=elevLayouts[layout][b].label; World.Sys_UI.buttonsDarkened[b]=elevLayouts[layout][b].darkened; World.Sys_UI.buttonsEnabled[b]=elevLayouts[layout][b].label>=0; World.Sys_UI.elevButtonLevelIdx[b]=ElevLabelToLevel(elevLayouts[layout][b].label); World.Sys_UI.elevButtonSpawnIdx[b]=U16_MAX; }
     ForceInventoryMode(); play_wav(sounds[91],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); MFD_OpenData(World.Sys_UI.lastDataSideRH,1);/*elevator keypad: data-tab view, so it comes up on the last-used data side (left by default)*/
 }
-
-bool FindElevatorKeypadPos(u8 level,V3* outPos) { for (u32 m=0;m<sizeof(elevPanelMap)/sizeof(elevPanelMap[0]);++m) { if (elevPanelMap[m].level==level) { outPos->x=elevPanelMap[m].x; outPos->y=elevPanelMap[m].y; outPos->z=elevPanelMap[m].z; return true; } } return false; }
 static void KeycodePanelUse(u16 i) {
     if(!PanelUseAllowed(i))return;
     Entity* e=&World.instances[i];
-    if(e->useQuestKeycode1||e->useQuestKeycode2){
-        const i8 *c=&World.lev1SecCode; int off=e->useQuestKeycode1?0:3; u16 msg=e->useQuestKeycode1?289:290;
-        if(c[off]<0||c[off+1]<0||c[off+2]<0){UIBlockedBySecurity(World.position[i]);CenterStatusPrint("%s",Sys_Text.stringTable[msg]);return;}
-        e->keycode=(u16)(c[off]*100 + c[off+1]*10 + c[off+2]);
-    }
-    SystemUI* s=&World.Sys_UI; s->tetheredKeypadKeycode=i; s->keycodeValue=e->keycode; s->keycodeValid=true; s->keycodeSolved=false;
-    s->keycodeHuns=s->keycodeTens=s->keycodeOnes=-1; s->keycodeEntry=-1; s->objectInUsePos=World.position[i];
+    if(e->useQuestKeycode1||e->useQuestKeycode2){ const i8 *c=&World.lev1SecCode; int off=e->useQuestKeycode1?0:3; u16 msg=e->useQuestKeycode1?289:290; if(c[off]<0||c[off+1]<0||c[off+2]<0){UIBlockedBySecurity(World.position[i]);CenterStatusPrint("%s",Sys_Text.stringTable[msg]);return;} e->keycode=(u16)(c[off]*100 + c[off+1]*10 + c[off+2]); }
+    SystemUI* s = &World.Sys_UI; s->tetheredKeypadKeycode = i; s->keycodeValue = e->keycode; s->keycodeValid = true; s->keycodeSolved = false; s->keycodeHuns=s->keycodeTens=s->keycodeOnes=-1; s->keycodeEntry=-1; s->objectInUsePos=World.position[i];
     ForceInventoryMode(); play_wav(sounds[91],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); MFD_OpenData(World.Sys_UI.lastDataSideRH,2);/*keycode pad: data-tab view, so it comes up on the last-used data side (left by default)*/
 }
 void CloseSearch() { u16 s=World.Sys_UI.tetheredSearchable; if (s>=INSTS_1ST_IDX && s<World.instCount) World.instances[s].srchInUse = false; World.Sys_UI.tetheredSearchable = U16_MAX; World.Sys_UI.searchFXActive[0] = World.Sys_UI.searchFXActive[1] = false; MFD_CloseSearch(); }
 void UpdateSearchTether() { u16 s=World.Sys_UI.tetheredSearchable; if (s==U16_MAX) return; if (s<INSTS_1ST_IDX || s>=World.instCount || !(World.instances[s].entflags&EF_ACTIVE) || !World.instances[s].srchInUse) { CloseSearch(); return; } V3 d=V3_AsubB(World.position[PLAYER1],World.position[s]); if (V3_dot(d,d)>(FROB_DISTANCE+0.16f)*(FROB_DISTANCE+0.16f)) CloseSearch(); }
 bool SearchTakeSlot(u8 slot) {
-    UpdateSearchTether(); u16 s=World.Sys_UI.tetheredSearchable;
-    if (s==U16_MAX || slot>=4 || World.invP1.holdingObject) return false;
+    UpdateSearchTether(); u16 s=World.Sys_UI.tetheredSearchable; if (s==U16_MAX || slot>=4 || World.invP1.holdingObject) return false;
     Entity* e=&World.instances[s]; i16 item=e->contents[slot]; if (item<0 || item>110 || !IdxIsUsableObject((u16)(item+307))) return false;
-    ResetHeldItem(); World.invP1.heldObjectIndex=(u16)(item+307); World.invP1.heldObjectCustIdx=(u16)e->custIdx[slot]; World.invP1.holdingObject=true;
-    e->contents[slot]=e->custIdx[slot]=-1;
+    ResetHeldItem(); World.invP1.heldObjectIndex=(u16)(item+307); World.invP1.heldObjectCustIdx=(u16)e->custIdx[slot]; World.invP1.holdingObject=true; e->contents[slot]=e->custIdx[slot]=-1;
     if (Sys_Settings.QuickItemPickup) AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx),ResetHeldItem(); else ForceInventoryMode(),CenterStatusPrint("%s%s",Sys_Text.stringTable[item+326],Sys_Text.stringTable[319]);/*Inventory mode is turned on when picking something up*/
-    for (u8 i=0;i<4;++i) if (e->contents[i]>=0) return true;
-    CloseSearch(); return true;
+    for (u8 i=0;i<4;++i) { if (e->contents[i]>=0) return true; }    CloseSearch(); return true;
 }
-
 void SearchObject(int searchable) {
     UpdateSearchTether();
     if (searchable<INSTS_1ST_IDX || searchable>=World.instCount || !(World.instances[searchable].entflags&EF_ACTIVE)) return;
     Entity* e = &World.instances[searchable];
-    if (World.Sys_UI.tetheredSearchable==searchable && e->srchInUse) {
-        for (u8 slot=0;slot<4;++slot) { if (e->contents[slot]>=0) { SearchTakeSlot(slot); return; } }
-        return;
-    }
-    CloseSearch();
-    World.Sys_UI.tetheredSearchable = (u16)searchable;
-    e->srchInUse = true;
-    World.Sys_UI.objectInUsePos = World.position[searchable];
-    MFD_OpenSearch(World.Sys_UI.lastSearchSideRH);
-    SearchFXEnable(World.Sys_UI.lastSearchSideRH ? 1 : 0);
-    play_wav(sounds[91], AppliedFXVol(0.75f), (V3){0}, false);
-    ForceInventoryMode();
+    if (World.Sys_UI.tetheredSearchable==searchable && e->srchInUse) { for (u8 slot=0;slot<4;++slot) { if (e->contents[slot]>=0) { SearchTakeSlot(slot); return; } } return; }
+    CloseSearch(); World.Sys_UI.tetheredSearchable = (u16)searchable; e->srchInUse = true; World.Sys_UI.objectInUsePos = World.position[searchable]; MFD_OpenSearch(World.Sys_UI.lastSearchSideRH); SearchFXEnable(World.Sys_UI.lastSearchSideRH ? 1 : 0); play_wav(sounds[91], AppliedFXVol(0.75f), (V3){0}, false); ForceInventoryMode();
 }
-
-void MissionTimerInit() {
-    World.misTimerT = 6000.0f;
-    World.misTimerFinished = World.pauseRelativeTime + 1.0f;
-    World.misTimerMission = 504;
-    World.misTimerCurIdx = 0;
-    World.misTimerLast = World.misTimerTimesUP = false;
-}
-
-void MissionTimerUpdateToNextMission(float newTimerAmount,int misTextIndex,int nextMissionIndex) {
-    if (World.misTimerCurIdx == (u8)nextMissionIndex) return;
-    if (World.diffMis < 3) return;
-    
-    World.misTimerT = newTimerAmount;
-    World.misTimerCurIdx = (u8)nextMissionIndex;
-    World.misTimerMission = (u16)misTextIndex;
-    if (World.misTimerCurIdx == 4) { World.misTimerLast = true; /*No gameover for last timer.*/ }
-}
-
+void MissionTimerInit() { World.misTimerT = 6000.0f; World.misTimerFinished = World.pauseRelativeTime + 1.0f; World.misTimerMission = 504; World.misTimerCurIdx = 0; World.misTimerLast = World.misTimerTimesUP = false; }
+void MissionTimerUpdateToNextMission(float newTimerAmount,int misTextIndex,int nextMissionIndex) { if (World.misTimerCurIdx == (u8)nextMissionIndex || World.diffMis < 3) { return; } World.misTimerT = newTimerAmount; World.misTimerCurIdx = (u8)nextMissionIndex; World.misTimerMission = (u16)misTextIndex; if (World.misTimerCurIdx == 4) { World.misTimerLast = true; } }
 void MissionTimerUpdate() {
-    if (World.diffMis < 3) return;
-    if (World.paused || World.menuActive) return;
-    if (World.curLev == LEVEL_CYBERSPACE) return;
+    if (World.diffMis < 3 || World.paused || World.menuActive || World.curLev == LEVEL_CYBERSPACE) { return; }
     if (World.misTimerTimesUP && World.instances[PLAYER1].health > 0.0f) { World.invP1.radiationArea = true; World.instances[PLAYER1].radiation += 0.1f; return; }
-    
-    if (World.misTimerT <= 0.0f) {
-        if (World.misTimerLast) { World.misTimerMission = 509; World.misTimerTimesUP = true; return; }
-        World.instances[PLAYER1].health = 0.0f; Death(PLAYER1,false); return;
-    }
-    
+    if (World.misTimerT <= 0.0f) { if (World.misTimerLast) { World.misTimerMission = 509; World.misTimerTimesUP = true; return; } World.instances[PLAYER1].health = 0.0f; Death(PLAYER1,false); return; }
     switch (World.misTimerCurIdx) {
         case 0: if (QuestBitIsSet(QB_LaserDestroyed)) MissionTimerUpdateToNextMission(10800.0f,505,1); break;
         case 1: if (QuestBitIsSet(QB_AntennaNorthDestroyed) && QuestBitIsSet(QB_AntennaSouthDestroyed) && QuestBitIsSet(QB_AntennaEastDestroyed) && QuestBitIsSet(QB_AntennaWestDestroyed)) MissionTimerUpdateToNextMission(2700.0f,506,2); break;
@@ -1221,7 +805,6 @@ static int UseNameTableIndex(int index) {
         case 685: return 1031; case 686: return 1031; case 687: return 1030; default: return -1; // No name available; caller will print just the prefix
     }
 }
-
 static const char* UseSecretText(int index, u16 inst) { /*sshhhhhh, pretend you didn't see this ;)*/ if (index < 860 || index > 862 || inst >= World.instCount) { return NULL; } u16 n = World.instances[inst].targetnameIdx; return (n && n < MAX_IO_NAMES) ? ioNames[n] : NULL; }
 static void CyberportUse(u16 i) { u8 src = World.curLev; int idx; if (src == 2) idx = (World.position[i].x < -26.0f) ? 2 : 3; else if (src == 5) idx = 4; else if (src == 6) idx = 5; else if (src == 8) idx = 6; else if (src == 9) idx = 7; else idx = (src < 8) ? src : 0; queuedLevelPos = cyberSpaceEntryLocations[idx]; queuedLevelToLoad = LEVEL_CYBERSPACE; }
 void UseEntity(u16 i) {
@@ -1245,7 +828,6 @@ void UseEntity(u16 i) {
         DeleteInstance(i);
     } else { int t = UseNameTableIndex(ent->index); const char* sec = UseSecretText(ent->index,i); CenterStatusPrint("%s%s",Sys_Text.stringTable[29],sec ? sec : (t >= 0 ? Sys_Text.stringTable[t] : "")); }
 }
-
 INLINE V3 ScreenPointToRayOffset(V3 f,V3 r,float dx,float dy){float px=(World.inventoryMode?(float)World.cursorPos_x:(float)UI_W*0.5f)+dx,py=(World.inventoryMode?(float)World.cursorPos_y:(float)UI_H*0.5f)+dy,t=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),aspect=(float)Sys_Settings.ScreenWidth/(float)Sys_Settings.ScreenHeight,nx=(px-(float)UI_W*0.5f)/((float)UI_W*0.5f),ny=((float)UI_H*0.5f-py)/((float)UI_H*0.5f);V3 v=V3_Normalize((V3){nx*aspect*t,ny*t,-1.0f}),ff=(V3){-f.x,-f.y,-f.z},up=V3_Normalize(V3_Cross(r,ff));return(V3){v.x*r.x+v.y*up.x+v.z*ff.x,v.x*r.y+v.y*up.y+v.z*ff.y,v.x*r.z+v.y*up.z+v.z*ff.z};}
 V3 ScreenPointToRayPixels(V3 f,V3 r,float dx,float dy){return ScreenPointToRayOffset(f,r,dx,dy);}
 INLINE bool FrobRayIsFrobable(RaycastHit h){if(!h.hit)return false;u16 i=h.hitInstanceIndex;if(i>=World.instCount)return false;u16 e=World.instances[i].index;if((World.layer[i]&L_CorpseSearchable))return true;if((World.layer[i]&L_Corpse)&&!IdxIsGib(e))return true;return IsFrobUsableSpecial(e)||IdxIsUsableObject(e)||IdxIsSearchable(e)||IdxIsDoor(e)||IdxIsButtonSwitch(e)||IdxIsNPC(e);};
@@ -1259,7 +841,16 @@ static void Frob(V3 p,V3 f,V3 r){
         else {editModeSelection=newEnt;editModeLightSelection=U16_MAX;editFieldEditing=false;if(newEnt<U16_MAX)CenterStatusPrint("Selected object %u (const index %u)",newEnt,World.instances[newEnt].index);else CenterStatusPrint("Object deselected");}
         return;/*No pickup/search/use while in edit mode; selection only.*/
     }
-    if(World.Sys_UI.vmailActive){World.Sys_UI.vmailActive=0;return;}if(World.invP1.holdingObject){if(FrobHeldItemIntoPanel(p,f,r)){return;} DropHeldItem();return;}if(TargetIDFrob(p,f,r))return;float o=(float)UI_H*0.02f;RaycastHit fh={0},bh={0};bool ok=false;V3 d0=ScreenPointToRayOffset(f,r,0,0);fh=Raycast(p,d0,FROB_DISTANCE,LMASK_PLAYER_FROB);bh=fh;ok=FrobRayIsFrobable(fh);float ox[8]={0,0,o,-o,o,-o,-o,o},oy[8]={-o,o,0,0,o,-o,o,-o};for(int i=0;i<8&&!ok;++i){V3 d=ScreenPointToRayOffset(f,r,ox[i],oy[i]);RaycastHit th=Raycast(p,d,FROB_DISTANCE,LMASK_PLAYER_FROB);if(FrobRayIsFrobable(th)){bh=th;ok=true;}}if(!ok)bh=fh;if(Cheats.showPhys){World.debugLine_start=p;World.debugLineFinished=World.pauseRelativeTime+3.0;V3 dbg=ok?ScreenPointToRayOffset(f,r,0,0):d0;RaycastHit dh=ok?bh:fh;World.debugLine_end=dh.hit?dh.point:(V3){dbg.x*FROB_DISTANCE+p.x,dbg.y*FROB_DISTANCE+p.y,dbg.z*FROB_DISTANCE+p.z};}if(!ok){if(fh.hit){u16 idx=fh.hitInstanceIndex;if(idx<World.instCount){u16 ei=World.instances[idx].index;if(IdxIsGeometry(ei)||IdxIsDoor(ei)||World.instances[idx].index>=595){int t=UseNameTableIndex(ei);const char* sec=UseSecretText(ei,idx);CenterStatusPrint("%s%s",Sys_Text.stringTable[29],sec?sec:(t>=0?Sys_Text.stringTable[t]:""));return;}}}CenterStatusPrint("%s",Sys_Text.stringTable[30]);}else UseEntity(bh.hitInstanceIndex);}
+    if (World.Sys_UI.vmailActive) { World.Sys_UI.vmailActive = 0; return; } if (World.invP1.holdingObject) { if (FrobHeldItemIntoPanel(p,f,r)) { return; } DropHeldItem(); return; }
+    if (TargetIDFrob(p,f,r)) { return; } float o=(float)UI_H*0.02f;RaycastHit fh={0},bh = {0}; bool ok = false; V3 d0 = ScreenPointToRayOffset(f,r,0,0); fh = Raycast(p,d0,FROB_DISTANCE,LMASK_PLAYER_FROB);bh=fh;ok=FrobRayIsFrobable(fh);float ox[8]={0,0,o,-o,o,-o,-o,o},oy[8]={-o,o,0,0,o,-o,o,-o};
+    for (int i=0;i<8&&!ok;++i) { V3 d = ScreenPointToRayOffset(f,r,ox[i],oy[i]); RaycastHit th = Raycast(p,d,FROB_DISTANCE,LMASK_PLAYER_FROB); if(FrobRayIsFrobable(th)) { bh = th; ok = true; } } 
+    if (!ok) { bh = fh; }
+    if (Cheats.showPhys) { World.debugLine_start = p; World.debugLineFinished = World.pauseRelativeTime + 3.0; V3 dbg = ok ? ScreenPointToRayOffset(f,r,0,0) : d0; RaycastHit dh = ok ? bh : fh; World.debugLine_end = dh.hit ? dh.point : (V3){dbg.x*FROB_DISTANCE+p.x,dbg.y*FROB_DISTANCE+p.y,dbg.z*FROB_DISTANCE+p.z}; }
+    if (!ok) {
+        if (fh.hit) { u16 idx = fh.hitInstanceIndex; if (idx < World.instCount) { u16 ei = World.instances[idx].index; if (IdxIsGeometry(ei) || IdxIsDoor(ei) || World.instances[idx].index >= 595) { int t = UseNameTableIndex(ei); const char* sec = UseSecretText(ei,idx); CenterStatusPrint("%s%s",Sys_Text.stringTable[29],sec?sec:(t >= 0 ? Sys_Text.stringTable[t] : "")); return; } } }
+        CenterStatusPrint("%s",Sys_Text.stringTable[30]);
+    } else UseEntity(bh.hitInstanceIndex);
+}
 // Update
 void WeaponsUpdate(); void TextureSequenceUpdate(u16 self); void AIAnimationControllerUpdate(u16 selfIdx); void AIControllerUpdate(u16 selfIdx);
 extern const V3 sightPointOffsets[NUM_AI_TYPES];
@@ -1271,13 +862,11 @@ void DrawAIDebug(u16 i) {
     else if (e->currentState == AIState_Attack1 || e->currentState == AIState_Attack2 || e->currentState == AIState_Attack3) dbgCol = (Color){1.0f,0.0f,1.0f,1.0f}; else if (e->currentState == AIState_Pain) dbgCol = (Color){1.0f,0.0f,1.0f,1.0f}; else if (e->currentState == AIState_Dead) dbgCol = (Color){0.5f,0.5f,0.5f,1.0f}; else { dbgCol = (Color){1.0f,0.9f,0.8f,1.0f}; }
     DrawSphereWireframe(dbgCol, (ShapeSphere){sightPt, 0.32f});
 }
-
 INLINE float CamYawFromQuat(Quaternion q) { float d = __builtin_atan2f(2.0f * (q.x*q.z + q.y*q.w), 1.0f - 2.0f * (q.x*q.x + q.y*q.y)) * (180.0f / 3.14159265f); if (d < 0.0f) d += 360.0f; return d; }
 void SecurityCameraRotateUpdate(u16 self) { /*Sweeps the camera back and forth between startYAngle and endYAngle about the Y axis (yaw) only*/
     if (!World.instances[self].camRotateEnabled) return;
     if (!(World.instances[self].entflags & EF_ACTIVE)) return;
     if (!SphereInFrustum(playerFrustumPlanes, World.position[self], 1.28f)) return;
-    
     if (!World.instances[self].camSweepInit) { World.instances[self].camSweepInit = true; World.instances[self].camBaseRot = World.rotation[self]; World.instances[self].camYaw0 = CamYawFromQuat(World.instances[self].camBaseRot); World.instances[self].camYaw = World.instances[self].camYaw0; }
     if (World.instances[self].camWaitingFinished >= World.pauseRelativeTime) return;
         
