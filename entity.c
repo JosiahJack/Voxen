@@ -2,19 +2,9 @@
 #include "common.h"
 /*TODO: Add grove grass extrusion in-shader*/
 /*TODO add the new shared grove2_7/grove2_8 mesh,shares chunk_grove2_3's mesh for now*/
-u16 teleportDestinations[MAX_LEVELS][8]; static bool teleportDestinationsInitialized;
-u16 elevatorDestinations[MAX_LEVELS][MAX_ELEV_DESTS_PER_LEVEL]; u8 elevatorDestCounts[MAX_LEVELS];
-Quaternion quat_from_axis_angle(V3,float);
-void AddDoorPortal(u16,u16), TextureSequenceInit(u16,char*), AddCamView(V3,Quaternion,u8,u16,u16,float,float), GravityLiftSyncAllVisuals(void);
-static Entity* entsFromFile;
-static V3 *posFromFile, *scaleFromFile;
-static Quaternion *rotationFromFile; 
-static Light *lightsFromFile;
-static LightAnimation *lanimsFromFile;
-static V3 *colCtrFromFile = NULL, *colSzFromFile = NULL;
-u16 headmountedLanternLight;
-static bool alreadyReadLightOnOnce[LIGHT_COUNT] = {0};
-u8 sensaroundCamViewCenter = 255, sensaroundCamViewLeft = 255, sensaroundCamViewRight = 255; // HUD sensaround cam view indices, assigned during level load
+u16 teleportDestinations[MAX_LEVELS][8]; static bool teleportDestinationsInitialized; u16 elevatorDestinations[MAX_LEVELS][MAX_ELEV_DESTS_PER_LEVEL]; u8 elevatorDestCounts[MAX_LEVELS]; Quaternion quat_from_axis_angle(V3,float);
+void AddDoorPortal(u16,u16),TextureSequenceInit(u16,char*),AddCamView(V3,Quaternion,u8,u16,u16,float,float),GravityLiftSyncAllVisuals(void);
+static Entity* entsFromFile; static V3 *posFromFile, *scaleFromFile; static Quaternion *rotationFromFile; static Light *lightsFromFile; static LightAnimation *lanimsFromFile; static V3 *colCtrFromFile = NULL, *colSzFromFile = NULL; static bool alreadyReadLightOnOnce[LIGHT_COUNT] = {0}; u8 sensaroundCamViewCenter = 255, sensaroundCamViewLeft = 255, sensaroundCamViewRight = 255; // HUD sensaround cam view indices, assigned during level load
 EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex,mass,animationNum,col,colCtr,colSz
 /*0 chunk_black*/                   [0]={178,0,0,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                    /*1 chunk_blocker*/                 [1]={178,0,1230,MAXTEX,1230,160,0,MAXANIM,0,{0},{0}},                                      /*2 chunk_bridg1_1*/                [2]={661,0,44,MAXTEX,MAXTEX,43,0,MAXANIM,0,{0},{0}},
 /*3 chunk_bridg1_1flipx*/           [3]={667,0,44,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                   /*4 chunk_bridg1_2*/                [4]={662,0,45,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                   /*5 chunk_bridg1_3*/                [5]={20,0,47,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
@@ -320,7 +310,6 @@ __attribute__((noinline)) float parse_float(const char* str, const char* line, u
     if (str == 0 || *str == '\0') { DualLogError("Blank on line %d:%s\n", lineNum+1, line); return 0.0f; } while (cEmpty(*str)){str++;} bool negative = false; if (*str == '-') { negative = true; str++; } else if (*str == '+') { str++; } double value = 0.0; bool has_digit = false; while (*str >= '0' && *str <= '9') { value = value * 10.0 + (*str - '0'); str++; has_digit = true; } // Integer part
     if (*str == '.') { str++; double frac = 0.0; double place = 0.1; while (*str >= '0' && *str <= '9') { frac += (*str - '0') * place; place *= 0.1; str++; has_digit = true; } value += frac; }/*Decimal part*/  if(!has_digit){return 0.0f;} if(negative){value = -value;} return (float)value;
 }
-
 __attribute__((noinline)) i32 AddLight(Light* lit, LightAnimation* la){ if(World.loadedLights>=LIGHT_COUNT){DualLogError("Too many lights,lev%d!\n",World.curLev); OS_Exit(1);} i32 i=World.loadedLights; World.loadedLights++; World.levelLoadedLights[World.curLev]++; mcpy(&World.lights[i],lit,sizeof(Light)); if (la && la->numIntervalSteps >= 1) { if (World.lanimCount < LANIM_MAX) { World.lanimLightIdx[World.lanimCount]=(u16)i; mcpy(&World.lanims[World.lanimCount],la,sizeof(LightAnimation)); World.lanimCount++; } else { DualLogError("Too many light animations,lev%d!\n",World.curLev); } } World.lightsNewPosition[i]=lit->pos; flag_set(&World.lights[i].lflags,LDIRTY,true); return i;}
 __attribute__((noinline)) u16 AddLightSimple(V3 pos, Color3 c, float r, float in, u16 lf){Light l={.pos=pos,.col=c,.range=r,.intensity=in,.maxIntensity=in,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=lf}; return AddLight(&l,NULL);}
 u16 IOInternName(const char*); static u16 lightTargetnameFile[LIGHT_COUNT];/*targetname per lightsFromFile slot, IO_NONE when anonymous.  A light is not an entity, so this is the only way a relay can address one.*/
@@ -337,15 +326,13 @@ void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light* lit, LightAni
     if (sEqual(k,"intensity")) {lit->intensity = lit->maxIntensity = parse_float(v,il,ln) * 0.35f;}else if(sEqual(k,"type")){flag_set(&lit->lflags, (v[0] == 'S') ? LSPOT : LDIR, true);}else if (sEqual(k,"lightOn") && !alreadyReadLightOnOnce[lIdx]) { alreadyReadLightOnOnce[lIdx] = true; flag_set(&lit->lflags,LIGHTON,parse_bool(v,il,ln)); } else if (sEqual(k,"lerpOn")) {flag_set(&lit->lflags,LERPON,parse_bool(v,il,ln));}
     else if (sEqual(k,"targetname")) {lightTargetnameFile[lIdx] = IOInternName(v);}
 }
-
 u16 headmountedLanternLight; V3 lanternPos;
 void UpdateLight(u16 i, V3 pos, Color3 col, float range, float intensity, float max, float min, float spotAng, Quaternion spotDir, bool on, bool shad) {
     bool changed = (!!(World.lights[i].lflags & SHADON) - shad) || (!!(World.lights[i].lflags & LIGHTON) -  on) || (vabs(World.lights[i].range - range) > 0.0001f) || (vabs(World.lights[i].pos.x - pos.x) > 0.0001f) || (vabs(World.lights[i].pos.y - pos.y) > 0.0001f) || (vabs(World.lights[i].pos.z - pos.z) > 0.0001f);
     World.lights[i].intensity = intensity; World.lights[i].minIntensity = min; World.lights[i].maxIntensity = max; World.lights[i].spotAng = spotAng; World.lights[i].spotDir = spotDir; World.lights[i].col = col; World.lights[i].pos = World.lightsNewPosition[i] = pos; World.lights[i].range = range; World.lights[i].lflags = (World.lights[i].lflags & ~(LIGHTON | SHADON | LDIRTY)) | ((World.lights[i].lflags & LDIRTY) | (changed << 4) | on | (shad << 1));
 }
 // Level Loading and Entity Management System
-void InitNPC(u16 i); bool IsLiveGrenade(u16);
-void CloseSearch(void);
+void InitNPC(u16),CloseSearch(); bool IsLiveGrenade(u16); 
 void DeleteInstance(u16 i) { if (i <= PLAYER1 || i >= World.instCount) return; if (World.Sys_UI.tetheredSearchable==i) { CloseSearch(); } for (u16 j=INSTS_1ST_IDX;j<World.instCount;++j) { if(World.instances[j].enemy==i)World.instances[j].enemy=WORLD; } flag_set(&World.instances[i].entflags,EF_ACTIVE,false); }
 typedef struct { u16 entIdx; V3 scale; float health; BloodType blood; } PrefabConst;
 static const PrefabConst prefabConsts[] = {
@@ -361,49 +348,36 @@ static const PrefabConst prefabConsts[] = {
     {478, {0},                 50.0f, BloodType_Robot},        /*sec_cpunode*/            {479, {0},                    35.0f, BloodType_Robot},        /*sec_cpunode_small*/         {525, {0},               200.0f, BloodType_Robot},        /*prop_console01*/
     {526, {0},                200.0f, BloodType_Robot},        /*prop_console02*/         {553, {0.5f,0.5f,0.5f},        0.0f, BloodType_None},         /*prop_cyber_decoy*/
 };
-
 static const PrefabConst* PrefabConstFor(u16 entIdx) { static const u8 slot[MAX_ENTITIES] = {[279]=1,[424]=2,[430]=3,[431]=4,[433]=5,[439]=6,[441]=7,[444]=8,[445]=9,[446]=10,[458]=11,[459]=12,[460]=13,[464]=14,[465]=15,[466]=16,[467]=17,[468]=18,[469]=19,[470]=20,[471]=21,[472]=22,[473]=23,[474]=24,[475]=25,[476]=26,[477]=27,[478]=28,[479]=29,[525]=30,[526]=31,[553]=32}; u8 k = slot[entIdx]; return k ? &prefabConsts[k-1] : 0; }
 __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
-    if (entIdx >= MAX_ENTITIES) { DualLogWarn("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTITIES); return WORLD; }
-    if (World.instCount >= INSTANCE_COUNT) { DualLogWarn("\nToo many instances while adding entity %u, max instance count is %u, skipped\n", entIdx, INSTANCE_COUNT); return WORLD; }
-    
-    u16 i = World.instCount;
-    mset(&World.instances[i],0,sizeof(Entity));
-    World.instances[i].entflags=EF_ACTIVE;
-    World.layer[i] = L_Default;World.instances[i].camView = 255; /*Sentinel value signaling that this mesh does not show a rendered camera view upon itself*/
-    World.instances[i].modelIndex = World.instances[i].lodIndex = World.instances[i].colMeshIndex = MAX_MDLS; /*Invalidate all model fields*/
-    World.velocity[i] = (V3){0.0f,0.0f,0.0f};
-    World.angularVelocity[i] = (V3){0.0f,0.0f,0.0f};
-    World.physSleep[i] = 0;
-    World.invTnsrValid[i] = false;
-    World.rotation[i] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
+    if (entIdx >= MAX_ENTITIES) { DualLogWarn("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTITIES); return WORLD; } if (World.instCount >= INSTANCE_COUNT) { DualLogWarn("\nToo many instances while adding entity %u, max instance count is %u, skipped\n", entIdx, INSTANCE_COUNT); return WORLD; }
+    u16 i = World.instCount; mset(&World.instances[i],0,sizeof(Entity)); World.instances[i].entflags = EF_ACTIVE; World.layer[i] = L_Default; World.instances[i].camView = 255; World.instances[i].modelIndex = World.instances[i].lodIndex = World.instances[i].colMeshIndex = MAX_MDLS; World.velocity[i] = (V3){0}; World.angularVelocity[i] = (V3){0}; World.physSleep[i] = 0; World.invTnsrValid[i] = false; World.rotation[i] = (Quaternion){.w=1.0f};
     World.scale[i].x = World.scale[i].y = World.scale[i].z = 1.0f;
     for (u8 slot=0;slot<4;++slot) { World.instances[i].contents[slot] = World.instances[i].custIdx[slot] = -1; }
     for (u8 slot=0;slot<7;++slot) { World.instances[i].randomItem[slot] = World.instances[i].randomItemCustIdx[slot] = -1; }
     World.instances[i].index = entIdx;
     World.position[i] = pos;
     const PrefabConst* pc = PrefabConstFor(entIdx);
-    if (pc && pc->scale.x) World.scale[i] = pc->scale;/*Default prefab scale (smaller sublist not in Edefs to save RAM).*/
+    if (pc && pc->scale.x) World.scale[i] = pc->scale; /*Default prefab scale (smaller sublist not in Edefs to save RAM).*/
     if (IdxIsNPC(entIdx)) { InitNPC(i); }
     else if (IsLiveGrenade(entIdx) && World.instances[i].health <= 0.0f) { World.instances[i].health = 15.0f; }
-    else if (entIdx == 574 /*prop_healingbed*/ && World.instances[i].health <= 0.0f) World.instances[i].health = 9999999.0f;/*Only the level 7 one is not industructible*/
+    else if (entIdx == 574 /*prop_healingbed*/ && World.instances[i].health <= 0.0f) World.instances[i].health = 9999999.0f; /*Only the level 7 one is not industructible*/
     World.instances[i].modelIndex = EDefs[entIdx].modelIndex; World.instances[i].colMeshIndex=EDefs[entIdx].colMeshIndex; World.instances[i].animationNum=EDefs[entIdx].animationNum; World.instances[i].texIndex=EDefs[entIdx].texIndex>=MAXTEX ? 0 : EDefs[entIdx].texIndex; World.instances[i].glowIndex=EDefs[entIdx].glowIndex>=MAXTEX ? 0 : EDefs[entIdx].glowIndex;
     World.instances[i].specIndex = EDefs[entIdx].specIndex >= MAXTEX ? 0 : EDefs[entIdx].specIndex; World.instances[i].normIndex = EDefs[entIdx].normIndex >= MAXTEX ? 0 : EDefs[entIdx].normIndex; flag_set(&World.instances[i].entflags,EF_RIGIDBODY,IdxIsDynamicObject(entIdx));
     if (entIdx == 585) { AnimationClip* c = &mdlAnimClips[46][A_LOOP_ALL]; u32 span = (u32)(c->frameEnd - c->frameStart) + 1u, off = random_range_u32(0u, span - 1u); World.instances[i].clip = A_LOOP_ALL; World.instances[i].frame = (u16)(c->frameStart + off); World.instances[i].modelIndex = (u16)(c->frameStartModelIndex + off); }
     if (entIdx == 592 || entIdx == 593) { World.instances[i].modelIndex = U16_MAX; } // 3D text decals (no mesh)
     if (pc && pc->health > 0.0f && World.instances[i].health <= 0.0f) World.instances[i].health = pc->health;
-    if (!IdxIsNPC(entIdx) && pc) World.instances[i].bloodType = pc->blood;/*Prefab constant, NOT per-instance state: HealthManager.bloodType is a serialized prefab field and no level*.txt record carries a bloodType key, so the parser has no branch for it and must never grow one.  InitNPC has already claimed the NPC types.*/
+    if (!IdxIsNPC(entIdx) && pc) World.instances[i].bloodType = pc->blood;
     if (entIdx == 717 /*ef_cyber_ice*/ && World.instances[i].cyberHealth <= 0.0f) World.instances[i].cyberHealth = 100.0f;
       if (entIdx == 477 /*sec_camera*/) { Entity* ce = &World.instances[i]; ce->camStartYAngle = 0.0f; ce->camEndYAngle = 180.0f; ce->camWaitTime = 0.8f; ce->camRotatePositive = true; ce->camRotateEnabled = false; }
     World.instances[i].questBitID = QB_None;
     if (entIdx == 594 /*trigger_counter*/) World.instances[i].dontReset = true;
     if (entIdx == 702 /*logic_spawner*/) { Entity* sm=&World.instances[i]; if (sm->numberToSpawn == 0) sm->numberToSpawn = 1; if (sm->maxDelayBetweenSpawns <= 0.0f) { sm->minDelayBetweenSpawns = 15.0f; sm->maxDelayBetweenSpawns = 45.0f; } if (sm->allSpawnedResetDelay <= 0.0f) sm->allSpawnedResetDelay = 120.0f; }
     if (World.levelCurrentlyLoading) { /*So cheat spawns don't affect the %*/ u8 sl=World.curLev; if (sl<MAX_LEVELS) { u8* dst=entIdx==477?&World.levelCameraCount[sl]:entIdx==478?&World.levelLargeNodeCount[sl]:entIdx==479?&World.levelSmallNodeCount[sl]:0; if (dst && *dst<255) (*dst)++; } }
-    World.col[i]=EDefs[entIdx].col; World.colliderCenter[i]=EDefs[entIdx].colCtr; World.colliderSize[i]=EDefs[entIdx].colSz; World.instances[i].hasGravity = (IdxIsDynamicObject(World.instances[i].index) && (entIdx<481 || entIdx>495)); if (IdxIsButtonSwitch(entIdx)) { World.instances[i].lockedMessageLingdex = 193; World.instances[i].SFXLockedIndex = -1; }
-    if (entIdx < 307 && cardChunk[entIdx]) { World.instances[i].lodIndex=178;/*LOD card index*/ World.col[i]=CT_BOX; World.colliderCenter[i].y=1.32f; World.colliderSize[i]=(V3){2.56f,0.08f,2.56f}; } World.instCount++; return i; }
-
-bool EntIsLodCardConst(u16 entIdx) { return entIdx < 307 && cardChunk[entIdx]; } /*Derived resident-set closure (models.c) needs the private cardChunk table to know which consts fall back to the generic LOD card*/
-
+    World.col[i]=EDefs[entIdx].col; World.colliderCenter[i]=EDefs[entIdx].colCtr; World.colliderSize[i]=EDefs[entIdx].colSz; World.instances[i].hasGrav = (IdxIsDynamicObject(World.instances[i].index) && (entIdx<481 || entIdx>495)); if (IdxIsButtonSwitch(entIdx)) { World.instances[i].lockedMessageLingdex = 193; World.instances[i].SFXLockedIndex = -1; }
+    if (entIdx < 307 && cardChunk[entIdx]) { World.instances[i].lodIndex = 178;/*card*/ World.col[i]=CT_BOX; World.colliderCenter[i].y=1.32f; World.colliderSize[i]=(V3){2.56f,0.08f,2.56f}; } World.instCount++; return i;
+}
+bool EntIsLodCardConst(u16 entIdx) { return entIdx < 307 && cardChunk[entIdx]; }
 static const char* mm_ptr; static const char* mm_end;
 #define KEY_EQ(lit) (keyLen == (int)(sizeof(lit)-1) && sCompUpToLen(key, lit, sizeof(lit)-1) == 0)
 static char* MmapGetLine(char* buf, int sz){if(mm_ptr>=mm_end){return NULL;} const char* start=mm_ptr; const char* p=start; while(p<mm_end&&*p!='\n'){++p;} int lineLen=(int)(p-start); if(p<mm_end&&*p =='\n'){mm_ptr=p+1;}else{mm_ptr=mm_end;}if(lineLen >= sz){lineLen=sz-1;} mcpy(buf,(void*)start,lineLen); while(lineLen>0&&(buf[lineLen-1]=='\r' || buf[lineLen - 1]=='\n')){--lineLen;} buf[lineLen]='\0'; return buf;}
@@ -433,15 +407,12 @@ void SetLevelPointers(u8 lev) {
     if (fwSnapValid[lev]) mcpy(fwParentOf, fwParentSnap[lev], sizeof(fwParentOf));/*func_wall child links are per-level*/
     World.lanims=World.levelLAnims[lev]; World.lanimLightIdx=World.levelLAnimLightIdx[lev]; World.lanimCount=World.levelLAnimCount[lev]; World.lightTargetnames=World.levelLightTargetnames[lev]; World.lightsNewPosition=World.levelLightsNewPosition[lev]; World.loadedLights=World.levelLoadedLights[lev]; World.weaponVModelIndex=World.levelWepVModel[lev];
 }
-
 void CopyPlayerState(u8 srcLevel, u8 dstLevel) {
     if(srcLevel >= MAX_LEVELS || dstLevel >= MAX_LEVELS || srcLevel == dstLevel){return;} u16 s=PLAYER1; World.levelInstances[dstLevel][s]=World.levelInstances[srcLevel][s]; World.levelPosition[dstLevel][s]=World.levelPosition[srcLevel][s]; World.levelScale[dstLevel][s]=World.levelScale[srcLevel][s];
     World.levelVelocity[dstLevel][s]=World.levelVelocity[srcLevel][s]; World.levelAngularVelocity[dstLevel][s]=World.levelAngularVelocity[srcLevel][s]; World.levelColliderCenter[dstLevel][s]=World.levelColliderCenter[srcLevel][s]; World.levelColliderSize[dstLevel][s]=World.levelColliderSize[srcLevel][s];
-    World.levelCollider[dstLevel][s]=World.levelCollider[srcLevel][s]; World.levelRotation[dstLevel][s]=World.levelRotation[srcLevel][s]; World.levelLayer[dstLevel][s]=World.levelLayer[srcLevel][s]; World.levelRadius[dstLevel][s]=World.levelRadius[srcLevel][s];
-    mcpy(World.levelInvInertiaTensor[dstLevel][s],World.levelInvInertiaTensor[srcLevel][s],6 * sizeof(float));
+    World.levelCollider[dstLevel][s]=World.levelCollider[srcLevel][s]; World.levelRotation[dstLevel][s]=World.levelRotation[srcLevel][s]; World.levelLayer[dstLevel][s]=World.levelLayer[srcLevel][s]; World.levelRadius[dstLevel][s]=World.levelRadius[srcLevel][s]; mcpy(World.levelInvInertiaTensor[dstLevel][s],World.levelInvInertiaTensor[srcLevel][s],6 * sizeof(float));
     World.levelInvTnsrValid[dstLevel][s]=World.levelInvTnsrValid[srcLevel][s]; World.levelColliding[dstLevel][s]=World.levelColliding[srcLevel][s];
 }
-
 static char lineSpace[LINE_LEN_MAX]; char ioNames[MAX_IO_NAMES][TARG_STRLEN]; u16 ioNameCount,fwParentOf[INSTANCE_COUNT]; static u16 fwSlotStart[INSTANCE_COUNT],fwSlotCount[INSTANCE_COUNT],fwPoolUsed,fwPoolPrefab[FW_POOL_MAX],fwCurChild,fwLastChunkSlot,lwPrefab[FW_MAX_CHILDREN];
 static V3 fwBasePos[INSTANCE_COUNT],fwInfoLocal[INSTANCE_COUNT],fwBaseScale[INSTANCE_COUNT],fwPoolPos[FW_POOL_MAX],fwPoolScale[FW_POOL_MAX],lwPos[FW_MAX_CHILDREN],lwScale[FW_MAX_CHILDREN],fwInfoLocalTmp,fwContainerPos,fwContainerScale,fwInfoScaleDummy,*fwCurP,*fwCurS;
 static Quaternion fwBaseRot[INSTANCE_COUNT],fwPoolRot[FW_POOL_MAX],lwRot[FW_MAX_CHILDREN],fwContainerRot,fwInfoRotDummy,*fwCurR; static bool fwLine,fwCollecting; static i32 fwStage;
@@ -457,67 +428,42 @@ static void FWBeginBlock(i32 cnt){V3 *p,*s; Quaternion *r; if(fwCollecting&&fwLa
 void LoadLevelMod(u8 lev) {
     typedef struct { const char* key; u16 offset; u8 bytes,len,kind,count; u32 mask; } LevelField;
     static const LevelField fields[]={
-        {"health",__builtin_offsetof(Entity,health),sizeof(((Entity*)0)->health),6,0,0,0},{"cyberHealth",__builtin_offsetof(Entity,cyberHealth),sizeof(((Entity*)0)->cyberHealth),11,0,0,0},
-        {"startYAngle",__builtin_offsetof(Entity,camStartYAngle),sizeof(((Entity*)0)->camStartYAngle),11,0,0,0},{"endYAngle",__builtin_offsetof(Entity,camEndYAngle),sizeof(((Entity*)0)->camEndYAngle),9,0,0,0},
-        {"waitTime",__builtin_offsetof(Entity,camWaitTime),sizeof(((Entity*)0)->camWaitTime),8,0,0,0},{"keycode",__builtin_offsetof(Entity,keycode),sizeof(((Entity*)0)->keycode),7,2,0,0},
-        {"radiationAmount",__builtin_offsetof(Entity,radiation),sizeof(((Entity*)0)->radiation),15,0,0,0},{"ammo",__builtin_offsetof(Entity,ammo),sizeof(((Entity*)0)->ammo),4,1,0,0},
-        {"ammo2",__builtin_offsetof(Entity,ammo2),sizeof(((Entity*)0)->ammo2),5,1,0,0},{"useableItemIndex",__builtin_offsetof(Entity,lookUpIndex),sizeof(((Entity*)0)->lookUpIndex),16,1,0,0},
-        {"idleTime",__builtin_offsetof(Entity,idleTime),sizeof(((Entity*)0)->idleTime),8,0,0,0},{"lookUpIndex",__builtin_offsetof(Entity,lookUpIndex),sizeof(((Entity*)0)->lookUpIndex),11,1,0,0},
+        {"health",__builtin_offsetof(Entity,health),sizeof(((Entity*)0)->health),6,0,0,0},{"cyberHealth",__builtin_offsetof(Entity,cyberHealth),sizeof(((Entity*)0)->cyberHealth),11,0,0,0},{"startYAngle",__builtin_offsetof(Entity,camStartYAngle),sizeof(((Entity*)0)->camStartYAngle),11,0,0,0},{"endYAngle",__builtin_offsetof(Entity,camEndYAngle),sizeof(((Entity*)0)->camEndYAngle),9,0,0,0},
+        {"waitTime",__builtin_offsetof(Entity,camWaitTime),sizeof(((Entity*)0)->camWaitTime),8,0,0,0},{"keycode",__builtin_offsetof(Entity,keycode),sizeof(((Entity*)0)->keycode),7,2,0,0},{"radiationAmount",__builtin_offsetof(Entity,radiation),sizeof(((Entity*)0)->radiation),15,0,0,0},{"ammo",__builtin_offsetof(Entity,ammo),sizeof(((Entity*)0)->ammo),4,1,0,0},
+        {"ammo2",__builtin_offsetof(Entity,ammo2),sizeof(((Entity*)0)->ammo2),5,1,0,0},{"useableItemIndex",__builtin_offsetof(Entity,lookUpIndex),sizeof(((Entity*)0)->lookUpIndex),16,1,0,0},{"idleTime",__builtin_offsetof(Entity,idleTime),sizeof(((Entity*)0)->idleTime),8,0,0,0},{"lookUpIndex",__builtin_offsetof(Entity,lookUpIndex),sizeof(((Entity*)0)->lookUpIndex),11,1,0,0},
         {"attack1SoundTime",__builtin_offsetof(Entity,attack1SoundTime),sizeof(((Entity*)0)->attack1SoundTime),16,0,0,0},{"attack2SoundTime",__builtin_offsetof(Entity,attack2SoundTime),sizeof(((Entity*)0)->attack2SoundTime),16,0,0,0},
         {"attack3SoundTime",__builtin_offsetof(Entity,attack3SoundTime),sizeof(((Entity*)0)->attack3SoundTime),16,0,0,0},{"currentDestination.x",__builtin_offsetof(Entity,currentDestination.x),sizeof(((Entity*)0)->currentDestination.x),20,0,0,0},
         {"currentDestination.y",__builtin_offsetof(Entity,currentDestination.y),sizeof(((Entity*)0)->currentDestination.y),20,0,0,0},{"currentDestination.z",__builtin_offsetof(Entity,currentDestination.z),sizeof(((Entity*)0)->currentDestination.z),20,0,0,0},
         {"idealTransformForward.x",__builtin_offsetof(Entity,idealTransformForward.x),sizeof(((Entity*)0)->idealTransformForward.x),23,0,0,0},{"idealTransformForward.y",__builtin_offsetof(Entity,idealTransformForward.y),sizeof(((Entity*)0)->idealTransformForward.y),23,0,0,0},
-        {"idealTransformForward.z",__builtin_offsetof(Entity,idealTransformForward.z),sizeof(((Entity*)0)->idealTransformForward.z),23,0,0,0},{"idealPos.x",__builtin_offsetof(Entity,idealPos.x),sizeof(((Entity*)0)->idealPos.x),10,0,0,0},
-        {"idealPos.y",__builtin_offsetof(Entity,idealPos.y),sizeof(((Entity*)0)->idealPos.y),10,0,0,0},{"idealPos.z",__builtin_offsetof(Entity,idealPos.z),sizeof(((Entity*)0)->idealPos.z),10,0,0,0},
+        {"idealTransformForward.z",__builtin_offsetof(Entity,idealTransformForward.z),sizeof(((Entity*)0)->idealTransformForward.z),23,0,0,0},{"idealPos.x",__builtin_offsetof(Entity,idealPos.x),sizeof(((Entity*)0)->idealPos.x),10,0,0,0},{"idealPos.y",__builtin_offsetof(Entity,idealPos.y),sizeof(((Entity*)0)->idealPos.y),10,0,0,0},{"idealPos.z",__builtin_offsetof(Entity,idealPos.z),sizeof(((Entity*)0)->idealPos.z),10,0,0,0},
         {"targettingPosition.x",__builtin_offsetof(Entity,targettingPosition.x),sizeof(((Entity*)0)->targettingPosition.x),20,0,0,0},{"targettingPosition.y",__builtin_offsetof(Entity,targettingPosition.y),sizeof(((Entity*)0)->targettingPosition.y),20,0,0,0},
-        {"targettingPosition.z",__builtin_offsetof(Entity,targettingPosition.z),sizeof(((Entity*)0)->targettingPosition.z),20,0,0,0},{"maxRandomItems",__builtin_offsetof(Entity,maxRandomItems),sizeof(((Entity*)0)->maxRandomItems),14,1,0,0},
-        {"contents",__builtin_offsetof(Entity,contents[0]),sizeof(((Entity*)0)->contents[0]),8,1,4,0},{"customIndex",__builtin_offsetof(Entity,custIdx[0]),sizeof(((Entity*)0)->custIdx[0]),11,1,4,0},
-        {"custIdx",__builtin_offsetof(Entity,custIdx[0]),sizeof(((Entity*)0)->custIdx[0]),7,1,4,0},{"randomItem",__builtin_offsetof(Entity,randomItem[0]),sizeof(((Entity*)0)->randomItem[0]),10,1,7,0},
-        {"randomItemDropChance",__builtin_offsetof(Entity,randomItemDropChance[0]),sizeof(((Entity*)0)->randomItemDropChance[0]),20,0,7,0},{"customIndex",__builtin_offsetof(Entity,customIndex),sizeof(((Entity*)0)->customIndex),11,1,0,0},
-        {"amount",__builtin_offsetof(Entity,amount),sizeof(((Entity*)0)->amount),6,0,0,0},{"resetTime",__builtin_offsetof(Entity,resetTime),sizeof(((Entity*)0)->resetTime),9,0,0,0},
-        {"minSecurityLevel",__builtin_offsetof(Entity,minSecurityLevel),sizeof(((Entity*)0)->minSecurityLevel),16,0,0,0},{"rechargeMsgLingdex",__builtin_offsetof(Entity,rechargeMsgLingdex),sizeof(((Entity*)0)->rechargeMsgLingdex),18,1,0,0},
-        {"usedMsgLingdex",__builtin_offsetof(Entity,usedMsgLingdex),sizeof(((Entity*)0)->usedMsgLingdex),14,1,0,0},{"damageOnUse",__builtin_offsetof(Entity,damage),sizeof(((Entity*)0)->damage),11,0,0,0},
-        {"randomItemCustomIndex",__builtin_offsetof(Entity,randomItemCustIdx[0]),sizeof(((Entity*)0)->randomItemCustIdx[0]),21,1,7,0},{"musicType",__builtin_offsetof(Entity,musicType),sizeof(((Entity*)0)->musicType),9,3,0,0},
-        {"securityThreshhold",__builtin_offsetof(Entity,securityThreshold),sizeof(((Entity*)0)->securityThreshold),18,3,0,0},{"securityThreshold",__builtin_offsetof(Entity,securityThreshold),sizeof(((Entity*)0)->securityThreshold),17,3,0,0},
-        {"messageIndex",__builtin_offsetof(Entity,messageIndex),sizeof(((Entity*)0)->messageIndex),12,1,0,0},{"delay",__builtin_offsetof(Entity,delay),sizeof(((Entity*)0)->delay),5,0,0,0},
-        {"counter",__builtin_offsetof(Entity,counter),sizeof(((Entity*)0)->counter),7,2,0,0},{"countToTrigger",__builtin_offsetof(Entity,countToTrigger),sizeof(((Entity*)0)->countToTrigger),14,2,0,0},
-        {"timeInterval",__builtin_offsetof(Entity,timeInterval),sizeof(((Entity*)0)->timeInterval),12,0,0,0},{"randomMin",__builtin_offsetof(Entity,randomMin),sizeof(((Entity*)0)->randomMin),9,0,0,0},
-        {"randomMax",__builtin_offsetof(Entity,randomMax),sizeof(((Entity*)0)->randomMax),9,0,0,0},{"ajarPercentage",__builtin_offsetof(Entity,ajarPercentage),sizeof(((Entity*)0)->ajarPercentage),14,0,0,0},
-        {"timeBeforeLasersOn",__builtin_offsetof(Entity,timeBeforeLasersOn),sizeof(((Entity*)0)->timeBeforeLasersOn),18,0,0,0},{"numberActive",__builtin_offsetof(Entity,numberActive),sizeof(((Entity*)0)->numberActive),12,2,0,0},
+        {"targettingPosition.z",__builtin_offsetof(Entity,targettingPosition.z),sizeof(((Entity*)0)->targettingPosition.z),20,0,0,0},{"maxRandomItems",__builtin_offsetof(Entity,maxRandomItems),sizeof(((Entity*)0)->maxRandomItems),14,1,0,0},{"contents",__builtin_offsetof(Entity,contents[0]),sizeof(((Entity*)0)->contents[0]),8,1,4,0},{"customIndex",__builtin_offsetof(Entity,custIdx[0]),sizeof(((Entity*)0)->custIdx[0]),11,1,4,0},
+        {"custIdx",__builtin_offsetof(Entity,custIdx[0]),sizeof(((Entity*)0)->custIdx[0]),7,1,4,0},{"randomItem",__builtin_offsetof(Entity,randomItem[0]),sizeof(((Entity*)0)->randomItem[0]),10,1,7,0},{"randomItemDropChance",__builtin_offsetof(Entity,randomItemDropChance[0]),sizeof(((Entity*)0)->randomItemDropChance[0]),20,0,7,0},{"customIndex",__builtin_offsetof(Entity,customIndex),sizeof(((Entity*)0)->customIndex),11,1,0,0},
+        {"amount",__builtin_offsetof(Entity,amount),sizeof(((Entity*)0)->amount),6,0,0,0},{"resetTime",__builtin_offsetof(Entity,resetTime),sizeof(((Entity*)0)->resetTime),9,0,0,0},{"minSecurityLevel",__builtin_offsetof(Entity,minSecurityLevel),sizeof(((Entity*)0)->minSecurityLevel),16,0,0,0},{"rechargeMsgLingdex",__builtin_offsetof(Entity,rechargeMsgLingdex),sizeof(((Entity*)0)->rechargeMsgLingdex),18,1,0,0},
+        {"usedMsgLingdex",__builtin_offsetof(Entity,usedMsgLingdex),sizeof(((Entity*)0)->usedMsgLingdex),14,1,0,0},{"damageOnUse",__builtin_offsetof(Entity,damage),sizeof(((Entity*)0)->damage),11,0,0,0},{"randomItemCustomIndex",__builtin_offsetof(Entity,randomItemCustIdx[0]),sizeof(((Entity*)0)->randomItemCustIdx[0]),21,1,7,0},{"musicType",__builtin_offsetof(Entity,musicType),sizeof(((Entity*)0)->musicType),9,3,0,0},
+        {"securityThreshhold",__builtin_offsetof(Entity,securityThreshold),sizeof(((Entity*)0)->securityThreshold),18,3,0,0},{"securityThreshold",__builtin_offsetof(Entity,securityThreshold),sizeof(((Entity*)0)->securityThreshold),17,3,0,0},{"messageIndex",__builtin_offsetof(Entity,messageIndex),sizeof(((Entity*)0)->messageIndex),12,1,0,0},{"delay",__builtin_offsetof(Entity,delay),sizeof(((Entity*)0)->delay),5,0,0,0},
+        {"counter",__builtin_offsetof(Entity,counter),sizeof(((Entity*)0)->counter),7,2,0,0},{"countToTrigger",__builtin_offsetof(Entity,countToTrigger),sizeof(((Entity*)0)->countToTrigger),14,2,0,0},{"timeInterval",__builtin_offsetof(Entity,timeInterval),sizeof(((Entity*)0)->timeInterval),12,0,0,0},{"randomMin",__builtin_offsetof(Entity,randomMin),sizeof(((Entity*)0)->randomMin),9,0,0,0},
+        {"randomMax",__builtin_offsetof(Entity,randomMax),sizeof(((Entity*)0)->randomMax),9,0,0,0},{"ajarPercentage",__builtin_offsetof(Entity,ajarPercentage),sizeof(((Entity*)0)->ajarPercentage),14,0,0,0},{"timeBeforeLasersOn",__builtin_offsetof(Entity,timeBeforeLasersOn),sizeof(((Entity*)0)->timeBeforeLasersOn),18,0,0,0},{"numberActive",__builtin_offsetof(Entity,numberActive),sizeof(((Entity*)0)->numberActive),12,2,0,0},
         {"numberToSpawn",__builtin_offsetof(Entity,numberToSpawn),sizeof(((Entity*)0)->numberToSpawn),13,2,0,0},{"minDelayBetweenSpawns",__builtin_offsetof(Entity,minDelayBetweenSpawns),sizeof(((Entity*)0)->minDelayBetweenSpawns),21,0,0,0},
         {"maxDelayBetweenSpawns",__builtin_offsetof(Entity,maxDelayBetweenSpawns),sizeof(((Entity*)0)->maxDelayBetweenSpawns),21,0,0,0},{"allSpawnedResetDelay",__builtin_offsetof(Entity,allSpawnedResetDelay),sizeof(((Entity*)0)->allSpawnedResetDelay),20,0,0,0},
-        {"lingdex",__builtin_offsetof(Entity,messageLingdex),sizeof(((Entity*)0)->messageLingdex),7,1,0,0},{"messageLingdex",__builtin_offsetof(Entity,messageLingdex),sizeof(((Entity*)0)->messageLingdex),14,1,0,0},
-        {"lockedMessageLingdex",__builtin_offsetof(Entity,lockedMessageLingdex),sizeof(((Entity*)0)->lockedMessageLingdex),20,1,0,0},{"texIndex",__builtin_offsetof(Entity,texIndex),sizeof(((Entity*)0)->texIndex),8,2,0,0},
-        {"SFXIndex",__builtin_offsetof(Entity,SFXIndex),sizeof(((Entity*)0)->SFXIndex),8,1,0,0},{"SFXClip",__builtin_offsetof(Entity,SFXIndex),sizeof(((Entity*)0)->SFXIndex),7,1,0,0},
-        {"SFXLockedIndex",__builtin_offsetof(Entity,SFXLockedIndex),sizeof(((Entity*)0)->SFXLockedIndex),14,1,0,0},{"trackType",__builtin_offsetof(Entity,trackType),sizeof(((Entity*)0)->trackType),9,1,0,0},
-        {"textIndex",__builtin_offsetof(Entity,textIndex),sizeof(((Entity*)0)->textIndex),9,1,0,0},{"logIndex",__builtin_offsetof(Entity,logIndex),sizeof(((Entity*)0)->logIndex),8,1,0,0},
-        {"requiredAccessCard",__builtin_offsetof(Entity,requiredAccessCard),sizeof(((Entity*)0)->requiredAccessCard),18,4,0,0},{"activatedScaleX",__builtin_offsetof(Entity,activatedScale.x),sizeof(((Entity*)0)->activatedScale.x),15,0,0,0},
-        {"activatedScaleY",__builtin_offsetof(Entity,activatedScale.y),sizeof(((Entity*)0)->activatedScale.y),15,0,0,0},{"activatedScaleZ",__builtin_offsetof(Entity,activatedScale.z),sizeof(((Entity*)0)->activatedScale.z),15,0,0,0},
-        {"maxDistance",__builtin_offsetof(Entity,reverbMaxDist),sizeof(((Entity*)0)->reverbMaxDist),11,0,0,0},{"reverbPreset",__builtin_offsetof(Entity,reverbPreset),sizeof(((Entity*)0)->reverbPreset),12,2,0,0},
-        {"direction.x",__builtin_offsetof(Entity,dir.x),sizeof(((Entity*)0)->dir.x),11,0,0,0},{"direction.y",__builtin_offsetof(Entity,dir.y),sizeof(((Entity*)0)->dir.y),11,0,0,0},
-        {"direction.z",__builtin_offsetof(Entity,dir.z),sizeof(((Entity*)0)->dir.z),11,0,0,0},{"force",__builtin_offsetof(Entity,force),sizeof(((Entity*)0)->force),5,0,0,0},
-        {"emailIndex",__builtin_offsetof(Entity,emailIndex),sizeof(((Entity*)0)->emailIndex),10,1,0,0},{"teleportID",__builtin_offsetof(Entity,teleportID),sizeof(((Entity*)0)->teleportID),10,2,0,0},
-        {"targetDestinationID",__builtin_offsetof(Entity,targetDestinationID),sizeof(((Entity*)0)->targetDestinationID),19,2,0,0},{"doorOpenState",__builtin_offsetof(Entity,doorOpen),sizeof(((Entity*)0)->doorOpen),13,3,0,0},
-        {"FuncWall.currentState",__builtin_offsetof(Entity,funcState),sizeof(((Entity*)0)->funcState),21,3,0,0},{"startPosition.x",__builtin_offsetof(Entity,startPosition.x),sizeof(((Entity*)0)->startPosition.x),15,0,0,0},
-        {"startPosition.y",__builtin_offsetof(Entity,startPosition.y),sizeof(((Entity*)0)->startPosition.y),15,0,0,0},{"startPosition.z",__builtin_offsetof(Entity,startPosition.z),sizeof(((Entity*)0)->startPosition.z),15,0,0,0},
-        {"speed",__builtin_offsetof(Entity,speed),sizeof(((Entity*)0)->speed),5,0,0,0},{"percentAjar",__builtin_offsetof(Entity,ajarPercentage),sizeof(((Entity*)0)->ajarPercentage),11,0,0,0},
-        {"percentMoved",__builtin_offsetof(Entity,percentMoved),sizeof(((Entity*)0)->percentMoved),12,0,0,0},{"wandering",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),9,7,0,EF_WANDERING},
-        {"asleep",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),6,7,0,EF_ASLEEP},{"actAsTurret",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),11,7,0,EF_ACT_AS_TURRET},
-        {"actAsCorpseOnly",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),15,7,0,EF_ACT_AS_CORPSE_ONLY},{"teleportOnDeath",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),15,7,0,EF_TELEPORT_ON_DEATH},
-        {"firstSighting",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),13,7,0,EF_FIRST_SIGHTING},{"shotFired",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),9,7,0,EF_SHOT_FIRED},
-        {"goIntoPain",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),10,7,0,EF_GO_INTO_PAIN},{"dyingSetup",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),10,7,0,EF_DYING_SETUP},
-        {"ai_dying",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),8,7,0,EF_DYING},{"ai_dead",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),7,7,0,EF_DEAD},
-        {"hopDone",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),7,7,0,EF_HOP_DONE},{"deathBurstDone",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),14,7,0,EF_DEATH_BURST_DONE},
-        {"hadEnemy",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),8,7,0,EF_HAD_ENEMY},{"walkPathOnStart",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),15,7,0,EF_WALK_PATH_ON_START},
-        {"inSight",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),7,7,0,EF_ENEM_IN_SIGHT},{"infront",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),7,7,0,EF_ENEM_IN_FRONT},
-        {"inProjFOV",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),9,7,0,EF_ENEM_IN_FOV},{"LOSpossible",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),11,7,0,EF_ENEM_IN_LOS},
-        {"locked",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),6,7,0,EF_LOCKED},{"doorOpen",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),8,7,0,TARG_IOFLAGS_DOOROPEN},
+        {"lingdex",__builtin_offsetof(Entity,messageLingdex),sizeof(((Entity*)0)->messageLingdex),7,1,0,0},{"messageLingdex",__builtin_offsetof(Entity,messageLingdex),sizeof(((Entity*)0)->messageLingdex),14,1,0,0},{"lockedMessageLingdex",__builtin_offsetof(Entity,lockedMessageLingdex),sizeof(((Entity*)0)->lockedMessageLingdex),20,1,0,0},{"texIndex",__builtin_offsetof(Entity,texIndex),sizeof(((Entity*)0)->texIndex),8,2,0,0},
+        {"SFXIndex",__builtin_offsetof(Entity,SFXIndex),sizeof(((Entity*)0)->SFXIndex),8,1,0,0},{"SFXClip",__builtin_offsetof(Entity,SFXIndex),sizeof(((Entity*)0)->SFXIndex),7,1,0,0},{"SFXLockedIndex",__builtin_offsetof(Entity,SFXLockedIndex),sizeof(((Entity*)0)->SFXLockedIndex),14,1,0,0},{"trackType",__builtin_offsetof(Entity,trackType),sizeof(((Entity*)0)->trackType),9,1,0,0},
+        {"textIndex",__builtin_offsetof(Entity,textIndex),sizeof(((Entity*)0)->textIndex),9,1,0,0},{"logIndex",__builtin_offsetof(Entity,logIndex),sizeof(((Entity*)0)->logIndex),8,1,0,0},{"requiredAccessCard",__builtin_offsetof(Entity,requiredAccessCard),sizeof(((Entity*)0)->requiredAccessCard),18,4,0,0},{"activatedScaleX",__builtin_offsetof(Entity,activatedScale.x),sizeof(((Entity*)0)->activatedScale.x),15,0,0,0},
+        {"activatedScaleY",__builtin_offsetof(Entity,activatedScale.y),sizeof(((Entity*)0)->activatedScale.y),15,0,0,0},{"activatedScaleZ",__builtin_offsetof(Entity,activatedScale.z),sizeof(((Entity*)0)->activatedScale.z),15,0,0,0},{"maxDistance",__builtin_offsetof(Entity,reverbMaxDist),sizeof(((Entity*)0)->reverbMaxDist),11,0,0,0},{"reverbPreset",__builtin_offsetof(Entity,reverbPreset),sizeof(((Entity*)0)->reverbPreset),12,2,0,0},
+        {"direction.x",__builtin_offsetof(Entity,dir.x),sizeof(((Entity*)0)->dir.x),11,0,0,0},{"direction.y",__builtin_offsetof(Entity,dir.y),sizeof(((Entity*)0)->dir.y),11,0,0,0},{"direction.z",__builtin_offsetof(Entity,dir.z),sizeof(((Entity*)0)->dir.z),11,0,0,0},{"force",__builtin_offsetof(Entity,force),sizeof(((Entity*)0)->force),5,0,0,0},
+        {"emailIndex",__builtin_offsetof(Entity,emailIndex),sizeof(((Entity*)0)->emailIndex),10,1,0,0},{"teleportID",__builtin_offsetof(Entity,teleportID),sizeof(((Entity*)0)->teleportID),10,2,0,0},{"targetDestinationID",__builtin_offsetof(Entity,targetDestinationID),sizeof(((Entity*)0)->targetDestinationID),19,2,0,0},{"doorOpenState",__builtin_offsetof(Entity,doorOpen),sizeof(((Entity*)0)->doorOpen),13,3,0,0},
+        {"FuncWall.currentState",__builtin_offsetof(Entity,funcState),sizeof(((Entity*)0)->funcState),21,3,0,0},{"startPosition.x",__builtin_offsetof(Entity,startPosition.x),sizeof(((Entity*)0)->startPosition.x),15,0,0,0},{"startPosition.y",__builtin_offsetof(Entity,startPosition.y),sizeof(((Entity*)0)->startPosition.y),15,0,0,0},{"startPosition.z",__builtin_offsetof(Entity,startPosition.z),sizeof(((Entity*)0)->startPosition.z),15,0,0,0},
+        {"speed",__builtin_offsetof(Entity,speed),sizeof(((Entity*)0)->speed),5,0,0,0},{"percentAjar",__builtin_offsetof(Entity,ajarPercentage),sizeof(((Entity*)0)->ajarPercentage),11,0,0,0},{"percentMoved",__builtin_offsetof(Entity,percentMoved),sizeof(((Entity*)0)->percentMoved),12,0,0,0},{"wandering",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),9,7,0,EF_WANDERING},
+        {"asleep",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),6,7,0,EF_ASLEEP},{"actAsTurret",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),11,7,0,EF_ACT_AS_TURRET},{"actAsCorpseOnly",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),15,7,0,EF_ACT_AS_CORPSE_ONLY},{"teleportOnDeath",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),15,7,0,EF_TELEPORT_ON_DEATH},
+        {"firstSighting",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),13,7,0,EF_FIRST_SIGHTING},{"shotFired",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),9,7,0,EF_SHOT_FIRED},{"goIntoPain",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),10,7,0,EF_GO_INTO_PAIN},{"dyingSetup",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),10,7,0,EF_DYING_SETUP},
+        {"ai_dying",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),8,7,0,EF_DYING},{"ai_dead",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),7,7,0,EF_DEAD},{"hopDone",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),7,7,0,EF_HOP_DONE},{"deathBurstDone",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),14,7,0,EF_DEATH_BURST_DONE},
+        {"hadEnemy",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),8,7,0,EF_HAD_ENEMY},{"walkPathOnStart",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),15,7,0,EF_WALK_PATH_ON_START},{"inSight",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),7,7,0,EF_ENEM_IN_SIGHT},{"infront",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),7,7,0,EF_ENEM_IN_FRONT},
+        {"inProjFOV",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),9,7,0,EF_ENEM_IN_FOV},{"LOSpossible",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),11,7,0,EF_ENEM_IN_LOS},{"locked",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),6,7,0,EF_LOCKED},{"doorOpen",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),8,7,0,TARG_IOFLAGS_DOOROPEN},
         {"doorClose",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),9,7,0,TARG_IOFLAGS_DOORCLOSE},{"switchTrigger",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),13,7,0,TARG_IOFLAGS_SWITCHTRIGGER},
         {"tripTrigger",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),11,7,0,TARG_IOFLAGS_TRIPTRIGGER},{"forceBridgeActivate",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),19,7,0,TARG_IOFLAGS_FBRIDGE_ACTIVATE},
         {"forceBridgeDeactivate",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),21,7,0,TARG_IOFLAGS_FBRIDGE_DEACTIVATE},{"forceBridgeToggle",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),17,7,0,TARG_IOFLAGS_FBRIDGE_TOGGLE},
         {"gravityLiftToggle",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),17,7,0,TARG_IOFLAGS_GRAVLIFT_TOGGLE},{"textureChangeToggle",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),19,7,0,TARG_IOFLAGS_TEXTURE_CHG_TOGGLE},
-        {"lightOn",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),7,7,0,TARG_IOFLAGS_LIGHT_ON},{"lightOff",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),8,7,0,TARG_IOFLAGS_LIGHT_OFF},
-        {"lightToggle",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),11,7,0,TARG_IOFLAGS_LIGHT_TOGGLE},{"funcwallMove",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),12,7,0,TARG_IOFLAGS_FUNCWALL_MOVE},
+        {"lightOn",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),7,7,0,TARG_IOFLAGS_LIGHT_ON},{"lightOff",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),8,7,0,TARG_IOFLAGS_LIGHT_OFF},{"lightToggle",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),11,7,0,TARG_IOFLAGS_LIGHT_TOGGLE},{"funcwallMove",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),12,7,0,TARG_IOFLAGS_FUNCWALL_MOVE},
         {"missionBitOn",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),12,7,0,TARG_IOFLAGS_MISSION_BIT_ON},{"missionBitOff",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),13,7,0,TARG_IOFLAGS_MISSION_BIT_OFF},
         {"missionBitToggle",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),16,7,0,TARG_IOFLAGS_MISSION_BIT_TOGGLE},{"switchLockToggle",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),16,7,0,TARG_IOFLAGS_SWITCH_LOCK_TOGGLE},
         {"GOSetActive",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),11,7,0,TARG_IOFLAGS_INST_ACTIVATE},{"enemyAlert",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),10,7,0,TARG_IOFLAGS_ENEMY_ALERT},
@@ -536,51 +482,26 @@ void LoadLevelMod(u8 lev) {
         {"BetaGroveJettisoned",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),19,8,0,QB_BetaGroveJettisoned},{"AntennaNorthDestroyed",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),21,8,0,QB_AntennaNorthDestroyed},
         {"AntennaSouthDestroyed",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),21,8,0,QB_AntennaSouthDestroyed},{"AntennaEastDestroyed",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),20,8,0,QB_AntennaEastDestroyed},
         {"AntennaWestDestroyed",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),20,8,0,QB_AntennaWestDestroyed},{"SelfDestructActivated",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),21,8,0,QB_SelfDestructActivated},
-        {"BridgeSeparated",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),15,8,0,QB_BridgeSeparated},{"IsolinearChipsetInstalled",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),25,8,0,QB_IsolinearChipsetInstalled},
-    };
-    /*Dispatch buckets: a one-time stable counting sort of fields[] by exact token length (plain keys by len, "name[d]" array keys by len+3). A token then only compares against same-length candidates, which lets two checks per entry be dropped as invariants: for plain entries keyLen==len is guaranteed by the bucket, and for array entries keyLen==len+3 likewise. Order inside a bucket preserves the original first-match-wins table scan (the two "customIndex" spellings differ in length, so they can never compete for one token). Length groups are tiny (1-6 entries) instead of the whole ~148-entry table every token used to walk, and level data is dominated by lP/lR/constIndex keys that match nothing here.*/
-    #define FIELD_TOKLEN(f) ((f)->count ? (u8)((f)->len+3u) : (f)->len)
-    #define FIELD_BUCKET_MAX 39
-    static u8 fieldBucketStart[FIELD_BUCKET_MAX+2]; static u8 fieldOrder[sizeof(fields)/sizeof(fields[0])]; static bool fieldBucketsBuilt;
+        {"BridgeSeparated",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),15,8,0,QB_BridgeSeparated},{"IsolinearChipsetInstalled",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),25,8,0,QB_IsolinearChipsetInstalled}};
+    static u8 fieldBucketStart[41]; static u8 fieldOrder[sizeof(fields)/sizeof(fields[0])]; static bool fieldBucketsBuilt;
     if (!fieldBucketsBuilt) {
-        u8 fill[FIELD_BUCKET_MAX+2] = {0};
-        for (u32 f=0;f<sizeof(fields)/sizeof(fields[0]);++f) { u8 tl=FIELD_TOKLEN(&fields[f]); fill[tl]++; }
-        u8 run=0;
-        for (u32 L=0;L<=FIELD_BUCKET_MAX+1;++L) { fieldBucketStart[L]=run; run=(u8)(run+fill[L]); }
-        u8 cursor[FIELD_BUCKET_MAX+2];
-        for (u32 L=0;L<=FIELD_BUCKET_MAX+1;++L) cursor[L]=fieldBucketStart[L];
-        for (u32 f=0;f<sizeof(fields)/sizeof(fields[0]);++f) fieldOrder[cursor[FIELD_TOKLEN(&fields[f])]++]=(u8)f;
-        fieldBucketsBuilt = true;
+        u8 fill[41] = {0}; for (u32 f=0;f<sizeof(fields) / sizeof(fields[0]);++f) { u8 tl = ((&fields[f])->count ? (u8)((&fields[f])->len+3u) : (&fields[f])->len); fill[tl]++; } u8 run=0; for (u32 L=0;L<=40;++L) { fieldBucketStart[L]=run; run=(u8)(run+fill[L]); } u8 cursor[41]; for (u32 L=0;L<=40;++L) cursor[L]=fieldBucketStart[L];
+        for (u32 f=0;f<sizeof(fields)/sizeof(fields[0]);++f) fieldOrder[cursor[((&fields[f])->count ? (u8)((&fields[f])->len+3u) : (&fields[f])->len)]++]=(u8)f; fieldBucketsBuilt = true;
     }
     u8 curlevel = vclamp(lev, 0, 13); World.levelCurrentlyLoading = true;/*precondition only, for AddInstance's level-security tally above -- NOT redundant bookkeeping. The tally must not see runtime spawns, and this flag is its only way to tell load-time from run-time. Nothing outside the loader reads it; the main loop gates level changes on the queuedLevelToLoad sentinel instead.*/
-    static const struct { u8 level; V3 pos; Quaternion rot; u8 fov; float near,far; } cameras[]={
-        {0,{-14.16170f,-54.72389f,20.71170f},{0.03959f,0.41918f,-0.01830f,0.90686f},85,0.84f,16.223f},
-        {0,{36.38030f,-57.61589f,-0.30230f},{0.12279f,0.69636f,-0.12279f,0.69636f},50,2.0f,17.05f},
-        {0,{-0.64170f,-54.17389f,-5.37830f},{0.17111f,0.16779f,-0.02959f,0.97041f},65,0.513f,26.13f},
-        {1,{-19.2301f,-42.6604f,-49.7453f},{0.2375f,0.0008f,-0.0002f,0.9713f},75,2.21f,11.5f},
-        {1,{7.664583f,-44.88017f,-14.26742f},{0.0f,0.9999f,0.0129f,0.0f},60,2.192f,20.6f},
-        {2,{36.73389f,-24.66895f,9.47060f},{0.11769f,-0.23125f,0.02819f,0.96534f},75,0.695f,13.73f},
-        {3,{-12.01620f,-28.52930f,33.53500f},{0.54295f,0.45300f,0.54295f,-0.45300f},68,0.868f,14.145f},
-        {4,{-26.93000f,46.56557f,-31.18625f},{0.00000f,0.00000f,0.00000f,1.00000f},68,0.82f,17.56f},
-        {5,{-30.72000f,8.96000f,-53.76000f},{0.00000f,0.70711f,0.70711f,0.00000f},68,2.7f,24.8f},
-        {6,{9.08000f,48.71000f,-47.32400f},{0.00000f,0.99054f,0.00000f,-0.13719f},90,1.2f,11.52f},
-        {6,{-3.90720f,13.90800f,2.47230f},{-0.50000f,0.50000f,0.50000f,0.50000f},90,0.06f,11.87f},
-        {7,{106.87113f,-14.55570f,24.65725f},{0.00000f,0.00000f,0.00000f,1.00000f},68,1.295f,26.01f},
-        {7,{-57.06100f,34.70000f,1.19200f},{0.00000f,-0.65094f,0.00000f,0.75913f},68,1.83f,19.9f},
-        {7,{29.51000f,3.29000f,-9.93000f},{0,0,0,1.f},80,0.77f,9.79f},
-        {8,{69.76093f,30.97230f,-0.84785f},{0.48739f,0.51230f,0.51230f,-0.48739f},85,0.33f,10.05f},
-        {8,{9.95000f,60.11100f,8.59600f},{0.14019f,0.00000f,0.00000f,0.99013f},68,1.0f,10.44f},
-        {8,{-5.55300f,77.60500f,25.11700f},{0.09230f,0.70106f,-0.09230f,0.70106f},68,1.2f,9.4f},
-        {8,{9.99800f,98.27100f,-14.68900f},{0.00000f,0.99255f,-0.12187f,0.00000f},68,0.7f,12.7f},
-        {8,{36.88600f,69.74000f,-3.47000f},{-0.06937f,0.60309f,-0.05276f,-0.79289f},68,1.34f,34.97f},
-        {8,{-24.66100f,82.29600f,2.08200f},{-0.00000f,0.70711f,0.00000f,-0.70711f},85,0.99f,12.53f},
-        {8,{53.26900f,77.89000f,-8.30000f},{-0.12279f,0.69636f,-0.12279f,-0.69636f},71,0.56f,16.38f},
-        {9,{53.36000f,108.73700f,8.72300f},{-0.11027f,0.77231f,-0.13966f,-0.60982f},71,0.5f,16.582f},
-        {10,{6.27000f,137.70000f,20.88000f},{0.05778f,-0.25920f,0.01554f,0.96397f},68,1.3f,9.4f},
-        {10,{24.67000f,136.79999f,-26.02000f},{-0.00879f,-0.90735f,0.01901f,-0.41985f},68,4.0f,13.6f},
-        {12,{35.80700f,196.89301f,-4.98400f},{0.12369f,0.00000f,0.00000f,0.99232f},68,0.7f,4.32f},
-        {12,{-9.23000f,199.00000f,2.98000f},{0.08830f,-0.69488f,0.08661f,0.70841f},68,1.5f,8.04f},
-    };
+    static const struct { u8 level; V3 pos; Quaternion rot; u8 fov; float near,far; } cameras[]={{0,{-14.16170f,-54.72389f,20.71170f},{0.03959f,0.41918f,-0.01830f,0.90686f},85,0.84f,16.223f},{0,{36.38030f,-57.61589f,-0.30230f},{0.12279f,0.69636f,-0.12279f,0.69636f},50,2.0f,17.05f},{0,{-0.64170f,-54.17389f,-5.37830f},{0.17111f,0.16779f,-0.02959f,0.97041f},65,0.513f,26.13f},
+                                                                                                 {1,{-19.2301f,-42.6604f,-49.7453f},{0.2375f,0.0008f,-0.0002f,0.9713f},75,2.21f,11.5f},{1,{7.664583f,-44.88017f,-14.26742f},{0.0f,0.9999f,0.0129f,0.0f},60,2.192f,20.6f},
+                                                                                                 {2,{36.73389f,-24.66895f,9.47060f},{0.11769f,-0.23125f,0.02819f,0.96534f},75,0.695f,13.73f},
+                                                                                                 {3,{-12.01620f,-28.52930f,33.53500f},{0.54295f,0.45300f,0.54295f,-0.45300f},68,0.868f,14.145f},
+                                                                                                 {4,{-26.93000f,46.56557f,-31.18625f},{0.00000f,0.00000f,0.00000f,1.00000f},68,0.82f,17.56f},
+                                                                                                 {5,{-30.72000f,8.96000f,-53.76000f},{0.00000f,0.70711f,0.70711f,0.00000f},68,2.7f,24.8f},
+                                                                                                 {6,{9.08000f,48.71000f,-47.32400f},{0.00000f,0.99054f,0.00000f,-0.13719f},90,1.2f,11.52f},{6,{-3.90720f,13.90800f,2.47230f},{-0.50000f,0.50000f,0.50000f,0.50000f},90,0.06f,11.87f},
+                                                                                                 {7,{106.87113f,-14.55570f,24.65725f},{0.00000f,0.00000f,0.00000f,1.00000f},68,1.295f,26.01f},{7,{-57.06100f,34.70000f,1.19200f},{0.00000f,-0.65094f,0.00000f,0.75913f},68,1.83f,19.9f},{7,{29.51000f,3.29000f,-9.93000f},{0,0,0,1.f},80,0.77f,9.79f},
+                                                                                                 {8,{69.76093f,30.97230f,-0.84785f},{0.48739f,0.51230f,0.51230f,-0.48739f},85,0.33f,10.05f},{8,{9.95000f,60.11100f,8.59600f},{0.14019f,0.00000f,0.00000f,0.99013f},68,1.0f,10.44f},{8,{-5.55300f,77.60500f,25.11700f},{0.09230f,0.70106f,-0.09230f,0.70106f},68,1.2f,9.4f},{8,{9.99800f,98.27100f,-14.68900f},{0.00000f,0.99255f,-0.12187f,0.00000f},68,0.7f,12.7f},
+                                                                                                 {8,{36.88600f,69.74000f,-3.47000f},{-0.06937f,0.60309f,-0.05276f,-0.79289f},68,1.34f,34.97f},{8,{-24.66100f,82.29600f,2.08200f},{-0.00000f,0.70711f,0.00000f,-0.70711f},85,0.99f,12.53f},{8,{53.26900f,77.89000f,-8.30000f},{-0.12279f,0.69636f,-0.12279f,-0.69636f},71,0.56f,16.38f},
+                                                                                                 {9,{53.36000f,108.73700f,8.72300f},{-0.11027f,0.77231f,-0.13966f,-0.60982f},71,0.5f,16.582f},
+                                                                                                 {10,{6.27000f,137.70000f,20.88000f},{0.05778f,-0.25920f,0.01554f,0.96397f},68,1.3f,9.4f},{10,{24.67000f,136.79999f,-26.02000f},{-0.00879f,-0.90735f,0.01901f,-0.41985f},68,4.0f,13.6f},
+                                                                                                 {12,{35.80700f,196.89301f,-4.98400f},{0.12369f,0.00000f,0.00000f,0.99232f},68,0.7f,4.32f},{12,{-9.23000f,199.00000f,2.98000f},{0.08830f,-0.69488f,0.08661f,0.70841f},68,1.5f,8.04f}};
     for (u32 i=0;i<sizeof(cameras)/sizeof(cameras[0]);++i) if (cameras[i].level==curlevel) AddCamView(cameras[i].pos,cameras[i].rot,cameras[i].fov,256,256,cameras[i].near,cameras[i].far);
     sensaroundCamViewCenter=(u8)camViewCount; AddCamView((V3){0.0f,0.0f,0.0f},QUAT_IDENTITY,100u,640u,240u,0.2f,1000.0f);/*Sensaround center rear view (always positioned/oriented per-frame in UpdateSensaroundCamViews)*/
     sensaroundCamViewLeft=(u8)camViewCount;   AddCamView((V3){0.0f,0.0f,0.0f},QUAT_IDENTITY,65u,320u,240u,0.2f,1000.0f);/*Sensaround left side view*/
@@ -601,18 +522,10 @@ void LoadLevelMod(u8 lev) {
             if (isLight) { LoadFieldIntoLight(key,value,lineSpace,lineNum,lit,lanim,lightsIdx);}
             else {
                 bool fieldRead=false;
-                if (keyLen <= FIELD_BUCKET_MAX) {/*longer keys cannot match any table entry (max is 25 chars)*/
+                if (keyLen <= 39) {
                     u8 bend=fieldBucketStart[keyLen+1];
                     for (u8 b=fieldBucketStart[keyLen]; b<bend; ++b) {
-                        const LevelField* fd=&fields[fieldOrder[b]];
-                        u8 len=fd->len,element=0;
-                        if (fd->count) {/*keyLen==len+3 is guaranteed by the bucket; only the name prefix, brackets and digit remain to check*/
-                            if (sCompUpToLen(key,fd->key,len) || key[len]!='[' || key[len+2]!=']' || (u8)(key[len+1]-'0')>=fd->count) continue;
-                            element=key[len+1]-'0';
-                        } else {/*keyLen==len is guaranteed by the bucket; the first char screens most mismatches without a call*/
-                            if (key[0]!=fd->key[0] || sCompUpToLen(key,fd->key,len)) continue;
-                        }
-                        void* dst=(u8*)inst+fd->offset+element*fd->bytes; u32 v=0; float fv;
+                        const LevelField* fd=&fields[fieldOrder[b]]; u8 len=fd->len,element=0; if (fd->count) { if (sCompUpToLen(key,fd->key,len) || key[len]!='[' || key[len+2]!=']' || (u8)(key[len+1]-'0')>=fd->count) continue; element=key[len+1]-'0'; } else { if (key[0]!=fd->key[0] || sCompUpToLen(key,fd->key,len)) continue; } void* dst=(u8*)inst+fd->offset+element*fd->bytes; u32 v=0; float fv;
                         switch (fd->kind) {
                             case 0: fv=parse_float(value,lineSpace,lineNum); mcpy(dst,&fv,sizeof(fv)); break;
                             case 1: v=(u32)parse_numberi16(value,lineSpace,lineNum); break; case 2: v=parse_numberu16(value,lineSpace,lineNum); break;
@@ -626,8 +539,8 @@ void LoadLevelMod(u8 lev) {
                     }
                 }
                 if (fieldRead) continue;
-                     if(KEY_EQ("constIndex")){if(!constIndexRead){/*SaveObject.Save writes the master PrefabIdentifier.constIndex as field 0, then appends per-component saves; GrenadeActivate.Save emits its own "constIndex" (the grenade type: 7 frag, 8 conc, 9 emp, 10 earth, 11 mine, 12 nitro, 13 gas, 14 plastique) onto the same record.  Both keys share a name, so keep the first.  Otherwise the 10 level-placed live landmines (402 then 11) loaded as chunk_bridg1_5 and never detonated.*/ constIndexRead=true; inst->index=parse_numberu16(value,lineSpace,lineNum); fwLine=(inst->index == 517); ipLine=(inst->index == 614 || inst->index == 615 || inst->index == 602); npcLine=IdxIsNPC(inst->index);}}
-                else if(keyLen==4 && key[0]=='l' && (key[1]=='P' || key[1]=='R' || key[1]=='S') && key[2]=='.' && key[3]>='w' && key[3]<='z') {/*the nine transform keys lP.x lP.y lP.z lR.x lR.y lR.z lR.w lS.x lS.y lS.z: ~560K tokens per full load hit this branch, so decode group+axis once into gk instead of re-running KEY_EQ string compares per candidate*/
+                     if(KEY_EQ("constIndex")){if(!constIndexRead){ constIndexRead=true; inst->index=parse_numberu16(value,lineSpace,lineNum); fwLine=(inst->index == 517); ipLine=(inst->index == 614 || inst->index == 615 || inst->index == 602); npcLine=IdxIsNPC(inst->index);}}
+                else if(keyLen==4 && key[0]=='l' && (key[1]=='P' || key[1]=='R' || key[1]=='S') && key[2]=='.' && key[3]>='w' && key[3]<='z') {
                     float v=parse_float(value,lineSpace,lineNum);
                     u32 gk=(((u32)key[1])<<8)|((u32)key[3]);/*'P'/'R'/'S' in the high byte, 'x'/'y'/'z'/'w' in the low byte*/
                     #define TR_KEY(g,a) ((((u32)(g))<<8)|((u32)(a)))
@@ -677,7 +590,6 @@ void LoadLevelMod(u8 lev) {
                 else if(KEY_EQ("startOpen"))       inst->startOpen = parse_bool(value, lineSpace, lineNum);                        else if(KEY_EQ("ajar"))            inst->ajar = parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("open"))            inst->panelOpen      = parse_bool(value,lineSpace,lineNum);/*InteractablePanel cover state (only us_relaypanel/isotopepanel/retinalscanner carry these keys)*/
                 else if(KEY_EQ("installed"))       inst->panelInstalled = parse_bool(value,lineSpace,lineNum);/*InteractablePanel: the required item is already in place*/
-                else if(KEY_EQ("toggleLasers"))    inst->toggleLasers = parse_bool(value, lineSpace, lineNum);/*TODO: parsed and copied but never read. The door's security-laser detector toggle is not wired; lev8doorx1 / lev8doorx2 (level8.txt:4580,4582) are the only two records that ask for it -- both set it on themselves via a self-target. Implement when the laser detector exists: needs a live beacon + a targetted test on the door. Skip for now.*/              else if(KEY_EQ("changeLayerOnOpenClose")) inst->changeLayerOnOpenClose=parse_bool(value,lineSpace,lineNum);
                 else if(KEY_EQ("waitBeforeClose")) inst->waitBefClose=parse_float(value,lineSpace,lineNum) + World.pauseRelativeTime;
                 else if(KEY_EQ("doorOpenIfUnlocked") || KEY_EQ("doorToggle")) flag_set(&inst->ioflags,TARG_IOFLAGS_DOOROPENIFUNLOCKED,parse_bool(value,lineSpace,lineNum));
                 else if(KEY_EQ("doorLock") || KEY_EQ("lockElevatorPad")) flag_set(&inst->ioflags, TARG_IOFLAGS_LOCK, parse_bool(value, lineSpace, lineNum));
@@ -685,15 +597,14 @@ void LoadLevelMod(u8 lev) {
                 else if(KEY_EQ("SpawnManager.active")) inst->active = parse_bool(value, lineSpace, lineNum);
                   else if(KEY_EQ("countOnlySameIndex"))  inst->countOnlySameIndex = parse_bool(value, lineSpace, lineNum);
                  else if(KEY_EQ("alertEnemiesOnAwake"))  inst->alertEnemiesOnAwake = parse_bool(value, lineSpace, lineNum);
-                else if(KEY_EQ("index") && inst->index == 702) inst->spawnIndex = parse_numberu16(value, lineSpace, lineNum);/*SpawnManager.index is the NPC constIndex it respawns; only meaningful on 702, since AIController.index means something else on every other prefab*/
+                else if(KEY_EQ("index") && inst->index == 702) inst->spawnIndex = parse_numberu16(value, lineSpace, lineNum);
                      else if(KEY_EQ("playEverywhere")) inst->playEverywhere = parse_bool(value, lineSpace, lineNum);
                           else if(KEY_EQ("resourceFolder") && *value) inst->texAnimResourceFolderIdx = TexAnimFolderIntern(value);
-                else if(KEY_EQ("codeScreen"))      inst->codeScreen = (u8)parse_bool(value, lineSpace, lineNum);/*prop_cpuscreen (551): flag only, the level is implicit -- see Entity.codeScreen*/
+                else if(KEY_EQ("codeScreen"))      inst->codeScreen = (u8)parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("text")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd) { u16 k=0; while(value[k] && k<DECAL_INLINE_TEXT_LEN-1) { pd->text[k]=(value[k]=='#')?'\n':value[k]; ++k; } pd->text[k]='\0'; } } }
                 else if(KEY_EQ("tA")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd){ i16 v=parse_numberi16(value,lineSpace,lineNum); pd->anchor=(u8)(v<0?0:(v>8?8:v)); } } }
                 else if(KEY_EQ("tAl")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd){ i16 v=parse_numberi16(value,lineSpace,lineNum); pd->align=(u8)(v<0?0:(v>2?2:v)); } } }
                 else if(KEY_EQ("tLs")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd) pd->lineSp=parse_float(value,lineSpace,lineNum); } }
-                /*trigger_music (599)*/      /*prop_cyber_datafrag (552), prop_cyber_switch (555)*/
                 else if(keyLen==23 && sCompUpToLen(key,"currentPositionsLeft[",21)==0 && key[21]>='0' && key[21]<='6' && key[22]==']') inst->wireCurL[key[21]-'0']=(i8)parse_numberi16(value, lineSpace, lineNum);/*us_puz_panel_*_wire (741..745)*/
                 else if(keyLen==24 && sCompUpToLen(key,"currentPositionsRight[",22)==0 && key[22]>='0' && key[22]<='6' && key[23]==']') inst->wireCurR[key[22]-'0']=(i8)parse_numberi16(value, lineSpace, lineNum);
                 else if(sCompUpToLen(key,"grid[",5)==0 && keyLen>=7 && key[keyLen-1]==']') { int gi=0; bool gok=true; for (int k=5;k<keyLen-1;++k) { if (key[k]<'0'||key[k]>'9') { gok=false; break; } gi=gi*10+(key[k]-'0'); } if (gok && gi<35) Entity_SetGridCell(inst,gi,parse_bool(value,lineSpace,lineNum)); }/*PuzzleGridPuzzle.grid[0..34], key width varies with the index*/
@@ -720,29 +631,28 @@ void LoadLevelMod(u8 lev) {
         if (!isLight && !activeStateRead) flag_set(&entsFromFile[entCount].entflags,EF_ACTIVE,true);
         if (!isLight && entsFromFile[entCount].index >= 595 && entsFromFile[entCount].index <= 601) { if (!(scaleReadMask&1u)) scaleFromFile[entCount].x = 1.0f; if (!(scaleReadMask&2u)) scaleFromFile[entCount].y = 1.0f; if (!(scaleReadMask&4u)) scaleFromFile[entCount].z = 1.0f; }
         if (!isLight && entsFromFile[entCount].index == 517) { // func_wall: stash base transform + chunk children for spawn below
-            fwBasePos[entCount]=fwContainerPos; fwBaseRot[entCount]=fwContainerRot; fwBaseScale[entCount]=fwContainerScale; fwInfoLocal[entCount]=fwInfoLocalTmp; u16 n=fwCurChild < FW_MAX_CHILDREN ? fwCurChild : FW_MAX_CHILDREN, start=fwPoolUsed;
-            for (u16 k=0;k<n;++k) { if (fwPoolUsed >= FW_POOL_MAX) { DualLogError("FuncWall chunk pool exhausted on line %u!\n",lineNum); break; } fwPoolPrefab[fwPoolUsed]=lwPrefab[k]; fwPoolPos[fwPoolUsed]=lwPos[k]; fwPoolRot[fwPoolUsed]=lwRot[k]; fwPoolScale[fwPoolUsed]=lwScale[k]; fwPoolUsed++; }
-            fwSlotStart[entCount]=start; fwSlotCount[entCount]=(u16)(fwPoolUsed-start);
+            fwBasePos[entCount]=fwContainerPos; fwBaseRot[entCount]=fwContainerRot; fwBaseScale[entCount]=fwContainerScale; fwInfoLocal[entCount]=fwInfoLocalTmp; u16 n=fwCurChild < FW_MAX_CHILDREN ? fwCurChild : FW_MAX_CHILDREN, start=fwPoolUsed; 
+            for (u16 k=0;k<n;++k) { if (fwPoolUsed >= FW_POOL_MAX) { DualLogError("FuncWall chunk pool exhausted on line %u!\n",lineNum); break; } fwPoolPrefab[fwPoolUsed]=lwPrefab[k]; fwPoolPos[fwPoolUsed]=lwPos[k]; fwPoolRot[fwPoolUsed]=lwRot[k]; fwPoolScale[fwPoolUsed]=lwScale[k]; fwPoolUsed++; } fwSlotStart[entCount]=start; fwSlotCount[entCount]=(u16)(fwPoolUsed-start);
         }
     }
     i32 totalEnts = entCount + 1;
     for (i32 e=0;e<totalEnts;++e) {
         Entity* src = &entsFromFile[e]; u16 entIdx = src->index; u16 parent = AddInstance(entIdx,posFromFile[e]); Entity* par = &World.instances[parent]; par->lastPosition = posFromFile[e]; World.rotation[parent] = rotationFromFile[e]; if (!IdxIsDynamicObject(entIdx)) {World.scale[parent] = scaleFromFile[e];}
-        if (IdxIsNPC(entIdx) && npcTable[entIdx-419].type != NPCType_Cyber) { par->forward = V3_Normalize(quat_rot_v3(World.rotation[parent], (V3){0.0f,0.0f,1.0f})); }/*All NPC placements are pre-baked upright in level data (root lR, incl. the 437 servbot counter-yaw), so only the derived forward remains.*/
-        bool srcActive=(src->entflags & EF_ACTIVE)!=0; par->entflags|= src->entflags;/*bitor `|` since AddInstance already set flags from entity definitions.*/
+        if (IdxIsNPC(entIdx) && npcTable[entIdx-419].type != NPCType_Cyber) { par->forward = V3_Normalize(quat_rot_v3(World.rotation[parent], (V3){0.0f,0.0f,1.0f})); }
+        bool srcActive=(src->entflags & EF_ACTIVE)!=0; par->entflags|= src->entflags;
         flag_set(&par->entflags,EF_ACTIVE,srcActive);
         if (IdxIsNPC(entIdx)) { par->currentState=src->currentState; par->currentDestination=src->currentDestination; par->idealPos=src->idealPos; par->idealTransformForward=src->idealTransformForward; par->targettingPosition=src->targettingPosition; par->attack1SoundTime=src->attack1SoundTime; par->attack2SoundTime=src->attack2SoundTime; par->attack3SoundTime=src->attack3SoundTime; } par->ioflags=src->ioflags; par->ammo=src->ammo; par->ammo2=src->ammo2; par->lookUpIndex=src->lookUpIndex; par->customIndex=src->customIndex;
         for (u8 slot=0;slot<4;++slot) { par->contents[slot]=src->contents[slot]; par->custIdx[slot]=src->custIdx[slot]; } for (u8 slot=0;slot<7;++slot) { par->randomItem[slot]=src->randomItem[slot]; par->randomItemCustIdx[slot]=src->randomItemCustIdx[slot]; par->randomItemDropChance[slot]=src->randomItemDropChance[slot]; }
         par->generateContents=src->generateContents; par->generationDone=src->generationDone; par->maxRandomItems=src->maxRandomItems; par->srchInUse=src->srchInUse;
         par->amount=src->amount; par->resetTime=src->resetTime; par->minSecurityLevel=src->minSecurityLevel; par->keycode=src->keycode; par->damage=src->damage; par->delay=src->delay; par->active=src->active; par->activatedScale=src->activatedScale;
         par->forceFieldDirectionX=src->forceFieldDirectionX; par->forceFieldDirectionY=src->forceFieldDirectionY; par->forceFieldDirectionZ=src->forceFieldDirectionZ; par->fieldColor=src->fieldColor; par->timeInterval=src->timeInterval;
-        par->randomMin=src->randomMin; par->randomMax=src->randomMax; par->useRandomTimes=src->useRandomTimes; if(src->health>=0.0f)par->health=src->health; if(src->cyberHealth>=0.0f)par->cyberHealth=src->cyberHealth; par->radiation=src->radiation; par->idleTime=src->idleTime;/*level data writes -1 for "unset"; copying it would stomp the table default set in AddInstance()*/
+        par->randomMin=src->randomMin; par->randomMax=src->randomMax; par->useRandomTimes=src->useRandomTimes; if(src->health>=0.0f)par->health=src->health; if(src->cyberHealth>=0.0f)par->cyberHealth=src->cyberHealth; par->radiation=src->radiation; par->idleTime=src->idleTime;
         par->timeSinceMovedEnough=src->timeSinceMovedEnough; par->waitBefClose=src->waitBefClose; par->onlyOnce=src->onlyOnce; par->stayOpen=src->stayOpen; par->startOpen=src->startOpen; par->ajar=src->ajar; par->ajarPercentage=src->ajarPercentage; par->timeBeforeLasersOn=src->timeBeforeLasersOn;
-        par->toggleLasers=src->toggleLasers; par->changeLayerOnOpenClose=src->changeLayerOnOpenClose; par->securityThreshold=src->securityThreshold; par->messageLingdex=src->messageLingdex; par->targetIdx=src->targetIdx; par->targetOnDeathIdx=src->targetOnDeathIdx; par->target2Idx=src->target2Idx; par->camStartYAngle=src->camStartYAngle; par->camEndYAngle=src->camEndYAngle; par->camWaitTime=src->camWaitTime; par->camRotatePositive=src->camRotatePositive; par->camRotateEnabled=src->camRotateEnabled;
-        if (entIdx == 592 || entIdx == 593) par->texIndex = src->texIndex; // 3D text decal texture comes from level matIndex, not entity definition
-        else if (entIdx == 112 && src->texIndex > 0 && src->texIndex < MAXTEX) par->texIndex = src->texIndex; // Explicit gravity-lift visual material state
-        else if ((entIdx == 21 || entIdx == 22 || entIdx == 130) && src->texIndex > 0 && src->texIndex < MAXTEX) par->texIndex = src->texIndex; // Per-instance material overrides: cyberspace panel colors (21/22) and coolant pipes (130) — the Unity material for these is carried as texIndex in the level data
-        if (entIdx == 21 || entIdx == 22) par->glowIndex = par->texIndex; // Cyberspace panels are essentially unlit: the glow texture must be the panel's own (possibly tinted) texture, else the untinted glow grid overdraws the tint at full strength
+        par->changeLayerOnOpenClose=src->changeLayerOnOpenClose; par->securityThreshold=src->securityThreshold; par->messageLingdex=src->messageLingdex; par->targetIdx=src->targetIdx; par->targetOnDeathIdx=src->targetOnDeathIdx; par->target2Idx=src->target2Idx; par->camStartYAngle=src->camStartYAngle; par->camEndYAngle=src->camEndYAngle; par->camWaitTime=src->camWaitTime; par->camRotatePositive=src->camRotatePositive; par->camRotateEnabled=src->camRotateEnabled;
+        if (entIdx == 592 || entIdx == 593) par->texIndex = src->texIndex;
+        else if (entIdx == 112 && src->texIndex > 0 && src->texIndex < MAXTEX) par->texIndex = src->texIndex;
+        else if ((entIdx == 21 || entIdx == 22 || entIdx == 130) && src->texIndex > 0 && src->texIndex < MAXTEX) par->texIndex = src->texIndex; // Per-instance material overrides: cyberspace panel colors (21/22) and coolant pipes (130)
+        if (entIdx == 21 || entIdx == 22) par->glowIndex = par->texIndex;
         if (entIdx == 592 || entIdx == 593) { DecalPend* pd=NULL; for (u16 k=0;k<pendDecalCount;++k) { if (pendDecals[k].ent == (u16)e) { pd=&pendDecals[k]; break; } } if (pd) { i16 li = (i16)src->messageLingdex;
             if (li <= 0 || li >= T_LOGSTR_CNT) { if (decalInlineTextCount < DECAL_INLINE_TEXT_MAX) { mcpy(decalInlineText[decalInlineTextCount],pd->text,DECAL_INLINE_TEXT_LEN); decalInlineTextLevel[decalInlineTextCount]=curlevel; decalInlineTextInst[decalInlineTextCount]=parent; ++decalInlineTextCount; } else DualLogError("Too many inline text decals\n"); }
             if (pd->anchor != 0 || pd->align != 0 || pd->lineSp != 1.0f) { if (decalStyleCount < DECAL_STYLE_MAX) { decalStyles[decalStyleCount]=(DecalStyle){curlevel,parent,pd->anchor,pd->align,pd->lineSp}; ++decalStyleCount; } else DualLogError("Too many decal styles\n"); } } }
@@ -755,7 +665,7 @@ void LoadLevelMod(u8 lev) {
         par->dir.x=src->dir.x; par->dir.y=src->dir.y; par->dir.z=src->dir.z; par->force=src->force;
         par->reverbMaxDist=src->reverbMaxDist; par->reverbPreset=src->reverbPreset; par->requiredAccessCard=src->requiredAccessCard; par->musicType=src->musicType; par->messageIndex=src->messageIndex; par->counter=src->counter; par->countToTrigger=src->countToTrigger; par->dontReset=src->dontReset; par->ioflagsHi=src->ioflagsHi; par->spawnIndex=src->spawnIndex; par->numberToSpawn=src->numberToSpawn; par->numberActive=src->numberActive; par->countOnlySameIndex=src->countOnlySameIndex; par->alertEnemiesOnAwake=src->alertEnemiesOnAwake; par->minDelayBetweenSpawns=src->minDelayBetweenSpawns; par->maxDelayBetweenSpawns=src->maxDelayBetweenSpawns; par->allSpawnedResetDelay=src->allSpawnedResetDelay; par->lockedMessageLingdex=src->lockedMessageLingdex; par->SFXIndex=src->SFXIndex; par->playEverywhere=src->playEverywhere; par->touchEnabled=src->touchEnabled; par->doorOpen=src->doorOpen; par->percentMoved=src->percentMoved;
         par->texAnimResourceFolderIdx = src->texAnimResourceFolderIdx;
-        if (entIdx == 517) { /*func_wall: anchor at startPosition (authoritative cell center); chunk children are mover-relative*/
+        if (entIdx == 517) { /*func_wall*/
             V3 sp = par->startPosition;
             if (sp.x == 0.0f && sp.y == 0.0f && sp.z == 0.0f) { sp = V3Add(fwBasePos[e],posFromFile[e]); par->startPosition = sp; } /*fallback for entries lacking startPosition*/
             World.position[parent] = par->lastPosition = sp;
@@ -783,15 +693,9 @@ void LoadLevelMod(u8 lev) {
     }
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
         u16 cidx=World.instances[i].index; if (cidx != 197 && cidx != 198) continue;
-        V3 tp=V3Add(World.position[i],quat_rot_v3(World.rotation[i],(V3){0.0f,0.96f,0.0f}));
-        bool dup=false;
-        for (u16 j=INSTS_1ST_IDX;j<World.instCount;++j) {
-            if (World.instances[j].index != 601) continue;
-            V3 d=V3_AsubB(World.position[j],tp);
-            if (vabs(d.x) < 0.01f && vabs(d.y) < 0.01f && vabs(d.z) < 0.01f) { dup=true; break; }
-        }
-        if (dup) continue;
-        u16 g=AddInstance(601,tp); if (g == 0) continue;
+        V3 tp=V3Add(World.position[i],quat_rot_v3(World.rotation[i],(V3){0.0f,0.96f,0.0f})); bool dup=false;
+        for (u16 j=INSTS_1ST_IDX;j<World.instCount;++j) { if (World.instances[j].index != 601) continue; V3 d=V3_AsubB(World.position[j],tp); if (vabs(d.x) < 0.01f && vabs(d.y) < 0.01f && vabs(d.z) < 0.01f) { dup=true; break; } }
+        if (dup) continue; u16 g=AddInstance(601,tp); if (g == 0) continue;
         World.instances[g].radiation=11.0f; World.colliderSize[g]=(V3){2.24f,0.64f,2.24f}; World.colliderCenter[g]=(V3){0.0f,0.0f,0.0f};
     }
     for (int i=0;i<=lightsIdx;++i) { if (lanimsFromFile[i].numIntervalSteps >= 1) { lanimsFromFile[i].currentStep = 0; lanimsFromFile[i].lerpUp = true; if (lightsFromFile[i].minIntensity < 0.01f) lightsFromFile[i].minIntensity = 0.01f; }/*Unity LightAnimation.Start() init parity: animations always begin at step 0, lerping up, with a nonzero floor*/ i32 wi=AddLight(&lightsFromFile[i],&lanimsFromFile[i]); if(wi>=0&&wi<LIGHT_COUNT){World.levelLightTargetnames[World.curLev][wi]=lightTargetnameFile[i];} }
@@ -808,40 +712,23 @@ void LoadLevelMod(u8 lev) {
     }
     if (World.instCount < INSTANCE_COUNT) {
         u16 editTextIdx = World.instCount; mset(&World.instances[editTextIdx],0,sizeof(Entity)); World.instances[editTextIdx].entflags=EF_ACTIVE; World.layer[editTextIdx]=L_Default; World.instances[editTextIdx].camView=255; World.instances[editTextIdx].modelIndex=World.instances[editTextIdx].lodIndex=World.instances[editTextIdx].colMeshIndex=MAX_MDLS;
-        World.instances[editTextIdx].index=592; World.position[editTextIdx]=(V3){0.0f,0.0f,0.0f}; World.rotation[editTextIdx]=QUAT_IDENTITY; World.scale[editTextIdx].x=World.scale[editTextIdx].y=World.scale[editTextIdx].z=World.rotation[editTextIdx].w=1.0f;
-        World.instances[editTextIdx].messageLingdex = 0;
-        World.instances[editTextIdx].texIndex = 881;
-        World.editTextInstanceIndex = editTextIdx; World.instCount++;
+        World.instances[editTextIdx].index=592; World.position[editTextIdx]=(V3){0.0f,0.0f,0.0f}; World.rotation[editTextIdx]=QUAT_IDENTITY; World.scale[editTextIdx].x=World.scale[editTextIdx].y=World.scale[editTextIdx].z=World.rotation[editTextIdx].w=1.0f; World.instances[editTextIdx].messageLingdex = 0; World.instances[editTextIdx].texIndex = 881; World.editTextInstanceIndex = editTextIdx; World.instCount++;
     }
 }
 #undef KEY_EQ
-void ButtonSwitchInitAfterLoad(u16), GrenadeInit(u16), FuncWallShiftChildren(u16,V3);
+void ButtonSwitchInitAfterLoad(u16),GrenadeInit(u16),FuncWallShiftChildren(u16,V3),RenderLoading(const char* restrict),ResetLevelAudio(),CullInit(),mp3_clear(),ComputeConvexMeshInertiaTensor(u16),CyberMineInitBeforeLoad(u16);
 void func_forcebridge(u16 i) {
-    World.instances[i].tickFinished = World.pauseRelativeTime + 0.05f + (double)random_range(0.0f,1.0f);
-    World.instances[i].lerping = true;
-    if (World.instances[i].activatedScale.x <= 0.02f) { World.instances[i].activatedScale.x = 2.56f; }
-    if (World.instances[i].activatedScale.y <= 0.02f) { World.instances[i].activatedScale.y = 0.08f; }
-    if (World.instances[i].activatedScale.z <= 0.02f) { World.instances[i].activatedScale.z = 2.56f; }
-    if (!World.instances[i].active) { World.instances[i].modelIndex = MAX_MDLS; World.col[i] = CT_NONE; }
-    static const u16 textures[]={38,40,39,41,198}; u32 color=World.instances[i].fieldColor;
-    if (color<sizeof(textures)/sizeof(textures[0])) World.instances[i].texIndex=textures[color];
+    World.instances[i].tickFinished = World.pauseRelativeTime + 0.05f + (double)random_range(0.0f,1.0f); World.instances[i].lerping = true;
+    if (World.instances[i].activatedScale.x <= 0.02f) { World.instances[i].activatedScale.x = 2.56f; } if (World.instances[i].activatedScale.y <= 0.02f) { World.instances[i].activatedScale.y = 0.08f; } if (World.instances[i].activatedScale.z <= 0.02f) { World.instances[i].activatedScale.z = 2.56f; }
+    if (!World.instances[i].active) { World.instances[i].modelIndex = MAX_MDLS; World.col[i] = CT_NONE; } static const u16 textures[]={38,40,39,41,198}; u32 color=World.instances[i].fieldColor; if (color<sizeof(textures)/sizeof(textures[0])) World.instances[i].texIndex=textures[color];
 }
-
 void FuncWallInitAfterLoad(u16 i) {
-    Entity* e = &World.instances[i]; V3 prev = World.position[i];
-    float distTotal = V3_Dist(e->startPosition,e->targetPosition), f = 0;
-    if (e->funcState >= FStat_AjarMovingTarget) { f = e->ajarPercentage; } else if (e->funcState == FStat_AjarMovingStart ) { f = 1.0f - e->ajarPercentage; }
-    
-    f = vclamp(f,0.0f,1.0f); V3 np = (distTotal > 0.0001f) ? V3Add(e->startPosition,V3_ScaleByF(V3_AsubB(e->targetPosition,e->startPosition),f)) : e->startPosition; World.position[i]=np;
-    if ((u8)e->funcState <= FStat_MovingTarget) { e->funcState = FStat_Start; e->percentMoved = 0.0f; }
-    FuncWallShiftChildren(i,V3_AsubB(np,prev));
+    Entity* e = &World.instances[i]; V3 prev = World.position[i]; float dd = V3_Dist(e->startPosition,e->targetPosition), f = 0; if (e->funcState >= FStat_AjarMovingTarget) { f = e->ajarPercentage; } else if (e->funcState == FStat_AjarMovingStart ) { f = 1.0f - e->ajarPercentage; }
+    f = vclamp(f,0.0f,1.0f); V3 np = (dd > 0.0001f) ? V3Add(e->startPosition,V3_ScaleByF(V3_AsubB(e->targetPosition,e->startPosition),f)) : e->startPosition; World.position[i]=np; if ((u8)e->funcState <= FStat_MovingTarget) { e->funcState = FStat_Start; e->percentMoved = 0.0f; } FuncWallShiftChildren(i,V3_AsubB(np,prev));
 }
-
 void LogicTimerInitBeforeLoad(u16 i) { Entity* e = &World.instances[i]; if (e->timeInterval <= 0.0f) { e->timeInterval = 0.35f; } if (e->randomMin <= 0.0f) { e->randomMin = 5.0f; } if (e->randomMax <= 0.0f) { e->randomMax = 10.0f; } e->intervalFinished = World.pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval); }
 u16 DoorFrameFromProgress(AnimationClip c, float t) { if(c.frameEnd <= c.frameStart){return c.frameStart;} u16 span = c.frameEnd - c.frameStart; return (u16)(c.frameStart + (u16)(vclamp(t,0.0f,1.0f) * (float)span + 0.5f)); }
-void ComputeConvexMeshInertiaTensor(u16), CyberMineInitBeforeLoad(u16);
 extern u16 npcCountInWorldPerType[NUM_AI_TYPES]; extern i16 targetIDText[INSTANCE_COUNT]; extern double targetIDTextFinished[INSTANCE_COUNT],targetIDAttachedFinished[INSTANCE_COUNT]; extern bool targetIDAttached[INSTANCE_COUNT];
-void RenderLoading(const char* restrict); void ResetLevelAudio(); void CullInit(); void mp3_clear();
 void LoadAllLevels() {
     double start_time = get_time(); RenderLoading("Loading level data..."); World.levelCurrentlyLoading = true; ioNameCount=1; ioNames[0][0]='\0';
     size_t larsz = INSTANCE_COUNT*sizeof(Entity) + INSTANCE_COUNT*sizeof(V3) + INSTANCE_COUNT*sizeof(V3) + INSTANCE_COUNT*sizeof(Quaternion) + INSTANCE_COUNT*sizeof(V3) + INSTANCE_COUNT*sizeof(V3) + LIGHT_COUNT*sizeof(Light) + LIGHT_COUNT*sizeof(LightAnimation); entsFromFile = OS_Alloc(larsz);
@@ -853,26 +740,16 @@ void LoadAllLevels() {
         if (!teleportDestinationsInitialized) { for (u8 l=0;l<MAX_LEVELS;++l) { for (u8 id=0;id<8;++id) { teleportDestinations[l][id] = U16_MAX; } } teleportDestinationsInitialized=true; }
         if (lev < MAX_LEVELS) { for (u8 id=0;id<8;++id) { teleportDestinations[lev][id] = U16_MAX; } elevatorDestCounts[lev] = 0; }
         World.curLev = lev;
-        mset(targetIDText,0,sizeof(targetIDText));
-        mset(targetIDTextFinished,0,sizeof(targetIDTextFinished));
-        mset(targetIDAttachedFinished,0,sizeof(targetIDAttachedFinished));
-        mset(targetIDAttached,0,sizeof(targetIDAttached));
+        mset(targetIDText,0,sizeof(targetIDText)); mset(targetIDTextFinished,0,sizeof(targetIDTextFinished)); mset(targetIDAttachedFinished,0,sizeof(targetIDAttachedFinished)); mset(targetIDAttached,0,sizeof(targetIDAttached));
         mset(npcCountInWorldPerType,0,sizeof(npcCountInWorldPerType));
         SetLevelPointers(lev);
-        World.invP1.makingNoise = World.decoyActive = false;
-        World.decoyInstance = U16_MAX;
-        mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity));
-        World.instCount = 3;
-        mset(World.lights,0,LIGHT_COUNT * sizeof(Light));
-        mset(World.lanims,0,LANIM_MAX * sizeof(LightAnimation));
-        mset(World.lanimLightIdx,0,LANIM_MAX * sizeof(u16));
-        World.lanimCount = 0;
-        World.loadedLights = 0;
+        World.invP1.makingNoise = World.decoyActive = false; World.decoyInstance = U16_MAX;
+        mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); World.instCount = 3;
+        mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LANIM_MAX * sizeof(LightAnimation)); mset(World.lanimLightIdx,0,LANIM_MAX * sizeof(u16)); World.lanimCount = 0; World.loadedLights = 0;
         mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
         mset(camViews,0,64 * sizeof(CamView));
         camViewCount=0;
         char filename[20]; sFormat(filename,sizeof(filename),"./Data/level%d.txt",lev); FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename,&fh,&fsize); if (!fbuf) { OS_Exit(1); }
-        
         mm_ptr = (const char*)fbuf;
         mm_end = mm_ptr + fsize;
         mset(fwParentOf,0,sizeof(fwParentOf));
@@ -883,18 +760,12 @@ void LoadAllLevels() {
         OS_Free(fbuf,(size_t)fsize);
         for (int i = 0; i < World.loadedLights; ++i) World.lightsNewPosition[i] = World.lights[i].pos;
         for (int i = PLAYER1; i < World.instCount; ++i) {
-            i32 cellIdx = PosGetCellCoords(World.position[i].x, World.position[i].z);
-            World.instances[i].cellIndex = cellIdx;
-            World.instances[i].cellX = PosGetCellCoordX(World.position[i].x);
-            World.instances[i].cellZ = PosGetCellCoordZ(World.position[i].z);
-            u16 mi = World.instances[i].modelIndex;
-            World.radius[i] = ((mi < mdlsCnt && modelBounds[mi] > 0.0f) ? modelBounds[mi] : 2.56f) * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
-            World.instances[i].shadRadius = World.radius[i] * 2.00f;
-            World.instances[i].massScaled = true;
+            i32 cellIdx = PosGetCellCoords(World.position[i].x, World.position[i].z); World.instances[i].cellIndex = cellIdx; World.instances[i].cellX = PosGetCellCoordX(World.position[i].x); World.instances[i].cellZ = PosGetCellCoordZ(World.position[i].z);
+            u16 mi = World.instances[i].modelIndex; World.radius[i] = ((mi < mdlsCnt && modelBounds[mi] > 0.0f) ? modelBounds[mi] : 2.56f) * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z); World.instances[i].shadRadius = World.radius[i] * 2.00f; World.instances[i].massScaled = true;
         }
         for (int i=PLAYER1;i<World.instCount;++i) {
             u16 constIndex = World.instances[i].index;
-            World.instances[i].hasGravity = (i == PLAYER1 || IdxIsDynamicObject(constIndex) || (IdxIsNPC(constIndex) && constIndex < 443));
+            World.instances[i].hasGrav = (i == PLAYER1 || IdxIsDynamicObject(constIndex) || (IdxIsNPC(constIndex) && constIndex < 443));
             if (IdxIsGeometry(constIndex)) World.layer[i] = L_Geometry;
             else if (IdxIsUsableObject(constIndex)) {
                 if (World.diffPuz == 3 && World.instances[i].index == 361 && random_range(0.0f,1.0f) < 0.33f) DeleteInstance(i); // 33% chance of not spawning logic probes on Puzzle difficulty of 3
@@ -944,197 +815,90 @@ void LoadAllLevels() {
     BuildTextDecalMeshes();
     DualLog("Load all levels.....................................................................took %.6f secs\n",get_time() - start_time);
 }
-
-void CyberTimerReset(u16,int); /*citadel.c: Unity CyberTimer.Reset(difficultyCyber)*/
-void CyberGolReset(void);
+void CyberTimerReset(u16,int),CyberGolReset();
 void LoadLevelSetup(u8 lev) {
     MdlBuildLevelConvexAdjacency(lev);
     if (World.particles->count == 0) { PSysAddLevelLoops(); }
-    mcpy(camViews, levelCamViews[lev],64 * sizeof(CamView));
-    mcpy(camViewTextures, levelCamViewTextures[lev], 64 * sizeof(u32));
-    camViewCount = levelCamViewCount[lev];
-    for (u8 i=0;i<camViewCount;++i) { GenerateAndBindTexture(&camViewTextures[i], GL_RGBA8, camViews[i].width, camViews[i].height, GL_RGBA,GL_UNSIGNED_BYTE, 0x2600/*GL_NEAREST*/, NULL); } /*The per-level texture caches share GL names across all 14 preloaded levels; whichever level preloaded LAST leaves its dims on the shared names, so slot storage must be re-specced to camViews[i] dims here or camview copies/samples pair up with the wrong-sized texture (CopyImageSubData region overflow -> INVALID_VALUE + black screens).*/
+    mcpy(camViews, levelCamViews[lev],64 * sizeof(CamView)); mcpy(camViewTextures, levelCamViewTextures[lev], 64 * sizeof(u32)); camViewCount = levelCamViewCount[lev];
+    for (u8 i=0;i<camViewCount;++i) { GenerateAndBindTexture(&camViewTextures[i], GL_RGBA8, camViews[i].width, camViews[i].height, GL_RGBA,GL_UNSIGNED_BYTE, 0x2600/*GL_NEAREST*/, NULL); }
     mset(alreadyReadLightOnOnce, 0, sizeof(alreadyReadLightOnOnce));
     CullInit(); // Must be after level!
-    glUseProgram(voxelUpdateSP);
-    glUniform2f(0, World.voxMinCtrX[World.curLev], World.voxMinCtrZ[World.curLev]);
-    glUniform1f(1, World.farPlane[World.curLev] * World.farPlane[World.curLev]);
-    glUniform1ui(2, World.loadedLights);
-    glUniform2f(3, World.worldMin_x[World.curLev], World.worldMin_z[World.curLev]);
-    glUniform1ui(4, SHADOW_MAP_SIZE);
-    glUniform1ui(6, (u32)MAX_LIGHTS_PER_VOXEL);
-    glUniform1ui(7, SHADOW_MAP_SIZE * SHADOW_MAP_SIZE);
+    glUseProgram(voxelUpdateSP); glUniform2f(0, World.voxMinCtrX[World.curLev], World.voxMinCtrZ[World.curLev]); glUniform1f(1, World.farPlane[World.curLev] * World.farPlane[World.curLev]); glUniform1ui(2, World.loadedLights); glUniform2f(3, World.worldMin_x[World.curLev], World.worldMin_z[World.curLev]); glUniform1ui(4, SHADOW_MAP_SIZE); glUniform1ui(6, (u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(7, SHADOW_MAP_SIZE * SHADOW_MAP_SIZE);
     for (u16 i=0;i<World.loadedLights;++i) { World.lightsNewPosition[i] = World.lights[i].pos; }
     mset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, World.loadedLights * sizeof(u32));
 }
-
 void LoadLevel(u8 curlevel, V3 pos) {
     u8 prevLevel = World.curLev;
-    if (curlevel == LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE) { World.cyberReturnLevel = (i8)World.curLev; World.cyberReturnPos = World.position[PLAYER1]; }/*ExitCyberspace returns here*/
-    LoadPerLevelModels(curlevel); /*Bring this level's exclusive models on the GPU and reparse their CPU welded/physics data; frees the outgoing level's exclusive set. No-ops when everything needed is already resident. No GL buffer is ever deleted: the swap window is overwritten in place.*/
+    if (curlevel == LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE) { World.cyberReturnLevel = (i8)World.curLev; World.cyberReturnPos = World.position[PLAYER1]; }
+    LoadPerLevelModels(curlevel);
     CloseSearch();
-    World.Sys_UI.tetheredKeypadKeycode=World.Sys_UI.tetheredKeypadElevator=World.Sys_UI.tetheredPGP=World.Sys_UI.tetheredPWP=U16_MAX;/*panel tethers are per-level; the entity index they point at dies with the level, so don't sever against a stale one*/
-    World.levelCurrentlyLoading = true;
-    World.paused = World.menuActive = false;
+    World.Sys_UI.tetheredKeypadKeycode = World.Sys_UI.tetheredKeypadElevator = World.Sys_UI.tetheredPGP = World.Sys_UI.tetheredPWP=U16_MAX;
+    World.levelCurrentlyLoading = true; World.paused = World.menuActive = false;
     if (World.curLev != curlevel) { CopyPlayerState(World.curLev,curlevel); PSysClearLevel(World.curLev); World.curLev = curlevel; SetLevelPointers(curlevel); }
     for (u16 i = PLAYER1; i < World.instCount; ++i) ComputeConvexMeshInertiaTensor(i);
     LoadLevelSetup(curlevel);
-    ResetLevelAudio();
-    mp3_clear();
-    World.Sys_Music.levelEntry = true;
-    World.Sys_Music.inZone = World.Sys_Music.cyberTube = false;
-    World.Sys_Music.combatImpulseFinished = get_time();
-    World.Sys_Music.combatImpulseFinished += 5.0;
-    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
-        Entity* e = &World.instances[i];
-        if (IdxIsNPC(e->index) && e->enemy == PLAYER1) { e->enemy = WORLD; /*level entry: NPCs drop the player, so nothing re-aggros from the level they came from*/ }
-        if (World.diffCbt == 0 && IdxIsNPC(e->index)) { if (e->entflags & EF_ACT_AS_CORPSE_ONLY) { e->health = 0.0f; e->cyberHealth = 0.0f; } else { e->health = 1.0f; if (npcTable[e->index - 419].type == NPCType_Cyber) { e->cyberHealth = 1.0f; } } }
-    }
+    ResetLevelAudio(); mp3_clear(); World.Sys_Music.levelEntry = true; World.Sys_Music.inZone = World.Sys_Music.cyberTube = false; World.Sys_Music.combatImpulseFinished = get_time(); World.Sys_Music.combatImpulseFinished += 5.0;
+    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { Entity* e = &World.instances[i]; if (IdxIsNPC(e->index) && e->enemy == PLAYER1) { e->enemy = WORLD; } if (World.diffCbt == 0 && IdxIsNPC(e->index)) { if (e->entflags & EF_ACT_AS_CORPSE_ONLY) { e->health = 0.0f; e->cyberHealth = 0.0f; } else { e->health = 1.0f; if (npcTable[e->index - 419].type == NPCType_Cyber) { e->cyberHealth = 1.0f; } } } }
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { Entity* e = &World.instances[i]; if (e->index != 702) continue; u16 n = e->numberToSpawn; if (World.diffCbt == 1) { n = (u16)(n / 2); } else if (World.diffCbt == 3) { n = (u16)(n + n / 2); } else if (World.diffCbt > 3) { n = (u16)(n * 5); } e->numberToSpawn = (n < 1) ? 1 : n; e->delayFinished = World.pauseRelativeTime; }
     World.levelCurrentlyLoading = false;
-    World.position[PLAYER1] = pos;
-    if (curlevel == LEVEL_CYBERSPACE) World.cyberspaceRecallPoint = World.position[PLAYER1];/*Recall returns to the cyberspace entry point*/
-    World.velocity[PLAYER1] = (V3){0.0f, 0.0f, 0.0f};
-    World.invP1.lastVelY = 0.0f;
-    World.invP1.wasGrounded = true;
-    World.invP1.ladderState = 0;
-    World.invP1.noiseFinished=World.pauseRelativeTime - 1.0;
+    World.position[PLAYER1] = pos; World.velocity[PLAYER1] = (V3){0.0f,0.0f,0.0f};
+    World.invP1.lastVelY = 0.0f; World.invP1.wasGrounded = true; World.invP1.ladderState = 0; World.invP1.noiseFinished=World.pauseRelativeTime - 1.0;
     if (curlevel == LEVEL_CYBERSPACE) {
-        World.col[PLAYER1] = CT_SPH; World.colliderSize[PLAYER1] = (V3){PLYR_RAD,PLYR_RAD,PLYR_RAD}; World.colliderCenter[PLAYER1] = (V3){0.0f,0.0f,0.0f}; World.radius[PLAYER1] = PLYR_RAD; World.instances[PLAYER1].hasGravity = false;
-        if (prevLevel != LEVEL_CYBERSPACE) { play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false); CyberTimerReset(PLAYER1,World.diffCyb); CyberGolReset(); World.instances[PLAYER1].timerFinished = World.pauseRelativeTime + 1.0; }
+        World.cyberspaceRecallPoint = World.position[PLAYER1]; World.col[PLAYER1] = CT_SPH; World.colliderSize[PLAYER1] = (V3){0.48f,0.48f,0.48f}; World.colliderCenter[PLAYER1] = (V3){0.0f,0.0f,0.0f}; World.radius[PLAYER1] = 0.48f; World.instances[PLAYER1].hasGrav = false; if (prevLevel != LEVEL_CYBERSPACE) { play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false); CyberTimerReset(PLAYER1,World.diffCyb); CyberGolReset();
+        World.instances[PLAYER1].timerFinished = World.pauseRelativeTime + 1.0; }
     } else {
-        World.col[PLAYER1] = CT_CAP;
-        World.colliderSize[PLAYER1] = (V3){PLYR_RAD,PLYR_HT * World.invP1.currentCrouchRatio,1.0f};
-        World.colliderCenter[PLAYER1].y = -PLYR_CAM_OFS_Y + (PLYR_HT - World.colliderSize[PLAYER1].y) * 0.5f;
-        World.instances[PLAYER1].hasGravity = true;
-        if (prevLevel == LEVEL_CYBERSPACE) {
-            V3 cyberFwd = quat_rot_v3(World.rotation[PLAYER1],(V3){0.0f,0.0f,1.0f});
-            float yawDeg = __builtin_atan2f(cyberFwd.x,cyberFwd.z) * (180.0f / 3.14159265f);
-            float halfYaw = deg2rad(yawDeg) * 0.5f;
-            World.rotation[PLAYER1] = (Quaternion){0.0f,vsinf(halfYaw),0.0f,vcosf(halfYaw)};
-            World.cam_yaw = yawDeg < 0.0f ? yawDeg + 360.0f : yawDeg;
-            World.cam_pitch = World.cam_roll = 0.0f; World.invP1.leanTarget = 0.0f;
-        }
+        World.col[PLAYER1] = CT_CAP; World.colliderSize[PLAYER1] = (V3){0.48f,2.0f * World.invP1.currentCrouchRatio,1.0f}; World.colliderCenter[PLAYER1].y = -PLYR_CAM_OFS_Y + (2.0f - World.colliderSize[PLAYER1].y) * 0.5f; World.instances[PLAYER1].hasGrav = true;
+        if (prevLevel == LEVEL_CYBERSPACE) { V3 cyberFwd = quat_rot_v3(World.rotation[PLAYER1],(V3){0.0f,0.0f,1.0f}); float yawDeg = __builtin_atan2f(cyberFwd.x,cyberFwd.z) * (180.0f / 3.14159265f); float halfYaw = deg2rad(yawDeg) * 0.5f; World.rotation[PLAYER1] = (Quaternion){0.0f,vsinf(halfYaw),0.0f,vcosf(halfYaw)}; World.cam_yaw = yawDeg < 0.0f ? yawDeg + 360.0f : yawDeg; World.cam_pitch = World.cam_roll = 0.0f; World.invP1.leanTarget = 0.0f; }
     }
 }
-
 void UpdateSensaroundCamViews() {
     if (camViewCount < 3 || camViews[camViewCount-1].far != 1000.0f) { sensaroundCamViewCenter=sensaroundCamViewLeft=sensaroundCamViewRight=255; return; }
-    sensaroundCamViewCenter = (u8)(camViewCount - 3);
-    sensaroundCamViewLeft   = (u8)(camViewCount - 2);
-    sensaroundCamViewRight  = (u8)(camViewCount - 1);
-    bool hwActive = (World.invP1.hardwareIsActive & HW_SNS) != 0;
-    u16 hwVer = World.invP1.hwVers[HW_SNS_IDX];
-    bool centerOn = hwActive && hwVer > 0;
-    bool sidesOn  = hwActive && hwVer > 1;
-    camViews[sensaroundCamViewCenter].visible = centerOn;
-    camViews[sensaroundCamViewLeft ].visible = sidesOn;
-    camViews[sensaroundCamViewRight].visible = sidesOn;
-    if (!hwActive) return;
-    V3 fwd = World.instances[PLAYER1].forward;
-    if (V3_dot(fwd,fwd) < 0.001f) fwd = quat_rot_v3(World.rotation[PLAYER1],(V3){0.0f,0.0f,1.0f}); /* fallback before physics tick */
-    V3 rear = V3_ScaleByF(fwd,-1.0f); const V3 up = {0.0f,1.0f,0.0f};
-    camViews[sensaroundCamViewCenter].position = World.position[PLAYER1];
-    camViews[sensaroundCamViewCenter].rotation = quat_look_rotation(rear,up);
-    if (sidesOn) {
-        V3 leftDir  = V3_Normalize((V3){ rear.z, rear.y, -rear.x });
-        V3 rightDir = V3_Normalize((V3){ -rear.z, rear.y,  rear.x });
-        camViews[sensaroundCamViewLeft ].position = World.position[PLAYER1]; camViews[sensaroundCamViewLeft ].rotation = quat_look_rotation(leftDir,up);
-        camViews[sensaroundCamViewRight].position = World.position[PLAYER1]; camViews[sensaroundCamViewRight].rotation = quat_look_rotation(rightDir,up);
-    }
+    sensaroundCamViewCenter = (u8)(camViewCount - 3); sensaroundCamViewLeft = (u8)(camViewCount - 2); sensaroundCamViewRight = (u8)(camViewCount - 1);
+    bool hwActive = (World.invP1.hardwareIsActive & HW_SNS) != 0; u16 hwVer = World.invP1.hwVers[HW_SNS_IDX]; bool sidesOn  = hwActive && hwVer > 1;
+    camViews[sensaroundCamViewCenter].visible = (hwActive && hwVer > 0); camViews[sensaroundCamViewLeft ].visible = sidesOn; camViews[sensaroundCamViewRight].visible = sidesOn; if (!hwActive) return;
+    V3 fwd = World.instances[PLAYER1].forward; if (V3_dot(fwd,fwd) < 0.001f) fwd = quat_rot_v3(World.rotation[PLAYER1],(V3){0.0f,0.0f,1.0f}); /* fallback before physics tick */
+    V3 rear = V3_ScaleByF(fwd,-1.0f); const V3 up = {0.0f,1.0f,0.0f}; camViews[sensaroundCamViewCenter].position = World.position[PLAYER1]; camViews[sensaroundCamViewCenter].rotation = quat_look_rotation(rear,up);
+    if (sidesOn) { V3 leftDir  = V3_Normalize((V3){ rear.z, rear.y, -rear.x }); V3 rightDir = V3_Normalize((V3){ -rear.z, rear.y,  rear.x }); camViews[sensaroundCamViewLeft ].position = World.position[PLAYER1]; camViews[sensaroundCamViewLeft ].rotation = quat_look_rotation(leftDir,up); camViews[sensaroundCamViewRight].position = World.position[PLAYER1]; camViews[sensaroundCamViewRight].rotation = quat_look_rotation(rightDir,up); }
 }
-
 // Save Game System
 #pragma pack(push, 1)
-typedef struct { u32 magicNumber; u32 version; u32 uncompressedSize; u32 compressedSize; char savename[48]; } SaveHeader;
+typedef struct { u32 magicNumber,version,uncompressedSize,compressedSize; char savename[48]; } SaveHeader;
 #pragma pack(pop)
 size_t GetMaxCompressedSize(size_t srcSize) { return srcSize + (srcSize / 128) + 16; } // Worst-case buffer size for allocation
 size_t VoidSquasher(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) { // Find and pop the zeroes bubbles.  Turned an otherwise 232mb save file into ~23mb.
     size_t s = 0, d = 0;
     while (s < srcSize) {/*1. Zeros*/
-        size_t zeroCount = 0;
-        while(s + zeroCount < srcSize && src[s + zeroCount] == 0){zeroCount++;}
-        if(zeroCount > 0){
-            if(zeroCount < 128){ if (d >= dstCapacity){return 0;} dst[d++]=(u8)(0x80 + (zeroCount-1));}
-            else{if(d + 5 > dstCapacity){return 0;} dst[d++] = 0xFF; u32 zCount32=(u32)zeroCount; mcpy(&dst[d],&zCount32,sizeof(u32)); d+=4;}
-            
-            s+=zeroCount;
-            continue;
-        }
-        
-        size_t litCount = 0;/*2. Non-Zeros. It costs 2 bytes of overhead so only break a run if 3 or more zeros ahead.*/
-        while (s + litCount < srcSize && litCount < 128) {
-            if (src[s + litCount] == 0) {
-                size_t remain = srcSize - (s + litCount);
-                if (remain >= 3 && src[s + litCount + 1] == 0 && src[s + litCount + 2] == 0) { break; }
-            }
-            litCount++;
-        }
-        if (litCount > 0) {
-            if (d + 1 + litCount > dstCapacity) {return 0;}
-            
-            dst[d++] = (u8)(litCount - 1);
-            mcpy(&dst[d],&src[s],litCount);
-            s+=litCount; d+=litCount;
-        }
+        size_t zeroCount = 0; while(s + zeroCount < srcSize && src[s + zeroCount] == 0){zeroCount++;}
+        if(zeroCount > 0){ if(zeroCount < 128){ if (d >= dstCapacity){return 0;} dst[d++]=(u8)(0x80 + (zeroCount-1));} else{if(d + 5 > dstCapacity){return 0;} dst[d++] = 0xFF; u32 zCount32=(u32)zeroCount; mcpy(&dst[d],&zCount32,sizeof(u32)); d+=4;} s+=zeroCount; continue; }
+        size_t litCount = 0;/*2. Non-Zeros. It costs 2 bytes of overhead so only break a run if 3 or more zeros ahead.*/ 
+        while (s + litCount < srcSize && litCount < 128) { if (src[s + litCount] == 0) { size_t remain = srcSize - (s + litCount); if (remain >= 3 && src[s + litCount + 1] == 0 && src[s + litCount + 2] == 0) { break; } } litCount++; }
+        if (litCount > 0) { if (d + 1 + litCount > dstCapacity) {return 0;} dst[d++] = (u8)(litCount - 1); mcpy(&dst[d],&src[s],litCount); s+=litCount; d+=litCount; }
     } return d;
 }
-
-size_t BlowBubblesOfVoid(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) { // Put the bubbles of zero back.
-    size_t s = 0, d = 0;
-    while (s < srcSize && d < dstCapacity) {
-        u8 cmd=src[s++];
-        if (cmd<128){size_t litCount=cmd+1; if(s + litCount>srcSize || d+litCount>dstCapacity){return 0;} mcpy(&dst[d],&src[s],litCount); s+=litCount; d+=litCount;}/*Literal Run*/
-        else { u32 zeroCount=cmd-127; if (cmd==0xFF) { if (s+4>srcSize) return 0; mcpy(&zeroCount,src+s,sizeof(zeroCount)); s+=4; }
-            if (d+zeroCount>dstCapacity) return 0; mset(dst+d,0,zeroCount); d+=zeroCount;
-        }
-
-    } return d;
+size_t BlowBubblesOfVoid(const u8* src, size_t sz, u8* dst, size_t cap) { // Put the bubbles of zero back.
+    size_t s = 0, d = 0; while (s < sz && d < cap) { u8 cmd = src[s++]; if (cmd < 128) { size_t litCount = cmd + 1; if (s + litCount > sz || d + litCount > cap) { return 0; } mcpy(&dst[d],&src[s],litCount); s += litCount; d += litCount; }/*Literal Run*/ else { u32 zCnt = cmd - 127; if (cmd == 0xFF) { if (s + 4 > sz) {return 0; } mcpy(&zCnt,src + s,sizeof(zCnt)); s += 4; } if (d + zCnt > cap) return 0; mset(dst + d,0,zCnt); d += zCnt; } } return d;
 }
-
 void SaveGame(u8 slot, const char* savename) {
-    if(slot > 7 && !savename){return;}
-    
-    char path[]="./Data/sav0.bin"; path[10]='0' + slot;
-    FHandle fd=OS_OpenWriteonly(path); if(fd == (FHandle)-1){return;}
-    
-    size_t sz=sizeof(GlobalContext);
-    size_t maxCompSize=GetMaxCompressedSize(sz);
-    u8* b=OS_Alloc(maxCompSize);
-    size_t finalCompSize=VoidSquasher((const u8*)&World,sz,b,maxCompSize);
-    if (finalCompSize > 0) {
-        SaveHeader header = {.magicNumber=0x56415343/*'CSAV'*/, .version=SAVE_VERSION, .uncompressedSize=(u32)sz, .compressedSize=(u32)finalCompSize};
-        int i=0;
-        while(savename[i] != '\0' && i < 47){header.savename[i]=savename[i]; i++;}
-        header.savename[i]='\0';
-        
-        World.justSavedTimeStamp = get_time();
-        OS_Write(fd,&header,sizeof(SaveHeader),path);
-        OS_Write(fd,b,finalCompSize,path);
-        CenterStatusPrint("Saved to Slot %d",slot);
-    } else { DualLogError("Compression failed during SaveGame!\n"); }    OS_Free(b,maxCompSize); OS_Close(fd);
+    if(slot > 7 && !savename){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenWriteonly(path); if(fd == (FHandle)-1){return;} size_t sz = sizeof(GlobalContext); size_t maxCompSize=GetMaxCompressedSize(sz); u8* b = OS_Alloc(maxCompSize); size_t finalCompSize = VoidSquasher((const u8*)&World,sz,b,maxCompSize);
+    if (finalCompSize > 0) { SaveHeader header = {.magicNumber=0x56415343/*'CSAV'*/, .version=SAVE_VERSION, .uncompressedSize=(u32)sz, .compressedSize=(u32)finalCompSize}; int i=0; while(savename[i] != '\0' && i < 47){header.savename[i]=savename[i]; i++;} header.savename[i]='\0'; World.justSavedTimeStamp = get_time(); OS_Write(fd,&header,sizeof(SaveHeader),path); OS_Write(fd,b,finalCompSize,path); CenterStatusPrint("Saved to Slot %d",slot); }
+    else { DualLogError("Compression failed during SaveGame!\n"); }    OS_Free(b,maxCompSize); OS_Close(fd);
 }
-
-void WarmPairsClear(void);
-extern WeaponFireCtx wfx;
+void WarmPairsClear(void); extern WeaponFireCtx wfx;
 void LoadGame(u8 slot) {
     if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenReadonly(path); if(fd == (FHandle)-1){return;} SaveHeader header; if (OS_Read(fd,&header,sizeof(SaveHeader)) != sizeof(SaveHeader) || header.magicNumber != 0x56415343) { DualLogError("Corrupted save file header!\n"); OS_Close(fd); return; }
-    if (header.version != SAVE_VERSION || header.uncompressedSize != sizeof(GlobalContext)) { DualLogError("Save is from an incompatible build (v%u, %u bytes; this build wants v%u, %zu bytes) -- start a new game.\n", header.version, header.uncompressedSize, (u32)SAVE_VERSION, sizeof(GlobalContext)); OS_Close(fd); return; }/*split out of the header check above, which reported a plain version or layout-size mismatch as corruption.  The two saves in Data/ are both v7 and were already unloadable by v11: this project bumps the constant rather than migrating, so name the real reason.*/
+    if (header.version != SAVE_VERSION || header.uncompressedSize != sizeof(GlobalContext)) { DualLogError("Save is from an incompatible build (v%u, %u bytes; this build wants v%u, %zu bytes) -- start a new game.\n", header.version, header.uncompressedSize, (u32)SAVE_VERSION, sizeof(GlobalContext)); OS_Close(fd); return; }
     if (header.compressedSize == 0 || header.compressedSize > GetMaxCompressedSize(header.uncompressedSize)) { DualLogError("Save has an implausible compressed size (%u bytes) -- treating as corrupt.\n", header.compressedSize); OS_Close(fd); return; }
     u8* b=OS_Alloc(header.compressedSize);
     if (OS_Read(fd,b,header.compressedSize) == (long)header.compressedSize) {
         for (u8 l=0;l<MAX_LEVELS;++l) PSysClearLevel(l);
-        size_t result = BlowBubblesOfVoid(b,header.compressedSize,(u8*)&World,header.uncompressedSize);/*Decompress straight into the World str uct*/ if (result == header.uncompressedSize) { SetLevelPointers(World.curLev); WarmPairsClear(); for (u8 l=0;l<MAX_LEVELS;++l) World.levelParticles[l].count=0; LoadPerLevelModels(World.curLev); LoadLevelSetup(World.curLev); LoadLogTextForLanguage(Sys_Settings.Language); ResetLevelAudio(); mset(targetIDText,0,sizeof(targetIDText)); mset(targetIDTextFinished,0,sizeof(targetIDTextFinished)); mset(targetIDAttachedFinished,0,sizeof(targetIDAttachedFinished)); mset(targetIDAttached,0,sizeof(targetIDAttached)); wfx.pendingMeleeFinished=0.0; if (World.curLev == LEVEL_CYBERSPACE) CyberGolReset(); cullVisibilityValid=false; AutomapOnLoad(); CenterStatusPrint("Loaded Game: %s", header.savename); } else { DualLogError("Decompression failed! Expected %u bytes, got %u\n", header.uncompressedSize, (u32)result); }
+        size_t result = BlowBubblesOfVoid(b,header.compressedSize,(u8*)&World,header.uncompressedSize);/*Decompress straight into the World str uct*/
+        if (result == header.uncompressedSize) {
+            SetLevelPointers(World.curLev); WarmPairsClear(); for (u8 l=0;l<MAX_LEVELS;++l) World.levelParticles[l].count=0; LoadPerLevelModels(World.curLev); LoadLevelSetup(World.curLev); LoadLogTextForLanguage(Sys_Settings.Language); ResetLevelAudio(); mset(targetIDText,0,sizeof(targetIDText)); mset(targetIDTextFinished,0,sizeof(targetIDTextFinished)); mset(targetIDAttachedFinished,0,sizeof(targetIDAttachedFinished));
+            mset(targetIDAttached,0,sizeof(targetIDAttached)); wfx.pendingMeleeFinished=0.0; if (World.curLev == LEVEL_CYBERSPACE) CyberGolReset(); cullVisibilityValid=false; AutomapOnLoad(); CenterStatusPrint("Loaded Game: %s", header.savename);
+        } else { DualLogError("Decompression failed! Expected %u bytes, got %u\n", header.uncompressedSize, (u32)result); }
     } OS_Free(b,header.compressedSize); OS_Close(fd); for (int i=0;i<World.loadedLights;++i) { flag_set(&World.lights[i].lflags,LDIRTY,true); }
 }
-
-/*Read just the save header for a slot (for the load/save menu slot list). Returns true and fills out (NUL-terminated) when a valid save file exists; false when the slot is unused/corrupt.*/
 bool ReadSaveSlotName(u8 slot, char* out, size_t cap) {
-    if (slot > 7 || !out || cap == 0) return false;
-    char path[]="./Data/sav0.bin"; path[10]=(char)('0'+slot);
-    FHandle fd=OS_OpenReadonly(path); if (fd == (FHandle)-1) return false;
-    SaveHeader header; bool ok = OS_Read(fd,&header,sizeof(SaveHeader))==sizeof(SaveHeader) && header.magicNumber==0x56415343u && header.version==SAVE_VERSION && header.uncompressedSize==(u32)sizeof(GlobalContext);
-    OS_Close(fd); if (!ok) return false;
-    size_t i=0; while (i+1<cap && i<sizeof(header.savename) && header.savename[i]!='\0') { out[i]=header.savename[i]; ++i; } out[i]='\0';
-    return out[0]!='\0';
+    if (slot > 7 || !out || cap == 0) { return false; } char path[]="./Data/sav0.bin"; path[10]=(char)('0'+slot); FHandle fd=OS_OpenReadonly(path); if (fd == (FHandle)-1) { return false; }
+    SaveHeader header; bool ok = OS_Read(fd,&header,sizeof(SaveHeader))==sizeof(SaveHeader) && header.magicNumber==0x56415343u && header.version==SAVE_VERSION && header.uncompressedSize==(u32)sizeof(GlobalContext); OS_Close(fd); if (!ok) { return false; } size_t i=0; while (i + 1 < cap && i < sizeof(header.savename) && header.savename[i]!='\0') { out[i]=header.savename[i]; ++i; } out[i]='\0'; return out[0] != '\0';
 }

@@ -78,7 +78,7 @@ void TriggerOnTriggerEnter(u16 self, u16 other) { if (World.instances[self].allD
 void TriggerOnTriggerStay(u16 self, u16 other) { if (World.instances[self].allDone && World.instances[self].onlyOnce){return;} TriggerTriggerTripped(self,other); }
 static float GravityLiftTopY(u16 liftIdx) { ShapeBox box=Entity_GetBox(liftIdx); V3 up=quat_rot_v3(box.rot,(V3){0,1,0}); float extent=vabs(up.x)*box.hExt.x+vabs(up.y)*box.hExt.y+vabs(up.z)*box.hExt.z; return box.ctr.y+extent; }
 static float GravityLiftBodyBottomY(u16 body) { if(World.col[body]==CT_CAP){ShapeCapsule cap=Entity_GetCap(body);return cap.base.y-cap.rad;} return World.position[body].y-(World.colliderSize[body].y*0.5f*vabs(World.scale[body].y)); }
-static float GravityLiftGravityAccel(u16 body) { if(body==PLAYER1&&(Cheats.noclip||World.invP1.ladderState>0||World.curLev==LEVEL_CYBERSPACE))return 0.0f; return World.instances[body].hasGravity ? 9.81f : 0.0f; }
+static float GravityLiftGravityAccel(u16 body) { if(body==PLAYER1&&(Cheats.noclip||World.invP1.ladderState>0||World.curLev==LEVEL_CYBERSPACE))return 0.0f; return World.instances[body].hasGrav ? 9.81f : 0.0f; }
 static float GravityLiftTopControlForce(u16 body,float gap) { /* Underdamped spring toward the top plane; at rest this exactly balances gravity. */ float accel=vclamp(gap*64.0f-World.velocity[body].y*6.0f,-32.0f,20.0f); return vmax(EntMass(body),0.001f)*(GravityLiftGravityAccel(body)+accel); }
 static void GravityLiftApplyTopSupport(u16 body) {
     u16 marker=gravityLiftTopSupport[body]; if(!marker)return; u16 liftIdx=(u16)(marker-1u);
@@ -549,7 +549,7 @@ void Physics(float dt) {
         for (u16 i=0;i<dynamicEntityCount;++i) { // 1. Integrate velocity
             u16 a=dynamicEntities[i]; if (IdxIsNPC(World.instances[a].index) && (World.instances[a].entflags & EF_ASLEEP)) { continue; }
             
-            V3 acc = {0.0f,World.instances[a].hasGravity ? -9.81f : 0.0f,0.0f}; if (World.curLev == LEVEL_CYBERSPACE) acc.y = 0.0f; /*Nothing gets gravity in cyberspace: NPCs, items, projectiles, and the player all float (user directive 2026-10-23).*/ else if ((a == PLAYER1) && (Cheats.noclip || World.invP1.ladderState > 0)) acc.y = 0.0f; if (a == PLAYER1 && World.curLev == LEVEL_CYBERSPACE && World.diffCyb > 1 && !Cheats.noclip && V3_dot(World.velocity[a],World.velocity[a]) < 10000.0f) { acc = V3Add(acc,V3_ScaleByF(quat_rot_v3(World.rotation[a],(V3){0.0f,0.0f,1.0f}),2.0f)); } /*Unity CyberspaceMovement detrimental force at difficultyCyber>1: AddForce(viewDir*walkAcceleration*0.05*dt, ForceMode.Force). The Unity player Rigidbody mass is 1, so at Unity's 50Hz fixed step that force is an effective 2.0 m/s^2 along the full 3D view direction; applied mass-independently here because the Voxen player mass is 10 (same convention as trigger_cyberpush 595, which scales its force by mass). The 10000 gate is Unity's velocity.magnitude < walkAcceleration*0.05 (=100) test, squared.*/ acc = V3Add(acc,V3_ScaleByF(World.instances[a].accumulatedForce,1.0f / EntMass(a))); World.velocity[a] = V3Add(World.velocity[a],V3_ScaleByF(acc,dtsub));
+            V3 acc = {0.0f,World.instances[a].hasGrav ? -9.81f : 0.0f,0.0f}; if (World.curLev == LEVEL_CYBERSPACE) acc.y = 0.0f; /*Nothing gets gravity in cyberspace: NPCs, items, projectiles, and the player all float (user directive 2026-10-23).*/ else if ((a == PLAYER1) && (Cheats.noclip || World.invP1.ladderState > 0)) acc.y = 0.0f; if (a == PLAYER1 && World.curLev == LEVEL_CYBERSPACE && World.diffCyb > 1 && !Cheats.noclip && V3_dot(World.velocity[a],World.velocity[a]) < 10000.0f) { acc = V3Add(acc,V3_ScaleByF(quat_rot_v3(World.rotation[a],(V3){0.0f,0.0f,1.0f}),2.0f)); } /*Unity CyberspaceMovement detrimental force at difficultyCyber>1: AddForce(viewDir*walkAcceleration*0.05*dt, ForceMode.Force). The Unity player Rigidbody mass is 1, so at Unity's 50Hz fixed step that force is an effective 2.0 m/s^2 along the full 3D view direction; applied mass-independently here because the Voxen player mass is 10 (same convention as trigger_cyberpush 595, which scales its force by mass). The 10000 gate is Unity's velocity.magnitude < walkAcceleration*0.05 (=100) test, squared.*/ acc = V3Add(acc,V3_ScaleByF(World.instances[a].accumulatedForce,1.0f / EntMass(a))); World.velocity[a] = V3Add(World.velocity[a],V3_ScaleByF(acc,dtsub));
             if (!V3_IsSane(World.velocity[a])) { World.velocity[a]=(V3){0.0f,0.0f,0.0f}; } else { float speed=V3_Mag(World.velocity[a]); if (speed > MAX_SPEED) World.velocity[a]=V3_ScaleByF(World.velocity[a],MAX_SPEED / speed); }
             float linDrag = (World.instances[a].index >= 481 && World.instances[a].index <= 495) ? 1.0f : bodyDrag;
             World.velocity[a].x*=linDrag; /*Y axis left unaffected, so gravity accumulates*/ World.velocity[a].z*=linDrag; if (Cheats.noclip) World.velocity[a].y*=linDrag*linDrag; World.angularVelocity[a]=V3_ScaleByF(World.angularVelocity[a],angDrag); SetPosition(a,V3Add(World.position[a],V3_ScaleByF(World.velocity[a],dtsub)));
@@ -616,7 +616,7 @@ void Physics(float dt) {
         for (u32 c=0; c<gContactCount; ++c) { // 3.5 Positional Correction (Projection)
             SolverContact *sc = &gContacts[c]; float avgPen = 0.0f; for (int p=0; p<sc->m.n; ++p) avgPen += sc->m.p[p].pen; if (sc->m.n > 0)avgPen/=(float)sc->m.n; float correction=vmax(avgPen-0.005f,0.0f)*0.4f; float massDiv=sc->invMassA+sc->invMassB+PHY_EPSILON; SetPosition(sc->a,V3Add(World.position[sc->a],V3_ScaleByF(sc->m.normal,correction*sc->invMassA/massDiv))); if (!sc->bStatic) SetPosition(sc->b, V3_AsubB(World.position[sc->b], V3_ScaleByF(sc->m.normal, correction * sc->invMassB / massDiv)));
         }
-        bool ladderTouched = false; World.invP1.radiationArea=World.Sys_Music.inZone=World.Sys_Music.elevator=World.Sys_Music.cyberTube=World.Sys_Music.distortion=false; World.instances[PLAYER1].hasGravity = World.curLev != LEVEL_CYBERSPACE;
+        bool ladderTouched = false; World.invP1.radiationArea=World.Sys_Music.inZone=World.Sys_Music.elevator=World.Sys_Music.cyberTube=World.Sys_Music.distortion=false; World.instances[PLAYER1].hasGrav = World.curLev != LEVEL_CYBERSPACE;
         for (u16 i=0;i<numTriggers;++i) {
             u16 self = triggerVolumes[i]; u16 trigdx=World.instances[self].index; if (Cheats.showPhys) {if(trigdx==703)DrawCapsuleCollider(self);else DrawBoxColliderColored(self,(Color){1.0f,0.642f,0.0f,0.5f});} ShapeBox trigBox = Entity_GetBox(self); ShapeCapsule teleportCap=trigdx==703?Entity_GetCap(self):(ShapeCapsule){0};
             for (u16 o=0;o<dynamicEntityCount;++o) { // 4. Triggers
@@ -628,7 +628,7 @@ void Physics(float dt) {
                 else {float sphereRadius=vmax(vmax(vabs(World.colliderSize[other].x*World.scale[other].x),vabs(World.colliderSize[other].y*World.scale[other].y)),vabs(World.colliderSize[other].z*World.scale[other].z)); if(sphereRadius<=0.0f)sphereRadius=0.32f; touches=CapsuleTouchesOBB(World.position[other],sphereRadius,trigBox);}
                 if (!touches) continue; if(trigdx==596){ if(other==PLAYER1 && Cheats.noclip) continue;/*noclip flies the player through trigger volumes, so don't latch a gravity lift onto them*/ u16 mark=(u16)(self+1);bool entering=gravityLiftWasInside[other]!=mark&&gravityLiftTouched[other]!=mark;gravityLiftTouched[other]=mark;trigger_gravitylift_touch(self,other,entering);continue;} if(trigdx==703){u16 mark=(u16)(self+1);if(teleportWasTouching!=mark&&teleportTouched!=mark)TeleportTouchOnTriggerEnter(self,other);teleportTouched=mark;continue;}
                 switch(trigdx) {
-                    case 554/*prop_cyber_exit*/:if(other == PLAYER1){UIExitCyberspace();} break;   case 595/*trigger_cyberpush*/:if(other == PLAYER1 && World.diffCyb >= 1){AddForce(other,V3_ScaleByF(World.instances[self].dir,World.instances[self].force*0.02f*EntMass(other)),false); World.Sys_Music.cyberTube=true; World.Sys_Music.inZone=true; World.Sys_Music.zoneTrack=TT_Cybertube; World.Sys_Music.zoneMusic=MT_Override;} break;
+                    case 595/*trigger_cyberpush*/:if(other == PLAYER1 && World.diffCyb >= 1){AddForce(other,V3_ScaleByF(World.instances[self].dir,World.instances[self].force*0.02f*EntMass(other)),false); World.Sys_Music.cyberTube=true; World.Sys_Music.inZone=true; World.Sys_Music.zoneTrack=TT_Cybertube; World.Sys_Music.zoneMusic=MT_Override;} break;
                     case 597/*trigger_ladder*/:if(other == PLAYER1 && !Cheats.noclip){/*noclip flies the player through trigger volumes, so don't latch a ladder onto them*/World.invP1.ladderState=1; ladderTouched=true; ladderTopY=trigBox.ctr.y + trigBox.hExt.y;} break;
                     case 598/*trigger_multiple*/: case 600/*trigger_once*/: TriggerTriggerTripped(self,other); break;  case 599/*trigger_music*/:if(other == PLAYER1){TrackType tt=World.instances[self].trackType; MusicType mt=World.instances[self].musicType; World.Sys_Music.inZone=true; World.Sys_Music.elevator=(tt == TT_Elev); World.Sys_Music.distortion=(tt == TT_Distortion); World.Sys_Music.zoneTrack=tt; World.Sys_Music.zoneMusic=mt;} break;
                     case 601/*trigger_radiation*/:if(other == PLAYER1){World.invP1.radiationArea=true;World.instances[PLAYER1].radiation=World.instances[self].radiation;} break; /* radiation bleedoff / amelioration handled in physics update */
@@ -705,7 +705,7 @@ bool CantStand(u16 playerIdx, float targetHeight) {
     World.colliderSize[playerIdx].y=oldHeight; World.colliderCenter[playerIdx].y=oldCenterY; return !clear;
 }
 
-INLINE bool StandBlocked(float targetHeight) { if (!CantStand(PLAYER1, targetHeight)) return false; CenterStatusPrint("%s", Sys_Text.stringTable[targetHeight >= PLYR_HT ? 187 : 188]); return true; }
+INLINE bool StandBlocked(float targetHeight) { if (!CantStand(PLAYER1, targetHeight)) return false; CenterStatusPrint("%s", Sys_Text.stringTable[targetHeight >= 2.0f ? 187 : 188]); return true; }
 KeyState* GetCodeMapping(int settingIndex); const char* FootStepSound(FootStepType);
 void ApplyPlayerMovements(float dt) {
     Entity *p = &World.instances[PLAYER1];
@@ -738,17 +738,17 @@ void ApplyPlayerMovements(float dt) {
     if (cyber) { p->bodyState = BodyState_Standing; } /*Unity CyberSetup forces Standing so crouch/prone speed and capsule state cannot leak into cyberspace.*/
     else if (Crouch()) {
         if (p->bodyState == BodyState_Crouch) {
-            if (!StandBlocked(PLYR_HT)){p->bodyState = BodyState_StandingUp;}
+            if (!StandBlocked(2.0f)){p->bodyState = BodyState_StandingUp;}
         } else if (currentRatio > PLAYER_CROUCH_RATIO) {
             p->bodyState = BodyState_CrouchingDown;
         } else {
-            if (!StandBlocked(PLYR_HT*PLAYER_CROUCH_RATIO)){p->bodyState=BodyState_ProningUp;}
+            if (!StandBlocked(2.0f * PLAYER_CROUCH_RATIO)){p->bodyState=BodyState_ProningUp;}
         }
     } else if (Prone()) {
         if (p->bodyState == BodyState_Standing) { p->bodyState = BodyState_ProningDown; }
-        else if (currentRatio > PLAYER_CROUCH_RATIO) { if (!StandBlocked(PLYR_HT)) { p->bodyState=BodyState_StandingUp; } else { p->bodyState = BodyState_ProningDown; } }
+        else if (currentRatio > PLAYER_CROUCH_RATIO) { if (!StandBlocked(2.0f)) { p->bodyState=BodyState_StandingUp; } else { p->bodyState = BodyState_ProningDown; } }
         else if (p->bodyState == BodyState_Crouch) { p->bodyState = BodyState_ProningDown; }
-        else { if (!StandBlocked(PLYR_HT*PLAYER_CROUCH_RATIO)){p->bodyState = BodyState_ProningUp;} }
+        else { if (!StandBlocked(2.0f * PLAYER_CROUCH_RATIO)){p->bodyState = BodyState_ProningUp;} }
     }
     float fatigueWane = 1.0f;
     if (Cheats.fatigueCheat || World.invP1.staminupActive) World.invP1.fatigue = 0.0f;
@@ -797,7 +797,7 @@ void ApplyPlayerMovements(float dt) {
     float lastRatio = World.invP1.currentCrouchRatio; World.invP1.currentCrouchRatio = smooth_damp(lastRatio,targR,&World.invP1.crouchingVelocity,transitionSec,dt);
     if (World.invP1.currentCrouchRatio >= 1.0f) { World.invP1.currentCrouchRatio = 1.0f; if(p->bodyState == BodyState_StandingUp){p->bodyState=BodyState_Standing;} } else if (p->bodyState == BodyState_CrouchingDown && World.invP1.currentCrouchRatio <= PLAYER_CROUCH_RATIO) { World.invP1.currentCrouchRatio = PLAYER_CROUCH_RATIO; p->bodyState = BodyState_Crouch; }
     else if (p->bodyState == BodyState_ProningUp && World.invP1.currentCrouchRatio >= PLAYER_CROUCH_RATIO) { World.invP1.currentCrouchRatio = PLAYER_CROUCH_RATIO; p->bodyState = BodyState_Crouch; } else if (p->bodyState == BodyState_ProningDown && World.invP1.currentCrouchRatio <= PLAYER_PRONE_RATIO) { World.invP1.currentCrouchRatio = PLAYER_PRONE_RATIO; p->bodyState = BodyState_Prone; }
-    if (World.col[PLAYER1] == CT_CAP) { World.colliderSize[PLAYER1].y = PLYR_HT * World.invP1.currentCrouchRatio; World.colliderCenter[PLAYER1].y =  -PLYR_CAM_OFS_Y + (PLYR_HT - World.colliderSize[PLAYER1].y) * 0.5f; } // Split capsule shape in the middle, camera is thus 0.16 away from top of the capsule ((2 / 2 = 1) - 0.84 which is PLYR_CAM_OFS_Y)
+    if (World.col[PLAYER1] == CT_CAP) { World.colliderSize[PLAYER1].y = 2.0f * World.invP1.currentCrouchRatio; World.colliderCenter[PLAYER1].y =  -PLYR_CAM_OFS_Y + (2.0f - World.colliderSize[PLAYER1].y) * 0.5f; } // Split capsule shape in the middle, camera is thus 0.16 away from top of the capsule ((2 / 2 = 1) - 0.84 which is PLYR_CAM_OFS_Y)
     float h=(float)Forward() - (float)Backpedal(), s=(float)StrafeRight() - (float)StrafeLeft(), vertInput = Cheats.noclip ? (float)((SwimUp()) || Jump()) - (float)SwimDn() : 0.0;
     bool isSprinting=Sprint() && (grounded || inGravLift || World.invP1.ladderState>0 || Cheats.noclip); if(World.invP1.fatigueMoveFinished<World.pauseRelativeTime && (vabs(h)>0.0f || vabs(s)>0.0f) && grounded && (V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1])>0.1f && !Cheats.noclip)&&!boostAct){World.invP1.fatigue+=isSprinting ? 2.85f : 1.0f; World.invP1.fatigueMoveFinished=World.pauseRelativeTime+0.298f;/*Ensure no sync w/ bleedoff*/}
     if(World.invP1.footstepFinished < World.pauseRelativeTime && (vabs(h) > 0.0f || vabs(s) > 0.0f) && grounded && (PlayerIsMoving() && !Cheats.noclip) && !boostAct){

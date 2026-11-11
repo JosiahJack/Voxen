@@ -543,7 +543,7 @@ float GetDamageTakeAmount(DamageData* dd) {
 }
 
 void SpawnImpactEffect(u16 impactType, V3 pos) { if (impactType == 0 || impactType == U16_MAX) return; u16 fx = SpawnDynamicObject(impactType); if (!EntIdxIsValid(fx)) return; World.position[fx] = pos; Entity* e = &World.instances[fx]; flag_set(&e->entflags, EF_ACTIVE, true); if (e->itemLifeTime <= 0.0f) e->itemLifeTime = 1.0f; e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
-void ExitCyberspace() { UIExitCyberspace(); if (World.curLev != LEVEL_CYBERSPACE) return; if (World.instances[PLAYER1].cyberHealth <= 0.0f) World.instances[PLAYER1].cyberHealth = 1.0f; play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false); LoadLevel((World.cyberReturnLevel >= 0 && (u8)World.cyberReturnLevel < MAX_LEVELS) ? (u8)World.cyberReturnLevel : (World.startLevel < MAX_LEVELS ? World.startLevel : 0), World.cyberReturnPos); }
+void ExitCyberspace() { if (World.curLev != LEVEL_CYBERSPACE) return; if (World.instances[PLAYER1].cyberHealth <= 0.0f) World.instances[PLAYER1].cyberHealth = 1.0f; play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false); LoadLevel((World.cyberReturnLevel >= 0 && (u8)World.cyberReturnLevel < MAX_LEVELS) ? (u8)World.cyberReturnLevel : (World.startLevel < MAX_LEVELS ? World.startLevel : 0), World.cyberReturnPos); }
 void ReduceCurrentLevelSecurity(SecurityType stype) {
     static const u32 score[3]={4u,10u,27u}; u8 lev = World.curLev; if (lev >= MAX_LEVELS || stype == SecurityType_None) return;
     
@@ -604,7 +604,7 @@ static const i16 objectDeathSound[] = {[458]=63,[459]=66,[460]=66,[464]=62,[465]
 static bool IsCyberEntity(u16 self) { if (World.curLev == LEVEL_CYBERSPACE){return true;} Entity* e=&World.instances[self]; if (self != PLAYER1 && e->cyberHealth > 0.0f){return true;} return (IdxIsNPC(e->index) && (e->index - 419) > 23);/*24-28 are cyber enemies*/}
 static float ApplyAttTypeAdjustments(u16 self,float take,AttType at) { if (!IdxIsNPC(World.instances[self].index) || World.instances[self].health <= 0.0f){return take;} NPCType t = npcTable[World.instances[self].index - 419].type; if (at >= 12){return take;} return take * attackTypeMult[t][at]; }
 static void UseDeathTargets(u16 self) { if(self == PLAYER1){return;} if (World.instances[self].targetOnDeathIdx != IO_NONE) UseTargets(self,World.instances[self].targetOnDeathIdx); }
-static void TeleportAway(u16 self) { const PSysDef* dgo = &particleTypeDefs[189]; PSysDef d = *dgo; d.pos = World.position[self]; d.rotation = World.rotation[self]; PSysAddInternal(&d,self,U16_MAX); World.col[self] = CT_NONE; World.instances[self].hasGravity = false; World.velocity[self] = World.angularVelocity[self] = (V3){0}; World.instances[self].modelIndex = U16_MAX; play_wav(sounds[106]/*misc/teleport*/,AppliedFXVol(1.0f),World.position[self],false); }
+static void TeleportAway(u16 self) { const PSysDef* dgo = &particleTypeDefs[189]; PSysDef d = *dgo; d.pos = World.position[self]; d.rotation = World.rotation[self]; PSysAddInternal(&d,self,U16_MAX); World.col[self] = CT_NONE; World.instances[self].hasGrav = false; World.velocity[self] = World.angularVelocity[self] = (V3){0}; World.instances[self].modelIndex = U16_MAX; play_wav(sounds[106]/*misc/teleport*/,AppliedFXVol(1.0f),World.position[self],false); }
 static void DropSearchables(u16 self) {
     for (int i=0;i<4;i++) {
         if(World.instances[self].contents[i]<=-1){continue;}
@@ -617,7 +617,7 @@ static void DropSearchables(u16 self) {
 }
 
 static void CreateDeathEffects(u16 self,u16 fxPoolType) { if (fxPoolType == 0) {return; /*PoolType_None*/} if (!IdxInBounds((int)fxPoolType) || IdxIsGeometry((int)fxPoolType)) { return; } V3 pos = World.position[self]; if (World.col[self] != CT_NONE) { pos = V3Add(pos,World.colliderCenter[self]); } SpawnImpactEffect(fxPoolType, pos); }
-static void HideSelf(u16 self) { if (World.instances[self].index == 279) {return; /*tv screens keep mesh visible*/} World.instances[self].modelIndex = MAX_MDLS; World.instances[self].hasGravity = false; }
+static void HideSelf(u16 self) { if (World.instances[self].index == 279) {return; /*tv screens keep mesh visible*/} World.instances[self].modelIndex = MAX_MDLS; World.instances[self].hasGrav = false; }
 static void SpawnSecCpuNodeGibs(u16 self) {
     if (World.instances[self].index != 478) return;
     
@@ -625,7 +625,7 @@ static void SpawnSecCpuNodeGibs(u16 self) {
     for (u16 gibConst = 840; gibConst <= 853; ++gibConst) {
         u16 gib = SpawnDynamicObject(gibConst); if (!EntIdxIsValid(gib) || gib == self) continue;
         
-        World.position[gib] = pos; World.rotation[gib] = rot; World.velocity[gib] = (V3){0.0f, World.velocity[self].y, 0.0f}; World.instances[gib].hasGravity = true; World.layer[gib] = L_Corpse;
+        World.position[gib] = pos; World.rotation[gib] = rot; World.velocity[gib] = (V3){0.0f, World.velocity[self].y, 0.0f}; World.instances[gib].hasGrav = true; World.layer[gib] = L_Corpse;
     }
 }
 static void SpawnDeathEffectAt(u16 type,V3 pos);

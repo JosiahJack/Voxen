@@ -12,7 +12,7 @@ typedef struct { float *pos,*nrm,*uv,*verts; u32 *hash,*used,*remap; u8* cache; 
 typedef struct { const char *data; i32 size; } RawOBJ;
 typedef struct { u16 index; bool animated; u8 animationNum; u16* frames; u32 frameCount; char path[128]; } ModelData;
 typedef struct { ModelData* entries; u32 count; } ModelDataParser;
-u32 mdlVboOfs[MAX_MDLS], mdlIboOfs[MAX_MDLS],modelVBO = 0, modelIBO = 0,rtCapNodeWords = 0, rtCapTriWords = 0, rtCapPosWords = 0, rtCapUvWords = 0, rtCapOrderU16 = 0,rtPersistNodeWords = 0, rtPersistTriWords = 0, rtPersistPosWords = 0, rtPersistUvWords = 0, rtPersistOrderU16 = 0;
+u32 mdlVboOfs[MAX_MDLS],mdlIboOfs[MAX_MDLS],modelVBO,modelIBO,rtCapNodeWords,rtCapTriWords,rtCapOrderU16,rtPersistNodeWords,rtPersistTriWords,rtPersistOrderU16;
 u8 mdlPersistentSet[MAX_MDLS],mdlSwapLev = 255u; 
 static u8 mdlIsAnimFrame[MAX_MDLS]; static u16 mdlLevelBits[MAX_MDLS], **mdlPstTri = NULL; static bool mdlDerivDone = false; static u32 mdlSwapVboBase,mdlSwapIboBase,mdlPoolVbBytes,mdlPoolIbBytes,mdlSpanBase[MAX_MDLS],g_mdlDataCnt = 0; static ModelData* g_mdlData = NULL; static float** vPos; static half** mdlPstHalfV = NULL; static u32 *mdlMetaVertCounts = NULL, *mdlMetaTriCounts = NULL;
 typedef struct { u32 base, spanLen; } AnimEntryRef; static AnimEntryRef animNumSpans[MAXANIM][8]; static u8 animNumSpanCnt[MAXANIM];
@@ -819,16 +819,16 @@ void LoadModels() {
     u32 tv = 0, tt = 0, vrun = 0, irun = 0; MdlLoadSet s = { lo, hi, mdlPersistentSet, 0, 0, 0, &tv, &tt }; MdlLoadModelSet(&s);
     for (u32 m=0; m<mdlsCnt; ++m) { if (!mdlPersistentSet[m] || !mdlPstHalfV[m]) continue; mdlVboOfs[m] = (vrun + 255u) & ~255u; vrun = mdlVboOfs[m] + MdlVbBytesRaw((u16)m); mdlIboOfs[m] = (irun + 255u) & ~255u; irun = mdlIboOfs[m] + MdlIbBytesRaw((u16)m); }
     mdlSwapVboBase = (vrun + 255u) & ~255u; mdlSwapIboBase = (irun + 255u) & ~255u;
-    u32 pOrdU16 = 0, pNodeSlW = 0, pTriW = 0, pUvW = 0;
-    for (u32 m=0; m<mdlsCnt; ++m) { if (!mdlPersistentSet[m] || !mdlPstHalfV[m]) continue; if (BvhHasBVH((u16)m)) { pOrdU16 = (pOrdU16 + 1u) & ~1u; pOrdU16 += modelBVHTriOrderCounts[m]; pNodeSlW += modelBVHNodeCounts[m]; pTriW += modelBVHTriOrderCounts[m]; } pUvW += rtSrcVertCounts[m]; }
+    u32 pOrdU16 = 0, pNodeSlW = 0, pTriW = 0;;
+    for (u32 m=0; m<mdlsCnt; ++m) { if (!mdlPersistentSet[m] || !mdlPstHalfV[m]) continue; if (BvhHasBVH((u16)m)) { pOrdU16 = (pOrdU16 + 1u) & ~1u; pOrdU16 += modelBVHTriOrderCounts[m]; pNodeSlW += modelBVHNodeCounts[m]; pTriW += modelBVHTriOrderCounts[m]; } }
     u32 wvbMax=0, wibMax=0, wOrdMax=0, wNodeMax=0, wTriMax=0, wVtxMax=0;
     for (u8 lev=0; lev<MAX_LEVELS; ++lev) {
         u32 vb = 0, ib = 0, ord = 0, nsl = 0, tri = 0, vtx = 0;
         for (u32 m=0; m<mdlsCnt; ++m) { if (!MdlIsWinMemberSet((u16)m,lev)) continue; vb = ((vb + 255u) & ~255u) + mdlMetaVertCounts[m]*VRT_ATT_SZ; ib = ((ib + 255u) & ~255u) + mdlMetaTriCounts[m]*6u + 4u; if (mdlMetaTriCounts[m]) { nsl += MdlBvhNodeBound(mdlMetaTriCounts[m]); tri += mdlMetaTriCounts[m]; ord = (ord + 1u) & ~1u; ord += mdlMetaTriCounts[m]; } vtx += mdlMetaVertCounts[m]; }
         if (vb > wvbMax) wvbMax = vb; if (ib > wibMax) wibMax = ib; if (ord > wOrdMax) wOrdMax = ord; if (nsl > wNodeMax) wNodeMax = nsl; if (tri > wTriMax) wTriMax = tri; if (vtx > wVtxMax) wVtxMax = vtx;
     }
-    u32 wvbMarg = wvbMax + (wvbMax + 49u) / 50u; u32 wVtxMarg = wVtxMax + (wVtxMax + 49u) / 50u;
-    rtCapNodeWords = (pNodeSlW + wNodeMax) * 16u; rtCapTriWords  = (pTriW + wTriMax) * 2u; rtCapPosWords  = pUvW * 2u + wVtxMarg * 2u; rtCapUvWords   = pUvW + wVtxMarg; rtCapOrderU16  = pOrdU16 + wOrdMax + 2u; rtPersistNodeWords = pNodeSlW * 16u; rtPersistTriWords = pTriW * 2u; rtPersistPosWords = pUvW * 2u; rtPersistUvWords = pUvW; rtPersistOrderU16 = pOrdU16;
+    u32 wvbMarg = wvbMax + (wvbMax + 49u) / 50u;
+    rtCapNodeWords = (pNodeSlW + wNodeMax) * 16u; rtCapTriWords  = (pTriW + wTriMax) * 2u; rtCapOrderU16  = pOrdU16 + wOrdMax + 2u; rtPersistNodeWords = pNodeSlW * 16u; rtPersistTriWords = pTriW * 2u; rtPersistOrderU16 = pOrdU16;
     mdlPoolVbBytes = mdlSwapVboBase + wvbMarg; mdlPoolIbBytes = mdlSwapIboBase + wibMax;
     glGenBuffers(1, &modelVBO); glBindBuffer(GL_ARRAY_BUFFER, modelVBO); glBufferData(GL_ARRAY_BUFFER, mdlPoolVbBytes, NULL, GL_STATIC_DRAW);
     glGenBuffers(1, &modelIBO); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, modelIBO); glBufferData(GL_ELEMENT_ARRAY_BUFFER, mdlPoolIbBytes, NULL, GL_STATIC_DRAW);

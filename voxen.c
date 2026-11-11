@@ -1641,14 +1641,14 @@ static const Color fogLUT[MAX_LEVELS] = { {0.3207547f, 0.29200783f,0.29200783f,0
 static const V2 levMins[MAX_LEVELS]={{-37.3600f,-52.7600f},/*0*/  {-53.8000f,-64.0800f},/*1*/  {-46.12f,-56.34f},/*2*/  {-51.266f,-51.246f},/*3*/  {-29.462f, -53.7872f},/*4*/ {-47.3622f,-55.04f},/*5*/ {-65.94f,-71.6833f},/*6*/ {-66.8989f,-82.0144f},/*7*/ {-43.7456f,-43.9872f},/*8*/ {-51.5039f,-69.0306f},/*9*/ {-24.0994f,-39.7972f},/*10*/ {-27.1772f,-28.3394f},/*11*/ {-18.05f,-30.50f},/*12*/ {99.4200f,-60.120f}/*13*/};
 static const float lFars[MAX_LEVELS] = { 56.32f/*R*/, 56.32f/*1*/, 51.2f/*2*/, 51.2f/*3*/, 40.96f/*4*/, 58.88f/*5*/, 79.36f/*6*/, 56.32f/*7*/, 69.12f/*8*/, 53.76f/*9*/,  51.2f/*10*/,  51.2f/*11*/, 38.4f/*12*/, 1300.00f/*13*/};
 int EdgeCompare(const void* a, const void* b) { u32 ea = *(const u32*)a, eb = *(const u32*)b; return (ea > eb) - (ea < eb); }
-u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount = 0; size_t cvxAdjLive = 0;
+u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount = 0;
 void ResetDoorPortals(), MissionTimerInit(), AddHardwareToInventory(int,int), mp3_clear();
 static void ResetLoadTallies(void) {
     decalInlineTextCount = decalStyleCount = 0;
     mset(World.levelCameraCount,0,sizeof(World.levelCameraCount));     mset(World.levelSmallNodeCount,0,sizeof(World.levelSmallNodeCount));     mset(World.levelLargeNodeCount,0,sizeof(World.levelLargeNodeCount));
     mset(World.levCamDestroyedCnt,0,sizeof(World.levCamDestroyedCnt)); mset(World.levSmNodeDestroyedCnt,0,sizeof(World.levSmNodeDestroyedCnt)); mset(World.levNodeDestroyedCnt,0,sizeof(World.levNodeDestroyedCnt));
     for (u32 u = 0; u < uniqueCvxMeshCount; ++u) { if (cvxAdjOffsets[u]) { OS_Free(cvxAdjOffsets[u], cvxAdjOffsetBytes[u]); cvxAdjOffsets[u] = 0; cvxAdjOffsetBytes[u] = 0; } if (cvxAdjLists[u]) { OS_Free(cvxAdjLists[u], cvxAdjListBytes[u]); cvxAdjLists[u] = 0; cvxAdjListBytes[u] = 0; } }
-    uniqueCvxMeshCount = 0; cvxAdjLive = 0; ResetDoorPortals(); mset(World.physSleep, 0, sizeof(World.physSleep));
+    uniqueCvxMeshCount = 0; ResetDoorPortals(); mset(World.physSleep, 0, sizeof(World.physSleep));
 }
 // Init && Main
 bool MdlIsWinMemberSet(u16,u8); void MdlSwapWindowDisposeData(u16);
@@ -1675,7 +1675,7 @@ void MdlBuildLevelConvexAdjacency(u8 lev) {
         u16* adjList = OS_Alloc(uniqueEdgeCount * 2 * sizeof(u16));
         u32* writePos = OS_Alloc(vCount * sizeof(u32)); mcpy(writePos, offsets, vCount * sizeof(u32));
         for (u32 i=0;i<uniqueEdgeCount;++i) { u16 a = (u16)(tempEdges[i] >> 16); u16 b = (u16)(tempEdges[i] & 0xFFFF); adjList[writePos[a]++]=b; adjList[writePos[b]++]=a; }
-        cvxAdjOffsets[u] = offsets; cvxAdjLists[u] = adjList; cvxAdjOffsetBytes[u] = (vCount+1) * sizeof(u32); cvxAdjListBytes[u] = uniqueEdgeCount * 2 * sizeof(u16); cvxAdjLive += cvxAdjOffsetBytes[u] + cvxAdjListBytes[u];
+        cvxAdjOffsets[u] = offsets; cvxAdjLists[u] = adjList; cvxAdjOffsetBytes[u] = (vCount+1) * sizeof(u32); cvxAdjListBytes[u] = uniqueEdgeCount * 2 * sizeof(u16);
         OS_Free(tempEdges,tCount * 3 * sizeof(u32)); OS_Free(degree,vCount * sizeof(u32)); OS_Free(writePos,vCount * sizeof(u32));
     }
 }
@@ -1695,8 +1695,8 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.instances[PLAYER1].index = 767;
     World.layer[PLAYER1] = L_Player; World.scale[PLAYER1] = (V3){1.0f,1.0f,1.0f}; World.rotation[PLAYER1] = (Quaternion){0.0f,0.7071f,0.0f,0.7071f}; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
     World.instances[PLAYER1].entflags = EF_ACTIVE|EF_RIGIDBODY; World.instances[PLAYER1].modelIndex = MAX_MDLS;
-    World.col[PLAYER1] = CT_CAP; World.colliderCenter[PLAYER1].y = -PLYR_CAM_OFS_Y; World.colliderSize[PLAYER1] = (V3){PLYR_RAD,PLYR_HT,1.0f}; World.velocity[PLAYER1] = (V3){0.0f,0.0f,0.0f};
-    World.cam_yaw = 90.0f; World.cam_pitch = World.cam_roll = World.invP1.leanTarget = 0.0f; World.instances[PLAYER1].hasGravity = true;
+    World.col[PLAYER1] = CT_CAP; World.colliderCenter[PLAYER1].y = -PLYR_CAM_OFS_Y; World.colliderSize[PLAYER1] = (V3){0.48f,2.0f,1.0f}; World.velocity[PLAYER1] = (V3){0.0f,0.0f,0.0f};
+    World.cam_yaw = 90.0f; World.cam_pitch = World.cam_roll = World.invP1.leanTarget = 0.0f; World.instances[PLAYER1].hasGrav = true;
     World.instances[PLAYER1].health = 211.0f; World.instances[PLAYER1].cyberHealth = 255.0f; World.instances[PLAYER1].bloodType = BloodType_Red;
     World.invP1.noiseFinished = World.pauseRelativeTime; World.invP1.energy = 54.0f; World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1 + (double)random_range(0.5f,1.0f);
     for (int i=0;i<12;++i) { World.invP1.hardwareInvReferenceIndex[i] = 21 + i; } World.invP1.hardwareInvReferenceIndex[12] = World.invP1.hardwareInvReferenceIndex[13] = 0;
