@@ -1115,13 +1115,16 @@ void SaveGame(u8 slot, const char* savename) {
     } else { DualLogError("Compression failed during SaveGame!\n"); }    OS_Free(b,maxCompSize); OS_Close(fd);
 }
 
+void WarmPairsClear(void);
+extern WeaponFireCtx wfx;
 void LoadGame(u8 slot) {
     if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenReadonly(path); if(fd == (FHandle)-1){return;} SaveHeader header; if (OS_Read(fd,&header,sizeof(SaveHeader)) != sizeof(SaveHeader) || header.magicNumber != 0x56415343) { DualLogError("Corrupted save file header!\n"); OS_Close(fd); return; }
     if (header.version != SAVE_VERSION || header.uncompressedSize != sizeof(GlobalContext)) { DualLogError("Save is from an incompatible build (v%u, %u bytes; this build wants v%u, %zu bytes) -- start a new game.\n", header.version, header.uncompressedSize, (u32)SAVE_VERSION, sizeof(GlobalContext)); OS_Close(fd); return; }/*split out of the header check above, which reported a plain version or layout-size mismatch as corruption.  The two saves in Data/ are both v7 and were already unloadable by v11: this project bumps the constant rather than migrating, so name the real reason.*/
     if (header.compressedSize == 0 || header.compressedSize > GetMaxCompressedSize(header.uncompressedSize)) { DualLogError("Save has an implausible compressed size (%u bytes) -- treating as corrupt.\n", header.compressedSize); OS_Close(fd); return; }
     u8* b=OS_Alloc(header.compressedSize);
     if (OS_Read(fd,b,header.compressedSize) == (long)header.compressedSize) {
-        size_t result = BlowBubblesOfVoid(b,header.compressedSize,(u8*)&World,header.uncompressedSize);/*Decompress straight into the World str uct*/ if (result == header.uncompressedSize) { SetLevelPointers(World.curLev); LoadPerLevelModels(World.curLev); LoadLevelSetup(World.curLev); LoadLogTextForLanguage(Sys_Settings.Language); cullVisibilityValid=false; AutomapOnLoad(); CenterStatusPrint("Loaded Game: %s", header.savename); } else { DualLogError("Decompression failed! Expected %u bytes, got %u\n", header.uncompressedSize, (u32)result); }
+        for (u8 l=0;l<MAX_LEVELS;++l) PSysClearLevel(l);
+        size_t result = BlowBubblesOfVoid(b,header.compressedSize,(u8*)&World,header.uncompressedSize);/*Decompress straight into the World str uct*/ if (result == header.uncompressedSize) { SetLevelPointers(World.curLev); WarmPairsClear(); for (u8 l=0;l<MAX_LEVELS;++l) World.levelParticles[l].count=0; LoadPerLevelModels(World.curLev); LoadLevelSetup(World.curLev); LoadLogTextForLanguage(Sys_Settings.Language); ResetLevelAudio(); mset(targetIDText,0,sizeof(targetIDText)); mset(targetIDTextFinished,0,sizeof(targetIDTextFinished)); mset(targetIDAttachedFinished,0,sizeof(targetIDAttachedFinished)); mset(targetIDAttached,0,sizeof(targetIDAttached)); wfx.pendingMeleeFinished=0.0; if (World.curLev == LEVEL_CYBERSPACE) CyberGolReset(); cullVisibilityValid=false; AutomapOnLoad(); CenterStatusPrint("Loaded Game: %s", header.savename); } else { DualLogError("Decompression failed! Expected %u bytes, got %u\n", header.uncompressedSize, (u32)result); }
     } OS_Free(b,header.compressedSize); OS_Close(fd); for (int i=0;i<World.loadedLights;++i) { flag_set(&World.lights[i].lflags,LDIRTY,true); }
 }
 

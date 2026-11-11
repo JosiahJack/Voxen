@@ -10,6 +10,7 @@ typedef struct { u16 a,b; Manifold m; V3 rA[MANIFOLD_MAX],rB[MANIFOLD_MAX]; floa
 static SolverContact gContacts[MAX_GLOBAL_CONTACTS]; static u32 gContactCount; static float posBudget[INSTANCE_COUNT]; static u16 dynamicEntities[512],dynamicEntityCount; static u8 grenadeImpactQueued[INSTANCE_COUNT],projImpQueued[INSTANCE_COUNT],projectileContactThisFrame[INSTANCE_COUNT]; static u16 projImpTarg[INSTANCE_COUNT]; static V3 projImpPt[INSTANCE_COUNT],projImpNor[INSTANCE_COUNT]; static float nextCapacityWarn[5]; static u16 gravityLiftWasInside[INSTANCE_COUNT],gravityLiftTouched[INSTANCE_COUNT],gravityLiftTopSupport[INSTANCE_COUNT],teleportWasTouching,teleportTouched; static u8 gravityLiftOverlapLevel=255;
 typedef struct { u16 a,b; u8 n; V3 pt[MANIFOLD_MAX],normal; float accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],pen[MANIFOLD_MAX],dt; u8 votes; V3 challN,posA,posB; u32 frame; } WarmPair;
 static WarmPair gWarmPairs[2048]; static u8 gWarmPairLevel=255;
+void WarmPairsClear(void){mset(gWarmPairs,0,sizeof(gWarmPairs));gWarmPairLevel=World.curLev;}
 INLINE u32 WarmPairHash(u16 a,u16 b) { return ((u32)a*40503u ^ (u32)b*69621u) & (2047u); }
 INLINE WarmPair* WarmPairProbe(u16 a,u16 b) { u32 h=WarmPairHash(a,b); for (u32 p=0;p<8;++p) { WarmPair* wp=&gWarmPairs[(h+p)&(2047u)]; if (!wp->n || (wp->a==a&&wp->b==b)) return wp; } return &gWarmPairs[h]; }
 INLINE bool WarmPairSkip(u16 a,u16 b) { return (a==PLAYER1 || b==PLAYER1 || IdxIsNPC(World.instances[a].index) || IdxIsNPC(World.instances[b].index)); }
