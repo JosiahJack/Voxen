@@ -134,21 +134,12 @@ void DualLogError(const char*, ...), DualLog(const char*, ...), DualLogWarn(cons
     INLINE int OS_GetNumThreads() { unsigned long m[16]; long r=204; __asm__ __volatile__("syscall":"+a"(r):"D"(0LL),"S"(128LL),"d"(m):"rcx","r11","memory"); int c = 0; for(int i=0;i<(r/8);i++) {c+=__builtin_popcountll(m[i]);} return r < 0 ? 1 : c; }
     INLINE void OS_Free(void* p, size_t s){ long r=11; if(!p || p == (void*)-1) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } __atomic_sub_fetch(&g_mmap_live,s,__ATOMIC_RELAXED); __asm__ __volatile__("syscall":"+a"(r):"D"(p),"S"(s):"rcx","r11","memory"); if(r<0) DualLogError("munmap failed\n"); }
     INLINE long OS_RawWrite(FHandle fd, const void* buf, size_t cnt) { i64 r=1; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(buf),"d"(cnt):"rcx","r11","memory"); return r; }
-
     // Multithreading taken from https://github.com/skeeto/scratch/blob/master/misc/stack_head.c Ref: https://nullprogram.com/blog/2023/03/23/ This is free and unencumbered software released into the public domain.
     #define SYSCALL4(n, a, b, c, d) syscall6(n,(long)(a),(long)(b),(long)(c),(long)(d),0,0)
     INLINE long syscall6(long n, long a, long b, long c, long d, long e, long f) { register long r=n; register long r10 __asm__("r10") = d; register long r8  __asm__("r8")  = e; register long r9  __asm__("r9")  = f; __asm__ __volatile__("syscall":"+a"(r):"D"(a),"S"(b),"d"(c),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); return r; }
     __attribute__((naked)) static long OS_CloneSyscall(struct OS_ThreadHead* stack) { __asm__ volatile ("mov %%rdi, %%rsi\nmov $0x50f00, %%edi\nmov $56, %%eax\nsyscall\nmov  %%rsp, %%rdi\nret\n":::"rax","rcx","rsi","rdi","r11","memory"); }
-    __attribute__((noreturn)) static void thrtramp(struct OS_ThreadHead* head) {
-        void*(*fn)(void*)=head->fn; void*arg=head->arg; int*futex=&head->join_futex; fn(arg); /*Publish completion then wake+exit using registers only: OS_ThreadJoin munmaps as soon as it observes flag, so no stack access (not even call/spill of syscall wrapper, fatal at -O0) may follow publish. xchg is seq-cst store.*/
-        __asm__ volatile ("movl $1, %%eax\n\txchgl %%eax, (%0)\n\tmov %0, %%rdi\n\tmov $1, %%esi\n\tmov $1, %%edx\n\tmov $202, %%eax\n\tsyscall\n\tmov $60, %%eax\n\txor %%edi, %%edi\n\tsyscall\n" :: "r"(futex) : "rax","rcx","rsi","rdi","rdx","r11","memory"); __builtin_unreachable();
-    }
-
-    INLINE int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) {
-        void* base = OS_AllocateRAM(THRSTACKSZ,0x1|0x2,0x2|0x20,INVALID_FHANDLE); struct OS_ThreadHead* head = (struct OS_ThreadHead*)((char*)base + THRSTACKSZ) - 1; head->trampoline = thrtramp; head->fn=fn; head->arg=arg; head->join_futex=0; head->_pad=0;
-        long tid = OS_CloneSyscall(head); if(tid < 0){OS_Free(base,THRSTACKSZ); return (int)tid;} out->head=head; out->stack_base=base; return 0;
-    }
-    
+    __attribute__((noreturn)) static void thrtramp(struct OS_ThreadHead* head) { void*(*fn)(void*)=head->fn; void*arg=head->arg; int*futex=&head->join_futex; fn(arg); __asm__ volatile ("movl $1, %%eax\n\txchgl %%eax, (%0)\n\tmov %0, %%rdi\n\tmov $1, %%esi\n\tmov $1, %%edx\n\tmov $202, %%eax\n\tsyscall\n\tmov $60, %%eax\n\txor %%edi, %%edi\n\tsyscall\n" :: "r"(futex) : "rax","rcx","rsi","rdi","rdx","r11","memory"); __builtin_unreachable(); }
+    INLINE int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) { void* b = OS_AllocateRAM(THRSTACKSZ,0x1|0x2,0x2|0x20,INVALID_FHANDLE); struct OS_ThreadHead* head = (struct OS_ThreadHead*)((char*)b + THRSTACKSZ) - 1; head->trampoline = thrtramp; head->fn=fn; head->arg=arg; head->join_futex=0; head->_pad=0; long tid = OS_CloneSyscall(head); if(tid < 0){OS_Free(b,THRSTACKSZ); return (int)tid;} out->head = head; out->stack_base = b; return 0; }
     INLINE void OS_ThreadJoin(OS_Thread* t) { int v; while ((v = __atomic_load_n(&t->head->join_futex, __ATOMIC_SEQ_CST)) == 0) SYSCALL4(202, &t->head->join_futex, 0 /*FUTEX_WAIT*/, v, 0); OS_Free(t->stack_base,THRSTACKSZ); t->head = NULL; t->stack_base = NULL; }
     INLINE void OS_FutexWait(u32* a, u32 expect) { while (__atomic_load_n(a,__ATOMIC_ACQUIRE)==expect) SYSCALL4(202, a, 0 /*FUTEX_WAIT*/, expect, 0); }
     INLINE void OS_FutexWakeAll(u32* a) { SYSCALL4(202, a, 1 /*FUTEX_WAKE*/, 0x7fffffff, 0); }
@@ -156,7 +147,6 @@ void DualLogError(const char*, ...), DualLog(const char*, ...), DualLogWarn(cons
 #endif 
 INLINE void* OS_Alloc(size_t amount) { return OS_AllocateRAM(amount,0x1|0x2,0x2|0x20,INVALID_FHANDLE); }
 void *OS_AllocScratch(size_t amount), OS_FreeInitPhase();
-extern u8 *scratch_cur, *scratch_end;
 INLINE void OS_Write(FHandle f,const void* buf, size_t s, const char* p) { size_t total=0; while(total < s) { i64 w=OS_RawWrite(f,(const char*)buf + total,s - total); if(w < 0) { DualLogError("Write error to %s: %s[%d]\n",p,w,(i32)-w); OS_Exit(1); } total += (size_t)w; } }
 INLINE void* OS_OpenAndAllocateFileBufferReadonly(const char* p,FHandle* f,int* s) {void* r;return((*f=OS_OpenReadonly(p))==(FHandle)-1)?*s=0,(void*)0:((*s=OS_FileSize(*f))<=0)?DualLogError("Skipping empty:%s\n",p),OS_Close(*f),OS_Exit(1),NULL:(r=OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p))?(OS_Close(*f),r):(*s=0,NULL);}
 INLINE void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (mcpy(n,old,olds),OS_Free(old,olds),n) : 0; }
@@ -271,7 +261,7 @@ extern CamView camViews[64],levelCamViews[14][64]; extern u8 camViewCount,levelC
 extern u8 sensaroundCamViewCenter,sensaroundCamViewLeft,sensaroundCamViewRight; void UpdateSensaroundCamViews();
 typedef struct { AttType type; float damage,range,speed,timeToActual,timeBetween,waitMin,waitMax,waitChance,projectileSpeed; bool hasLaser; int projectilePrefab; } NPCAttack;
 typedef struct { // Keep initializer order in npcTable.
-    const char* name; NPCAttack attack[3]; float health,healthForCyberNPC,armorvalue/*TODO delete from table and here*/,defense; AIMoveType moveType; float yawSpeed,fov,fovStartMovement,distToSeeBehind,sightRange,walkSpeed,runSpeed,attack3Force,attack3Radius,timeToPain,timeBetweenPain,timeTillDead,timeToChangeEnemy,timeIdleSFXMin,timeIdleSFXMax; bool explodeOnAttack3; double huntTime; float flightHeight; bool flightHeightIsPercentage,switchMaterialOnDeath;
+    const char* name; NPCAttack attack[3]; float health,healthForCyberNPC,defense; AIMoveType moveType; float yawSpeed,fov,fovStartMovement,distToSeeBehind,sightRange,walkSpeed,runSpeed,attack3Force,attack3Radius,timeToPain,timeBetweenPain,timeTillDead,timeToChangeEnemy,timeIdleSFXMin,timeIdleSFXMax; bool explodeOnAttack3; double huntTime; float flightHeight; bool flightHeightIsPercentage,switchMaterialOnDeath;
     float hearingRange,timeForTranquilization; bool hopsOnMove; NPCType type;
 } NPCTable;
 extern const NPCTable npcTable[NUM_AI_TYPES];
