@@ -14,7 +14,7 @@ static u8 currentPlayerNameLength,currentMenuPage,resDropdownCount,resSelectedId
 static i8 currentMenuItem,currentMenuTab, menuItemCount = 4, menuTabCount = 1, resHoverIdx = -1;
 u8 particleBlendTexture[MAXTEX],camViewCount,levelCamViewCount[14];
 char decalInlineText[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN];
-bool doubleSidedTexture[MAXTEX],transparentTexture[MAXTEX],shadowBuffersCreated,resDropdownOpen,mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause,fovSliderActive,gammaSliderActive,masterVolumeSliderActive,musicVolumeSliderActive,messageVolumeSliderActive,sfxVolumeSliderActive,enteringPlayerName;
+bool doubleSidedTexture[MAXTEX],transparentTexture[MAXTEX],shadowBuffersCreated,resDropdownOpen,mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause,fovSliderActive,gammaSliderActive,masterVolumeSliderActive,musicVolumeSliderActive,messageVolumeSliderActive,sfxVolumeSliderActive,ssrResSliderActive,mouseSensSliderActive,enteringPlayerName;
 typedef struct { u32 nodeBase,triBase,vtxBase,uvBase,orderBase; } ModelRTInfo; typedef struct { u32 geom[4]; u32 info[4]; float iscl2[4]; } InstanceRTInfo; static InstanceRTInfo rtInstanceInfo[INSTANCE_COUNT]; static InstanceRTInfo rtPrevInfo[INSTANCE_COUNT]; static ModelRTInfo rtModelInfo[MAX_MDLS];
 V3 modelMin[MAX_MDLS], modelMax[MAX_MDLS],sunDirection={0.0f,1.0f,0.0f}; FrustumPlane lightFrustumPlanes[MAX_SHADOWMAPS][6][6],playerFrustumPlanes[6],sunShadowFrustum[6]; DecalStyle decalStyles[DECAL_STYLE_MAX]; CamView camViews[64], levelCamViews[14][64];
 typedef struct {int w,h;} ResMode; ResMode resModes[16];
@@ -160,6 +160,7 @@ void CycleWeaponSlot(int),CloseFullmap(),UI_AutomapClick(bool,int),UpdateScreenS
         MSG m; while (PeekMessageW(&m,NULL,0,0,0x1)) { if (m.message==0x12) OS_Exit(0); else { TranslateMessage(&m); DispatchMessageW(&m); } } const int k[4][2]={{0xA0,KEY_LEFT_SHIFT},{0xA1,KEY_RIGHT_SHIFT},{0x5B,KEY_LEFT_SUPER},{0x5C,KEY_RIGHT_SUPER}}; for (int i=0;i<4;i++) { if ((GetKeyState(k[i][0])&0x8000)||window->keys[k[i][1]]!=INPUT_PRESS) continue; InputKey(window->keys,k[i][1],INPUT_RELEASE); }
         if (WinSys.win32.disabledCursorWindow==window) { int W,H; GetWindowSize(window,&W,&H); if (window->win32.lastCurX != W/2 || window->win32.lastCurY != H/2) SetCurV(window,W/2,H/2); }/*Only re-center while the cursor is actually captured*/
     }
+    DLL_IMP FARPROC WINAPI GetProcAddress(HINSTANCE,const char*);
     WSP PlatformGetModuleSymbol(void* m, const char* n) { return (WSP)GetProcAddress((HMODULE)m,n); }
     typedef struct {u16 i; i32 v;} WinKeyRemap;
     static const WinKeyRemap wkm[]={{0xB,KEY_0},{0x2,KEY_1},{0x3,KEY_2},{0x4,KEY_3},{0x5,KEY_4},{0x6,KEY_5},{0x7,KEY_6},{0x8,KEY_7},{0x9,KEY_8},{0xA,KEY_9},{0x1E,KEY_A},{0x30,KEY_B},{0x2E,KEY_C},{0x20,KEY_D},{0x12,KEY_E},{0x21,KEY_F},{0x22,KEY_G},{0x23,KEY_H},{0x17,KEY_I},{0x24,KEY_J},{0x25,KEY_K},{0x26,KEY_L},{0x32,KEY_M},{0x31,KEY_N},{0x18,KEY_O},{0x19,KEY_P},{0x10,KEY_Q},{0x13,KEY_R},{0x1F,KEY_S},{0x14,KEY_T},{0x16,KEY_U},{0x2F,KEY_V},{0x11,KEY_W},
@@ -591,7 +592,7 @@ typedef enum { SETTING_U8, SETTING_U16, SETTING_INPUT } SettingType; typedef str
 #define S_U16(n, v) { n, &Sys_Settings.v, SETTING_U16 }
 #define S_IN(n, i)  { n, &Sys_Settings.InputCodeSettings[i], SETTING_INPUT }
 const Setting configTable[] = {
-    S_U16("ResolutionWidth",ScreenWidth), S_U16("ResolutionHeight",ScreenHeight), S_U8("Fullscreen",Fullscreen),           S_U8("FOV",FOV),                                       S_U8("Brightness",Brightness),           S_U8("AA",FXAA),          S_U8("Shadows",Shadows),                   S_U8("SSR",Reflections),           S_U8("VSync",Vsync),         S_U8("ModelDetail",ModelDetail), S_U8("GI",GI),
+    S_U16("ResolutionWidth",ScreenWidth), S_U16("ResolutionHeight",ScreenHeight), S_U8("Fullscreen",Fullscreen),           S_U8("FOV",FOV),                                       S_U8("Brightness",Brightness),           S_U8("AA",FXAA),          S_U8("Shadows",Shadows),                   S_U8("SSR",Reflections),           S_U8("VSync",Vsync),         S_U8("ModelDetail",ModelDetail), S_U8("GI",GI), S_U8("SSR_RES",SSR_RES),
     S_U8("SpeakerMode",SpeakerMode),      S_U8("Reverb",Reverb),                  S_U8("VolumeMaster",VolumeMaster),       S_U8("VolumeMusic",VolumeMusic),                       S_U8("VolumeMessage",VolumeMessage),     S_U8("VolumeEffects",VolumeEffects),           S_U8("Language",Language),                 S_U8("DynamicMusic",DynamicMusic), S_U8("Footsteps",Footsteps),
     S_U8("InvertLook",InvertLook),        S_U8("Monitor",CurrentMonitor),         S_U8("InvertCyberspaceLook",InvCybLook), S_U8("InvertInventoryCycling",InvertInventoryCycling), S_U8("QuickItemPickup",QuickItemPickup), S_U8("QuickReloadWeapons",QuickReloadWeapons), S_U8("MouseSensitivity",MouseSensitivity), S_U8("NoShootMode",NoShootMode),   S_U8("HeadBob",HeadBob),
     S_IN("Forward",0),     S_IN("Strafe Left",1), S_IN("Backpedal",2),   S_IN("Strafe Right",3), S_IN("Jump",4),       S_IN("Crouch",5),     S_IN("Prone",6),      S_IN("Lean Left",7), S_IN("Lean Right",8), S_IN("Sprint",9),    S_IN("Turn Left",10), S_IN("Turn Right",11), S_IN("Look Up",12),     S_IN("Look Down",13),
@@ -675,13 +676,10 @@ void EnableCheatArsenal(u8 level) {
 }
 void cmd_kill() { World.instances[PLAYER1].health = World.instances[PLAYER1].cyberHealth = 0.0f; CenterStatusPrint("%s", Sys_Text.stringTable[1011]); } // "Player decides to become a cyborg."
 void cmd_undo() { if (Cheats.editMode) { if (lastSpawned < U16_MAX && lastSpawned >= INSTS_1ST_IDX) { DeleteInstance(lastSpawned); lastSpawned = U16_MAX; CenterStatusPrint("Last spawned object removed"); } else { CenterStatusPrint("Nothing to undo"); } } else { CenterStatusPrint("Cannot undo when not in Edit Mode"); } }
-// Screen Shake
 void ScreenShake() { World.shakeFinished = World.pauseRelativeTime + 1.0f; shakeAmp = 0.48f; } // The whole station is a shakin' and a movin'!
 void cmd_shake() { ScreenShake(); CenterStatusPrint("SHAKIN LIKE A LEAF!"); }
-// Edit Mode
 void cmd_edit() { Cheats.editMode = !Cheats.editMode; if (Cheats.editMode) { Cheats.noclip = Cheats.notarget =  true; Cheats.editSubMode = 0; CenterStatusPrint("Edit Mode activated!" ); } else { Cheats.noclip = Cheats.notarget = false; editModeSelection = U16_MAX; editModeLightSelection = U16_MAX; CenterStatusPrint("Edit Mode deactivated"); } }
 static void cmd_editsub(int submode) { if (submode < 0 || submode > 1) { CenterStatusPrint("Invalid edit submode: %d (0=select, 1=spawn physics objects)", submode); return; } Cheats.editSubMode = (u8)submode; CenterStatusPrint("Edit submode: %s", submode == 0 ? "select" : "spawn physics objects"); }
-// Cheat Level Loading
 int ParseLevelArg(const char* arg) {    
     char clean[64] = {0}; int j = 0; for (int i = 0; arg[i] && j < 60; i++) { if (arg[i] != ' ' && arg[i] != '_') { clean[j++] = c2Lower((u8)arg[i]); } } clean[j] = '\0'; if (sEqual(clean,"r")) { return 0; } if (sFindSub(clean,"g1") || sFindSub(clean,"10")) { return 10; } if (sFindSub(clean,"g2") || sFindSub(clean,"11")) { return 11; } if (sFindSub(clean,"g4") || sFindSub(clean,"12")) { return 12; }
     if (sFindSub(clean, "g3")) { CenterStatusPrint("%s", Sys_Text.stringTable[1001]); return -2; } /*"Gamma grove already jettisoned!"  Those poor arrogant people.*/ int level = s2i32(clean); if (level >= 0 && level < MAX_LEVELS) { return level; } return -1; // Invalid
@@ -1864,7 +1862,7 @@ void InitalizeEnvironment() {
             }
         }
     }
-    Sys_Settings.ScreenWidth = vmax(Sys_Settings.ScreenWidth,320); Sys_Settings.ScreenHeight = vmax(Sys_Settings.ScreenHeight,200); OS_Close(f); /*Get settings before setting window size.*/
+    Sys_Settings.ScreenWidth = vmax(Sys_Settings.ScreenWidth,320); Sys_Settings.ScreenHeight = vmax(Sys_Settings.ScreenHeight,200); Sys_Settings.SSR_RES = (u8)vmax(vmin((i32)Sys_Settings.SSR_RES,4),1); OS_Close(f); /*Get settings before setting window size.*/
     OS_Thread fontInitThr; OS_ThreadCreate(&fontInitThr,InitFontAtlasses_Thread,NULL);
     ClampWindowSizeToMonitor();
     WSWin* w=OS_Alloc(sizeof(WSWin)); w->decorated=1;

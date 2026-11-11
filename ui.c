@@ -34,6 +34,7 @@ bool PlayerInElevatorCell(),FindElevatorKeypadPos(u8,V3*),ReadSaveSlotName(u8,ch
                       UI_ID_##P##_AUTOMAP_SIDE
 enum{UI_ID_NONE,
     /*Menu*/ UI_ID_MENU_SINGLEPLAYER, UI_ID_MENU_MULTIPLAYER, UI_ID_MENU_OPTIONS, UI_ID_MENU_QUIT, UI_ID_MENU_CONTINUE, UI_ID_MENU_NEW_GAME, UI_ID_MENU_PLAY_INTRO, UI_ID_MENU_PLAY_CREDITS, UI_ID_MENU_BACK, UI_ID_MENU_TAB_GRAPHICS, UI_ID_MENU_TAB_INPUT, UI_ID_MENU_TAB_AUDIO_LANG, UI_ID_MENU_MODEL_DETAIL, UI_ID_MENU_FXAA, UI_ID_MENU_SHADOWS, UI_ID_MENU_SSR, UI_ID_MENU_VSYNC, UI_ID_MENU_FOV_SLIDER, UI_ID_MENU_GAMMA_SLIDER, UI_ID_MENU_RESOLUTION,
+             UI_ID_MENU_GI, UI_ID_MENU_SSR_RES_SLIDER, UI_ID_MENU_INVERT_LOOK, UI_ID_MENU_INVERT_CYB_LOOK, UI_ID_MENU_INVERT_INV_CYC, UI_ID_MENU_QUICK_PICKUP, UI_ID_MENU_QUICK_RELOAD, UI_ID_MENU_NO_SHOOT, UI_ID_MENU_HEAD_BOB, UI_ID_MENU_MOUSE_SENS_SLIDER, UI_ID_MENU_SPEAKER_MODE, UI_ID_MENU_REVERB, UI_ID_MENU_DYNAMIC_MUSIC, UI_ID_MENU_FOOTSTEPS,
              UI_ID_MENU_FULLSCREEN, UI_ID_MENU_TOGGLE_MONITOR, UI_ID_MENU_RES_APPLY, UI_ID_MENU_MASTER_VOLUME_SLIDER, UI_ID_MENU_MUSIC_VOLUME_SLIDER, UI_ID_MENU_SFX_VOLUME_SLIDER, UI_ID_MENU_LOG_VOLUME_SLIDER, UI_ID_MENU_LANGUAGE, UI_ID_MENU_INPUT_0, UI_ID_MENU_INPUT_41=UI_ID_MENU_INPUT_0 + 41,
     /*NewGame*/ UI_ID_MENU_NAME_INPUT, UI_ID_MENU_DIFF_COMBAT, UI_ID_MENU_DIFF_PUZZLE, UI_ID_MENU_DIFF_MISSION, UI_ID_MENU_DIFF_CYBER, UI_ID_MENU_DIFF_CELL_0, UI_ID_MENU_DIFF_CELL_15 = UI_ID_MENU_DIFF_CELL_0 + 15, UI_ID_MENU_START,
     /*Save/Load*/ UI_ID_MENU_SAVE_SLOT_0, UI_ID_MENU_SAVE_SLOT_7=UI_ID_MENU_SAVE_SLOT_0 + 7,
@@ -200,16 +201,21 @@ void RenderMenu() {
         static const i16 cfgTabX[3]={190,354,520}; static const u16 cfgTabStr[3]={791,792,793}; static const i16 cfgTabTx[3]={200,366,530}; static const u32 cfgTabId[3]={UI_ID_MENU_TAB_GRAPHICS,UI_ID_MENU_TAB_INPUT,UI_ID_MENU_TAB_AUDIO_LANG};
         for (i8 t=2;t>=0;--t) { RenderUIImage(cfgTabX[t],196,160,30,currentMenuTab==t ? 920 : 921); if (UI_Button(cfgTabId[t],cfgTabX[t],196+30,160,30,NULL,t)) currentMenuTab=(u8)t; RenderTextL(cfgTabTx[t],202,currentMenuTab==t ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,Sys_Text.stringTable[cfgTabStr[t]]); }
         if (currentMenuTab == 0) {
-            bool overRes = false, overFull = false, overChgM = false, overApply = false; menuItemCount = 12;/*Graphics*/
+            bool overRes = false, overFull = false, overChgM = false, overApply = false; menuItemCount = 14;/*Graphics*/
             if(resDropdownOpen){ bool lmb=Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed, rmb=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed;
                 if(lmb||rmb){ int rlh=resDropdownCount*16; bool inList=resDropdownCount>0 && World.cursorPos_x>=336 && World.cursorPos_x<=496 && World.cursorPos_y>=710-rlh && World.cursorPos_y<=710;
                     bool inHeader=World.cursorPos_x>=190 && World.cursorPos_x<=518 && World.cursorPos_y>710 && World.cursorPos_y<=726;
                     if(inList){ int row=(World.cursorPos_y-(710-rlh))/16; if(row>=0 && row<resDropdownCount){resSelectedIdx=row;} }
                     resDropdownOpen=false;
                     if(inList||inHeader){ Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed=false; World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; } } }
-            if (UI_Checkbox(UI_ID_MENU_MODEL_DETAIL,200,500,0,Sys_Settings.ModelDetail ?/*High*/915 :/*No Detail Level Models*/914,Sys_Settings.ModelDetail)) { Sys_Settings.ModelDetail = Sys_Settings.ModelDetail ? 0u : 1u; SaveConfig(); }
-            if (UI_Checkbox(UI_ID_MENU_FXAA,200,530,1,/*"FXAA"*/780,Sys_Settings.FXAA)) { Sys_Settings.FXAA = Sys_Settings.FXAA ? 0u : 1u; SaveConfig(); }
-            if (UI_Checkbox(UI_ID_MENU_SHADOWS,200,560,2,Sys_Settings.Shadows ?/*Soft*/787 :/*No Shadows*/785,Sys_Settings.Shadows)) { Sys_Settings.Shadows = Sys_Settings.Shadows ? 0u : 1u; if (!shadowBuffersCreated) {CreateShadowBuffers();} SaveConfig(); }
+            bool overGI=false;
+            RenderUIImage(200,470, 16,16, 910);
+            if (UI_Button(UI_ID_MENU_GI,200,486, 210,16, &overGI, 1) || (MenuEnter() && currentMenuItem == 1)) { Sys_Settings.GI = Sys_Settings.GI ? 0u : 1u; SaveConfig(); }
+            overGI = overGI || currentMenuItem == 1; if (Sys_Settings.GI) RenderUIImage(202,472, 12,12, 912);
+            RenderTextL(220,470,overGI ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"Global Illumination");
+            if (UI_Checkbox(UI_ID_MENU_MODEL_DETAIL,200,500,2,Sys_Settings.ModelDetail ?/*High*/915 :/*No Detail Level Models*/914,Sys_Settings.ModelDetail)) { Sys_Settings.ModelDetail = Sys_Settings.ModelDetail ? 0u : 1u; SaveConfig(); }
+            if (UI_Checkbox(UI_ID_MENU_FXAA,200,530,3,/*"FXAA"*/780,Sys_Settings.FXAA)) { Sys_Settings.FXAA = Sys_Settings.FXAA ? 0u : 1u; SaveConfig(); }
+            if (UI_Checkbox(UI_ID_MENU_SHADOWS,200,560,4,Sys_Settings.Shadows ?/*Soft*/787 :/*No Shadows*/785,Sys_Settings.Shadows)) { Sys_Settings.Shadows = Sys_Settings.Shadows ? 0u : 1u; if (!shadowBuffersCreated) {CreateShadowBuffers();} SaveConfig(); }
             if (reflDropdownOpen) {
                 bool lmb=Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed, rmb=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed;
                 if (lmb||rmb) { int rlh=3*16; bool inList = World.cursorPos_x>=336 && World.cursorPos_x<=496 && World.cursorPos_y>=590-rlh && World.cursorPos_y<=590;
@@ -219,8 +225,8 @@ void RenderMenu() {
                 }
             }
             bool overRefl=false;
-            if (UI_Button(UI_ID_MENU_SSR,190,606,328,16,&overRefl,3) || (MenuEnter() && currentMenuItem == 3)) { if (!reflDropdownOpen) { reflDropdownOpen=true; } else { reflDropdownOpen=false; } currentMenuItem = 3; }
-            overRefl = overRefl || currentMenuItem == 3;
+            if (UI_Button(UI_ID_MENU_SSR,190,606,328,16,&overRefl,5) || (MenuEnter() && currentMenuItem == 5)) { if (!reflDropdownOpen) { reflDropdownOpen=true; } else { reflDropdownOpen=false; } currentMenuItem = 5; }
+            overRefl = overRefl || currentMenuItem == 5;
             static const char* reflNames[3] = {"OFF","SCREEN SPACE","RAYTRACED"};
             char reflBuf[32]; sFormat(reflBuf, sizeof(reflBuf), "%s", reflNames[Sys_Settings.Reflections > 2u ? 0u : Sys_Settings.Reflections]);
             RenderUIImage(476,590,16,16,overRefl ? 1119 : 1077); RenderTextL(200,590,overRefl ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"REFLECTIONS %s",reflBuf);
@@ -229,12 +235,12 @@ void RenderMenu() {
                 RenderUIImage(336,rTop,160,rlh,922);
                 for (int ri=0; ri<3; ++ri) { if (ri==Sys_Settings.Reflections) RenderUIImage(336,rTop-2+ri*16,160,18,1087); RenderTextL(366,rTop+ri*16, (ri==reflHoverIdx) ? T_YELLOW : T_GREEN, FONT_NORMAL, 0.9f, "%s", reflNames[ri]); }
             } else { reflHoverIdx=-1; }
-            if (UI_Checkbox(UI_ID_MENU_VSYNC,200,620,4,/*VSYNC*/1026,Sys_Settings.Vsync)) { Sys_Settings.Vsync = Sys_Settings.Vsync ? 0u : 1u; window->context.swapInterval((i32)Sys_Settings.Vsync); SaveConfig(); }
+            if (UI_Checkbox(UI_ID_MENU_VSYNC,200,620,6,/*VSYNC*/1026,Sys_Settings.Vsync)) { Sys_Settings.Vsync = Sys_Settings.Vsync ? 0u : 1u; window->context.swapInterval((i32)Sys_Settings.Vsync); SaveConfig(); }
             RenderTextL(310,620,T_GREEN,FONT_NORMAL,1.0f,"(FPS: %d)", globalframesPerLastSecond);/*Helper to see vsync take effect.*/
-            UI_Slider(UI_ID_MENU_FOV_SLIDER,400,650,128,16,(((Sys_Settings.FOV - 45.0f) / 105.0f) * (128 - 16)),200,&Sys_Settings.FOV,&fovSliderActive,45,150,5,5,/*Field of View*/775);
-            UI_Slider(UI_ID_MENU_GAMMA_SLIDER,400,680,128,16,((Sys_Settings.Brightness / 100.0f) * (128 - 16)),200,&Sys_Settings.Brightness,&gammaSliderActive,0,100,2,6,/*Brightness*/774);
-            if (UI_Button(UI_ID_MENU_RESOLUTION,190,726,328,16,&overRes,7) || (MenuEnter() && currentMenuItem == 7)) { DualLog("Resolution dropdown clicked! %u\n",globalframe); if(!resDropdownOpen){ GatherResolutionModesFor(GetCurrentMonitorIndex()); if(resDropdownCount>0){resDropdownOpen=true;} } else{resDropdownOpen=false;} currentMenuItem = 7; }
-            overRes = overRes || currentMenuItem == 7; char resBuf[32];
+            UI_Slider(UI_ID_MENU_FOV_SLIDER,400,650,128,16,(((Sys_Settings.FOV - 45.0f) / 105.0f) * (128 - 16)),200,&Sys_Settings.FOV,&fovSliderActive,45,150,5,7,/*Field of View*/775);
+            UI_Slider(UI_ID_MENU_GAMMA_SLIDER,400,680,128,16,((Sys_Settings.Brightness / 100.0f) * (128 - 16)),200,&Sys_Settings.Brightness,&gammaSliderActive,0,100,2,8,/*Brightness*/774);
+            if (UI_Button(UI_ID_MENU_RESOLUTION,190,726,328,16,&overRes,9) || (MenuEnter() && currentMenuItem == 9)) { DualLog("Resolution dropdown clicked! %u\n",globalframe); if(!resDropdownOpen){ GatherResolutionModesFor(GetCurrentMonitorIndex()); if(resDropdownCount>0){resDropdownOpen=true;} } else{resDropdownOpen=false;} currentMenuItem = 9; }
+            overRes = overRes || currentMenuItem == 9; char resBuf[32];
             if (resDropdownCount > 0) sFormat(resBuf, sizeof(resBuf), "%ux%u",(u32)resModes[resSelectedIdx].w,(u32)resModes[resSelectedIdx].h); else sFormat(resBuf, sizeof(resBuf), "%ux%u",Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
             RenderUIImage(476,710,16,16,overRes ? 1119 : 1077); RenderTextL(200,710,overRes ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"RESOLUTION %s",resBuf);
             if(resDropdownOpen && resDropdownCount>0){ int rlh2=resDropdownCount*16, rTop=710-rlh2;
@@ -243,21 +249,21 @@ void RenderMenu() {
                 for(int ri=0;ri<resDropdownCount;++ri){char rb[32]; sFormat(rb,sizeof(rb),"%ux%u",(u32)resModes[ri].w,(u32)resModes[ri].h); if(ri==resSelectedIdx){RenderUIImage(336,rTop-2+ri*16,160,18,1087);} RenderTextL(366,rTop+ri*16,ri==resHoverIdx ? T_YELLOW : T_GREEN,FONT_NORMAL,0.9f,"%s",rb);}
             } else { resHoverIdx = -1; }
             RenderUIImage(200,740, 16,16, 910);/*Fullscreen checkbox background*/
-            if (UI_Button(UI_ID_MENU_FULLSCREEN,200,756, 210,16, &overFull, 8) || (MenuEnter() && currentMenuItem == 8)) { Sys_Settings.Fullscreen = Sys_Settings.Fullscreen == 1u ? 0u : 1u; ChangeFullScreenWindowed(true); SaveConfig(); }
-            overFull = overFull || currentMenuItem == 8; if (Sys_Settings.Fullscreen) RenderUIImage(202,742, 12,12, 912);/*Checkbox check*/
+            if (UI_Button(UI_ID_MENU_FULLSCREEN,200,756, 210,16, &overFull, 10) || (MenuEnter() && currentMenuItem == 10)) { Sys_Settings.Fullscreen = Sys_Settings.Fullscreen == 1u ? 0u : 1u; ChangeFullScreenWindowed(true); SaveConfig(); }
+            overFull = overFull || currentMenuItem == 10; if (Sys_Settings.Fullscreen) RenderUIImage(202,742, 12,12, 912);/*Checkbox check*/
             RenderTextL(220,740,overFull ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,/*"Fullscreen"*/Sys_Text.stringTable[773]); RenderUIImage(588,730, 210,30, 1079);/*Toggle monitor button background*/
-            if (UI_Button(UI_ID_MENU_TOGGLE_MONITOR,588,760, 210,30, &overChgM, 9) || (MenuEnter() && currentMenuItem == 9)) { CycleToNextMonitor(); }
-            overChgM = overChgM || currentMenuItem == 9; RenderTextL(602,735,overChgM ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,/*"CHANGE MONITOR"*/Sys_Text.stringTable[1025]);
+            if (UI_Button(UI_ID_MENU_TOGGLE_MONITOR,588,760, 210,30, &overChgM, 11) || (MenuEnter() && currentMenuItem == 11)) { CycleToNextMonitor(); }
+            overChgM = overChgM || currentMenuItem == 11; RenderTextL(602,735,overChgM ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,/*"CHANGE MONITOR"*/Sys_Text.stringTable[1025]);
             RenderUIImage(588,690, 210,30, 1079);/*Apply button background*/
-            if (UI_Button(UI_ID_MENU_RES_APPLY,588,720, 210,30, &overApply, 10) || (MenuEnter() && currentMenuItem == 10)) { ApplyStagedWindowedSize(); GatherResolutionModesFor(GetCurrentMonitorIndex()); currentMenuItem = 10; }
-            overApply = overApply || currentMenuItem == 10; RenderTextL(602,695,overApply ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"APPLY");
+            if (UI_Button(UI_ID_MENU_RES_APPLY,588,720, 210,30, &overApply, 12) || (MenuEnter() && currentMenuItem == 12)) { ApplyStagedWindowedSize(); GatherResolutionModesFor(GetCurrentMonitorIndex()); currentMenuItem = 12; }
+            overApply = overApply || currentMenuItem == 12; RenderTextL(602,695,overApply ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"APPLY");
         } else if (currentMenuTab == 1) {
             i8 cfgIdxOf[64]; u8 inCount=0; for (int c=0;c<CONFIG_CNT && inCount<64;++c) if (configTable[c].type==SETTING_INPUT) cfgIdxOf[inCount++]=(i8)c;
-            menuItemCount = (i8)(inCount + 1);/*Input rows + BACK*/
+            menuItemCount = (i8)(inCount + 9);/*Input rows + BACK*/
             bool armState = rebindRow >= 0; if (armState) rebindCaptureActive = true;
             for (u8 r=0;r<inCount;++r) {
                 i8 col = (r < 21) ? 0 : 1; u8 sub = (r < 21) ? r : (u8)(r - 21);
-                i16 rowY = (i16)(254 + sub*22);
+                i16 rowY = (i16)(254 + sub*17);
                 i16 labelX = col ? (i16)750 : (i16)210; i16 valueX = col ? (i16)895 : (i16)450;
                 bool over=false;
                 u8 clk = UI_Button(UI_ID_MENU_INPUT_0 + r, labelX, (i16)(rowY+16), col ? 280 : 280, 16, &over, (i8)r);
@@ -290,12 +296,20 @@ void RenderMenu() {
                 }
             }
             if (rebindRow < 0) rebindCaptureActive = false;
+            if (UI_Checkbox(UI_ID_MENU_INVERT_LOOK,210,620,42,849,Sys_Settings.InvertLook)) { Sys_Settings.InvertLook = Sys_Settings.InvertLook ? 0u : 1u; SaveConfig(); }
+            if (UI_Checkbox(UI_ID_MENU_INVERT_CYB_LOOK,210,642,43,850,Sys_Settings.InvCybLook)) { Sys_Settings.InvCybLook = Sys_Settings.InvCybLook ? 0u : 1u; SaveConfig(); }
+            if (UI_Checkbox(UI_ID_MENU_INVERT_INV_CYC,210,664,44,851,Sys_Settings.InvertInventoryCycling)) { Sys_Settings.InvertInventoryCycling = Sys_Settings.InvertInventoryCycling ? 0u : 1u; SaveConfig(); }
+            if (UI_Checkbox(UI_ID_MENU_QUICK_PICKUP,210,686,45,852,Sys_Settings.QuickItemPickup)) { Sys_Settings.QuickItemPickup = Sys_Settings.QuickItemPickup ? 0u : 1u; SaveConfig(); }
+            if (UI_Checkbox(UI_ID_MENU_QUICK_RELOAD,640,620,46,853,Sys_Settings.QuickReloadWeapons)) { Sys_Settings.QuickReloadWeapons = Sys_Settings.QuickReloadWeapons ? 0u : 1u; SaveConfig(); }
+            if (UI_Checkbox(UI_ID_MENU_NO_SHOOT,640,642,47,854,Sys_Settings.NoShootMode)) { Sys_Settings.NoShootMode = Sys_Settings.NoShootMode ? 0u : 1u; SaveConfig(); }
+            if (UI_Checkbox(UI_ID_MENU_HEAD_BOB,640,664,48,847,Sys_Settings.HeadBob)) { Sys_Settings.HeadBob = Sys_Settings.HeadBob ? 0u : 1u; SaveConfig(); }
+            UI_Slider(UI_ID_MENU_MOUSE_SENS_SLIDER,1030,686,128,16,(((Sys_Settings.MouseSensitivity - 1.0f) / 99.0f) * (128 - 16)),640,&Sys_Settings.MouseSensitivity,&mouseSensSliderActive,1,100,5,49,848);
         } else {
             menuItemCount = 10;/*Audio / Lang*/
             UI_Slider(UI_ID_MENU_MASTER_VOLUME_SLIDER,426,240,128,16,((Sys_Settings.VolumeMaster / 100.0f) * (128 - 16)),200,&Sys_Settings.VolumeMaster,&masterVolumeSliderActive,0,100,5,0,/*Master Volume*/802);
             UI_Slider(UI_ID_MENU_MUSIC_VOLUME_SLIDER,426,270,128,16,((Sys_Settings.VolumeMusic / 100.0f) * (128 - 16)),200,&Sys_Settings.VolumeMusic,&musicVolumeSliderActive,0,100,5,1,/*Music Volume*/803);
-            UI_Slider(UI_ID_MENU_SFX_VOLUME_SLIDER,426,300,128,16,((Sys_Settings.VolumeEffects / 100.0f) * (128 - 16)),200,&Sys_Settings.VolumeEffects,&sfxVolumeSliderActive,0,100,5,1,/*Music Volume*/803);
-            UI_Slider(UI_ID_MENU_LOG_VOLUME_SLIDER,426,330,128,16,((Sys_Settings.VolumeMessage / 100.0f) * (128 - 16)),200,&Sys_Settings.VolumeMessage,&messageVolumeSliderActive,0,100,5,1,/*Music Volume*/803);
+            UI_Slider(UI_ID_MENU_SFX_VOLUME_SLIDER,426,300,128,16,((Sys_Settings.VolumeEffects / 100.0f) * (128 - 16)),200,&Sys_Settings.VolumeEffects,&sfxVolumeSliderActive,0,100,5,2,805);
+            UI_Slider(UI_ID_MENU_LOG_VOLUME_SLIDER,426,330,128,16,((Sys_Settings.VolumeMessage / 100.0f) * (128 - 16)),200,&Sys_Settings.VolumeMessage,&messageVolumeSliderActive,0,100,5,3,804);
             /*Language picker*/
             static const char* langNames[8] = {"English","Espa\u00f1ol","Deutsch","Fran\u00e7""ais","\u65e5\u672c\u8a9e","\u0420\u0443\u0441\u0441\u043a\u0438\u0439","Italiano","Portugu\u00ea""s"};
             bool langOver = false;
@@ -306,6 +320,17 @@ void RenderMenu() {
             }
             langOver = langOver || currentMenuItem == 4;
             RenderTextL(200,370, langOver ? T_YELLOW : T_GREEN, FONT_NORMAL, 1.0f, "LANGUAGE: %s", langNames[Sys_Settings.Language % 8]);
+            bool spkOver = false;
+            if (UI_Button(UI_ID_MENU_SPEAKER_MODE,200,410, 328,16, &spkOver, 5) || (MenuEnter() && currentMenuItem == 5)) { Sys_Settings.SpeakerMode = (Sys_Settings.SpeakerMode + 1) % 7; SaveConfig(); currentMenuItem = 5; }
+            spkOver = spkOver || currentMenuItem == 5;
+            RenderTextL(200,410,spkOver ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f, "SPEAKER MODE: %s", Sys_Text.stringTable[795 + (Sys_Settings.SpeakerMode % 7)]);
+            RenderUIImage(200,440, 16,16, 910);
+            bool overRev=false;
+            if (UI_Button(UI_ID_MENU_REVERB,200,456, 210,16, &overRev, 6) || (MenuEnter() && currentMenuItem == 6)) { Sys_Settings.Reverb = Sys_Settings.Reverb ? 0u : 1u; SaveConfig(); }
+            overRev = overRev || currentMenuItem == 6; if (Sys_Settings.Reverb) RenderUIImage(202,442, 12,12, 912);
+            RenderTextL(220,440,overRev ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"Reverb");
+            if (UI_Checkbox(UI_ID_MENU_DYNAMIC_MUSIC,200,470,7,807,Sys_Settings.DynamicMusic)) { Sys_Settings.DynamicMusic = Sys_Settings.DynamicMusic ? 0u : 1u; SaveConfig(); }
+            if (UI_Checkbox(UI_ID_MENU_FOOTSTEPS,200,500,8,808,Sys_Settings.Footsteps)) { Sys_Settings.Footsteps = Sys_Settings.Footsteps ? 0u : 1u; SaveConfig(); }
         }
         MenuBackButton(1087,723,1103,731,(i8)(menuItemCount - 1));
     } else if (currentMenuPage == MPG_LOAD || currentMenuPage == MPG_SAVE) {
