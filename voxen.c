@@ -1570,7 +1570,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glUniform1ui(18,(gridCellStates[playerCellIdx] & CELL_SEES_SUN) && World.curLev != LEVEL_CYBERSPACE);
     glUniform1ui(19,((World.curLev >= 10 && World.curLev < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
     u32 shieldOnType = 0u/*No shield green tint*/;
-    if (World.instances[WORLD].ioflags & Q_SHIELD_ACTIVATED) { shieldOnType=(World.curLev <= 5) ? 1u/*Shielding everywhere*/ : 2u/*Shielding only below, levels 6+*/; }
+    if (World.instances[WORLD].ioflags & QB_ShieldActivated) { shieldOnType=(World.curLev <= 5) ? 1u/*Shielding everywhere*/ : 2u/*Shielding only below, levels 6+*/; }
     glUniform1ui(20,shieldOnType); // Green Shield
     Color3 painStaticColor = (Color3){1.0f,0.0f,0.0f}; // TODO reuse for blue EMP static effect
     glUniform3f(23,painStaticColor.r, painStaticColor.g, painStaticColor.b);
