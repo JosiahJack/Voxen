@@ -154,10 +154,10 @@ typedef struct { V3 point; V3 normal; float distance; u16 hitInstanceIndex; bool
 typedef struct { V3 pos; float intensity; Color3 col; u32 lflags; float range, spotAng, maxIntensity, minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer   
 typedef struct { float speed; u16 frameStart, frameEnd, frameStartModelIndex; u8 framerate;} AnimationClip;
 typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
-enum {/*Initialization*/ SCRATCH_ARENA_SIZE = (92ULL * 1024 * 1024),
-      /*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELL), VOXELS_Z = (WORLDZ * VOXELS_PER_CELL), VOXEL_COUNT = (VOXELS_X * VOXELS_Z), MAX_PORTALS = 640, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128, MAX_CULL_FILESIZE = 500000,
-      /*Entity Management*/ MAX_LEVELS = 14, LEVEL_CYBERSPACE = 13, AVG_CPU_TAPS = 2048, MAX_ENTITIES = 864, INSTANCE_COUNT = 9032, MAX_LEVEL_PARTICLES = 128, WORLD = 0, PLAYER1 = 1, INSTS_1ST_IDX = 2, NUM_AI_TYPES = 29, MAX_IO_NAMES = 1024, FW_MAX_CHILDREN = 48, FW_POOL_MAX = 512, MAX_ELEV_DESTS_PER_LEVEL = 8, SAVE_VERSION = 26,
-      /*Lights*/ LIGHT_COUNT = 2048, LANIM_MAX = 128, MAX_LIGHTS_PER_VOXEL = 96, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 80, SUN_SHADOW_SIZE = 4096, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, SHADOW_NEARMESH_MAX = 1024, SC_MAX = (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS),
+enum {/*Initialization*/ SCRATCH_ARENA_SIZE = 96468992 /*92mb*/,
+      /*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELL), VOXELS_Z = (WORLDZ * VOXELS_PER_CELL), VOXEL_COUNT = (VOXELS_X * VOXELS_Z), MAX_PORTALS = 50/*max 49 on lev 7*/, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128,
+      /*Entity Management*/ MAX_LEVELS = 14, LEVEL_CYBERSPACE = 13, AVG_CPU_TAPS = 256, MAX_ENTITIES = 863, INSTANCE_COUNT = 8704, MAX_LEVEL_PARTICLES = 128, WORLD = 0, PLAYER1 = 1, INSTS_1ST_IDX = 2, NUM_AI_TYPES = 29, MAX_IO_NAMES = 416, FW_MAX_CHILDREN = 42 /*max is 41 chunks (lev 9 func_wall)*/, FW_POOL_MAX = 512, MAX_ELEV_DESTS_PER_LEVEL = 8, SAVE_VERSION = 26,
+      /*Lights*/ LIGHT_COUNT = 2048, LANIM_MAX = 72/*max 71 (level 5)*/, MAX_LIGHTS_PER_VOXEL = 96, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 128, SUN_SHADOW_SIZE = 4096, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, SHADOW_NEARMESH_MAX = 1024, SC_MAX = (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS),
       /*Models*/ MAX_MDLS = 7490, WELD_HASH_SIZE = 32768, MAX_VERT_ELEMENT_SIZE = 6964, MAX_OUTPUT_VERTS = 22960, VRT_ATT_SZ = 16, CPU_VRT_SZ = 32, MAX_GLB_JOINTS = 96, MAX_GLB_BLOCKS = 60, SUB_MAIN = 32,
       /*Textures*/ MAXTEX = 4096, MAX_TOTAL_PIXELS = 48000000u, MAX_UNIQUE_COLORS = 86000u, TEXHASH_SZ = 256, NUM_TEXTURE_CLIPS = 49, VIDEO_MAXFRAME = (1280u*720u), VIDEO_RING = 8,
       /*Animations*/ MAX_ANIMCLIPS = 10, MAXANIM = 59, A_LOOP_ALL = 0, A_IDLE_CLOSED = 0, A_IDLE = 0, A_INACTIVE = 0, A_ATTACK_MISS = 1, A_OPENING = 1, A_WALK = 1, A_ACTIVATE = 1, A_ATTACK_HIT = 2, A_ACTIVATED = 2, A_IDLE_OPEN = 2, A_RUN = 2, A_CLOSING = 3, A_DEACTIVATE = 3, A_ATTACK1 = 3, A_ATTACK2 = 4, A_INSTALL = 4, A_ATTACK3 = 5, A_INSTALLED = 5, A_PAIN = 6, A_PAIN2 = 7, A_PAIN3 = 8, A_DYING = 9,
@@ -218,13 +218,13 @@ enum{L_Default=(1u<<0),L_TransparentFX=(1u<<1),L_BlocksRaycast=(1u<<4),L_UI=(1u<
 typedef struct {i32 InputCodeSettings[42]; u16 ScreenWidth,ScreenHeight; bool Fullscreen; u8 FOV,Brightness,FXAA,Shadows,Reflections,Vsync,ModelDetail,GI,SpeakerMode,Reverb,VolumeMaster,VolumeMusic,VolumeMessage,VolumeEffects,Language,DynamicMusic,Footsteps,InvertLook,InvertInventoryCycling,InvCybLook,QuickItemPickup,QuickReloadWeapons,MouseSensitivity,NoShootMode,HeadBob,SSR_RES,CurrentMonitor;} SettingsSystem; extern SettingsSystem Sys_Settings;
 typedef struct { u16 god:1,noclip:1,notarget:1,bottomless:1,superoverride:1,fatigueCheat:1,redbull:1,consoleActive:1,noHUD:1,showLocation:1,showFPS:1,showPhys:1,showNPC:1,editMode:1; u8 dizzyLevel:2,animTest:2,editSubMode:2; } CheatsSystem; extern CheatsSystem Cheats;
 typedef struct {
-        double vmailFrameFinished, tickFinished,searchFXStartTime[2],generalClickTime,tWrnFinished[10];
+        double vmailFrameFinished, tickFinished,searchFXStartTime[2],genClickTime,tWrnFinished[10];
         float searchFXCursorX[2], searchFXCursorY[2];
         i32 lastMultiMediaTabOpened, tWrnTextIdx[10], tWrnTextIdx2[10], tWrnTextIdx3[10], tWrnColorIdx[10], keycodeEntry,keycodeValue;
-        u16 vmailFrame, linkedElevatorDoor, tetheredPGP, tetheredPWP, tetheredSearchable, tetheredKeypadElevator, tetheredKeypadKeycode,elevButtonSpawnIdx[8], generalClickCustom, logReferenceIndex;
-        i16 generalClickItem, logFolderList[16], logReaderPage;
+        u16 vmailFrame, linkedElevatorDoor, tetheredPGP, tetheredPWP, tetheredSearchable, tetheredKeypadElevator, tetheredKeypadKeycode,elevButtonSpawnIdx[8], genClickCustom, logReferenceIndex;
+        i16 genClickItem, logFolderList[16], logReaderPage;
         u8 highlightTickCount[4], elevButtonLevelIdx[8], vmailActive, mfdTab[3], MFD_Data, MFD_MediaTab, MFD_ReaderView, mfdSelected[3], mfdReturnTab[3], mfdReturnView[3], mfdItemReader[2], mfdConsumable, pg_type[35], pg_gridType, pg_theme, pg_source, pg_output, pg_width, pg_height, pw_wireColor[7], logFolderCount;
-        i8 elevButtonLabelIdx[8], generalClickSlot, consumableClickRow, keycodeHuns, keycodeTens, keycodeOnes, pw_curL[7], pw_curR[7], pw_tgtL[7], pw_tgtR[7], pw_selectedWire, mg_current;
+        i8 elevButtonLabelIdx[8], genClickSlot, consumableClickRow, keycodeHuns, keycodeTens, keycodeOnes, pw_curL[7], pw_curR[7], pw_tgtL[7], pw_tgtR[7], pw_selectedWire, mg_current;
         u8 lastItemSideRH:1, lastAutomapSideRH:1, lastDataSideRH:1, lastSearchSideRH:1, lastMinigameSideRH:1,         logActive:1,             paperLogInUse:1/*TODO*/, mouseClickHeldOverGUI:1;
         u8 mfdGeneralItem:1,   mfdHardwareItem:1,   keycodeValid:1,    keycodeSolved:1,          pg_solved:1, pw_selectedWireRH:1, shieldAnimationIsActivate:1,                     pw_solved:1;
         u8 pg_fired:1, firstMain:1, firstGeneral:1, firstHardware:1, firstWeapon:1;
@@ -246,7 +246,7 @@ typedef struct { // Hw referenceIndex,ref14Index::Sys 21,0 Nav 22,1 Ere 23,2 Sen
     u32 accessCardOwned, wepAmmo[16], wepAmmoSecondary[16];
     i32 lastAddedIndex, wepInvIndices[7], wepInvAmIndices[7], hardwareInvCurrent, genInvIdxRef[14], berserkIncrement, mediPatchPulseCount;
     i16 ladderState, wepCurPending, weaponIndexPending, wepCur;
-    u16 hasHardware, hardwareIsActive, hardwareInvReferenceIndex[HW_COUNT], heldObjectIndex, heldObjectCustIdx, heldAmmo, heldAmmo2, weaponIndex, generalInvCustIdx[14], patchActive, drainJPM, grenConstIndex[7];
+    u16 hasHardware, hardwareIsActive, hardwareInvReferenceIndex[HW_COUNT], heldObjectIndex, heldObjectCustIdx, heldAmmo, heldAmmo2, weaponIndex, genInvCustIdx[14], patchActive, drainJPM, grenConstIndex[7];
     u8 numLogsFromLevel[10], lerpUp, hasSoft, softVersions[7], hasMinigame, numweapons, currentMagazineAmount[7], currentMagazineAmount2[7], hwVers[HW_COUNT], hwVersSetting[HW_COUNT], grenAmmo[7], grenCur, generalInvCurrent, patchCur, patchCounts[7];
     i8 cyberItemIndex;
     u8      beepDone:1, hasNewEmail:1, hasNewNotes:1, isPulserNotDrill:1, overloadEnabled:1,   recoiling:1,     heldObjectLoadedAlternate:1;

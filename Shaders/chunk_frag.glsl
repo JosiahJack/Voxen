@@ -1,4 +1,5 @@
 // chunk_frag.glsl: Generic shader for all world objects
+#extension GL_EXT_gpu_shader5 : require
 in vec2 TexCoord; in vec3 Normal; in vec3 FragPos;
 layout(location=0) uniform uint instanceIndex; // start vert shader uniforms
 layout(location=1) uniform uint normInstanceIndex;
@@ -151,17 +152,15 @@ void main() {
         lighting += albedoColor.rgb * cyberColA * (clamp(dot(adjustedNormal, cyberDirA), 0.0, 1.0) * 0.9);
         lighting += albedoColor.rgb * cyberColB * (clamp(dot(adjustedNormal, cyberDirB), 0.0, 1.0) * 0.6);
     } else if (sunEnabled > 0u) { // Sun is off entirely in cells that can't see it, and whenever shadows are off
-        vec3 sunCol = vec3(1.0, 0.97, 0.85) * 0.5;
-        float sunShadow = 1.0;
-        vec3 sunProj = (sunShadowMatrix * vec4(FragPos, 1.0)).xyz;
+        vec3 sunCol = vec3(1.0, 0.97, 0.85) * 0.5, sunProj = (sunShadowMatrix * vec4(FragPos, 1.0)).xyz;
         vec2 sunUV   = sunProj.xy * 0.5 + 0.5;
-        float sunZ   = sunProj.z  * 0.5 + 0.5;
+        float sunShadow = 1.0, sunZ   = sunProj.z  * 0.5 + 0.5;
         if (all(lessThan(abs(sunProj.xy), vec2(1.0))) && abs(sunProj.z) < 1.0) {
             float sunBias = 0.0006 / clamp(dot(adjustedNormal, sunDirection), 0.5, 1.0);
             vec2 sunTexel = 1.0 / vec2(textureSize(sunShadowMap, 0));
             float sunSum = 0.0;
             for (int si=0;si<PCF_SAMPLES;++si) sunSum += texture(sunShadowMap, vec3(sunUV + poissonDisk[si]*(SUN_PCF_SCALE*sunTexel), sunZ - sunBias)); // Same 12-tap golden-angle Poisson scheme as the point-light shadows above, each tap a hardware 2x2 PCF compare on the sampler2DShadow
-            sunShadow = sunSum * invSamples; /*Average like the point lights do: the penumbra is a continuous gradient across the rotating sun angle instead of the old 3x3 min() dilation's hard single-texel edges that made the shadow angle read as stepped*/
+            sunShadow = sunSum * invSamples;
         }
         lighting += albedoColor.rgb * sunCol * (clamp(dot(adjustedNormal, sunDirection), 0.0, 1.0) * sunShadow);
     }

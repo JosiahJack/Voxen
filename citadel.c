@@ -55,7 +55,7 @@ void AddHardwareToInventory(int index,int hwversion) {
 }
 bool AddGeneralObjectToInventory(int index, int custIdx){
     if (!World.Sys_UI.firstGeneral){World.Sys_UI.firstGeneral=true; World.Sys_UI.mfdTab[0]=3;}
-    for (i8 i=1;i<14;++i) { if (World.invP1.genInvIdxRef[i]==-1) { if (!World.invP1.accessCardOwned && World.invP1.generalInvCurrent == 0 /*First slot is always access cards.*/) { World.invP1.generalInvCurrent = i; } World.invP1.genInvIdxRef[i] = index; World.invP1.generalInvCustIdx[i] = (i16)custIdx; World.Sys_UI.generalClickSlot = -1; CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[31]); return true; } }
+    for (i8 i=1;i<14;++i) { if (World.invP1.genInvIdxRef[i]==-1) { if (!World.invP1.accessCardOwned && World.invP1.generalInvCurrent == 0 /*First slot is always access cards.*/) { World.invP1.generalInvCurrent = i; } World.invP1.genInvIdxRef[i] = index; World.invP1.genInvCustIdx[i] = (i16)custIdx; World.Sys_UI.genClickSlot = -1; CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[31]); return true; } }
     return false;
 }
 void CheckForUnreadLogs() { int e=0,l=0; for (int i=0;i<LOGCNT;++i) if (World.invP1.hasLog[i] && !World.invP1.readLog[i]) *(Sys_Text.audioLogType[i] == AudioLogType_Email ? &e : &l)=1; World.invP1.hasNewEmail=e; World.invP1.hasNewLogs=l; }
@@ -257,7 +257,7 @@ void HealingBedUse(u16 self, u16 owner) { Entity* e=&World.instances[self]; if (
 int GeneralInvItem(int slot) { if (slot<0 || slot>=14) return -1; if (!slot) return 81; int item=World.invP1.genInvIdxRef[slot]; if (item<0) return -1; item=UseableFromConst(item); return IdxIsGenericItem(item + 307) ? item : -1; }
 bool GeneralInvCanVaporize(int slot) { int item=GeneralInvItem(slot); return slot>0 && item>=0 && (item<6 || item==33 || item==35 || item==58 || item==62); }
 void GeneralInvRemove(int slot) {
-    if (slot<=0 || slot>=14) { return; } for (int i=slot;i<13;++i) { World.invP1.genInvIdxRef[i]=World.invP1.genInvIdxRef[i+1]; World.invP1.generalInvCustIdx[i]=World.invP1.generalInvCustIdx[i+1]; } World.invP1.genInvIdxRef[13] = -1; World.invP1.generalInvCustIdx[13] = U16_MAX; World.Sys_UI.generalClickSlot = -1;
+    if (slot<=0 || slot>=14) { return; } for (int i=slot;i<13;++i) { World.invP1.genInvIdxRef[i]=World.invP1.genInvIdxRef[i+1]; World.invP1.genInvCustIdx[i]=World.invP1.genInvCustIdx[i+1]; } World.invP1.genInvIdxRef[13] = -1; World.invP1.genInvCustIdx[13] = U16_MAX; World.Sys_UI.genClickSlot = -1;
     if (World.invP1.generalInvCurrent==slot) { if (GeneralInvItem(slot) < 0) { World.invP1.generalInvCurrent = 0; for (int i=13;i>=0;--i) { if (GeneralInvItem(i) >= 0) { World.invP1.generalInvCurrent = (u8)i; break; } } } } else if (World.invP1.generalInvCurrent>slot) World.invP1.generalInvCurrent--;
 }
 void VaporizeClick() {int slot=World.invP1.generalInvCurrent; if(!GeneralInvCanVaporize(slot))return; GeneralInvRemove(slot); play_wav(sounds[89],AppliedFXVol(1.0f),(V3){0},false);}
@@ -324,9 +324,9 @@ void ChargeStationUse(u16 self, u16 owner) {
 }
 void MFD_ShowGeneralItem();
 bool GeneralInvCanUse(int slot) { int item=GeneralInvItem(slot); return slot>0 && (item==52 || item==53 || item==55); }
-void GeneralInvClick(int buttonIdx) { int item = GeneralInvItem(buttonIdx); if (item < 0) return; World.invP1.generalInvCurrent = (u8)buttonIdx; World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true; MFD_ShowGeneralItem(); }
-void GeneralInvApply(int buttonIdx) { if (!GeneralInvCanUse(buttonIdx) || World.invP1.holdingObject) { return; } int item = GeneralInvItem(buttonIdx); if ((item == 55 ? World.instances[PLAYER1].health : World.invP1.energy) >= 255.0f) { CenterStatusPrint("%s", Sys_Text.stringTable[303]); return; } if (item == 55) { World.instances[PLAYER1].health = 255.0f; } else { GiveEnergy(item == 52 ? 83.0f : 255.0f,EnergyType_Battery); } GeneralInvRemove(buttonIdx); }
-bool GeneralInvTake(int slot) { int item = GeneralInvItem(slot); if (slot <= 0 || item < 0 || World.invP1.holdingObject) return false; ResetHeldItem(); World.invP1.heldObjectIndex = (u16)(item + 307); World.invP1.heldObjectCustIdx = World.invP1.generalInvCustIdx[slot]; World.invP1.holdingObject = true; GeneralInvRemove(slot); ForceInventoryMode(); CenterStatusPrint("%s%s",Sys_Text.stringTable[item+326],Sys_Text.stringTable[319]); return true; }
+void GenInvClick(int buttonIdx) { int item = GeneralInvItem(buttonIdx); if (item < 0) return; World.invP1.generalInvCurrent = (u8)buttonIdx; World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true; MFD_ShowGeneralItem(); }
+void GenInvApply(int buttonIdx) { if (!GeneralInvCanUse(buttonIdx) || World.invP1.holdingObject) { return; } int item = GeneralInvItem(buttonIdx); if ((item == 55 ? World.instances[PLAYER1].health : World.invP1.energy) >= 255.0f) { CenterStatusPrint("%s", Sys_Text.stringTable[303]); return; } if (item == 55) { World.instances[PLAYER1].health = 255.0f; } else { GiveEnergy(item == 52 ? 83.0f : 255.0f,EnergyType_Battery); } GeneralInvRemove(buttonIdx); }
+bool GenInvTake(int slot) { int item = GeneralInvItem(slot); if (slot <= 0 || item < 0 || World.invP1.holdingObject) return false; ResetHeldItem(); World.invP1.heldObjectIndex = (u16)(item + 307); World.invP1.heldObjectCustIdx = World.invP1.genInvCustIdx[slot]; World.invP1.holdingObject = true; GeneralInvRemove(slot); ForceInventoryMode(); CenterStatusPrint("%s%s",Sys_Text.stringTable[item+326],Sys_Text.stringTable[319]); return true; }
 static bool GrenadeIsNPCMine(u16 self) { return World.layer[self] != L_PlayerBullets; }
 void ApplyImpactForce(u16 target, float vel, V3 normal, V3 pt) {
     if (target == WORLD || target >= World.instCount || vel <= 0.0f) { return; } Entity* e = &World.instances[target]; if((e->entflags & EF_DEAD) || (!(e->entflags & EF_RIGIDBODY) && target != PLAYER1)) { return; }

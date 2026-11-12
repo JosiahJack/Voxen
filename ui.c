@@ -4,55 +4,26 @@ bool enteringSaveName = false;
 extern V3 queuedLevelPos; extern u8 queuedLevelToLoad; extern float reloadTime[16];
 void BiomonitorBlitToUI(),LoadTextForLanguage(u8),LoadLogTextForLanguage(u8),SaveGame(u8,const char*),LoadGame(u8),WeaponFireStartWeaponDip(float),RemoveWeapon(i32),ActualChangeAmmoType(),OverloadButtonAction(),ReloadSecret(bool),Unload(bool),PlayLog(int),CheckForUnreadLogs(),UseTargets(u16,u16),UseCyberspaceItemByIndex(int);;
 bool PlayerInElevatorCell(),FindElevatorKeypadPos(u8,V3*),ReadSaveSlotName(u8,char*,size_t);
-#define UI_MFD_IDS(P) UI_ID_##P##_TAB_WEAPON,           UI_ID_##P##_TAB_ITEM,             UI_ID_##P##_TAB_AUTOMAP,       UI_ID_##P##_TAB_DATA,          UI_ID_##P##_PANEL,                 \
-                      UI_ID_##P##_WEAPON_NAME,          UI_ID_##P##_WEAPON_ICON,          UI_ID_##P##_WEAPON_AMMO,       UI_ID_##P##_WEAPON_RELOAD,     UI_ID_##P##_WEAPON_UNLOAD,         \
-                      UI_ID_##P##_WEAPON_OVERLOAD,      UI_ID_##P##_WEAPON_ENERGY_SLIDER, UI_ID_##P##_MEDIA_HEADER,      UI_ID_##P##_MEDIA_TAB_0,                                          \
-                      UI_ID_##P##_MEDIA_TAB_3 = UI_ID_##P##_MEDIA_TAB_0 + 3, \
-                      UI_ID_##P##_ITEM_NAME,            UI_ID_##P##_ITEM_ICON,            UI_ID_##P##_ITEM_USE,          UI_ID_##P##_ITEM_VAPORIZE,     UI_ID_##P##_ITEM_SKATE,            \
-                      UI_ID_##P##_ITEM_BOOST,           UI_ID_##P##_ITEM_TIMER_VALUE,     UI_ID_##P##_ITEM_TIMER_SLIDER, UI_ID_##P##_ITEM_ACCESS_CARDS, UI_ID_##P##_BLOCKED_SECURITY_TEXT, \
-                      UI_ID_##P##_ELEV_FLOOR_INDICATOR, UI_ID_##P##_ELEV_BUTTON_0,                                                                                                         \
-                      UI_ID_##P##_ELEV_BUTTON_7 = UI_ID_##P##_ELEV_BUTTON_0 + 7, \
-                      UI_ID_##P##_ELEV_CLOSE,           UI_ID_##P##_KEYCODE_0,                                                                                                             \
-                      UI_ID_##P##_KEYCODE_11 = UI_ID_##P##_KEYCODE_0 + 11, \
-                      UI_ID_##P##_KEYCODE_DIGIT_0,                                                                                                                                         \
-                      UI_ID_##P##_KEYCODE_DIGIT_2 = UI_ID_##P##_KEYCODE_DIGIT_0 + 2, \
-                      UI_ID_##P##_KEYCODE_CLOSE,        UI_ID_##P##_AUDIOLOG_IMAGE,       UI_ID_##P##_AUDIOLOG_NAME,     UI_ID_##P##_AUDIOLOG_SENDER,   UI_ID_##P##_AUDIOLOG_SUBJECT,      \
-                      UI_ID_##P##_PUZZLE_NODE_SOURCE,   UI_ID_##P##_PUZZLE_NODE,          UI_ID_##P##_PUZZLE_CELL_0,                                                                       \
-                      UI_ID_##P##_PUZZLE_CELL_34 = UI_ID_##P##_PUZZLE_CELL_0 + 34, \
-                      UI_ID_##P##_PUZZLE_SLIDER,        UI_ID_##P##_PUZZLE_CLOSE,         UI_ID_##P##_WIRE_SLIDER,       UI_ID_##P##_WIRE_TARGET,       UI_ID_##P##_WIRE_NODE_0,           \
-                      UI_ID_##P##_WIRE_NODE_13 = UI_ID_##P##_WIRE_NODE_0 + 13, \
-                      UI_ID_##P##_WIRE_CLOSE,           UI_ID_##P##_SYS_HEADER,           UI_ID_##P##_SYS_DESC_0,                                                                          \
-                      UI_ID_##P##_SYS_DESC_10 = UI_ID_##P##_SYS_DESC_0 + 10, \
-                      UI_ID_##P##_SYS_VAL_0,                                                                                                                                               \
-                      UI_ID_##P##_SYS_VAL_10 = UI_ID_##P##_SYS_VAL_0 + 10, \
-                      UI_ID_##P##_SYS_CLOSE,            UI_ID_##P##_MINIGAMES_HEADER,     UI_ID_##P##_MINIGAME_0,                                                                          \
-                      UI_ID_##P##_MINIGAME_8 = UI_ID_##P##_MINIGAME_0 + 8, \
-                      UI_ID_##P##_MINIGAMES_FOOTER,     UI_ID_##P##_MINIGAME_VIEW,        UI_ID_##P##_MINIGAME_BACK,     UI_ID_##P##_MINIGAME_CLOSE,    UI_ID_##P##_SEARCH_NAME,           \
-                      UI_ID_##P##_SEARCH_ICON_0,                                                                                                                                           \
-                      UI_ID_##P##_SEARCH_ICON_3 = UI_ID_##P##_SEARCH_ICON_0 + 3, \
-                      UI_ID_##P##_SEARCH_EMPTY,         UI_ID_##P##_SEARCH_CLOSE,         UI_ID_##P##_AUTOMAP_ZOOM_IN,   UI_ID_##P##_AUTOMAP_ZOOM_OUT,  UI_ID_##P##_AUTOMAP_FULL,          \
-                      UI_ID_##P##_AUTOMAP_SIDE
-enum{UI_ID_NONE,
-    /*Menu*/ UI_ID_MENU_SINGLEPLAYER, UI_ID_MENU_MULTIPLAYER, UI_ID_MENU_OPTIONS, UI_ID_MENU_QUIT, UI_ID_MENU_CONTINUE, UI_ID_MENU_NEW_GAME, UI_ID_MENU_PLAY_INTRO, UI_ID_MENU_PLAY_CREDITS, UI_ID_MENU_BACK, UI_ID_MENU_TAB_GRAPHICS, UI_ID_MENU_TAB_INPUT, UI_ID_MENU_TAB_AUDIO_LANG, UI_ID_MENU_MODEL_DETAIL, UI_ID_MENU_FXAA, UI_ID_MENU_SHADOWS, UI_ID_MENU_SSR, UI_ID_MENU_VSYNC, UI_ID_MENU_FOV_SLIDER, UI_ID_MENU_GAMMA_SLIDER, UI_ID_MENU_RESOLUTION,
-             UI_ID_MENU_GI, UI_ID_MENU_SSR_RES_SLIDER, UI_ID_MENU_INVERT_LOOK, UI_ID_MENU_INVERT_CYB_LOOK, UI_ID_MENU_INVERT_INV_CYC, UI_ID_MENU_QUICK_PICKUP, UI_ID_MENU_QUICK_RELOAD, UI_ID_MENU_NO_SHOOT, UI_ID_MENU_HEAD_BOB, UI_ID_MENU_MOUSE_SENS_SLIDER, UI_ID_MENU_SPEAKER_MODE, UI_ID_MENU_REVERB, UI_ID_MENU_DYNAMIC_MUSIC, UI_ID_MENU_FOOTSTEPS,
-             UI_ID_MENU_FULLSCREEN, UI_ID_MENU_TOGGLE_MONITOR, UI_ID_MENU_RES_APPLY, UI_ID_MENU_MASTER_VOLUME_SLIDER, UI_ID_MENU_MUSIC_VOLUME_SLIDER, UI_ID_MENU_SFX_VOLUME_SLIDER, UI_ID_MENU_LOG_VOLUME_SLIDER, UI_ID_MENU_LANGUAGE, UI_ID_MENU_INPUT_0, UI_ID_MENU_INPUT_41=UI_ID_MENU_INPUT_0 + 41,
-    /*NewGame*/ UI_ID_MENU_NAME_INPUT, UI_ID_MENU_DIFF_COMBAT, UI_ID_MENU_DIFF_PUZZLE, UI_ID_MENU_DIFF_MISSION, UI_ID_MENU_DIFF_CYBER, UI_ID_MENU_DIFF_CELL_0, UI_ID_MENU_DIFF_CELL_15 = UI_ID_MENU_DIFF_CELL_0 + 15, UI_ID_MENU_START,
-    /*Save/Load*/ UI_ID_MENU_SAVE_SLOT_0, UI_ID_MENU_SAVE_SLOT_7=UI_ID_MENU_SAVE_SLOT_0 + 7,
+#define UI_MFD_IDS(P) UI_ID_##P##_TAB_WEAPON, UI_ID_##P##_TAB_ITEM, UI_ID_##P##_TAB_AUTOMAP, UI_ID_##P##_TAB_DATA,      UI_ID_##P##_PANEL,      UI_ID_##P##_WEAPON_NAME, UI_ID_##P##_WEAPON_ICON,      UI_ID_##P##_WEAPON_AMMO,       UI_ID_##P##_WEAPON_RELOAD,     UI_ID_##P##_WEAPON_UNLOAD, UI_ID_##P##_WEAPON_OVERLOAD, UI_ID_##P##_WEAPON_ENERGY_SLIDER, UI_ID_##P##_MEDIA_HEADER, UI_ID_##P##_MEDIA_TAB_0, UI_ID_##P##_MEDIA_TAB_3 = UI_ID_##P##_MEDIA_TAB_0 + 3, \
+                      UI_ID_##P##_ITEM_NAME, UI_ID_##P##_ITEM_ICON, UI_ID_##P##_ITEM_USE,    UI_ID_##P##_ITEM_VAPORIZE, UI_ID_##P##_ITEM_SKATE, UI_ID_##P##_ITEM_BOOST,  UI_ID_##P##_ITEM_TIMER_VALUE, UI_ID_##P##_ITEM_TIMER_SLIDER, UI_ID_##P##_ITEM_ACCESS_CARDS, UI_ID_##P##_BLOCKED_SECURITY_TEXT, UI_ID_##P##_ELEV_FLOOR_INDICATOR, UI_ID_##P##_ELEV_BUTTON_0,    UI_ID_##P##_ELEV_BUTTON_7 = UI_ID_##P##_ELEV_BUTTON_0 + 7, UI_ID_##P##_ELEV_CLOSE, \
+                      UI_ID_##P##_KEYCODE_0, UI_ID_##P##_KEYCODE_11 = UI_ID_##P##_KEYCODE_0 + 11, UI_ID_##P##_KEYCODE_DIGIT_0, UI_ID_##P##_KEYCODE_DIGIT_2 = UI_ID_##P##_KEYCODE_DIGIT_0 + 2,          UI_ID_##P##_KEYCODE_CLOSE,     UI_ID_##P##_AUDIOLOG_IMAGE,    UI_ID_##P##_AUDIOLOG_NAME, UI_ID_##P##_AUDIOLOG_SENDER, UI_ID_##P##_AUDIOLOG_SUBJECT, UI_ID_##P##_PUZZLE_NODE_SOURCE, UI_ID_##P##_PUZZLE_NODE, UI_ID_##P##_PUZZLE_CELL_0, \
+                      UI_ID_##P##_PUZZLE_CELL_34 = UI_ID_##P##_PUZZLE_CELL_0 + 34,           UI_ID_##P##_PUZZLE_SLIDER, UI_ID_##P##_PUZZLE_CLOSE, UI_ID_##P##_WIRE_SLIDER, UI_ID_##P##_WIRE_TARGET,    UI_ID_##P##_WIRE_NODE_0,       UI_ID_##P##_WIRE_NODE_13 = UI_ID_##P##_WIRE_NODE_0 + 13,  UI_ID_##P##_WIRE_CLOSE,      UI_ID_##P##_SYS_HEADER,       UI_ID_##P##_SYS_DESC_0,         UI_ID_##P##_SYS_DESC_10 = UI_ID_##P##_SYS_DESC_0 + 10, \
+                      UI_ID_##P##_SYS_VAL_0, UI_ID_##P##_SYS_VAL_10 = UI_ID_##P##_SYS_VAL_0 + 10, UI_ID_##P##_SYS_CLOSE, UI_ID_##P##_MINIGAMES_HEADER, UI_ID_##P##_MINIGAME_0, UI_ID_##P##_MINIGAME_8 = UI_ID_##P##_MINIGAME_0 + 8,   UI_ID_##P##_MINIGAMES_FOOTER,  UI_ID_##P##_MINIGAME_VIEW, UI_ID_##P##_MINIGAME_BACK,   UI_ID_##P##_MINIGAME_CLOSE,   UI_ID_##P##_SEARCH_NAME,        UI_ID_##P##_SEARCH_ICON_0, \
+                      UI_ID_##P##_SEARCH_ICON_3 = UI_ID_##P##_SEARCH_ICON_0 + 3,             UI_ID_##P##_SEARCH_EMPTY,  UI_ID_##P##_SEARCH_CLOSE, UI_ID_##P##_AUTOMAP_ZOOM_IN, UI_ID_##P##_AUTOMAP_ZOOM_OUT, UI_ID_##P##_AUTOMAP_FULL,UI_ID_##P##_AUTOMAP_SIDE
+enum{UI_ID_NONE, /*Menu*/ UI_ID_MENU_SINGLEPLAYER, UI_ID_MENU_MULTIPLAYER, UI_ID_MENU_OPTIONS, UI_ID_MENU_QUIT, UI_ID_MENU_CONTINUE, UI_ID_MENU_NEW_GAME, UI_ID_MENU_PLAY_INTRO, UI_ID_MENU_PLAY_CREDITS, UI_ID_MENU_BACK, UI_ID_MENU_TAB_GRAPHICS, UI_ID_MENU_TAB_INPUT, UI_ID_MENU_TAB_AUDIO_LANG, UI_ID_MENU_MODEL_DETAIL, UI_ID_MENU_FXAA, UI_ID_MENU_SHADOWS, UI_ID_MENU_SSR, UI_ID_MENU_VSYNC, UI_ID_MENU_FOV_SLIDER, UI_ID_MENU_GAMMA_SLIDER, UI_ID_MENU_RESOLUTION,
+                          UI_ID_MENU_GI, UI_ID_MENU_SSR_RES_SLIDER, UI_ID_MENU_INVERT_LOOK, UI_ID_MENU_INVERT_CYB_LOOK, UI_ID_MENU_INVERT_INV_CYC, UI_ID_MENU_QUICK_PICKUP, UI_ID_MENU_QUICK_RELOAD, UI_ID_MENU_NO_SHOOT, UI_ID_MENU_HEAD_BOB, UI_ID_MENU_MOUSE_SENS_SLIDER, UI_ID_MENU_SPEAKER_MODE, UI_ID_MENU_REVERB, UI_ID_MENU_DYNAMIC_MUSIC, UI_ID_MENU_FOOTSTEPS, UI_ID_MENU_FULLSCREEN, UI_ID_MENU_TOGGLE_MONITOR, UI_ID_MENU_RES_APPLY,
+                          UI_ID_MENU_MASTER_VOLUME_SLIDER, UI_ID_MENU_MUSIC_VOLUME_SLIDER, UI_ID_MENU_SFX_VOLUME_SLIDER, UI_ID_MENU_LOG_VOLUME_SLIDER, UI_ID_MENU_LANGUAGE, UI_ID_MENU_INPUT_0, UI_ID_MENU_INPUT_41 = UI_ID_MENU_INPUT_0 + 41, UI_ID_MENU_NAME_INPUT, UI_ID_MENU_DIFF_COMBAT, UI_ID_MENU_DIFF_PUZZLE, UI_ID_MENU_DIFF_MISSION, UI_ID_MENU_DIFF_CYBER, UI_ID_MENU_DIFF_CELL_0, UI_ID_MENU_DIFF_CELL_15 = UI_ID_MENU_DIFF_CELL_0 + 15, UI_ID_MENU_START,
+                          UI_ID_MENU_SAVE_SLOT_0, UI_ID_MENU_SAVE_SLOT_7 = UI_ID_MENU_SAVE_SLOT_0 + 7,
     /*Pause*/ UI_ID_PAUSE_RESUME, UI_ID_PAUSE_LOAD, UI_ID_PAUSE_SAVE, UI_ID_PAUSE_OPTIONS, UI_ID_PAUSE_QUIT_TO_MENU, UI_ID_PAUSE_QUIT_GAME,
     /*HUD*/ UI_ID_HUD_SHOOTMODE, UI_ID_HUD_HW_0, UI_ID_HUD_HW_7 = UI_ID_HUD_HW_0 + 7, UI_ID_CMFD_MISSION_TIMER, UI_ID_CMFD_CYBER_TIMER, UI_ID_CMFD_BIOMONITOR, UI_ID_VMAIL_VIEWER, UI_ID_FULLMAP_CLOSE, UI_ID_SENSA_CTR, UI_ID_SENSA_LH, UI_ID_SENSA_RH,
-    /*Center MFD*/ UI_ID_CMFD_ADD_TO_INVENTORY, UI_ID_CMFD_TAB_MAIN, UI_ID_CMFD_TAB_HARDWARE, UI_ID_CMFD_TAB_GENERAL, UI_ID_CMFD_TAB_SOFTWARE,
-                     UI_ID_CMFD_WEAPON_HEADER, UI_ID_CMFD_SHOTS_HEADER, UI_ID_CMFD_WEAPON_ROW_0, UI_ID_CMFD_WEAPON_ROW_6 = UI_ID_CMFD_WEAPON_ROW_0 + 6, UI_ID_CMFD_GREN_HEADER, UI_ID_CMFD_PATCH_HEADER, UI_ID_CMFD_GREN_USE_0, UI_ID_CMFD_GREN_USE_6 = UI_ID_CMFD_GREN_USE_0 + 6,
-                       UI_ID_CMFD_GREN_ROW_0, UI_ID_CMFD_GREN_ROW_6 = UI_ID_CMFD_GREN_ROW_0 + 6, UI_ID_CMFD_PATCH_USE_0, UI_ID_CMFD_PATCH_USE_6 = UI_ID_CMFD_PATCH_USE_0 + 6, UI_ID_CMFD_PATCH_ROW_0, UI_ID_CMFD_PATCH_ROW_6 = UI_ID_CMFD_PATCH_ROW_0 + 6,
-                     UI_ID_CMFD_HARDWARE_HEADER, UI_ID_CMFD_HARDWARE_ROW_0, UI_ID_CMFD_HARDWARE_ROW_11 = UI_ID_CMFD_HARDWARE_ROW_0 + 11,
-                     UI_ID_CMFD_GENERAL_HEADER, UI_ID_CMFD_GENERAL_USE_0, UI_ID_CMFD_GENERAL_USE_13 = UI_ID_CMFD_GENERAL_USE_0 + 13, UI_ID_CMFD_GENERAL_ROW_0, UI_ID_CMFD_GENERAL_ROW_13 = UI_ID_CMFD_GENERAL_ROW_0 + 13,
-                     UI_ID_CMFD_SOFTWARE_HEADER, UI_ID_CMFD_SOFTWARE_ROW_0, UI_ID_CMFD_SOFTWARE_ROW_6 = UI_ID_CMFD_SOFTWARE_ROW_0 + 6,
-                     UI_ID_CMFD_MEDIA_HEADER, UI_ID_CMFD_LOG_TABLE_0, UI_ID_CMFD_LOG_TABLE_9 = UI_ID_CMFD_LOG_TABLE_0 + 9, UI_ID_CMFD_LOG_ENTRY_0, UI_ID_CMFD_LOG_ENTRY_14 = UI_ID_CMFD_LOG_ENTRY_0 + 14, UI_ID_CMFD_LOG_TEXT, UI_ID_CMFD_LOG_MORE, UI_ID_CMFD_LOG_BACK,
-                       UI_ID_CMFD_EMAIL_ENTRY_0, UI_ID_CMFD_EMAIL_ENTRY_14 = UI_ID_CMFD_EMAIL_ENTRY_0 + 14, UI_ID_CMFD_DATA_ENTRY_0, UI_ID_CMFD_DATA_ENTRY_12 = UI_ID_CMFD_DATA_ENTRY_0 + 12, UI_ID_CMFD_NOTE_TOGGLE_0, UI_ID_CMFD_NOTE_TOGGLE_17 = UI_ID_CMFD_NOTE_TOGGLE_0 + 17,
+    /*Center MFD*/ UI_ID_CMFD_ADD_TO_INVENTORY, UI_ID_CMFD_TAB_MAIN, UI_ID_CMFD_TAB_HARDWARE, UI_ID_CMFD_TAB_GENERAL, UI_ID_CMFD_TAB_SOFTWARE, UI_ID_CMFD_WEAPON_HEADER, UI_ID_CMFD_SHOTS_HEADER, UI_ID_CMFD_WEAPON_ROW_0, UI_ID_CMFD_WEAPON_ROW_6 = UI_ID_CMFD_WEAPON_ROW_0 + 6, UI_ID_CMFD_GREN_HEADER, UI_ID_CMFD_PATCH_HEADER, UI_ID_CMFD_GREN_USE_0, UI_ID_CMFD_GREN_USE_6 = UI_ID_CMFD_GREN_USE_0 + 6, UI_ID_CMFD_GREN_ROW_0,
+                   UI_ID_CMFD_GREN_ROW_6 = UI_ID_CMFD_GREN_ROW_0 + 6, UI_ID_CMFD_PATCH_USE_0, UI_ID_CMFD_PATCH_USE_6 = UI_ID_CMFD_PATCH_USE_0 + 6, UI_ID_CMFD_PATCH_ROW_0, UI_ID_CMFD_PATCH_ROW_6 = UI_ID_CMFD_PATCH_ROW_0 + 6, UI_ID_CMFD_HARDWARE_HEADER, UI_ID_CMFD_HARDWARE_ROW_0, UI_ID_CMFD_HARDWARE_ROW_11 = UI_ID_CMFD_HARDWARE_ROW_0 + 11, UI_ID_CMFD_GENERAL_HEADER, UI_ID_CMFD_GENERAL_USE_0, UI_ID_CMFD_GENERAL_USE_13 = UI_ID_CMFD_GENERAL_USE_0 + 13,
+                   UI_ID_CMFD_GENERAL_ROW_0, UI_ID_CMFD_GENERAL_ROW_13 = UI_ID_CMFD_GENERAL_ROW_0 + 13, UI_ID_CMFD_SOFTWARE_HEADER, UI_ID_CMFD_SOFTWARE_ROW_0, UI_ID_CMFD_SOFTWARE_ROW_6 = UI_ID_CMFD_SOFTWARE_ROW_0 + 6, UI_ID_CMFD_MEDIA_HEADER, UI_ID_CMFD_LOG_TABLE_0, UI_ID_CMFD_LOG_TABLE_9 = UI_ID_CMFD_LOG_TABLE_0 + 9, UI_ID_CMFD_LOG_ENTRY_0, UI_ID_CMFD_LOG_ENTRY_14 = UI_ID_CMFD_LOG_ENTRY_0 + 14, UI_ID_CMFD_LOG_TEXT, UI_ID_CMFD_LOG_MORE,
+                   UI_ID_CMFD_LOG_BACK, UI_ID_CMFD_EMAIL_ENTRY_0, UI_ID_CMFD_EMAIL_ENTRY_14 = UI_ID_CMFD_EMAIL_ENTRY_0 + 14, UI_ID_CMFD_DATA_ENTRY_0, UI_ID_CMFD_DATA_ENTRY_12 = UI_ID_CMFD_DATA_ENTRY_0 + 12, UI_ID_CMFD_NOTE_TOGGLE_0, UI_ID_CMFD_NOTE_TOGGLE_17 = UI_ID_CMFD_NOTE_TOGGLE_0 + 17,
     /*Left/Right MFD*/ UI_MFD_IDS(LMFD), UI_ID_SIDEMFD_PAD, UI_MFD_IDS(RMFD),
-    /*In-Game Editor*/ UI_ID_CMFD_EDIT_PANEL, UI_ID_CMFD_EDIT_ROW_0, UI_ID_CMFD_EDIT_ROW_14 = UI_ID_CMFD_EDIT_ROW_0 + 14,
-    UI_ID_CMFD_EDIT_LIGHT_TYPE, UI_ID_CMFD_EDIT_LIGHT_DIR_N, UI_ID_CMFD_EDIT_LIGHT_DIR_E, UI_ID_CMFD_EDIT_LIGHT_DIR_S, UI_ID_CMFD_EDIT_LIGHT_DIR_W, UI_ID_CMFD_EDIT_LIGHT_DIR_UP, UI_ID_CMFD_EDIT_LIGHT_DIR_DN, UI_ID_COUNT};
+    /*In-Game Editor*/ UI_ID_CMFD_EDIT_PANEL, UI_ID_CMFD_EDIT_ROW_0, UI_ID_CMFD_EDIT_ROW_14 = UI_ID_CMFD_EDIT_ROW_0 + 14, UI_ID_CMFD_EDIT_LIGHT_TYPE, UI_ID_CMFD_EDIT_LIGHT_DIR_N, UI_ID_CMFD_EDIT_LIGHT_DIR_E, UI_ID_CMFD_EDIT_LIGHT_DIR_S, UI_ID_CMFD_EDIT_LIGHT_DIR_W, UI_ID_CMFD_EDIT_LIGHT_DIR_UP, UI_ID_CMFD_EDIT_LIGHT_DIR_DN, UI_ID_COUNT};
 #define UI_MFD_STRIDE (UI_ID_RMFD_TAB_WEAPON-UI_ID_LMFD_TAB_WEAPON)
-#define MID(rh, n) ((u32)UI_ID_LMFD_##n + ((rh) ? (u32)UI_MFD_STRIDE : 0u))/*Mirror an LMFD id onto whichever side we are drawing*/
+#define MID(rh, n) ((u32)UI_ID_LMFD_##n + ((rh) ? (u32)(UI_ID_RMFD_TAB_WEAPON-UI_ID_LMFD_TAB_WEAPON) : 0u))/*Mirror an LMFD id onto whichever side we are drawing*/
 #define UIC(i) World.uiComponents[i]
 INLINE bool CursorIsOverBounds(float x0, float x1, float y0, float y1) { return World.cursorPos_x >= x0 && World.cursorPos_x <= x1 && World.cursorPos_y >= y0 && World.cursorPos_y <= y1;/*0,0=top left*/ }
 INLINE bool WorldToScreenPoint(V3 d, float* sx, float* sy) {
@@ -81,14 +52,14 @@ void SaveNameEntry(i32 k) {
     if (saveNameEntryLen>=47) { return; }
     char c = (k >= KEY_A && k <= KEY_Z) ? (char)('a' + (k - KEY_A)):((k >= KEY_1 && k <= KEY_9) ? (char)('1' + (k - KEY_1)) : ((k == KEY_0) ? '0' : ((k == KEY_SPACE) ? ' ' : 0))); if (c) { saveNameEntry[saveNameEntryLen] = c; saveNameEntry[++saveNameEntryLen] = '\0'; }
 }
-void MFD_ResetGeneral() { World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.consumableClickRow=-1; World.Sys_UI.generalClickSlot = -1; }
+void MFD_ResetGeneral() { World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.consumableClickRow=-1; World.Sys_UI.genClickSlot = -1; }
 void MFD_ShowGeneralItem() { u8 side=World.Sys_UI.lastItemSideRH?2:1; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdGeneralItem=true; World.Sys_UI.mfdHardwareItem=false; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; World.Sys_UI.mfdTab[side]=2; World.Sys_UI.mfdSelected[side]=2; }
 void MFD_OpenSearch(bool isRH) { for (u8 side=0;side<2;++side) {u8 tab=World.Sys_UI.mfdTab[1+!!side]; if (!(tab==2 && World.Sys_UI.mfdItemReader[side]) && World.Sys_UI.MFD_Data!=5) { World.Sys_UI.mfdReturnTab[side+1]=tab; World.Sys_UI.mfdReturnView[side+1]=World.Sys_UI.MFD_Data;}} World.Sys_UI.MFD_Data=5; World.Sys_UI.mfdTab[1+!!isRH]=4;}
 void MFD_CloseSearch() {if (World.Sys_UI.MFD_Data!=5) return; for (u8 side=0;side<2;++side) {u8* tab=&World.Sys_UI.mfdTab[1+!!side]; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];} u8 rv=World.Sys_UI.mfdReturnView[1]; if (rv==5) rv=0; World.Sys_UI.MFD_Data=rv;}
 void MFD_OpenData(bool isRH,u8 code) { u8 side=isRH?2:1; u8 tab=World.Sys_UI.mfdTab[1+!!isRH]; if (tab!=4) World.Sys_UI.mfdReturnTab[side]=tab; if (World.Sys_UI.MFD_Data == 0 || World.Sys_UI.MFD_Data == 5) World.Sys_UI.mfdReturnView[side]=World.Sys_UI.MFD_Data; World.Sys_UI.MFD_Data=code; World.Sys_UI.mfdTab[1+!!isRH]=4; }
 void MFD_CloseData(void) { if (World.Sys_UI.MFD_Data == 0 || World.Sys_UI.MFD_Data == 5) return; u8 keepDataTab=(World.Sys_UI.mfdReturnTab[1]==4||World.Sys_UI.mfdReturnTab[2]==4); for (u8 side=0;side<2;++side) {u8* tab=&World.Sys_UI.mfdTab[1+!!side]; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];} World.Sys_UI.MFD_Data=keepDataTab?(((World.invP1.hasHardware&HW_SYS)?7:0)):0; }
 INLINE void MFD_SelectTab(u8 panel, u8 tab, bool toggle) {
-    World.Sys_UI.generalClickSlot = -1;
+    World.Sys_UI.genClickSlot = -1;
     if (panel && tab == 2) { World.Sys_UI.lastItemSideRH = (panel == 2); }
     if (panel && tab == 3) { World.Sys_UI.lastAutomapSideRH = (panel == 2); }
     if (panel && tab == 4) { World.Sys_UI.lastDataSideRH = (panel == 2); }
@@ -570,7 +541,7 @@ static int UILogWrap(char* out,int outSz,int startChar,int maxLines) {/*word-wra
             w=MeasureLineAdvance(line,FONT_NORMAL);
             if (w>maxU && n>0) { if (lastSp) { s=lastSp; n=lastN; } else { s-=clen; n-=clen; } break; }
         }
-        if (!n) break;
+        if (!n) { break; }
         line[n]=0; if (line[n-1]==' ') line[--n]=0;
         if (lineStart>=startChar && emitted<maxLines && op+n+1<outSz) { mcpy(out+op,line,(size_t)n); op+=n; out[op++]='\n'; emitted++; }
         lineStart+=n; total++;
@@ -649,8 +620,7 @@ static bool LightDirIs(u8 d){if(!EditLightSelIsActive()||d>=6)return false;Quate
 bool EditPanelPointerHover(void){if(!EditSelIsActive()&&!EditLightSelIsActive())return false;if(!World.inventoryMode)return false;for(int i=0;i<EF_LAST;++i)if(UIOver(UI_ID_CMFD_EDIT_ROW_0+i))return true;if(UIOver(UI_ID_CMFD_EDIT_LIGHT_TYPE))return true;for(int d=0;d<6;++d)if(UIOver(UI_ID_CMFD_EDIT_LIGHT_DIR_N+d))return true;return false;}
 static void EditStop(void){editFieldEditing=false;editFieldSlot=EF_LAST;}
 static void EditFieldWrite(u16 s,float f,i32 iv) { void* p = EditFieldPtr(editFieldSlot,s); if (!p) return; if (editFieldSlot<EF_TEX) *(float*)p = f; else *(u16*)p=(u16)vclamp(iv,0,(editFieldSlot == EF_MODEL ? MAX_MDLS : MAXTEX) - 1); if (editFieldSlot >= EF_ROTX && editFieldSlot <= EF_ROTW) World.rotation[s] = quat_normalize(World.rotation[s]); }
-static void EditFieldCommitLive(void) {
-    if(EditLightSelIsActive()){LightFieldCommitLive();return;}if(!EditSelIsActive())return;u16 s=editModeSelection;float f=0;{const char* p=editFieldBuffer;f=fast_atof(&p);}EditFieldWrite(s,f,s2i32(editFieldBuffer));}
+static void EditFieldCommitLive(void) { if(EditLightSelIsActive()){LightFieldCommitLive();return;}if(!EditSelIsActive())return;u16 s=editModeSelection;float f=0;{const char* p=editFieldBuffer;f=fast_atof(&p);}EditFieldWrite(s,f,s2i32(editFieldBuffer)); }
 static void EditFieldStep(float delta) {
     if(!editFieldEditing)return;if(EditLightSelIsActive()){LightFieldStep(delta);return;}if(!EditSelIsActive())return;float cur;{const char* p=editFieldBuffer;cur=fast_atof(&p);}
     if(editFieldSlot<EF_TEX){int steps=delta>0?(int)(delta+0.5f):-(int)((-delta)+0.5f);cur+=steps*0.01f;int prec=(editFieldSlot>=EF_ROTX&&editFieldSlot<=EF_ROTW)?3:2;sFormat(editFieldBuffer,40,prec==3 ? "%.3f" : "%.2f",cur);}
@@ -659,19 +629,18 @@ static void EditFieldStep(float delta) {
 }
 void EditFieldKey(i32 keycode){
     if(!editFieldEditing)return; if(keycode==KEY_ESCAPE){EditStop();return;} if(keycode==KEY_ENTER||keycode==KEY_KP_ENTER){EditStop();return;}
-    size_t len=slen(editFieldBuffer); bool changed=false;
-    if(keycode>=KEY_0&&keycode<=KEY_9){if(len<39){editFieldBuffer[len]=(char)('0'+(keycode-KEY_0));editFieldBuffer[len+1]='\0';changed=true;}}
-    else if(keycode>=KEY_KP_0&&keycode<=KEY_KP_9){if(len<39){editFieldBuffer[len]=(char)('0'+(keycode-KEY_KP_0));editFieldBuffer[len+1]='\0';changed=true;}}
-    else if((keycode==KEY_MINUS||keycode==KEY_KP_SUBTRACT)&&len==0){if(len<39){editFieldBuffer[len]='-';editFieldBuffer[len+1]='\0';changed=true;}}
-    else if(keycode==KEY_PERIOD||keycode==KEY_KP_DECIMAL){bool hasdot=false;for(size_t k=0;k<len&&!hasdot;++k)if(editFieldBuffer[k]=='.')hasdot=true;if(!hasdot&&len<39){editFieldBuffer[len]='.';editFieldBuffer[len+1]='\0';changed=true;}}
-    else if(keycode==KEY_BACKSPACE){if(len>0){editFieldBuffer[len-1]='\0';changed=true;}}
+    size_t len=slen(editFieldBuffer); bool changed = false, isTopRow = (keycode >= KEY_0 && keycode <= KEY_9);
+         if ((isTopRow || (keycode >= KEY_KP_0 && keycode <= KEY_KP_9)) && len < 39) { int base = isTopRow ? KEY_0 : KEY_KP_0; editFieldBuffer[len] = (char)('0' + (keycode - base)); editFieldBuffer[len + 1] = '\0'; changed = true; }
+    else if ((keycode == KEY_MINUS || keycode == KEY_KP_SUBTRACT) && len == 0 && len < 39) { editFieldBuffer[len] = '-'; editFieldBuffer[len + 1] = '\0'; changed = true; }
+    else if (keycode == KEY_PERIOD || keycode == KEY_KP_DECIMAL) { bool hasdot = false; for(size_t k=0;k<len&&!hasdot;++k)if(editFieldBuffer[k]=='.')hasdot=true;if(!hasdot&&len<39){editFieldBuffer[len]='.';editFieldBuffer[len+1]='\0';changed=true;}}
+    else if (keycode == KEY_BACKSPACE) { if(len>0){editFieldBuffer[len-1]='\0';changed=true;}}
     if(changed)EditFieldCommitLive();
 }
 bool UIInteractions() { if (!World.inventoryMode) return false; if (World.menuActive || World.paused || World.creditsActive || Cheats.consoleActive) return true; if (Cheats.noHUD || World.Sys_UI.vmailActive) return false; for (u32 i=UI_ID_NONE+1;i<UI_ID_COUNT;++i) if (UIOver(i)) return true; return false; }
 bool InventoryPointerHover() { return UIInteractions(); }
 int GeneralInvItem(int);
-bool GeneralInvCanUse(int),GeneralInvCanVaporize(int),GeneralInvTake(int slot);
-void GeneralInvClick(int),GeneralInvApply(int),VaporizeClick();
+bool GeneralInvCanUse(int),GeneralInvCanVaporize(int),GenInvTake(int slot);
+void GenInvClick(int),GenInvApply(int),VaporizeClick();
 bool InventoryHasAccessCard(AccCardType card);
 const char* AccessCardCodeForType(AccCardType card);
 u16 GetItemFrobTexture(u16 index);
@@ -712,7 +681,7 @@ void RenderGeneralItem(bool isRH) {
     int slot=World.invP1.generalInvCurrent,item=GeneralInvItem(slot); if (item<0) return;
     i16 dx=isRH?1059:0; UIRText(MID(isRH,ITEM_NAME),dx+28,540,T_YELLOW,FONT_NORMAL,0.8f,260,GeneralInvLabel(slot));
     u16 tex=GetItemFrobTexture((u16)(item+307));
-    if (item>=92 && item<=94) { static const u8 heads[19]={37,11,32,1,7,9,10,12,13,14,15,17,25,27,28,31,33,35,36}; u16 custom=World.invP1.generalInvCustIdx[slot]; tex=(u16)(1272+heads[custom<19?custom:0]); }
+    if (item>=92 && item<=94) { static const u8 heads[19]={37,11,32,1,7,9,10,12,13,14,15,17,25,27,28,31,33,35,36}; u16 custom=World.invP1.genInvCustIdx[slot]; tex=(u16)(1272+heads[custom<19?custom:0]); }
     if (tex<MAXTEX) UIRImg(MID(isRH,ITEM_ICON),dx+112,560,80,64,tex);
     if (!slot) {
         i16 x=dx+36,y=638;
@@ -1078,59 +1047,39 @@ void CenterMFD() { //640x240
         }
     }
 }
-
-static void UI_WeaponEnergySliderSet(bool rh) { /*Sliders need .down rather than .pressed, so they get their own short pass ahead of the click walk.*/
-    if (!CurrentWeaponUsesEnergy()) return;
-    int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); if (wep16 < 0 || wep16 >= 16) return;
-
-    float value = ((float)World.cursorPos_x - UIC(MID(rh,WEAPON_ENERGY_SLIDER)).min.x) / 164.0f;
-    World.invP1.weaponEnergySetting[wep16] = vclamp(value*100.0f,0.0f,100.0f);
-    World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true;
-}
-
+static void UI_WeaponEnergySliderSet(bool rh) { if (!CurrentWeaponUsesEnergy()) { return; } int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); if (wep16 < 0 || wep16 >= 16) return; float value = ((float)World.cursorPos_x - UIC(MID(rh,WEAPON_ENERGY_SLIDER)).min.x) / 164.0f; World.invP1.weaponEnergySetting[wep16] = vclamp(value*100.0f,0.0f,100.0f); World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true; }
 static void UI_DragRegions(void) {
-    if (!Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down) return;
+    if (!Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down) { return; }
     for (u8 s=0;s<2;++s) {
-        u32 id=MID(s,ITEM_TIMER_SLIDER); if (UIOver(id)) { World.Sys_UI.lastItemSideRH=s!=0; ConsumableSetTimer(((float)World.cursorPos_x-UIC(id).min.x)/224.0f); World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; }
-        id = MID(s,PUZZLE_SLIDER); if (UIOver(id)) { World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; }
-        id = MID(s,WIRE_SLIDER); if (UIOver(id)) { World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; }
-        id = MID(s,WEAPON_ENERGY_SLIDER); if (UIOver(id)) UI_WeaponEnergySliderSet(s!=0);
+        u32 id = MID(s,ITEM_TIMER_SLIDER); if (UIOver(id)) { World.Sys_UI.lastItemSideRH = s != 0; ConsumableSetTimer(((float)World.cursorPos_x - UIC(id).min.x) / 224.0f); World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true; } id = MID(s,PUZZLE_SLIDER); if (UIOver(id)) { World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true; } id = MID(s,WIRE_SLIDER); if (UIOver(id)) { World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true; }
+        id = MID(s,WEAPON_ENERGY_SLIDER); if (UIOver(id)) UI_WeaponEnergySliderSet(s != 0);
     }
 }
-/*c: 1 LMB, 2 RMB, +4 double click of that same button.*/
 static void UI_OnRegionClick(u32 id, u8 c) {
-    bool rh=false, dbl=(c&4)!=0, left=(c&3)==1; if (id>=UI_ID_RMFD_TAB_WEAPON && id<UI_ID_CMFD_EDIT_PANEL) { id-=UI_MFD_STRIDE; rh=true; }/*RMFD ids remap onto LMFD; the editor block sits after the MFD blocks, so without the upper bound every edit-row click was remapped into dead ids and swallowed*/
+    bool dbl = (c & 4) != 0, left = (c & 3) == 1, rh = false; if (id >= UI_ID_RMFD_TAB_WEAPON && id < UI_ID_CMFD_EDIT_PANEL) { id -= (UI_ID_RMFD_TAB_WEAPON - UI_ID_LMFD_TAB_WEAPON); rh = true; }
     switch (id) {
         case UI_ID_HUD_SHOOTMODE: ForceShootMode(); return;
         case UI_ID_HUD_HW_0 ... UI_ID_HUD_HW_7: HwToggle((u8)(id-UI_ID_HUD_HW_0)); return;
         case UI_ID_CMFD_ADD_TO_INVENTORY: if (World.invP1.holdingObject) { AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem(); } return;
-        case UI_ID_CMFD_TAB_MAIN ... UI_ID_CMFD_TAB_SOFTWARE: MFD_SelectTab(0,(u8)(id-UI_ID_CMFD_TAB_MAIN+1),true); if(World.Sys_UI.mfdTab[0]==1){World.Sys_UI.firstMain=true;}else if(World.Sys_UI.mfdTab[0]==2){World.Sys_UI.firstHardware=true;}else if(World.Sys_UI.mfdTab[0]==3){World.Sys_UI.firstGeneral=true;} return;
-        case UI_ID_CMFD_WEAPON_ROW_0 ... UI_ID_CMFD_WEAPON_ROW_6: { int row=(int)(id-UI_ID_CMFD_WEAPON_ROW_0); if (left) WeaponSelectSlot(row); else RemoveWeapon(row); return; }/*RMB takes the weapon out of the inventory; the region click path already delivers c==2/6 here, this used to swallow it behind if (left) */
-        case UI_ID_CMFD_GREN_USE_0 ... UI_ID_CMFD_GREN_USE_6: ConsumableUse(false,(int)(id-UI_ID_CMFD_GREN_USE_0)); return;
-        case UI_ID_CMFD_GREN_ROW_0 ... UI_ID_CMFD_GREN_ROW_6: { int row=(int)(id-UI_ID_CMFD_GREN_ROW_0); ConsumableSelect(false,row); if (dbl) ConsumableUse(false,row); return; }
-        case UI_ID_CMFD_PATCH_USE_0 ... UI_ID_CMFD_PATCH_USE_6: ConsumableUse(true,(int)(id-UI_ID_CMFD_PATCH_USE_0)); return;
-        case UI_ID_CMFD_PATCH_ROW_0 ... UI_ID_CMFD_PATCH_ROW_6: { int row=(int)(id-UI_ID_CMFD_PATCH_ROW_0); ConsumableSelect(true,row); if (dbl) ConsumableUse(true,row); return; }
-        case UI_ID_CMFD_HARDWARE_ROW_0 ... UI_ID_CMFD_HARDWARE_ROW_11: UI_HardwareRowClick((int)(id-UI_ID_CMFD_HARDWARE_ROW_0)); return;
-        case UI_ID_CMFD_SOFTWARE_ROW_0 ... UI_ID_CMFD_SOFTWARE_ROW_6: UI_SoftwareRowClick((int)(id-UI_ID_CMFD_SOFTWARE_ROW_0)); return;
-        case UI_ID_CMFD_GENERAL_USE_0 ... UI_ID_CMFD_GENERAL_USE_13: { u8 s=(u8)(id-UI_ID_CMFD_GENERAL_USE_0); World.Sys_UI.generalClickSlot = -1; GeneralInvClick(s); GeneralInvApply(s); return; }
-        case UI_ID_CMFD_GENERAL_ROW_0 ... UI_ID_CMFD_GENERAL_ROW_13: {
-            u8 s=(u8)(id-UI_ID_CMFD_GENERAL_ROW_0); int item=GeneralInvItem(s); if (item<0) return;
-            if (!left) { World.Sys_UI.generalClickSlot = -1; if (s) GeneralInvTake(s); return; }
-            
-            bool twice=dbl && World.Sys_UI.generalClickSlot==(i8)s && World.Sys_UI.generalClickItem==(i16)item && World.Sys_UI.generalClickCustom==World.invP1.generalInvCustIdx[s];
-            World.Sys_UI.generalClickSlot = -1;
-            GeneralInvClick(s);
-            if (twice) GeneralInvApply(s);
-            else { World.Sys_UI.generalClickSlot=(i8)s; World.Sys_UI.generalClickItem=(i16)item; World.Sys_UI.generalClickCustom=World.invP1.generalInvCustIdx[s]; World.Sys_UI.generalClickTime=World.pauseRelativeTime; }
-            return; }
-        case UI_ID_CMFD_LOG_TABLE_0 ... UI_ID_CMFD_LOG_TABLE_9: UI_LogTableClick((int)(id-UI_ID_CMFD_LOG_TABLE_0)); return;
-        case UI_ID_CMFD_LOG_ENTRY_0 ... UI_ID_CMFD_LOG_ENTRY_14: UI_LogEntryClick((int)(id-UI_ID_CMFD_LOG_ENTRY_0)); return;
+        case UI_ID_CMFD_TAB_MAIN ... UI_ID_CMFD_TAB_SOFTWARE: MFD_SelectTab(0,(u8)(id - UI_ID_CMFD_TAB_MAIN + 1),true); if (World.Sys_UI.mfdTab[0] == 1) { World.Sys_UI.firstMain = true; } else if (World.Sys_UI.mfdTab[0] == 2) { World.Sys_UI.firstHardware = true; } else if (World.Sys_UI.mfdTab[0] == 3) { World.Sys_UI.firstGeneral = true; } return;
+        case UI_ID_CMFD_WEAPON_ROW_0 ... UI_ID_CMFD_WEAPON_ROW_6: { int row=(int)(id - UI_ID_CMFD_WEAPON_ROW_0); if (left) WeaponSelectSlot(row); else RemoveWeapon(row); return; }
+        case UI_ID_CMFD_GREN_USE_0 ... UI_ID_CMFD_GREN_USE_6: ConsumableUse(false,(int)(id - UI_ID_CMFD_GREN_USE_0)); return;
+        case UI_ID_CMFD_GREN_ROW_0 ... UI_ID_CMFD_GREN_ROW_6: { int row = (int)(id - UI_ID_CMFD_GREN_ROW_0); ConsumableSelect(false,row); if (dbl) ConsumableUse(false,row); return; }
+        case UI_ID_CMFD_PATCH_USE_0 ... UI_ID_CMFD_PATCH_USE_6: ConsumableUse(true,(int)(id - UI_ID_CMFD_PATCH_USE_0)); return;
+        case UI_ID_CMFD_PATCH_ROW_0 ... UI_ID_CMFD_PATCH_ROW_6: { int row=(int)(id - UI_ID_CMFD_PATCH_ROW_0); ConsumableSelect(true,row); if (dbl) ConsumableUse(true,row); return; }
+        case UI_ID_CMFD_HARDWARE_ROW_0 ... UI_ID_CMFD_HARDWARE_ROW_11: UI_HardwareRowClick((int)(id - UI_ID_CMFD_HARDWARE_ROW_0)); return;
+        case UI_ID_CMFD_SOFTWARE_ROW_0 ... UI_ID_CMFD_SOFTWARE_ROW_6: UI_SoftwareRowClick((int)(id - UI_ID_CMFD_SOFTWARE_ROW_0)); return;
+        case UI_ID_CMFD_GENERAL_USE_0 ... UI_ID_CMFD_GENERAL_USE_13: { u8 s=(u8)(id - UI_ID_CMFD_GENERAL_USE_0); World.Sys_UI.genClickSlot = -1; GenInvClick(s); GenInvApply(s); return; }
+        case UI_ID_CMFD_GENERAL_ROW_0 ... UI_ID_CMFD_GENERAL_ROW_13: { u8 s = (u8)(id - UI_ID_CMFD_GENERAL_ROW_0); int item = GeneralInvItem(s); if (item<0) { return; } if (!left) { World.Sys_UI.genClickSlot = -1; if (s) GenInvTake(s); return; }
+            World.Sys_UI.genClickSlot = -1; GenInvClick(s); if (dbl && World.Sys_UI.genClickSlot == (i8)s && World.Sys_UI.genClickItem == (i16)item && World.Sys_UI.genClickCustom == World.invP1.genInvCustIdx[s]) GenInvApply(s); else { World.Sys_UI.genClickSlot=(i8)s; World.Sys_UI.genClickItem=(i16)item; World.Sys_UI.genClickCustom=World.invP1.genInvCustIdx[s]; World.Sys_UI.genClickTime=World.pauseRelativeTime; } return; }
+        case UI_ID_CMFD_LOG_TABLE_0 ... UI_ID_CMFD_LOG_TABLE_9: UI_LogTableClick((int)(id - UI_ID_CMFD_LOG_TABLE_0)); return;
+        case UI_ID_CMFD_LOG_ENTRY_0 ... UI_ID_CMFD_LOG_ENTRY_14: UI_LogEntryClick((int)(id - UI_ID_CMFD_LOG_ENTRY_0)); return;
         case UI_ID_CMFD_LOG_MORE: UI_LogMore(); return;
         case UI_ID_CMFD_LOG_BACK: UI_LogBack(); return;
-        case UI_ID_CMFD_EMAIL_ENTRY_0 ... UI_ID_CMFD_EMAIL_ENTRY_14: UI_EmailEntryClick((int)(id-UI_ID_CMFD_EMAIL_ENTRY_0)); return;
-        case UI_ID_CMFD_DATA_ENTRY_0 ... UI_ID_CMFD_DATA_ENTRY_12: UI_DataEntryClick((int)(id-UI_ID_CMFD_DATA_ENTRY_0)); return;
-        case UI_ID_CMFD_NOTE_TOGGLE_0 ... UI_ID_CMFD_NOTE_TOGGLE_17: UI_NoteToggleClick((int)(id-UI_ID_CMFD_NOTE_TOGGLE_0)); return;
-        case UI_ID_CMFD_EDIT_ROW_0 ... UI_ID_CMFD_EDIT_ROW_14: { u8 slot=(u8)(id-UI_ID_CMFD_EDIT_ROW_0); if (EditLightSelIsActive()) { if (slot>=LF_LAST) return; LightFieldValueText(slot,editModeLightSelection,editFieldBuffer,40); editFieldSlot=slot; editFieldEditing=true; return; } if (!EditSelIsActive()) return; EditFieldValueText(slot,editModeSelection,editFieldBuffer,40); editFieldSlot=slot; editFieldEditing=true; return; }
+        case UI_ID_CMFD_EMAIL_ENTRY_0 ... UI_ID_CMFD_EMAIL_ENTRY_14: UI_EmailEntryClick((int)(id - UI_ID_CMFD_EMAIL_ENTRY_0)); return;
+        case UI_ID_CMFD_DATA_ENTRY_0 ... UI_ID_CMFD_DATA_ENTRY_12: UI_DataEntryClick((int)(id - UI_ID_CMFD_DATA_ENTRY_0)); return;
+        case UI_ID_CMFD_NOTE_TOGGLE_0 ... UI_ID_CMFD_NOTE_TOGGLE_17: UI_NoteToggleClick((int)(id - UI_ID_CMFD_NOTE_TOGGLE_0)); return;
+        case UI_ID_CMFD_EDIT_ROW_0 ... UI_ID_CMFD_EDIT_ROW_14: { u8 slot = (u8)(id - UI_ID_CMFD_EDIT_ROW_0); if (EditLightSelIsActive()) { if (slot>=LF_LAST) return; LightFieldValueText(slot,editModeLightSelection,editFieldBuffer,40); editFieldSlot=slot; editFieldEditing=true; return; } if (!EditSelIsActive()) return; EditFieldValueText(slot,editModeSelection,editFieldBuffer,40); editFieldSlot=slot; editFieldEditing=true; return; }
         case UI_ID_CMFD_EDIT_LIGHT_TYPE: LightTypeCycle(); return;
         case UI_ID_CMFD_EDIT_LIGHT_DIR_N ... UI_ID_CMFD_EDIT_LIGHT_DIR_DN: LightDirSet((u8)(id-UI_ID_CMFD_EDIT_LIGHT_DIR_N)); return;
         case UI_ID_LMFD_TAB_WEAPON ... UI_ID_LMFD_TAB_DATA: MFD_SelectTab((u8)(rh?2:1),(u8)(id-UI_ID_LMFD_TAB_WEAPON+1),true); return;
@@ -1140,11 +1089,9 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_LMFD_AUTOMAP_SIDE: UI_AutomapClick(rh,UI_AUTOMAP_SIDE); return;
         case UI_ID_FULLMAP_CLOSE: CloseFullmap(); return;
         case UI_ID_LMFD_MEDIA_TAB_0 ... UI_ID_LMFD_MEDIA_TAB_3: {
-            u8 section=(u8)(id-UI_ID_LMFD_MEDIA_TAB_0); if (section==MM_NOTES && !World.diffMis) return;
-            World.Sys_UI.mfdTab[0]=5; World.Sys_UI.MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened=section; World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS;
-            if (section>=MM_DATA_TABLE) { World.Sys_UI.highlightStatus[section]=false; World.Sys_UI.highlightTickCount[section]=0; } play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0},false); return; }
-        case UI_ID_LMFD_ITEM_USE: { World.Sys_UI.lastItemSideRH=rh; if (World.Sys_UI.mfdConsumable) { int row=ConsumableSelectedRow(); ConsumableUse(World.Sys_UI.mfdConsumable==2,row); } else { int s=World.invP1.generalInvCurrent; World.Sys_UI.generalClickSlot = -1; if (GeneralInvCanUse(s)) GeneralInvApply(s); } return; }
-        case UI_ID_LMFD_ITEM_VAPORIZE: World.Sys_UI.lastItemSideRH=rh; World.Sys_UI.generalClickSlot = -1; if (GeneralInvCanVaporize(World.invP1.generalInvCurrent)) VaporizeClick(); return;
+            u8 sec = (u8)(id - UI_ID_LMFD_MEDIA_TAB_0); if (sec == MM_NOTES && !World.diffMis) { return; } World.Sys_UI.mfdTab[0] = 5; World.Sys_UI.MFD_MediaTab = World.Sys_UI.lastMultiMediaTabOpened = sec; World.Sys_UI.MFD_ReaderView = MFD_READER_CONTENTS; if (sec >= MM_DATA_TABLE) { World.Sys_UI.highlightStatus[sec] = false; World.Sys_UI.highlightTickCount[sec] = 0; } play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0},false); return; }
+        case UI_ID_LMFD_ITEM_USE: { World.Sys_UI.lastItemSideRH=rh; if (World.Sys_UI.mfdConsumable) { int row=ConsumableSelectedRow(); ConsumableUse(World.Sys_UI.mfdConsumable==2,row); } else { int s=World.invP1.generalInvCurrent; World.Sys_UI.genClickSlot = -1; if (GeneralInvCanUse(s)) GenInvApply(s); } return; }
+        case UI_ID_LMFD_ITEM_VAPORIZE: World.Sys_UI.lastItemSideRH=rh; World.Sys_UI.genClickSlot = -1; if (GeneralInvCanVaporize(World.invP1.generalInvCurrent)) VaporizeClick(); return;
         case UI_ID_LMFD_ITEM_SKATE: World.Sys_UI.lastItemSideRH=rh; BoosterSetMode(false); return;
         case UI_ID_LMFD_ITEM_BOOST: World.Sys_UI.lastItemSideRH=rh; BoosterSetMode(true); return;
         case UI_ID_LMFD_ITEM_TIMER_SLIDER: World.Sys_UI.lastItemSideRH=rh; ConsumableSetTimer(((float)World.cursorPos_x-UIC(MID(rh,ITEM_TIMER_SLIDER)).min.x)/224.0f); return;
@@ -1169,46 +1116,23 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_LMFD_MINIGAME_CLOSE: World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.mg_running[rh?1:0]) World.Sys_UI.mg_running[rh?1:0]=false; World.Sys_UI.mg_current=-1; MFD_CloseData(); return;
         case UI_ID_LMFD_SEARCH_ICON_0 ... UI_ID_LMFD_SEARCH_ICON_3: World.Sys_UI.lastSearchSideRH=rh; SearchTakeSlot((u8)(id-UI_ID_LMFD_SEARCH_ICON_0)); return;
         case UI_ID_LMFD_SEARCH_CLOSE: CloseSearch(); return;
-        default: return;/*Decoration, labels and panel backdrops: they block the pointer but have no action*/
+        default: return; /*Decoration, labels and panel backdrops: they block the pointer but have no action*/
     }
 }
 static bool UI_DispatchRegions(void) { for (u32 id=UI_ID_NONE+1;id<UI_ID_COUNT;++id) { if (!UIC(id).active) continue; u8 c=UIClicked(id); if (!c) continue; UI_OnRegionClick(id,c); return true; } return false; }
 void UI_ProcessNavigation(void) {
-    UpdateSearchTether();
-    if (World.menuActive || World.paused || World.creditsActive || Cheats.consoleActive || World.Sys_UI.vmailActive) { World.Sys_UI.generalClickSlot = -1; return; }
-    
-    static const u16 keys[8] = {KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F7, KEY_F8, KEY_F11};
-    static const u8 mfdtabs[8]={1, 2, 3, 4, 1, 2, 3, 4};
-    for (u8 i=0;i<8;++i) {
-        if (Sys_Input.keyStates[keys[i]].pressed) { Sys_Input.keyStates[keys[i]].pressed=false; MFD_SelectTab(i<4?1:2,mfdtabs[i],true); }
-    }
-    
-    if (Sys_Input.keyStates[KEY_HOME].pressed) { /*HUD Home: center = Main, left = Weapon, right = Automap*/
-        MFD_SelectTab(0,1,false);
-        MFD_SelectTab(1,1,false);
-        MFD_SelectTab(2,3,false);
-        World.Sys_UI.firstMain=true;
-    }
-    
+    UpdateSearchTether(); if (World.menuActive || World.paused || World.creditsActive || Cheats.consoleActive || World.Sys_UI.vmailActive) { World.Sys_UI.genClickSlot = -1; return; }
+    static const u16 keys[8] = {KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F7, KEY_F8, KEY_F11}; static const u8 mfdtabs[8]={1, 2, 3, 4, 1, 2, 3, 4};
+    for (u8 i=0;i<8;++i) { if (Sys_Input.keyStates[keys[i]].pressed) { Sys_Input.keyStates[keys[i]].pressed=false; MFD_SelectTab(i<4?1:2,mfdtabs[i],true); } }
+    if (Sys_Input.keyStates[KEY_HOME].pressed) { /*HUD Home: center = Main, left = Weapon, right = Automap*/ MFD_SelectTab(0,1,false); MFD_SelectTab(1,1,false); MFD_SelectTab(2,3,false); World.Sys_UI.firstMain = true; }
     for (u8 up=0;up<2;++up) {
-        u16 key = up ? KEY_PAGE_UP : KEY_PAGE_DOWN;
-        if (!Sys_Input.keyStates[key].pressed) continue;
-        
-        Sys_Input.keyStates[key].pressed = false;
-        u8 tab = World.Sys_UI.mfdTab[0] ? World.Sys_UI.mfdTab[0] : World.Sys_UI.mfdSelected[0];
-        MFD_SelectTab(0, tab == 5 ? 1 : 1 + (tab - 1 + (up ? 3 : 1)) % 4, false);
-        World.Sys_UI.MFD_ReaderView = MFD_READER_CONTENTS;
-             if (tab == 1) { World.Sys_UI.firstMain     = true; }
-        else if (tab == 2) { World.Sys_UI.firstHardware = true; }
-        else if (tab == 3) { World.Sys_UI.firstGeneral  = true; }
+        u16 key = up ? KEY_PAGE_UP : KEY_PAGE_DOWN; if (!Sys_Input.keyStates[key].pressed) { continue; }
+        Sys_Input.keyStates[key].pressed = false; u8 tab = World.Sys_UI.mfdTab[0] ? World.Sys_UI.mfdTab[0] : World.Sys_UI.mfdSelected[0]; MFD_SelectTab(0, tab == 5 ? 1 : 1 + (tab - 1 + (up ? 3 : 1)) % 4, false); World.Sys_UI.MFD_ReaderView = MFD_READER_CONTENTS;
+        if (tab == 1) { World.Sys_UI.firstMain     = true; } else if (tab == 2) { World.Sys_UI.firstHardware = true; } else if (tab == 3) { World.Sys_UI.firstGeneral  = true; }
     }
-    if (!World.inventoryMode || Cheats.noHUD) { World.Sys_UI.generalClickSlot = -1; return; }
-    
-    if (World.Sys_UI.generalClickSlot >= 0 && World.pauseRelativeTime - World.Sys_UI.generalClickTime > 0.5f) { World.Sys_UI.generalClickSlot = -1; }
-    UI_DragRegions();
-    UI_DispatchRegions();
+    if (!World.inventoryMode || Cheats.noHUD) { World.Sys_UI.genClickSlot = -1; return; }
+    if (World.Sys_UI.genClickSlot >= 0 && World.pauseRelativeTime - World.Sys_UI.genClickTime > 0.5f) { World.Sys_UI.genClickSlot = -1; } UI_DragRegions(); UI_DispatchRegions();
 }
-
 u16 GetCrosshairTexture() { static const u16 crosshairByWeapon[359] = {[0 ... 358]=1260,/*green*/[343]=1121,[345]=1121,[350]=1121,[352]=1121,[355]=1121,/*red*/[344]=1253,[347]=1253,[357]=1253,/*blue*/[348]=1066,[349]=1066,/*orange*/[351]=1122,[354]=1122,/*yellow*/[353]=1161,[358]=1161/*teal*/}; int wi = World.invP1.weaponIndex; return (wi >= 0 && wi < 359) ? crosshairByWeapon[wi] : 1260; }
 u16 GetItemFrobTexture(u16 index) {
     static const u16 frobTex[418] = {[0 ... 417]=MAXTEX,
@@ -1217,33 +1141,19 @@ u16 GetItemFrobTexture(u16 index) {
                                      [387]=851,[388]=762,[389]=850,[390]=610,[391]=621,[392]=609,[393]=610,[394]=635,[395]=760,[396]=632,[397]=608,[398]=624,[399]=872,[400]=862,[401]=872,[402]=860,[403]=861,[404]=859,[417]=760};
     return index < 418 ? frobTex[index] : MAXTEX;/*405-416 intentionally stay MAXTEX (no frob icons exist for those consts)*/
 }
-
 static u16 CursorClickTexture(void) { return (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down) ? 2147 : 1261; }/*busy-hand cursor over clickable UI*/
-u16 GetCursorTexture() {
-    if (World.paused || World.menuActive) return CursorClickTexture();
-    if (World.invP1.holdingObject) { u16 tex = GetItemFrobTexture(World.invP1.heldObjectIndex); return tex < MAXTEX ? tex : 1250; }
-    if (World.uiIsBlocking || World.Sys_UI.mouseClickHeldOverGUI) return CursorClickTexture();
-    return GetCrosshairTexture();
-}
-
+u16 GetCursorTexture() { if (World.paused || World.menuActive) { return CursorClickTexture(); } if (World.invP1.holdingObject) { u16 t = GetItemFrobTexture(World.invP1.heldObjectIndex); return t < MAXTEX ? t : 1250; } if (World.uiIsBlocking || World.Sys_UI.mouseClickHeldOverGUI) { return CursorClickTexture(); } return GetCrosshairTexture(); }
 static void RenderUI() {
     drawCallsNormal = drawCalls; UiClickGate(); UI_BeginFrame();
-    if (!EditSelIsActive() && !EditLightSelIsActive()) editFieldEditing=false;
+    if (!EditSelIsActive() && !EditLightSelIsActive()) { editFieldEditing = false; }
     if (World.creditsActive) {
         RenderUIImage(0,0, 1366,768, 0);/*Video blackground*/
         if (Sys_Input.keyStates[KEY_ESCAPE].pressed) { World.creditsActive=false; PlayMenuMusic(); }
-        else if (!uiClickBlocked && Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed && World.creditsPageIndex < 22) {
-            uiClickBlocked = uiClickLock = true;
-            ++World.creditsPageIndex;
-            if (World.creditsPageIndex == 1 && !World.gameFinished) ++World.creditsPageIndex;
-        } else if (!uiClickBlocked && Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed && World.creditsPageIndex>0) { uiClickBlocked = uiClickLock = true; --World.creditsPageIndex; }
-        
-        if (World.creditsPageIndex>=22) { World.creditsActive=false; MenuGoBack(); return; }
-        if (World.creditsPageIndex==1) { CreditsStats(); RenderTextL(208,72,T_WHITE,FONT_NORMAL,1.0f,(const char*)&creditStats); }
-        else RenderTextL(208,72,T_WHITE,FONT_NORMAL,1.0f,creditPages[World.creditsPageIndex]);
-        return;
+        else if (!uiClickBlocked && Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed && World.creditsPageIndex < 22) { uiClickBlocked = uiClickLock = true; ++World.creditsPageIndex; if (World.creditsPageIndex == 1 && !World.gameFinished) { ++World.creditsPageIndex; } }
+        else if (!uiClickBlocked && Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed && World.creditsPageIndex>0) { uiClickBlocked = uiClickLock = true; --World.creditsPageIndex; }
+        if (World.creditsPageIndex>=22) { World.creditsActive=false; MenuGoBack(); return; } if (World.creditsPageIndex==1) { CreditsStats(); RenderTextL(208,72,T_WHITE,FONT_NORMAL,1.0f,(const char*)&creditStats); } else { RenderTextL(208,72,T_WHITE,FONT_NORMAL,1.0f,creditPages[World.creditsPageIndex]); } return;
     }
-    if (World.menuActive) RenderMenu(); else if (World.paused) RenderPausedUI();
+    if (World.menuActive) { RenderMenu(); } else if (World.paused) { RenderPausedUI(); }
     if (World.menuActive || World.paused) {
         if (resDropdownOpen && currentMenuPage==MPG_OPTS && currentMenuTab==0) { if (Sys_Input.keyStates[KEY_DOWN].pressed) { if(resSelectedIdx<resDropdownCount-1){resSelectedIdx++;} } else if (Sys_Input.keyStates[KEY_UP].pressed) { if(resSelectedIdx>0){resSelectedIdx--;} } }
         if (reflDropdownOpen && currentMenuPage==MPG_OPTS && currentMenuTab==0) { if (Sys_Input.keyStates[KEY_DOWN].pressed) { if(Sys_Settings.Reflections<2){Sys_Settings.Reflections++; SaveConfig(); EnsureReflectionResources();} } else if (Sys_Input.keyStates[KEY_UP].pressed) { if(Sys_Settings.Reflections>0){Sys_Settings.Reflections--; SaveConfig(); EnsureReflectionResources();} } }
@@ -1252,24 +1162,17 @@ static void RenderUI() {
     } else if (!World.Sys_UI.vmailActive) {
         if (!Cheats.noHUD) {
             for(u16 i=INSTS_1ST_IDX;i<World.instCount;++i){/*TargetID*/
-                Entity* e = &World.instances[i];
-                if (!IdxIsNPC(e->index)) { continue; }
-                
-                V3 tpos = World.position[i];
-                tpos.y += 1.0f;
-                i16 textIdx = TargetIDGetText(i);
-                bool tid = TargetIDShouldRender(i), hw = (World.invP1.hasHardware&HW_TID) != 0;
-                float targetRange = V3_Dist(tpos,World.position[PLAYER1]);
-                if (!tid) continue;
-                if (!TargetIDInPlayerPVS(i)) continue;
+                Entity* e = &World.instances[i]; if (!IdxIsNPC(e->index)) { continue; }
+                V3 tpos = World.position[i]; tpos.y += 1.0f;
+                i16 textIdx = TargetIDGetText(i); bool tid = TargetIDShouldRender(i), hw = (World.invP1.hasHardware&HW_TID) != 0; float targetRange = V3_Dist(tpos,World.position[PLAYER1]); if (!tid || !TargetIDInPlayerPVS(i)) { continue; }
                 float sx, sy;
-                if (!WorldToScreenPoint(V3_AsubB(tpos,World.position[PLAYER1]),&sx,&sy))continue;
-                float imgSz=vclamp(128.0f * (7.68f / vmax(targetRange,0.25f)), 24.0f, 640.0f), imgHalf=imgSz*0.5f;
-                if(tid&&hw)RenderUIImage((i16)(sx-imgHalf),(i16)sy,(i16)(imgSz*1.2f),(i16)(imgSz*1.38f),1051);
-                char label[192]={0}; size_t used=0; u8 ver=World.invP1.hwVers[HW_TID_IDX]; float range=targetRange;
-                const char* attitude=(e->entflags&EF_ASLEEP)?Sys_Text.stringTable[519]:(e->currentState==AIState_Run||e->currentState==AIState_Attack1||e->currentState==AIState_Attack2||e->currentState==AIState_Attack3||e->currentState==AIState_Pain)?Sys_Text.stringTable[518]:Sys_Text.stringTable[516];
-                const char* status=textIdx>=0?Sys_Text.stringTable[textIdx]:attitude;
-                if(tid&&hw&&textIdx!=511){/*Two lines: "SERV-BOT 4" then "20, 6.3M, Idle". The number is this NPC's 1-based index within its own type.*/
+                if (!WorldToScreenPoint(V3_AsubB(tpos,World.position[PLAYER1]),&sx,&sy)) { continue; }
+                float imgSz = vclamp(128.0f * (7.68f / vmax(targetRange,0.25f)), 24.0f, 640.0f), imgHalf=imgSz*0.5f;
+                if (tid && hw) { RenderUIImage((i16)(sx - imgHalf),(i16)sy,(i16)(imgSz * 1.2f),(i16)(imgSz * 1.38f),1051); }
+                char label[192] = {0}; size_t used = 0; u8 ver = World.invP1.hwVers[HW_TID_IDX]; float range = targetRange;
+                const char* attitude = (e->entflags & EF_ASLEEP) ? Sys_Text.stringTable[519] : (e->currentState == AIState_Run || e->currentState == AIState_Attack1 || e->currentState == AIState_Attack2 || e->currentState == AIState_Attack3 || e->currentState == AIState_Pain) ? Sys_Text.stringTable[518] : Sys_Text.stringTable[516];
+                const char* status = textIdx >= 0 ? Sys_Text.stringTable[textIdx] : attitude;
+                if(tid&&hw&&textIdx != 511) { /*Two lines, e.g.: "SERV-BOT 4" then "20, 6.3M, Idle". The number is this NPC's 1-based index within its own type.*/
                     if (ver > 1)                                 used += (size_t)sFormat(label + used, sizeof(label) - used, "%s %u",             npcTable[e->index-419].name, e->npcNumber);
                     if (ver > 2 && used < sizeof(label))         used += (size_t)sFormat(label + used, sizeof(label) - used, "%s%.0f, %.1fM, %s", used ? "\n" : "", e->health, range, status);
                     if (!used&&textIdx >= 512 && textIdx <= 515) used += (size_t)sFormat(label + used, sizeof(label) - used, "%s",                status); /*Damage status with v0 hardware*/
@@ -1277,15 +1180,20 @@ static void RenderUI() {
                 if (label[0]) { float textY = sy - 64.0f + vclamp(0.6f * 64.0f * (7.68f / vmax(targetRange, 0.25f) - 1.0f), -128.0f, 96.0f); RenderText3DC((V3){sx, textY, 0.0f}, T_YELLOW, FONT_NORMAL, 0.8f, label); }
             }
             bool cyber = World.curLev == LEVEL_CYBERSPACE;
-            if (cyber) { World.Sys_UI.mfdTab[0] = 4; World.Sys_UI.mfdSelected[0] = 4; } /*Unity MFDManager.EnterCyberspace forces the center MFD to the Software tab (CenterTabButtonClickSilent(3)); forcing it every frame also overrides tab hotkeys/clicks while in cyberspace*/
-            bool editPanelActive=EditSelIsActive()||EditLightSelIsActive(); if (!editPanelActive) { TickBar(false); if (!cyber) TickBar(true); } if (!cyber) HardwareButtons(); UIRImg(UI_ID_HUD_SHOOTMODE,667,0,32,32,1020); RenderShieldEffect();/*cyberspace: health ticks only, no energy ticks, no hardware buttons; shootmode button stays; while the edit panel is active the health/energy ticks are skipped too*/
+            if (cyber) { World.Sys_UI.mfdTab[0] = 4; World.Sys_UI.mfdSelected[0] = 4; }
+            bool editPanelActive=EditSelIsActive()||EditLightSelIsActive(); if (!editPanelActive) { TickBar(false); if (!cyber) TickBar(true); } if (!cyber) HardwareButtons(); UIRImg(UI_ID_HUD_SHOOTMODE,667,0,32,32,1020); RenderShieldEffect();
             for (u8 i=0;i<10;++i) if (World.Sys_UI.tWrnFinished[i]>World.pauseRelativeTime) {
                 char flt[6]; if (World.Sys_UI.tWrnTextIdx[i]==185) sFormat(flt,6,"%.1f",(double)World.instances[PLAYER1].radiation);
                 RenderTextL(340,72+i*18,World.Sys_UI.tWrnColorIdx[i],FONT_NORMAL,0.8f,"%s%s%s",Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx[i]],World.Sys_UI.tWrnTextIdx[i]==185?flt:World.Sys_UI.tWrnTextIdx2[i]>=0?Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx2[i]]:"",World.Sys_UI.tWrnTextIdx3[i]>=0?Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx3[i]]:"");
             }
-            if (!editPanelActive && !World.Sys_UI.fullMapOpen[0] && !World.Sys_UI.fullMapOpen[1]) { if (cyber) { CenterMFD(); } else { SideMFD(false); CenterMFD(); SideMFD(true); } } else if (World.Sys_UI.fullMapOpen[0] || World.Sys_UI.fullMapOpen[1]) { AutomapBlitFullToUI(); UIRImg(UI_ID_FULLMAP_CLOSE,(i16)((UI_W-146)/2),706,146,28,1087); RenderTextL(610,710,T_YELLOW,FONT_NORMAL,0.8,"CLOSE"); }/*while the edit panel is active neither MFD set renders, so no MFD region can intercept a panel click; the full-screen automap is untouched*/
-            if(World.diffMis>=3){UIR(UI_ID_CMFD_MISSION_TIMER,43,2,260,14); RenderTextL(43,2,T_YELLOW,FONT_NORMAL,0.8,"%s",World.misTimerMission<1100?Sys_Text.stringTable[World.misTimerMission]:"");/*MissionTimerT*/ {char misT[8]; if(World.misTimerTimesUP) sFormat(misT,sizeof(misT),"%s",869<1100?Sys_Text.stringTable[869]:""); else {float mt=World.misTimerT<0.0f?0.0f:World.misTimerT; int mm=(int)(mt/60.0f),ss=(int)(mt-(float)(mm*60)); sFormat(misT,sizeof(misT),"%02d:%02d",mm,ss);} RenderTextL(258,2,T_YELLOW,FONT_NORMAL,0.8,"%s",misT);}}
-            if (World.curLev==LEVEL_CYBERSPACE) { UIR(UI_ID_CMFD_CYBER_TIMER,28,530,80,14); RenderTextL(28,530,T_WHITE,FONT_NORMAL,0.8,"T -"); char cyberT[8]; float ct = World.instances[PLAYER1].cyberTimer < 0.0f ? 0.0f : World.instances[PLAYER1].cyberTimer; int cmm = (int)(ct / 60.0f); sFormat(cyberT,sizeof(cyberT),"%02d:%02d",cmm,(int)(ct - (float)(cmm * 60))); RenderTextL(68,530,T_WHITE,FONT_NORMAL,0.8,"%s",cyberT); } /*the player's live CyberTimer countdown, not the old hardcoded 99:99*/
+            if (!editPanelActive && !World.Sys_UI.fullMapOpen[0] && !World.Sys_UI.fullMapOpen[1]) { if (cyber) { CenterMFD(); } else { SideMFD(false); CenterMFD(); SideMFD(true); } } else if (World.Sys_UI.fullMapOpen[0] || World.Sys_UI.fullMapOpen[1]) { AutomapBlitFullToUI(); UIRImg(UI_ID_FULLMAP_CLOSE,(i16)((UI_W-146)/2),706,146,28,1087); RenderTextL(610,710,T_YELLOW,FONT_NORMAL,0.8,"CLOSE"); }
+            if(World.diffMis>=3){
+                UIR(UI_ID_CMFD_MISSION_TIMER,43,2,260,14);
+                RenderTextL(43,2,T_YELLOW,FONT_NORMAL,0.8,"%s",World.misTimerMission < 1100 ? Sys_Text.stringTable[World.misTimerMission] : "");/*MissionTimerT*/
+                {char misT[8]; if(World.misTimerTimesUP) sFormat(misT,sizeof(misT),"%s",869<1100?Sys_Text.stringTable[869]:""); else {float mt=World.misTimerT<0.0f?0.0f:World.misTimerT; int mm=(int)(mt/60.0f),ss=(int)(mt-(float)(mm*60)); sFormat(misT,sizeof(misT),"%02d:%02d",mm,ss);} RenderTextL(258,2,T_YELLOW,FONT_NORMAL,0.8,"%s",misT);}
+            }
+                
+            if (World.curLev==LEVEL_CYBERSPACE) { UIR(UI_ID_CMFD_CYBER_TIMER,28,530,80,14); RenderTextL(28,530,T_WHITE,FONT_NORMAL,0.8,"T -"); char cyberT[8]; float ct = World.instances[PLAYER1].cyberTimer < 0.0f ? 0.0f : World.instances[PLAYER1].cyberTimer; int cmm = (int)(ct / 60.0f); sFormat(cyberT,sizeof(cyberT),"%02d:%02d",cmm,(int)(ct - (float)(cmm * 60))); RenderTextL(68,530,T_WHITE,FONT_NORMAL,0.8,"%s",cyberT); }
             if(World.curLev != LEVEL_CYBERSPACE && (World.invP1.hardwareIsActive & HW_BIO)!=0){/*BioMonitor: not part of the cyberspace HUD*/
                 BiomonitorBlitToUI();
                 if (!Cheats.showFPS) {
@@ -1373,8 +1281,6 @@ static void RenderUI() {
         RenderTextL(16, debugTextStartY - lineSpacing, timingColor,FONT_NORMAL,1.0f,"ms: %.2f",World.thisFrameTime);
         RenderTextL(16 + 260, debugTextStartY - lineSpacing,T_WHITE,FONT_NORMAL,1.0f,"(FPS:%d),Drwclls:%d [G:%d UI:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u",globalframesPerLastSecond,drawCalls,drawCallsNormal,uiDrawCalls,shadDrawCalls,vertsRendered,Cheats.editMode,World.menuActive,World.paused);
     }
-    if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused) {
-        RenderUIImage((i16)(World.cursorPos_x - 20),(i16)(World.cursorPos_y - 20),40,40,GetCursorTexture());
-    } else if (!Cheats.noHUD) { RenderUIImage(663,364,40,40,GetCursorTexture()); }
+    if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused) { RenderUIImage((i16)(World.cursorPos_x - 20),(i16)(World.cursorPos_y - 20),40,40,GetCursorTexture()); } else if (!Cheats.noHUD) { RenderUIImage(663,364,40,40,GetCursorTexture()); }
     if(World.invP1.grenActive && World.invP1.holdingObject && !World.menuActive && !World.paused && !Cheats.noHUD) { RenderTextL((World.inventoryMode ? World.cursorPos_x : 683) + 26,(World.inventoryMode ? World.cursorPos_y : 384) - 8,T_YELLOW,FONT_NORMAL,0.8f,"Live"); }
 }

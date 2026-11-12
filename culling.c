@@ -1,8 +1,7 @@
 // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
 #include "common.h"
 typedef struct { u16 x,z; } PortalCell; typedef struct { PortalCell cellA,cellB; bool portalNS,open,dirty; u8 lev;} Portal;
-u32 gridCellStates[ARRSIZE]; static u32 precomputedVisibleCellsFromHere[524288];/*4096 * 4096 / 32*/ u16 playerCellIdx = 0u; bool instanceIsLODArray[INSTANCE_COUNT]; static Portal activePortals[MAX_PORTALS]; static u32 numActivePortals = 0; bool cullVisibilityValid;
-void ResetDoorPortals(void) { numActivePortals = 0; cullVisibilityValid=false; }
+u32 gridCellStates[ARRSIZE]; static u32 precomputedVisibleCellsFromHere[524288];/*4096 * 4096 / 32*/ u16 playerCellIdx = 0u; bool instanceIsLODArray[INSTANCE_COUNT]; static Portal activePortals[MAX_PORTALS]; u32 numActivePortals = 0; bool cullVisibilityValid;
 bool get_cull_bit(const u32* arr, int idx) { return (arr[idx >> 5] >> (idx & 31)) & 1; }
 INLINE void set_cull_bit(u32* arr, int idx, bool val) {u32* w = arr + (idx >> 5); u32 m = 1U << (idx & 31); *w = val ? (*w | m) : (*w & ~m);}
 bool PositionVisibleFromPlayerCell(float x, float z) { return (get_cull_bit(precomputedVisibleCellsFromHere,((playerCellIdx * ARRSIZE)/*cellIdx*/ + PosGetCellCoords(x,z)/*subIdx*/)/*flat_idx*/)); }
@@ -12,7 +11,7 @@ bool SkySunIsVisible() { return ((gridCellStates[playerCellIdx] & CELL_SEES_SUN)
 bool NeighborhoodInPVS(u16 x, u16 z, u8 r) { u32 cellIdx=(z*WORLDX)+x; for(int ix=(int)x-r;ix<=(int)x+r;++ix){for(int iz=(int)z-r;iz<=(int)z+r;++iz){if(unlikely(!XZPairInBounds(ix,iz))){continue;} int subIdx=iz*WORLDX + ix; if(get_cull_bit(precomputedVisibleCellsFromHere,cellIdx*ARRSIZE+subIdx)&&(gridCellStates[subIdx]&CELL_VISIBLE))return true;} } return false; }
 static u8* LoadCullPNG(const char* name, int level) {
     char path[256]; sFormat(path,sizeof(path),"./Data/%s_%d.png",name,level);
-    FHandle fd; int size; u8* data=OS_OpenAndAllocateFileBufferReadonly(path,&fd,&size); if (!data || size>MAX_CULL_FILESIZE) { DualLogError("PNG missing or too large: %s\n",path); OS_Exit(1); }
+    FHandle fd; int size; u8* data=OS_OpenAndAllocateFileBufferReadonly(path,&fd,&size); if (!data || size > 500000) { DualLogError("PNG missing or too large: %s\n",path); OS_Exit(1); }
     i32 w,h; u8* pixels = PngLoad(data,size,&w,&h,&png_arena_main); OS_Free(data,size); if (!pixels) { DualLogError("PngLoad failed: %s\n",path); OS_Exit(1); } return pixels;
 }
 

@@ -7,8 +7,4 @@ layout(location = 3) uniform uint triCount;
 layout(location = 4) uniform uint triWordBase;
 layout(location = 5) uniform uint orderBase;
 uint U16At(uint i) { return (srcWords[i >> 1u] >> ((i & 1u) << 4)) & 0xFFFFu; }
-uint OrderAt(uint i) { uint j = orderBase + i; return (orderWords[j >> 1u] >> ((j & 1u) << 4)) & 0xFFFFu; }
-void main() {
-    uint i = gl_GlobalInvocationID.x;
-    if (i < triCount) { uint t = OrderAt(i) * 3u; rtWords[triWordBase + i * 2u] = U16At(t) | (U16At(t + 1u) << 16); rtWords[triWordBase + i * 2u + 1u] = U16At(t + 2u); }
-}
+void main() { uint i = gl_GlobalInvocationID.x; if (i < triCount) { uint j = orderBase + i; uint t = ((orderWords[j >> 1u] >> ((j & 1u) << 4)) & 0xFFFFu) * 3u; uint b = triWordBase + i * 2u; rtWords[b] = U16At(t) | (U16At(t + 1u) << 16); rtWords[b + 1u] = U16At(t + 2u); } }

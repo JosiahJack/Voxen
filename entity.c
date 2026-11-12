@@ -3,7 +3,7 @@
 /*TODO: Add grove grass extrusion in-shader*/
 /*TODO add the new shared grove2_7/grove2_8 mesh,shares chunk_grove2_3's mesh for now*/
 u16 teleportDestinations[MAX_LEVELS][8]; static bool teleportDestinationsInitialized; u16 elevatorDestinations[MAX_LEVELS][MAX_ELEV_DESTS_PER_LEVEL]; u8 elevatorDestCounts[MAX_LEVELS]; Quaternion quat_from_axis_angle(V3,float);
-void AddDoorPortal(u16,u16),TextureSequenceInit(u16,char*),AddCamView(V3,Quaternion,u8,u16,u16,float,float),GravityLiftSyncAllVisuals(void);
+void TextureSequenceInit(u16,char*),AddCamView(V3,Quaternion,u8,u16,u16,float,float),GravityLiftSyncAllVisuals(void);
 static Entity* entsFromFile; static V3 *posFromFile, *scaleFromFile; static Quaternion *rotationFromFile; static Light *lightsFromFile; static LightAnimation *lanimsFromFile; static V3 *colCtrFromFile = NULL, *colSzFromFile = NULL; static bool alreadyReadLightOnOnce[LIGHT_COUNT] = {0}; u8 sensaroundCamViewCenter = 255, sensaroundCamViewLeft = 255, sensaroundCamViewRight = 255; // HUD sensaround cam view indices, assigned during level load
 EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex,mass,animationNum,col,colCtr,colSz
 /*0 chunk_black*/                   [0]={178,0,0,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},                                    /*1 chunk_blocker*/                 [1]={178,0,1230,MAXTEX,1230,160,0,MAXANIM,0,{0},{0}},                                      /*2 chunk_bridg1_1*/                [2]={661,0,44,MAXTEX,MAXTEX,43,0,MAXANIM,0,{0},{0}},
@@ -631,7 +631,7 @@ void LoadLevelMod(u8 lev) {
         if (!isLight && !activeStateRead) flag_set(&entsFromFile[entCount].entflags,EF_ACTIVE,true);
         if (!isLight && entsFromFile[entCount].index >= 595 && entsFromFile[entCount].index <= 601) { if (!(scaleReadMask&1u)) scaleFromFile[entCount].x = 1.0f; if (!(scaleReadMask&2u)) scaleFromFile[entCount].y = 1.0f; if (!(scaleReadMask&4u)) scaleFromFile[entCount].z = 1.0f; }
         if (!isLight && entsFromFile[entCount].index == 517) { // func_wall: stash base transform + chunk children for spawn below
-            fwBasePos[entCount]=fwContainerPos; fwBaseRot[entCount]=fwContainerRot; fwBaseScale[entCount]=fwContainerScale; fwInfoLocal[entCount]=fwInfoLocalTmp; u16 n=fwCurChild < FW_MAX_CHILDREN ? fwCurChild : FW_MAX_CHILDREN, start=fwPoolUsed; 
+            fwBasePos[entCount]=fwContainerPos; fwBaseRot[entCount]=fwContainerRot; fwBaseScale[entCount]=fwContainerScale; fwInfoLocal[entCount]=fwInfoLocalTmp; u16 n = fwCurChild < FW_MAX_CHILDREN ? fwCurChild : FW_MAX_CHILDREN, start=fwPoolUsed; 
             for (u16 k=0;k<n;++k) { if (fwPoolUsed >= FW_POOL_MAX) { DualLogError("FuncWall chunk pool exhausted on line %u!\n",lineNum); break; } fwPoolPrefab[fwPoolUsed]=lwPrefab[k]; fwPoolPos[fwPoolUsed]=lwPos[k]; fwPoolRot[fwPoolUsed]=lwRot[k]; fwPoolScale[fwPoolUsed]=lwScale[k]; fwPoolUsed++; } fwSlotStart[entCount]=start; fwSlotCount[entCount]=(u16)(fwPoolUsed-start);
         }
     }
@@ -673,7 +673,6 @@ void LoadLevelMod(u8 lev) {
             World.scale[parent] = (V3){fwBaseScale[e].x * scaleFromFile[e].x, fwBaseScale[e].y * scaleFromFile[e].y, fwBaseScale[e].z * scaleFromFile[e].z}; par->targetPosition = V3Add(sp,fwInfoLocal[e]);/*info_target offset denotes full travel*/ if (par->speed <= 0.0f) par->speed = 0.64f;
             for(u16 k=0;k<fwSlotCount[e];++k){u16 pi=fwPoolPrefab[fwSlotStart[e]+k]; if(pi>=307)continue; u16 c=AddInstance(pi,V3Add(sp,quat_rot_v3(fwBaseRot[e],fwPoolPos[fwSlotStart[e]+k]))); if(c == 0)continue; World.rotation[c]=quat_multiply(fwBaseRot[e],fwPoolRot[fwSlotStart[e]+k]); V3 cs=fwPoolScale[fwSlotStart[e]+k]; World.scale[c]=(V3){World.scale[parent].x*cs.x,World.scale[parent].y*cs.y,World.scale[parent].z*cs.z}; fwParentOf[c]=parent;}
         }
-        if (IdxIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx,parent);
         if ((entIdx>=595 && entIdx<=601) || entIdx==706 || entIdx==697 || entIdx==698) {
             V3 sz=colSzFromFile[e]; float d=entIdx<=601 ? 1.0f : 2.56f; bool custom=sz.x>=0 || sz.y>=0 || sz.z>=0;
             World.colliderCenter[parent]=custom ? colCtrFromFile[e] : entIdx==706 ? (V3){0.013999939f,0.20199966f,0.03299904f} : (V3){0};
@@ -735,7 +734,7 @@ void LoadAllLevels() {
     posFromFile = (void*)entsFromFile + INSTANCE_COUNT*sizeof(Entity); scaleFromFile = (void*)posFromFile + INSTANCE_COUNT*sizeof(V3); rotationFromFile = (void*)scaleFromFile + INSTANCE_COUNT*sizeof(V3); colCtrFromFile = (void*)rotationFromFile + INSTANCE_COUNT*sizeof(Quaternion); colSzFromFile = (void*)colCtrFromFile + INSTANCE_COUNT*sizeof(V3); lightsFromFile = (void*)colSzFromFile + INSTANCE_COUNT*sizeof(V3); lanimsFromFile = (void*)lightsFromFile + LIGHT_COUNT*sizeof(Light);
     for (u8 i=0;i<8;++i) { World.TeleportTouch_allTeleportTouches[i] = U16_MAX; }
     fwPoolUsed = 0;
-    for(u8 lev=0;lev<MAX_LEVELS;++lev){
+    for (u8 lev=0;lev<MAX_LEVELS;++lev) {
         for (i32 i=0;i<INSTANCE_COUNT;++i) { colCtrFromFile[i]=(V3){-1,-1,-1}; colSzFromFile[i]=(V3){-1,-1,-1}; }
         if (!teleportDestinationsInitialized) { for (u8 l=0;l<MAX_LEVELS;++l) { for (u8 id=0;id<8;++id) { teleportDestinations[l][id] = U16_MAX; } } teleportDestinationsInitialized=true; }
         if (lev < MAX_LEVELS) { for (u8 id=0;id<8;++id) { teleportDestinations[lev][id] = U16_MAX; } elevatorDestCounts[lev] = 0; }

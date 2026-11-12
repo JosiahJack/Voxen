@@ -1639,15 +1639,8 @@ static const Color fogLUT[MAX_LEVELS] = { {0.3207547f, 0.29200783f,0.29200783f,0
 static const V2 levMins[MAX_LEVELS]={{-37.3600f,-52.7600f},/*0*/  {-53.8000f,-64.0800f},/*1*/  {-46.12f,-56.34f},/*2*/  {-51.266f,-51.246f},/*3*/  {-29.462f, -53.7872f},/*4*/ {-47.3622f,-55.04f},/*5*/ {-65.94f,-71.6833f},/*6*/ {-66.8989f,-82.0144f},/*7*/ {-43.7456f,-43.9872f},/*8*/ {-51.5039f,-69.0306f},/*9*/ {-24.0994f,-39.7972f},/*10*/ {-27.1772f,-28.3394f},/*11*/ {-18.05f,-30.50f},/*12*/ {99.4200f,-60.120f}/*13*/};
 static const float lFars[MAX_LEVELS] = { 56.32f/*R*/, 56.32f/*1*/, 51.2f/*2*/, 51.2f/*3*/, 40.96f/*4*/, 58.88f/*5*/, 79.36f/*6*/, 56.32f/*7*/, 69.12f/*8*/, 53.76f/*9*/,  51.2f/*10*/,  51.2f/*11*/, 38.4f/*12*/, 1300.00f/*13*/};
 int EdgeCompare(const void* a, const void* b) { u32 ea = *(const u32*)a, eb = *(const u32*)b; return (ea > eb) - (ea < eb); }
-u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount = 0;
-void ResetDoorPortals(), MissionTimerInit(), AddHardwareToInventory(int,int), mp3_clear();
-static void ResetLoadTallies(void) {
-    decalInlineTextCount = decalStyleCount = 0;
-    mset(World.levelCameraCount,0,sizeof(World.levelCameraCount));     mset(World.levelSmallNodeCount,0,sizeof(World.levelSmallNodeCount));     mset(World.levelLargeNodeCount,0,sizeof(World.levelLargeNodeCount));
-    mset(World.levCamDestroyedCnt,0,sizeof(World.levCamDestroyedCnt)); mset(World.levSmNodeDestroyedCnt,0,sizeof(World.levSmNodeDestroyedCnt)); mset(World.levNodeDestroyedCnt,0,sizeof(World.levNodeDestroyedCnt));
-    for (u32 u = 0; u < uniqueCvxMeshCount; ++u) { if (cvxAdjOffsets[u]) { OS_Free(cvxAdjOffsets[u], cvxAdjOffsetBytes[u]); cvxAdjOffsets[u] = 0; cvxAdjOffsetBytes[u] = 0; } if (cvxAdjLists[u]) { OS_Free(cvxAdjLists[u], cvxAdjListBytes[u]); cvxAdjLists[u] = 0; cvxAdjListBytes[u] = 0; } }
-    uniqueCvxMeshCount = 0; ResetDoorPortals(); mset(World.physSleep, 0, sizeof(World.physSleep));
-}
+u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount = 0; extern u32 numActivePortals;
+void MissionTimerInit(),AddHardwareToInventory(int,int),mp3_clear(),AddDoorPortal(u16,u16);
 // Init && Main
 bool MdlIsWinMemberSet(u16,u8); void MdlSwapWindowDisposeData(u16);
 void MdlBuildLevelConvexAdjacency(u8 lev) {
@@ -1680,10 +1673,9 @@ void MdlBuildLevelConvexAdjacency(u8 lev) {
 __attribute__((cold)) void NewGame() { // Reset World States
     double newGamePrepStart = get_time();
     CloseSearch();
-    World.Sys_UI=(SystemUI){.MFD_MediaTab=MM_LOG_TABLE,.MFD_ReaderView=MFD_READER_CONTENTS,.mfdSelected={1,1,1},.mfdReturnTab={1,1,1},.lastAutomapSideRH=true,.generalClickSlot=-1,.generalClickItem=-1,.generalClickCustom=U16_MAX,.linkedElevatorDoor=U16_MAX,.tetheredPGP=U16_MAX,.tetheredPWP=U16_MAX,.tetheredSearchable=U16_MAX,.tetheredKeypadElevator=U16_MAX,.tetheredKeypadKeycode=U16_MAX,.keycodeHuns=-1,.keycodeTens=-1,.keycodeOnes=-1,.keycodeEntry=-1,
+    World.Sys_UI=(SystemUI){.MFD_MediaTab=MM_LOG_TABLE,.MFD_ReaderView=MFD_READER_CONTENTS,.mfdSelected={1,1,1},.mfdReturnTab={1,1,1},.lastAutomapSideRH=true,.genClickSlot=-1,.genClickItem=-1,.genClickCustom=U16_MAX,.linkedElevatorDoor=U16_MAX,.tetheredPGP=U16_MAX,.tetheredPWP=U16_MAX,.tetheredSearchable=U16_MAX,.tetheredKeypadElevator=U16_MAX,.tetheredKeypadKeycode=U16_MAX,.keycodeHuns=-1,.keycodeTens=-1,.keycodeOnes=-1,.keycodeEntry=-1,
                             .logReaderPage=-1,.mg_current=-1,.pw_selectedWire=-1};
-    DualLog("Loading new game");
-    RenderLoading("Loading new game...");
+    DualLog("Loading new game"); RenderLoading("Loading new game...");
     World.menuActive = World.paused = enteringPlayerName = fovSliderActive = gammaSliderActive = masterVolumeSliderActive = musicVolumeSliderActive = messageVolumeSliderActive = sfxVolumeSliderActive = returnToPause = false;
     for (int i=0;i<MAX_LEVELS;++i) { World.worldMin_x[i] = levMins[i].x; World.worldMin_z[i] = levMins[i].y; World.voxMinCtrX[i] = World.worldMin_x[i] + (VOXEL_SIZE * 0.5f); World.voxMinCtrZ[i] = World.worldMin_z[i] + (VOXEL_SIZE * 0.5f); World.farPlane[i] = lFars[i]; World.fogColor[i] = fogLUT[i]; World.fogColor[i].a *= 3.8f; }
     World.curLev = 0; World.col[0] = CT_NONE;
@@ -1713,7 +1705,11 @@ __attribute__((cold)) void NewGame() { // Reset World States
     mset(&Sys_Input,0,sizeof(Sys_Input));
     World.currentMouse_dx = World.currentMouse_dy = 0; last_mouse_x = last_mouse_y = 0; ignore_next_mouse_delta = true; Sys_Input.isCapsLockOn = false; /*As far as we're concerned, don't worry about OS capslock actual state.*/
     for (u8 lev=1;lev<MAX_LEVELS;++lev) { CopyPlayerState(0,lev); }
-    ResetLoadTallies();
+    decalInlineTextCount = decalStyleCount = 0;
+    mset(World.levelCameraCount,0,sizeof(World.levelCameraCount));     mset(World.levelSmallNodeCount,0,sizeof(World.levelSmallNodeCount));     mset(World.levelLargeNodeCount,0,sizeof(World.levelLargeNodeCount));
+    mset(World.levCamDestroyedCnt,0,sizeof(World.levCamDestroyedCnt)); mset(World.levSmNodeDestroyedCnt,0,sizeof(World.levSmNodeDestroyedCnt)); mset(World.levNodeDestroyedCnt,0,sizeof(World.levNodeDestroyedCnt));
+    for (u32 u = 0; u < uniqueCvxMeshCount; ++u) { if (cvxAdjOffsets[u]) { OS_Free(cvxAdjOffsets[u], cvxAdjOffsetBytes[u]); cvxAdjOffsets[u] = 0; cvxAdjOffsetBytes[u] = 0; } if (cvxAdjLists[u]) { OS_Free(cvxAdjLists[u], cvxAdjListBytes[u]); cvxAdjLists[u] = 0; cvxAdjListBytes[u] = 0; } }
+    uniqueCvxMeshCount = 0; numActivePortals = 0; cullVisibilityValid = false; mset(World.physSleep, 0, sizeof(World.physSleep));
     DualLog(" prep...............................................................took %.6f secs\n",get_time() - newGamePrepStart);
     LoadAllLevels();
     for (u8 lev=0;lev<MAX_LEVELS;++lev) { /*Done after levels are loaded to remove difficulty related items.*/
@@ -1723,6 +1719,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     }
     LoadModels();
     LoadLevel(World.startLevel,(V3){10.52f, -43.792f + 0.84f, 20.2908f});
+    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { if (IdxIsPortalBlockingDoor(World.instances[i].index)) { AddDoorPortal(World.instances[i].index,i); } }
     double newGameCvxStart = get_time();
     World.invP1.currentCrouchRatio = 1.0f;
     for (u32 m=0; m<mdlsCnt; ++m) { if (mdlPersistentSet[m]) continue; if (World.curLev < MAX_LEVELS && MdlIsWinMemberSet((u16)m,World.curLev)) continue; if (physPos[m] || modelTriangles[m] || modelVertexCounts[m]) { MdlSwapWindowDisposeData((u16)m); } }
@@ -1950,7 +1947,7 @@ void InitalizeEnvironment() {
     NewGame();
     if (Sys_Settings.Reflections >= 1u) { EnsureReflectionResources(); }
     double initAudioStart = get_time(); InitAudio(); synth_set_reverb_preset(0); 
-    World.menuActive = true; //COMMENT for immediate into game
+    //World.menuActive = true; //COMMENT for immediate into game
     if (playIntroAtBoot && World.menuActive) ChangeMenuPage(MPG_INTRO); else if (World.menuActive) { PlayMenuMusic(); } else { PlayTrack(TT_Walking, MT_Walking); }
     DualLog("Audio and Menu init.................................................................took %.6f secs\n",get_time() - initAudioStart);
     DualLog("Scratch arena total peak: %u MB, ", (u32)(scratch_peak >> 20)); OS_Free(scratch_base,SCRATCH_ARENA_SIZE); // Free the initialization scratch arena.
