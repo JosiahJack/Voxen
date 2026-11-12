@@ -134,7 +134,7 @@ static void RenderVideoPage(u8 page) {
     i32 frame = frames>0 ? (i32)(elapsed*(double)frames/vidLen) : 0; if (frame<0) frame = 0; else if (frame>=frames) frame = frames-1;
     static u32 heldRt = 0xFFFFFFFFu, heldBase = 0xFFFFFFFFu;
     if (heldBase != frameBase) { heldBase = frameBase; heldRt = 0xFFFFFFFFu; }
-    if (frames>0) { u32 want = frameBase+(u32)frame; u32 nxt = VideoPeekFrame(want); VideoRequestFrame(want); if (nxt != 0xFFFFFFFFu) VideoPrefetchFrame(nxt); u32 rt = VideoFrameTexIndex(want); if (rt != 0xFFFFFFFFu) heldRt = rt; if (heldRt != 0xFFFFFFFFu) RenderUIImage(43,isIntro ? 39 : 0,1280,isIntro ? 600 : 720,heldRt); }    
+    if (frames>0) { u32 want = frameBase+(u32)frame; u32 nxt = VideoPeekFrame(want); QueueVideoFrame(want,false); if (nxt != 0xFFFFFFFFu) QueueVideoFrame(nxt,true); u32 rt = VideoFrameTexIndex(want); if (rt != 0xFFFFFFFFu) heldRt = rt; if (heldRt != 0xFFFFFFFFu) RenderUIImage(43,isIntro ? 39 : 0,1280,isIntro ? 600 : 720,heldRt); }    
     int card = -1;
     if (elapsed < cardsEnd) { for (int i=cardCount-1;i>=0;--i) { if (elapsed >= at[i]) { card = i; break; } } }
     if (card >= 0) { RenderTextC(546,544,T_VIDEOTEXT,FONT_NORMAL,1.25f,"%s",Sys_Text.stringTable[(isIntro?613:(isDeath?628:610))+card]); }
@@ -588,7 +588,7 @@ void UI_AutomapClick(bool rh,int action) { World.Sys_UI.mouseClickHeldOverGUI=tr
 }
 void CloseFullmap() { World.Sys_UI.fullMapOpen[0]=World.Sys_UI.fullMapOpen[1]=false; }
 void AddItemToInventory(int index, int custIdx); void ResetHeldItem();
-static const u16 vmailStartFrames[6]={1579,1645,1713,1784,1864,1931}; static const u16 vmailEndFrames[6]={1644,1712,1783,1863,1930,1988}; static double avgCPUt[AVG_CPU_TAPS]={0}; static int avgCPUt_idx = 0;
+static const u16 vmailStartFrames[6]={1579,1645,1713,1784,1864,1931}; static const u16 vmailEndFrames[6]={1644,1712,1783,1863,1930,1988};
 void AppendTextWarning(i32 sidx, i32 sidx2, i32 sidx3, i32 col, i32 id) { World.Sys_UI.tWrnTextIdx[id]=sidx; World.Sys_UI.tWrnTextIdx2[id]=sidx2; World.Sys_UI.tWrnTextIdx3[id]=sidx3; World.Sys_UI.tWrnFinished[id]=World.Sys_UI.tWrnFinished[id] < World.pauseRelativeTime ? World.pauseRelativeTime + 0.1f : World.Sys_UI.tWrnFinished[id] + 0.1f; World.Sys_UI.tWrnColorIdx[id] = col; }
 enum { EF_POSX,EF_POSY,EF_POSZ,EF_ROTX,EF_ROTY,EF_ROTZ,EF_ROTW,EF_SCLX,EF_SCLY,EF_SCLZ,EF_TEX,EF_MODEL,EF_GLOW,EF_SPEC,EF_NORM,EF_LAST }; bool editFieldEditing=false; static u8 editFieldSlot=EF_LAST; static char editFieldBuffer[40]={0}; static const i16 efRowY[EF_LAST]={160,188,216,244,272,300,328,356,384,412,440,468,496,524,552};
 static const char* efRowLabel[EF_LAST]={"position x","position y","position z","rotation x","rotation y","rotation z","rotation w","scale x","scale y","scale z","texIndex","modelIndex","glowIndex","specIndex","normIndex"};
@@ -1187,11 +1187,9 @@ static void RenderUI() {
             }
             if (!editPanelActive && !World.Sys_UI.fullMapOpen[0] && !World.Sys_UI.fullMapOpen[1]) { if (cyber) { CenterMFD(); } else { SideMFD(false); CenterMFD(); SideMFD(true); } } else if (World.Sys_UI.fullMapOpen[0] || World.Sys_UI.fullMapOpen[1]) { AutomapBlitFullToUI(); UIRImg(UI_ID_FULLMAP_CLOSE,(i16)((UI_W-146)/2),706,146,28,1087); RenderTextL(610,710,T_YELLOW,FONT_NORMAL,0.8,"CLOSE"); }
             if(World.diffMis>=3){
-                UIR(UI_ID_CMFD_MISSION_TIMER,43,2,260,14);
-                RenderTextL(43,2,T_YELLOW,FONT_NORMAL,0.8,"%s",World.misTimerMission < 1100 ? Sys_Text.stringTable[World.misTimerMission] : "");/*MissionTimerT*/
+                UIR(UI_ID_CMFD_MISSION_TIMER,43,2,260,14); RenderTextL(43,2,T_YELLOW,FONT_NORMAL,0.8,"%s",World.misTimerMission < 1100 ? Sys_Text.stringTable[World.misTimerMission] : "");/*MissionTimerT*/
                 {char misT[8]; if(World.misTimerTimesUP) sFormat(misT,sizeof(misT),"%s",869<1100?Sys_Text.stringTable[869]:""); else {float mt=World.misTimerT<0.0f?0.0f:World.misTimerT; int mm=(int)(mt/60.0f),ss=(int)(mt-(float)(mm*60)); sFormat(misT,sizeof(misT),"%02d:%02d",mm,ss);} RenderTextL(258,2,T_YELLOW,FONT_NORMAL,0.8,"%s",misT);}
             }
-                
             if (World.curLev==LEVEL_CYBERSPACE) { UIR(UI_ID_CMFD_CYBER_TIMER,28,530,80,14); RenderTextL(28,530,T_WHITE,FONT_NORMAL,0.8,"T -"); char cyberT[8]; float ct = World.instances[PLAYER1].cyberTimer < 0.0f ? 0.0f : World.instances[PLAYER1].cyberTimer; int cmm = (int)(ct / 60.0f); sFormat(cyberT,sizeof(cyberT),"%02d:%02d",cmm,(int)(ct - (float)(cmm * 60))); RenderTextL(68,530,T_WHITE,FONT_NORMAL,0.8,"%s",cyberT); }
             if(World.curLev != LEVEL_CYBERSPACE && (World.invP1.hardwareIsActive & HW_BIO)!=0){/*BioMonitor: not part of the cyberspace HUD*/
                 BiomonitorBlitToUI();
@@ -1233,8 +1231,7 @@ static void RenderUI() {
             }
             if(editFieldEditing&&Sys_Input.scrollDelta!=0.0f){EditFieldStep((float)Sys_Input.scrollDelta);Sys_Input.scrollDelta=0.0f;}
             if(sel==World.weaponVModelIndex){int wep16=Get16WeaponIndexFromConstIndex(e->index);if(wep16>=0&&wep16<16){V3 offs=vWepOfs[wep16];offs.y+=wfx.reloadContainerPos.y;RenderTextL(982,580,T_GREEN,FONT_NORMAL,1.0f,"vm offset");RenderTextL(1108,580,T_YELLOW,FONT_NORMAL,1.0f,"%.5f %.5f %.5f",offs.x,offs.y,offs.z);}}
-        }
-        else if (EditLightSelIsActive()) {/*Edit mode light info panel: same dialogue, light properties instead of entity fields*/
+        } else if (EditLightSelIsActive()) {/*Edit mode light info panel: same dialogue, light properties instead of entity fields*/
             u16 li=editModeLightSelection; Light* L=&World.lights[li];
             float sx,sy; if (WorldToScreenPoint(V3_AsubB(L->pos,World.position[PLAYER1]),&sx,&sy)) RenderUIImage((i16)(sx-24.0f),(i16)(sy-24.0f),48,48,1051);
             RenderUIImage(966,84,400,600,1025);/*Edit object info panel bg (non-interactive backdrop)*/
@@ -1251,34 +1248,22 @@ static void RenderUI() {
     }
     if (World.Sys_UI.vmailActive) {
         u8 clip=(u8)(World.Sys_UI.vmailActive-1);
-        static u32 heldMail = 0xFFFFFFFFu, heldMailClip = 0xFFu; if (heldMailClip != World.Sys_UI.vmailActive) { heldMailClip = World.Sys_UI.vmailActive; heldMail = 0xFFFFFFFFu; }
         if (World.Sys_UI.vmailFrameFinished < World.pauseRelativeTime && World.Sys_UI.vmailFrame < vmailEndFrames[clip]) { if (World.Sys_UI.vmailFrame == (vmailStartFrames[clip]+11)) play_wav(sounds[99], AppliedFXVol(1.0f), (V3){0}, false); World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; World.Sys_UI.vmailFrame++; if (World.Sys_UI.vmailFrame > vmailEndFrames[clip]) World.Sys_UI.vmailFrame = vmailEndFrames[clip]; }
-        u32 want = World.Sys_UI.vmailFrame, nxt = VideoPeekFrame(want); VideoRequestFrame(want); if (nxt != 0xFFFFFFFFu) VideoPrefetchFrame(nxt);
-        heldMail = VideoFrameTexIndex(want); if (heldMail != 0xFFFFFFFFu) UIRImg(UI_ID_VMAIL_VIEWER,283,184,800,400,heldMail);
+        u32 want = World.Sys_UI.vmailFrame, nxt = VideoPeekFrame(want); QueueVideoFrame(want,false);; if (nxt != 0xFFFFFFFFu) QueueVideoFrame(nxt,true);
+        u32 heldMail = VideoFrameTexIndex(want); if (heldMail != 0xFFFFFFFFu) UIRImg(UI_ID_VMAIL_VIEWER,283,134,800,400,heldMail); SideMFD(false); CenterMFD(); SideMFD(true); /*Draw the email sender stats and text*/
     }
-    i16 debugTextStartY = 90;
-    if (Cheats.showLocation && !World.menuActive) RenderTextL(16, debugTextStartY, T_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z,World.rotation[PLAYER1].x,World.rotation[PLAYER1].y,World.rotation[PLAYER1].z,World.rotation[PLAYER1].w);
-    i16 lineSpacing = 18;
-    if (!World.menuActive && !Cheats.noHUD && Cheats.showFPS) RenderTextL(16,debugTextStartY + (lineSpacing * 1),T_WHITE,FONT_NORMAL,1.0f,"GPU ms::All:%.2f, Shad:%.2f, Pre:%.2f, Main:%.2f, SSR:%.2f, Comp:%.2f",World.gpuFrameMs,World.gpuShadowMs,World.gpuPreMs,World.gpuMainMs,World.gpuSsrMs,World.gpuCompMs);
-    if (!World.menuActive && !Cheats.noHUD && Cheats.showFPS) RenderTextL(16,debugTextStartY + (lineSpacing * 2),T_WHITE,FONT_NORMAL,1.0f,"CPU ms::Shad:%.3f, Phys:%.3f, Subs:%u, Rend:%.3f, Pre Phys:%.3f, Logic:%.3f, Ray:%.3f(%u)",shadowTime * 1000,physTime * 1000,World.substeps,renderTime * 1000,prePhys * 1000,gameTime * 1000,raycastMs * 1000,raycastCalls);
-    if (!World.menuActive && !Cheats.noHUD && !World.paused && Cheats.showFPS) RenderTextL(16,debugTextStartY + (lineSpacing * 3),T_WHITE,FONT_NORMAL,1.0f,"Grounded: %u  wepCur: %d  weaponIndex: %d  pendingIdx: %d  wep16: %d  viewModel: %u  reloadDone: %.2f",(World.instances[PLAYER1].entflags & EF_GROUNDED) > 0,(int)World.invP1.wepCur,(int)World.invP1.weaponIndex,(int)World.invP1.weaponIndexPending,Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex),((Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==5||Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==6)?49u:((Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==0||Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==1)?50u:0u)),World.invP1.reloadFinished);
-    if (!World.menuActive && !Cheats.noHUD && Cheats.showFPS) RenderTextL(16,debugTextStartY + (lineSpacing * 4),T_WHITE,FONT_NORMAL,1.0f,"Test Edx: %u, Time Elapsed: %.3f, Fatigue: %.2f, Sprinting: %u, Reverb: %u, Making Noise: %u",editModeTestEntityDefinition,World.pauseRelativeTime - game_actual_start_time,World.invP1.fatigue,Sprint(),World.invP1.inReverbZone,World.invP1.makingNoise);
-    if (!Cheats.noHUD && Cheats.showLocation) RenderTextL(16,debugTextStartY + (lineSpacing * 5),T_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",World.cursorPos_x,World.cursorPos_y,World.currentMouse_dx,World.currentMouse_dy);
     if (Cheats.consoleActive) RenderTextL(16,0,T_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (World.statusTextDecayFinished > World.current_time) RenderTextC(683,164,T_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
     if (World.invP1.ressurectingFinished > World.pauseRelativeTime) { double el = World.pauseRelativeTime - (World.invP1.ressurectingFinished - 3.0); static const float resDelay[8] = {0.2f,0.4f,0.5f,0.7f,0.8f,0.9f,1.0f,1.4f}; static const i16 resY[8] = {9,30,30,52,52,74,74,94}; if (el < 2.0) { for (int i = 0; i < 8; ++i) { if (el >= resDelay[i]) RenderTextL(38,resY[i],T_GREEN,FONT_NORMAL,1.8f,"%s",Sys_Text.stringTable[860 + i]); } } }
-    double time_now = get_time();
+    if (Cheats.showLocation) RenderTextL(16, 90, T_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f, Cursor: %d, %d  dx:%d dy:%d",World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z,World.rotation[PLAYER1].x,World.rotation[PLAYER1].y,World.rotation[PLAYER1].z,World.rotation[PLAYER1].w,World.cursorPos_x,World.cursorPos_y,World.currentMouse_dx,World.currentMouse_dy);
     if (Cheats.showFPS) {
-        World.thisFrameTime = (time_now - World.last_time) * 1000.0; World.last_time = time_now; World.cpuFrameTime = World.cpuTime * 1000.0;
-        u8 timingColor = (get_time() - World.current_time) > (World.thisFrameTime - 0.2) ? T_RED : T_WHITE;
-        double avgCPU = 0.0;
-        avgCPUt[avgCPUt_idx] = World.cpuFrameTime; avgCPUt_idx++; if (avgCPUt_idx >= AVG_CPU_TAPS) avgCPUt_idx = 0;
-        u32 avgmax = globalframe > AVG_CPU_TAPS ? AVG_CPU_TAPS : globalframe;
-        for (u32 i=0;i<avgmax;++i) avgCPU += avgCPUt[i];
-        avgCPU /= (double)avgmax;
-        RenderTextL(16 + 110, debugTextStartY - lineSpacing,timingColor,FONT_NORMAL,1.0f,"CPU avg %.2f",avgCPU); avgCPU = 0; RenderTextL(16, debugTextStartY - lineSpacing, timingColor,FONT_NORMAL,1.0f,"ms: %.2f",World.thisFrameTime);
-        RenderTextL(16 + 260, debugTextStartY - lineSpacing,T_WHITE,FONT_NORMAL,1.0f,"(FPS:%d),Drwclls:%d [G:%d UI:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u",globalframesPerLastSecond,drawCalls,drawCallsNormal,uiDrawCalls,shadDrawCalls,vertsRendered,Cheats.editMode,World.menuActive,World.paused);
+        double time_now = get_time(); World.thisFrameTime = (time_now - World.last_time) * 1000.0; World.last_time = time_now; World.cpuFrameTime = World.cpuTime * 1000.0; u8 timingColor = (time_now - World.current_time) > (World.thisFrameTime - 0.2) ? T_RED : T_WHITE;
+        static double avg; avg += (World.cpuFrameTime - avg) * (1.0 / 60.0/*frame "taps"*/);
+        RenderTextL(16 + 110,72,timingColor,FONT_NORMAL,1.0f,"CPU avg %.2f",avg); RenderTextL(16,72,timingColor,FONT_NORMAL,1.0f,"ms: %.2f",World.thisFrameTime); RenderTextL(16 + 260,72,T_WHITE,FONT_NORMAL,1.0f,"(FPS:%d),Drawcalls:%d [G:%d UI:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u",globalframesPerLastSecond,drawCalls,drawCallsNormal,uiDrawCalls,shadDrawCalls,vertsRendered,Cheats.editMode,World.menuActive,World.paused);
+        RenderTextL(16,108,T_WHITE,FONT_NORMAL,1.0f,"GPU ms::All:%.2f, Shad:%.2f, Pre:%.2f, Main:%.2f, SSR:%.2f, Comp:%.2f",World.gpuFrameMs,World.gpuShadowMs,World.gpuPreMs,World.gpuMainMs,World.gpuSsrMs,World.gpuCompMs);
+        RenderTextL(16,126,T_WHITE,FONT_NORMAL,1.0f,"CPU ms::Shad:%.3f, Phys:%.3f, Subs:%u, Rend:%.3f, Pre Phys:%.3f, Logic:%.3f, Ray:%.3f(%u)",shadowTime * 1000,physTime * 1000,World.substeps,renderTime * 1000,prePhys * 1000,gameTime * 1000,raycastMs * 1000,raycastCalls);
+        RenderTextL(16,144,T_WHITE,FONT_NORMAL,1.0f,"Test Edx: %u, Time Elapsed: %.3f, Fatigue: %.2f, Sprinting: %u, Reverb: %u, Making Noise: %u, Grounded: %u",editModeTestEntityDefinition,World.pauseRelativeTime - game_actual_start_time,World.invP1.fatigue,Sprint(),World.invP1.inReverbZone,World.invP1.makingNoise,(World.instances[PLAYER1].entflags & EF_GROUNDED) > 0);
     }
-    if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused) { RenderUIImage((i16)(World.cursorPos_x - 20),(i16)(World.cursorPos_y - 20),40,40,GetCursorTexture()); } else if (!Cheats.noHUD) { RenderUIImage(663,364,40,40,GetCursorTexture()); }
+    bool p = (World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused; if (p || !Cheats.noHUD) RenderUIImage(p?World.cursorPos_x-20:663,p?World.cursorPos_y-20:364,40,40,GetCursorTexture()); 
     if(World.invP1.grenActive && World.invP1.holdingObject && !World.menuActive && !World.paused && !Cheats.noHUD) { RenderTextL((World.inventoryMode ? World.cursorPos_x : 683) + 26,(World.inventoryMode ? World.cursorPos_y : 384) - 8,T_YELLOW,FONT_NORMAL,0.8f,"Live"); }
 }

@@ -66,15 +66,12 @@ static void* vid_worker(void* arg) { /*Decode-ahead: never touches GL. Slot stat
 }
 u32 VideoPeekFrame(u32 texIdx) { VidFrameRec* r=g_vidUp ? vid_find(texIdx) : NULL; return r && r+1<g_vidFrames+g_vidFrameCnt ? r[1].texIdx : U32_MAX; }
 void VideoInit(void) { if (g_vidUp) return; PngArenaInit(&g_vidArena); g_vidUp = true; OS_ThreadCreate(&g_vidThr, vid_worker, NULL); }
-static void QueueVideoFrame(u32 texIdx,bool prefetch) {
+void QueueVideoFrame(u32 texIdx,bool prefetch) {
     if (!g_vidUp || texIdx==__atomic_load_n(&g_vidReqFrame,__ATOMIC_RELAXED) || !vid_find(texIdx)) return;
     for (u32 r=0;r<VIDEO_RING;++r) if (g_vidSlot[r].frameTexIdx==texIdx && __atomic_load_n(&g_vidSlot[r].state,__ATOMIC_ACQUIRE)) return;
     __atomic_store_n(prefetch ? &g_vidPreFrame : &g_vidReqFrame,texIdx,__ATOMIC_RELAXED); __atomic_fetch_add(&g_vidReqGen,1,__ATOMIC_RELEASE); OS_FutexWakeAll(&g_vidReqGen);
 }
-void VideoRequestFrame(u32 texIdx) { QueueVideoFrame(texIdx,false); }
-void VideoPrefetchFrame(u32 texIdx) { QueueVideoFrame(texIdx,true); }
-
-u32 VideoFrameTexIndex(u32 texIdx) { /*Exact match only. The old nearest-slot fallback could walk backwards, and worse, could match a frame from a different clip that happened to be numerically closer. Playback is monotonic, so the correct answer when the wanted frame is not resident is to hold the previous one*/
+u32 VideoFrameTexIndex(u32 texIdx) {
     if (!g_vidUp) return 0xFFFFFFFFu;
     u32 best = 0xFFFFFFFFu;
     for (u32 r=0;r<VIDEO_RING;++r) { VidSlot* s = &g_vidSlot[r];
