@@ -1000,8 +1000,7 @@ void CenterMFD() { //640x240
         if (World.Sys_UI.mfdTab[0]==2) {/*Hardware*/
             UIRText(UI_ID_CMFD_HARDWARE_HEADER,372,hdrH,T_RED,FONT_NORMAL,0.8f,260,Sys_Text.stringTable[874]/*HARDWARE*/);
             for (int slot=0;slot<14;++slot) {
-                int ref=World.invP1.hardwareInvReferenceIndex[slot]; if (ref<0 || World.invP1.hwVers[slot] <= 0) continue;
-                i16 x=generalColX[slot < 7 ? 0 : 1], y=generalRowY[slot%7];
+                int ref=World.invP1.hardwareInvReferenceIndex[slot]; if (ref<0 || World.invP1.hwVers[slot] <= 0) { continue; } i16 x = generalColX[slot < 7 ? 0 : 1], y = generalRowY[slot % 7];
                 const char* label=Sys_Text.stringTable[ref+326]; UIRText(UI_ID_CMFD_HARDWARE_ROW_0+slot,x,y,World.invP1.hardwareInvCurrent==slot ? T_YELLOW : (World.invP1.hasHardware&(1u<<slot) ? T_GREEN_MENU : T_GREEN_MENU_SHADOW),FONT_NORMAL,0.8f,210,label); RenderTextL((i16)(x+(slot<7 ? 276 : 309)),y,World.invP1.hardwareInvCurrent==slot ? T_YELLOW : T_GREEN_MENU,FONT_NORMAL,0.8f,"v%d",(int)World.invP1.hwVers[slot]);
             }
         }
@@ -1277,8 +1276,7 @@ static void RenderUI() {
         u32 avgmax = globalframe > AVG_CPU_TAPS ? AVG_CPU_TAPS : globalframe;
         for (u32 i=0;i<avgmax;++i) avgCPU += avgCPUt[i];
         avgCPU /= (double)avgmax;
-        RenderTextL(16 + 110, debugTextStartY - lineSpacing,timingColor,FONT_NORMAL,1.0f,"CPU avg %.2f",avgCPU); avgCPU = 0;
-        RenderTextL(16, debugTextStartY - lineSpacing, timingColor,FONT_NORMAL,1.0f,"ms: %.2f",World.thisFrameTime);
+        RenderTextL(16 + 110, debugTextStartY - lineSpacing,timingColor,FONT_NORMAL,1.0f,"CPU avg %.2f",avgCPU); avgCPU = 0; RenderTextL(16, debugTextStartY - lineSpacing, timingColor,FONT_NORMAL,1.0f,"ms: %.2f",World.thisFrameTime);
         RenderTextL(16 + 260, debugTextStartY - lineSpacing,T_WHITE,FONT_NORMAL,1.0f,"(FPS:%d),Drwclls:%d [G:%d UI:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u",globalframesPerLastSecond,drawCalls,drawCallsNormal,uiDrawCalls,shadDrawCalls,vertsRendered,Cheats.editMode,World.menuActive,World.paused);
     }
     if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused) { RenderUIImage((i16)(World.cursorPos_x - 20),(i16)(World.cursorPos_y - 20),40,40,GetCursorTexture()); } else if (!Cheats.noHUD) { RenderUIImage(663,364,40,40,GetCursorTexture()); }

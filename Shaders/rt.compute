@@ -32,28 +32,6 @@ vec3 DecodeOctahedral(vec2 e) { e = e * 2.0 - 1.0; vec3 n = vec3(e, 1.0 - abs(e.
 vec3 safeRcp(vec3 v) { return vec3(v.x >= 0.0 ? 1.0 : -1.0, v.y >= 0.0 ? 1.0 : -1.0, v.z >= 0.0 ? 1.0 : -1.0) / max(abs(v), vec3(1e-18)); }
 vec4 PalettePixel(uint pixelOffset, uint paletteBase) { uint packet = colors[pixelOffset >> 2u]; uint idx = (packet >> ((pixelOffset & 3u) << 3u)) & 255u; return unpackUnorm4x8(texturePalettes[paletteBase + idx]); }
 vec4 TexturePixel(uint texBase, uint paletteBase, ivec2 p, uint width) { return PalettePixel(texBase + uint(p.y) * width + uint(p.x), paletteBase); }
-vec4 TextureGaussian(uint texBase, uint paletteBase, vec2 uv, ivec2 sz) {
-    vec2 tc = uv * vec2(sz) - 0.5;
-    ivec2 p = ivec2(floor(tc));
-    vec2 f = fract(tc);
-    float wx0 = 0.25 - 0.25 * f.x, wx1 = 0.50 - 0.25 * f.x, wx2 = 0.25 + 0.25 * f.x, wx3 = 0.25 * f.x;
-    float wy0 = 0.25 - 0.25 * f.y, wy1 = 0.50 - 0.25 * f.y, wy2 = 0.25 + 0.25 * f.y, wy3 = 0.25 * f.y;
-    int w = sz.x, h = sz.y, x0 = p.x - 1, y0 = p.y - 1;
-    if (x0 < 0) x0 += w; if (x0 < 0) x0 += w;
-    if (y0 < 0) y0 += h; if (y0 < 0) y0 += h;
-    int x1 = x0 + 1; if (x1 >= w) x1 -= w;
-    int x2 = x1 + 1; if (x2 >= w) x2 -= w;
-    int x3 = x2 + 1; if (x3 >= w) x3 -= w;
-    int y1 = y0 + 1; if (y1 >= h) y1 -= h;
-    int y2 = y1 + 1; if (y2 >= h) y2 -= h;
-    int y3 = y2 + 1; if (y3 >= h) y3 -= h;
-    uint uw = uint(w), row0 = texBase + uint(y0) * uw, row1 = texBase + uint(y1) * uw, row2 = texBase + uint(y2) * uw, row3 = texBase + uint(y3) * uw;
-    vec4 r0 = PalettePixel(row0 + uint(x0), paletteBase) * wx0 + PalettePixel(row0 + uint(x1), paletteBase) * wx1 + PalettePixel(row0 + uint(x2), paletteBase) * wx2 + PalettePixel(row0 + uint(x3), paletteBase) * wx3;
-    vec4 r1 = PalettePixel(row1 + uint(x0), paletteBase) * wx0 + PalettePixel(row1 + uint(x1), paletteBase) * wx1 + PalettePixel(row1 + uint(x2), paletteBase) * wx2 + PalettePixel(row1 + uint(x3), paletteBase) * wx3;
-    vec4 r2 = PalettePixel(row2 + uint(x0), paletteBase) * wx0 + PalettePixel(row2 + uint(x1), paletteBase) * wx1 + PalettePixel(row2 + uint(x2), paletteBase) * wx2 + PalettePixel(row2 + uint(x3), paletteBase) * wx3;
-    vec4 r3 = PalettePixel(row3 + uint(x0), paletteBase) * wx0 + PalettePixel(row3 + uint(x1), paletteBase) * wx1 + PalettePixel(row3 + uint(x2), paletteBase) * wx2 + PalettePixel(row3 + uint(x3), paletteBase) * wx3;
-    return r0 * wy0 + r1 * wy1 + r2 * wy2 + r3 * wy3;
-}
 uint GetVoxelIndex(vec3 p) { uvec2 v = uvec2(clamp((p.xz - worldMin) * 3.125, vec2(0.0), vec2(511.0))); return (v.y << 9u) | v.x; }
 float rayAABB(vec3 o, vec3 id, vec3 mn, vec3 mx, float maxT) { vec3 a = (mn - o) * id, b = (mx - o) * id, lo = min(a,b), hi = max(a,b); float n = max(max(lo.x,lo.y),lo.z), f = min(min(hi.x,hi.y),hi.z); return (f < max(0.02,n) || n > maxT) ? -1.0 : max(n,0.02); }
 uint RtCellCount(uint c) { uint v = rtCellCountsP[c >> 1u]; return (v >> ((c & 1u) << 4u)) & 65535u; }
