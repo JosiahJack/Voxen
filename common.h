@@ -109,7 +109,7 @@ void DualLogError(const char*, ...), DualLog(const char*, ...), DualLogWarn(cons
     INLINE u32 WINAPI thrtramp(void* a) { void** b=(void**)a; void*(*fn)(void*)=(void*(*)(void*))b[0]; void* arg=b[1]; HeapFree(GetProcessHeap(),0,b); fn(arg); return 0; }
     INLINE int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) { void** b=(void**)HeapAlloc(GetProcessHeap(),0,2 * sizeof(void*)); b[0]=(void*)fn; b[1]=arg; out->handle=CreateThread(NULL,THRSTACKSZ,thrtramp,b,0,NULL); if(!out->handle){HeapFree(GetProcessHeap(),0,b); return -1;} return 0; }
     INLINE void OS_ThreadJoin(OS_Thread* t) { WaitForSingleObject(t->handle,U32_MAX); CloseHandle(t->handle); t->handle = NULL; }
-    i32 __stdcall SwitchToThread(void);
+    i32 __stdcall SwitchToThread();
     INLINE void OS_FutexWait(u32* a, u32 expect) { while (__atomic_load_n(a,__ATOMIC_ACQUIRE)==expect) SwitchToThread(); } /* no futex on Win32: yield to a runnable thread instead of burning the core */
     INLINE void OS_FutexWakeAll(u32* a) { (void)a; }
     INLINE double get_time() { static LARGE_INTEGER frequency,counter; static i32 init=0; if (!init) { QueryPerformanceFrequency(&frequency); init=1; } QueryPerformanceCounter(&counter); return (double)counter.QuadPart / frequency.QuadPart; }
@@ -382,10 +382,10 @@ bool HudHeatTickOn(int);
 double get_time();
 float Tranquilize(u16,float,bool),TakeDamage(u16,DamageData),MeasureLineAdvance(const char*,u8);
 void ApplyImpactForceSphere(DamageData*,V3,float,float);
-void UseTargets(u16,u16),AddForce(u16,V3,bool),TriggerTrippedUpdate(u16),CyberItemOnTriggerEnter(u16,u16),CyberMineOnTriggerEnter(u16,u16),CenterStatusPrint(const char * restrict fmt, ...),GameEndSequence(void),GameDeathSequence(void),DebugRAMActual(const char*),DebugRAMPeak(),play_wav(const char*,float,V3,bool),play_wav_ext(const char*,float,V3,bool,float),play_message(const char*),PlaySparkSound(V3),LoadLevel(u8,V3),SetLevelPointers(u8),
+void UseTargets(u16,u16),AddForce(u16,V3,bool),TriggerTrippedUpdate(u16),CyberItemOnTriggerEnter(u16,u16),CyberMineOnTriggerEnter(u16,u16),CenterStatusPrint(const char * restrict fmt, ...),GameEndSequence(),GameDeathSequence(),DebugRAMActual(const char*),DebugRAMPeak(),play_wav(const char*,float,V3,bool),play_wav_ext(const char*,float,V3,bool,float),play_message(const char*),PlaySparkSound(V3),LoadLevel(u8,V3),SetLevelPointers(u8),
      CopyPlayerState(u8,u8),DeleteInstance(u16),MenuGoBack(),GoIntoGame(),ScreenShake(),TakeEnergy(float),CreateTargetIDInstance(float,u16,float),InputProcessing(),LoadAllLevels(),DrawLine(V3,V3,Color),ForceInventoryMode(),ForceShootMode(),PlayVmail(u8),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),UpdateLights(),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),LoadTextForLanguage(u8),
      RenderTextL(i16,i16,u32,u8,float,const char* restrict,...),RenderTextC(i16,i16,u32,u8,float,const char* restrict,...),RenderText3DC(V3,u32,u8,float,const char* restrict,...),BuildTextDecalMeshes(),CullCore(),PngArenaInit(PngArena*),AppendTextWarning(i32,i32,i32,i32,i32),ChangeAnim(Entity*,u8),ForceDoorPortalOpen(u16),QuestBitSet(u8),QuestBitClear(u8),QuestBitToggle(u8);
-bool VidMenuKeyArmed(void);
+bool VidMenuKeyArmed();
 size_t AudioLiveBytes();
 const char *JumpSound(FootStepType),*JumpLandSound(FootStepType); FootStepType GetFootstepTypeForPrefab(int); char* StringFindFirstCharWithin(const char*,char);
 enum{QB_RobotSpawnDeactivated=0,QB_IsotopeInstalled,QB_ShieldActivated,QB_LaserSafetyOverriden,QB_LaserDestroyed,QB_BetaGroveCyberUnlocked,QB_GroveAlphaJettisonEnabled,QB_GroveBetaJettisonEnabled,QB_GroveDeltaJettisonEnabled,QB_MasterJettisonBroken,QB_Relay428Fixed,QB_MasterJettisonEnabled,QB_BetaGroveJettisoned,QB_AntennaNorthDestroyed,QB_AntennaSouthDestroyed,QB_AntennaEastDestroyed,QB_AntennaWestDestroyed,QB_SelfDestructActivated,QB_BridgeSeparated,QB_IsolinearChipsetInstalled,QB_COUNT,QB_None=255};
@@ -469,12 +469,10 @@ INLINE bool IdxIsAudioLog(int c) { return c == 313; }
 INLINE float UsableOrDef(float cur, float def){u32 c=*(u32*)&cur,d=*(u32*)&def; u32 m = 0 - ((c >> 31) | ((c & 0x7FFFFFFF) == 0)); u32 r = (m & d) | (~m & c); return *(float*)&r; }
 INLINE int UseableFromConst(int c){return c>=307?c-307:c;}
 INLINE int ItemStringIdx(int c){return UseableFromConst(c)+326;}
-INLINE bool CurrentWeaponUsesEnergy(void) { int i = World.invP1.weaponIndex; return i==344 || i==347 || i==353 || i==357 || i==358; }
+INLINE bool CurrentWeaponUsesEnergy() { int i = World.invP1.weaponIndex; return i==344 || i==347 || i==353 || i==357 || i==358; }
 INLINE u16 GetImpactType(u16 instanceIdx){ switch(World.instances[instanceIdx].bloodType){ case BloodType_None: return 729; case BloodType_Red: return 721; case BloodType_Yellow: return 723; case BloodType_Green: return 722; case BloodType_Robot: return 730; case BloodType_Leaf: return 756; case BloodType_Mutation: return 757; case BloodType_GrayMutation: return 758; } return 729; }
 INLINE void HealthManagerHealingBed(u16 playerIdx, float amount) { Entity* p = &World.instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
-void UI_PuzzleGridClose();
-void UI_BlockedClose();
-void PGEvalPuzzle(void);
+void UI_PuzzleGridClose(),UI_BlockedClose(),PGEvalPuzzle();
 INLINE u16 PGThemeOffset(HUDColor t){ return t==HUDColor_Red||t==HUDColor_Green ? 1u : t==HUDColor_Orange||t==HUDColor_Purple ? 2u : t==HUDColor_Yellow||t==HUDColor_Blue ? 3u : 0u; }
 INLINE float SfxMaster(){return vclamp((float)Sys_Settings.VolumeMaster/100.f,0,1.f);}
 INLINE float SfxMusic(){ return vclamp((float)Sys_Settings.VolumeMusic /100.f,0,1.f);}
@@ -492,7 +490,7 @@ INLINE const char* AudioLogPath(i32 id) { return (id >= 0 && id < (i32)LOGCNT) ?
 typedef struct PSysDef { V3 pos; const u16* textures; u8 textureCount; float emitRate,duration,sizeMin,sizeMax,speedMin,speedMax,lifetimeMin,lifetimeMax,gravity,animWindow,softness,shapeRadius,shapeAngle; u8 shapeType; Color colStart,colEnd; const Color* rampColors; const float* rampTimes; u8 rampCount; const float *scaleKeys,*scaleTimes; u8 scaleCount; const float *velKeys,*velTimes; u8 velCount; const float *rotKeys,*rotTimes;
                          u8 rotCount; const float *emissKeys,*emissTimes; u8 emissCount; u8 trail; u32 trailTexture; Color trailColorStart,trailColorEnd; float trailLifetime,trailWidthStart,trailWidthEnd,trailVertexDistance; bool looping; u8 blendMode; bool blendModeOverride; u8 rotationMode,colorMode; u16 burstCount; Quaternion rotation; bool useMesh; } PSysDef;
 const PSysDef* PSysTypeGet(u16);
-u16 PSysAddInternal(const PSysDef* pd, u16 meshInstance, u16 parentIdx); void PSysAddLevelLoops(void),PSysClearLevel(u8); extern const PSysDef particleTypeDefs[192];
+u16 PSysAddInternal(const PSysDef* pd, u16 meshInstance, u16 parentIdx); void PSysAddLevelLoops(),PSysClearLevel(u8); extern const PSysDef particleTypeDefs[192];
 typedef void(*FGL_AT)(u32),(*FGL_F)(),    (*FGL_FF)(u32),  (*FGL_AS)(u32,u32),  (*FGL_VAB)(u32,u32), (*FGL_GT)(i32,u32*),   (*FGL_DA)(u32,i32,i32),     (*FGL_CC)(float,float,float,float),(*FGL_BD)(u32,size_t,const void*,u32),   (*FGL_U4F)(i32,float,float,float,float),        (*FGL_BBB)(u32,u32,u32),  *(*FGL_MBR)(u32,intptr_t,size_t,u32);
 typedef void(*FGL_C)(u32),                (*FGL_EVAA)(u32),(*FGL_BB)(u32,u32),  (*FGL_BT)(u32,u32),  (*FGL_U1F)(i32,float), (*FGL_BFS)(u32,u32,u32,u32),(*FGL_DE)(u32,i32,u32,const void*),(*FGL_UM4FV)(i32,i32,bool,const float*), (*FGL_BSD)(u32,intptr_t,intptr_t,const void*),  (*FGL_DB)(i32,const u32*), (*FGL_CM)(bool,bool,bool,bool);
 typedef void(*FGL_CS)(u32),(*FGL_BVA)(u32), (*FGL_GVA)(i32,u32*),(*FGL_U1I)(i32,i32), (*FGL_DC)(u32,u32,u32),(*FGL_MB)(u32),(*FGL_CPIV)(u32,u32,i32*),  (*FGL_BVB)(u32,u32,intptr_t,i32),  (*FGL_RP)(i32,i32,i32,i32,u32,u32,void*),(*FGL_SS)(u32,i32,const char*const*,const i32*),(*FGL_U2UI)(i32,u32,u32);
@@ -500,7 +498,7 @@ typedef void(*FGL_E)(u32), (*FGL_DF)(u32),(*FGL_LP)(u32),  (*FGL_GB)(i32,u32*), 
 typedef void(*FGL_UP)(u32),(*FGL_D)(u32), (*FGL_DM)(bool), (*FGL_LW)(float),    (*FGL_GIV)(u32,i32*),(*FGL_U1UI)(i32,u32),  (*FGL_GSIV)(u32,u32,i32*),  (*FGL_VAF)(u32,i32,u32,bool,u32),  (*FGL_UM3FV)(i32,i32,bool,const float*), (*FGL_U3F)(i32,float,float,float),              (*FGL_U2F)(i32,float,float);
 typedef u32(*FGL_CP)(), (*FGL_GERR)(), (*FGL_CRS)(u32); typedef bool(*FGL_UB)(u32); typedef void(*FGL_GIQ)(i32,u32*),(*FGL_GQOU64)(u32,u32,u64*); typedef void(*FGL_DAI)(u32,i32,i32,i32); typedef void(*FGL_BF)(i32,i32,i32,i32,i32,i32,i32,i32,u32,u32); typedef void(*FGL_GTKP)(u32,i32,u32,i32*); typedef void(*FGL_CISD)(u32,u32,i32,i32,i32,i32,u32,u32,i32,i32,i32,i32,i32,i32,i32);
 extern FGL_GTKP glGetTexLevelParameteriv; extern FGL_BF glBlitFramebuffer; extern FGL_T2D glTexSubImage2D; extern FGL_BFB glBindFramebuffer; extern FGL_GFS glGenFramebuffers; extern FGL_FBT2D glFramebufferTexture2D; extern FGL_GT glGenTextures; extern FGL_T2D glTexImage2D;
-extern u32 uiFBO; void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp); void EnsureReflectionResources(void);void VideoInit(void); void QueueVideoFrame(u32,bool),QueueVideoFrame(u32,bool); u32 VideoFrameTexIndex(u32 texIdx),VideoPeekFrame(u32 texIdx); void ParseAllModels(void); void LoadModels(void); void LoadPerLevelModels(u8),RtSwapPatchModels(); void MdlBuildLevelConvexAdjacency(u8); bool EntIsLodCardConst(u16);
+extern u32 uiFBO; void GenerateAndBindTexture(u32*,i32,i32,i32,u32,u32,i32,u8*),EnsureReflectionResources(),VideoInit(),QueueVideoFrame(u32,bool),QueueVideoFrame(u32,bool),ParseAllModels(),LoadModels(),LoadPerLevelModels(u8),RtSwapPatchModels(),MdlBuildLevelConvexAdjacency(u8); bool EntIsLodCardConst(u16); u32 VideoFrameTexIndex(u32),VideoPeekFrame(u32);
 extern FGL_GB glGenBuffers; extern FGL_BB glBindBuffer; extern FGL_BD glBufferData; extern FGL_UB glUnmapBuffer; extern FGL_MBR glMapBufferRange; extern FGL_U2F glUniform2f; extern FGL_U1F glUniform1f; extern FGL_U1UI glUniform1ui; extern FGL_UP glUseProgram; extern FGL_RP glReadPixels; extern FGL_U3F glUniform3f; extern FGL_DC glDispatchCompute; extern FGL_DA glDrawArrays; extern FGL_MB glMemoryBarrier;
 extern FGL_AT glActiveTexture; extern FGL_BVA glBindVertexArray; extern FGL_U1I glUniform1i; extern FGL_E glEnable; extern FGL_U4F glUniform4f; extern FGL_BT glBindTexture; extern FGL_GERR glGetError; extern FGL_GVA glGenVertexArrays; extern FGL_VAF glVertexAttribFormat; extern FGL_VAB glVertexAttribBinding;
 extern FGL_EVAA glEnableVertexAttribArray; extern FGL_BVB glBindVertexBuffer; extern FGL_BSD glBufferSubData; extern FGL_UM4FV glUniformMatrix4fv; extern FGL_DM glDepthMask; extern FGL_DF glDepthFunc; extern FGL_D glDisable; extern FGL_LW glLineWidth; extern FGL_GIQ glGenQueries; extern FGL_GQOU64 glGetQueryObjectui64v; extern FGL_DAI glDrawArraysInstanced; extern FGL_TPFV glTexParameterfv;

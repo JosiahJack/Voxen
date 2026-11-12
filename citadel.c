@@ -160,8 +160,8 @@ static bool CyberWallToucherTouches(CyberWallToucher* t, ShapeBox panelBox, V3 p
 static u8 cyberGolOpen[ARRSIZE],cyberGolCur[ARRSIZE],cyberGolNext[ARRSIZE]; u8 cyberGolBuilt;
 static float cyberGolTimer;
 static bool CyberGolIsPlanar(u16 self) { V3 wn = quat_rot_v3(World.rotation[self], (V3){0.0f, -1.0f, 0.0f}); return vabs(wn.y) > 0.95f; }
-static void CyberGolOpenBuild(void) { mset(cyberGolOpen, 0, sizeof(cyberGolOpen)); for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { Entity* e = &World.instances[i]; u16 ci = e->index; if (ci != 21 && ci != 22) { continue; } cyberGolOpen[PosGetCellCoords(World.position[i].x,World.position[i].z)] = 1; if (CyberGolIsPlanar(i)) cyberWallFade[i] = 1.0f; } mcpy(cyberGolCur, cyberGolOpen, ARRSIZE); cyberGolTimer = 0.0f; cyberGolBuilt = 1; }
-static void CyberGolStep(void) {
+static void CyberGolOpenBuild() { mset(cyberGolOpen, 0, sizeof(cyberGolOpen)); for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { Entity* e = &World.instances[i]; u16 ci = e->index; if (ci != 21 && ci != 22) { continue; } cyberGolOpen[PosGetCellCoords(World.position[i].x,World.position[i].z)] = 1; if (CyberGolIsPlanar(i)) cyberWallFade[i] = 1.0f; } mcpy(cyberGolCur, cyberGolOpen, ARRSIZE); cyberGolTimer = 0.0f; cyberGolBuilt = 1; }
+static void CyberGolStep() {
     for (u32 c = 0; c < ARRSIZE; ++c) {
         if (!cyberGolOpen[c]) { cyberGolNext[c] = 0; continue; }
         u32 x = c % WORLDX; u32 z = c / WORLDX; u32 n = 0;
@@ -169,7 +169,7 @@ static void CyberGolStep(void) {
         if (cyberGolCur[c]) { cyberGolNext[c] = (n == 2 || n == 3) ? 1 : 0; } else { cyberGolNext[c] = (n == 3) ? 1 : 0; }
     } mcpy(cyberGolCur, cyberGolNext, ARRSIZE);
 }
-static void CyberGolUpdate(void) { if (!cyberGolBuilt) CyberGolOpenBuild(); cyberGolTimer += vclamp((float)World.dt, 0.0f, 0.1f); if (cyberGolTimer >= 1.0f) { cyberGolTimer -= 1.0f; CyberGolStep(); } }
+static void CyberGolUpdate() { if (!cyberGolBuilt) CyberGolOpenBuild(); cyberGolTimer += vclamp((float)World.dt, 0.0f, 0.1f); if (cyberGolTimer >= 1.0f) { cyberGolTimer -= 1.0f; CyberGolStep(); } }
 void CyberWallUpdate(u16 self) { Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE)) return; bool gol = false; u32 cell = 0; if (cyberGolBuilt) { if (CyberGolIsPlanar(self)) { cell = PosGetCellCoords(World.position[self].x, World.position[self].z); gol = cyberGolOpen[cell] != 0; } } if (gol) { float target = cyberGolCur[cell] ? 1.0f : 0.02f; float step = 0.49f * vclamp((float)World.dt, 0.0f, 0.1f); if (cyberWallFade[self] < target) { cyberWallFade[self] += step; if (cyberWallFade[self] > target) cyberWallFade[self] = target; } else if (cyberWallFade[self] > target) { cyberWallFade[self] -= step; if (cyberWallFade[self] < target) cyberWallFade[self] = target; } } else if (cyberWallFade[self] > 0.02f) { cyberWallFade[self] -= 0.49f * vclamp((float)World.dt, 0.0f, 0.1f); if (cyberWallFade[self] < 0.02f) cyberWallFade[self] = 0.02f; } ShapeBox panelBox = Entity_GetBox(self); ShapeSphere sph = Entity_GetSph(PLAYER1); float reach = World.radius[self] + 1.86f; bool touching = false; if (V3_SqDist(World.position[self], sph.ctr) < reach * reach) touching = CapsuleTouchesOBB(sph.ctr, sph.rad + 0.06f, panelBox); for (u16 k = 0; k < cyberWallToucherCount && !touching; ++k) touching = CyberWallToucherTouches(&cyberWallTouchers[k], panelBox, World.position[self], World.radius[self]); if (touching && !cyberWallWasTouching[self]) { cyberWallFade[self] = 1.0f; if (gol) cyberGolCur[cell] = 1; } cyberWallWasTouching[self] = touching; }
 void CyberItemUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f){ CyberItemOnTriggerEnter(self,PLAYER1); } }
 void CyberMineUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f){ CyberMineOnTriggerEnter(self,PLAYER1); } }
@@ -603,8 +603,7 @@ void UseTargets(u16 activator, u16 targetIdx) {
 }
 // Frob/Use
 static const float FROB_DISTANCE = 4.9f;
-void MFD_OpenSearch(bool isRH),MFD_CloseSearch(void),MFD_OpenData(bool isRH,u8 code),MFD_OpenPaperLog(int,V3);
-void UI_KeycodeClose(bool),UI_ElevClose(bool),UI_WireClose();
+void MFD_OpenSearch(bool),MFD_CloseSearch(),MFD_OpenData(bool,u8),MFD_OpenPaperLog(int,V3),UI_KeycodeClose(bool),UI_ElevClose(bool),UI_WireClose();
 static void PaperLogUse(u16 self) { ForceInventoryMode();/*Unity PaperLog.Use forces inventory mode, as do the sibling panel uses here; without it the reader's [MORE]/[CLOSE] clicks cannot work (UI interaction is inventory-mode-only)*/ MFD_OpenPaperLog((int)World.instances[self].logIndex, World.position[self]); }
 static bool IsPuzzleGridPanel(u16 index) { return index>=609&&index<=613; }
 static bool IsPuzzleWirePanel(u16 index) { return index>=741&&index<=745; }
@@ -740,12 +739,8 @@ static void ElevatorPanelUse(u16 i) {
     if(!PanelUseAllowed(i))return;
     World.Sys_UI.tetheredKeypadElevator=i; World.Sys_UI.linkedElevatorDoor=U16_MAX; World.Sys_UI.objectInUsePos=World.position[i];
     { V3 kp=World.position[i]; float best=1000000000000000000000000000000.0f; for (u32 d=INSTS_1ST_IDX;d<World.instCount;++d) { Entity* de=&World.instances[d]; if(!IdxIsDoor(de->index)||!(de->entflags&EF_ACTIVE)) continue; V3 dd=V3_AsubB(World.position[d],kp); float dist2=V3_dot(dd,dd); if(dist2<best){best=dist2; World.Sys_UI.linkedElevatorDoor=(u16)d;} } }
-    int layout=-1; V3 pp=World.position[i];
-    for (u32 m=0;m<sizeof(elevPanelMap)/sizeof(elevPanelMap[0]);++m) {
-        if (elevPanelMap[m].level==World.curLev) { float dx=elevPanelMap[m].x-pp.x,dz=elevPanelMap[m].z-pp.z; if (dx*dx+dz*dz<4.0f) { layout=elevPanelMap[m].layout; break; } }
-    }
-    if (layout<0) layout=1;/*fallback: 2 to 3 strip*/
-    for (int b=0;b<8;++b) { World.Sys_UI.elevButtonLabelIdx[b]=elevLayouts[layout][b].label; World.Sys_UI.buttonsDarkened[b]=elevLayouts[layout][b].darkened; World.Sys_UI.buttonsEnabled[b]=elevLayouts[layout][b].label>=0; World.Sys_UI.elevButtonLevelIdx[b]=ElevLabelToLevel(elevLayouts[layout][b].label); World.Sys_UI.elevButtonSpawnIdx[b]=U16_MAX; }
+    int layout=-1; V3 pp=World.position[i]; for (u32 m=0;m<sizeof(elevPanelMap)/sizeof(elevPanelMap[0]);++m) { if (elevPanelMap[m].level==World.curLev) { float dx=elevPanelMap[m].x-pp.x,dz=elevPanelMap[m].z-pp.z; if (dx*dx+dz*dz<4.0f) { layout=elevPanelMap[m].layout; break; } } }
+    if (layout<0) layout=1;/*fallback: 2 to 3 strip*/ for (int b=0;b<8;++b) { World.Sys_UI.elevButtonLabelIdx[b]=elevLayouts[layout][b].label; World.Sys_UI.buttonsDarkened[b]=elevLayouts[layout][b].darkened; World.Sys_UI.buttonsEnabled[b]=elevLayouts[layout][b].label>=0; World.Sys_UI.elevButtonLevelIdx[b]=ElevLabelToLevel(elevLayouts[layout][b].label); World.Sys_UI.elevButtonSpawnIdx[b]=U16_MAX; }
     ForceInventoryMode(); play_wav(sounds[91],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); MFD_OpenData(World.Sys_UI.lastDataSideRH,1);/*elevator keypad: data-tab view, so it comes up on the last-used data side (left by default)*/
 }
 static void KeycodePanelUse(u16 i) {
@@ -878,7 +873,6 @@ void SecurityCameraRotateUpdate(u16 self) { /*Sweeps the camera back and forth b
     Quaternion yaw = {0.0f,vsinf(half),0.0f,vcosf(half)};
     World.rotation[self] = quat_multiply(yaw,World.instances[self].camBaseRot);
 }
-
 static bool PanelTetherBroken(u16 i) { return i<World.instCount && (World.instances[i].entflags&EF_ACTIVE) && V3_SqDist(World.position[PLAYER1],World.position[i]) > 64.0f; }
 void ModUpdate() {
     if (World.paused || World.menuActive) return;

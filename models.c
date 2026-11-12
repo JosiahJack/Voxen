@@ -8,10 +8,7 @@ static void OS_SubArenaSliceInit(u32 idx, u8* base, size_t sz) { SubArena* a = &
 static void* OS_SubArenaAlloc(i32 tid, size_t n) { if (tid < 0) { tid = SUB_MAIN; } SubArena* a = &thrd_sub[tid]; size_t aligned = (n + 15) & ~(size_t)15; if (a->cur + aligned > a->end) { DualLogError("SubArena %d ovr! want %u, cap %u MB\n", tid,(u32)n, (u32)((a->end - a->base))); OS_Exit(1); } void* p = a->cur; a->cur += aligned; mset(p, 0, aligned); return p; }
 static void* OS_SubArenaMark(i32 tid) { return (void*)(tid < 0 ? thrd_sub[SUB_MAIN].cur : thrd_sub[tid].cur); }
 static void OS_SubArenaRelease(i32 tid, void* mark) { SubArena* a = (tid < 0) ? &thrd_sub[SUB_MAIN] : &thrd_sub[tid]; a->cur = (u8*)mark; }
-typedef struct { float *pos,*nrm,*uv,*verts; u32 *hash,*used,*remap; u8* cache; } MeshScratch;
-typedef struct { const char *data; i32 size; } RawOBJ;
-typedef struct { u16 index; bool animated; u8 animationNum; u16* frames; u32 frameCount; char path[128]; } ModelData;
-typedef struct { ModelData* entries; u32 count; } ModelDataParser;
+typedef struct { float *pos,*nrm,*uv,*verts; u32 *hash,*used,*remap; u8* cache; } MeshScratch;        typedef struct { const char *data; i32 size; } RawOBJ;        typedef struct { u16 index; bool animated; u8 animationNum; u16* frames; u32 frameCount; char path[128]; } ModelData;        typedef struct { ModelData* entries; u32 count; } ModelDataParser;
 u32 mdlVboOfs[MAX_MDLS],mdlIboOfs[MAX_MDLS],modelVBO,modelIBO,rtCapNodeWords,rtCapTriWords,rtCapOrderU16,rtPersistNodeWords,rtPersistTriWords,rtPersistOrderU16;
 u8 mdlPersistentSet[MAX_MDLS],mdlSwapLev = 255u; 
 static u8 mdlIsAnimFrame[MAX_MDLS]; static u16 mdlLevelBits[MAX_MDLS], **mdlPstTri = NULL; static bool mdlDerivDone = false; static u32 mdlSwapVboBase,mdlSwapIboBase,mdlPoolVbBytes,mdlPoolIbBytes,mdlSpanBase[MAX_MDLS],g_mdlDataCnt = 0; static ModelData* g_mdlData = NULL; static float** vPos; static half** mdlPstHalfV = NULL; static u32 *mdlMetaVertCounts = NULL, *mdlMetaTriCounts = NULL;
@@ -98,20 +95,13 @@ void Mat4FromTRS(const float* T, const float* R, const float* S, float* lm) {
 }
 typedef struct { const u8* base; size_t stride; u8 nc, cs, cls, nrm; } GlbCell;
 static GlbCell GlbCellInit(const glb_accessor* a) {
-    GlbCell c; c.stride = a->stride; c.nrm = (u8)a->normalized;
-    switch (a->type) { case glbv2: c.nc = 2; break; case glbv3: c.nc = 3; break; case glbv4: c.nc = 4; break; case glbmat4: c.nc = 16; break; default: c.nc = 1;  break; }
+    GlbCell c; c.stride = a->stride; c.nrm = (u8)a->normalized; switch (a->type) { case glbv2: c.nc = 2; break; case glbv3: c.nc = 3; break; case glbv4: c.nc = 4; break; case glbmat4: c.nc = 16; break; default: c.nc = 1;  break; }
     switch (a->component_type) { case glb_component_type_r_8u: c.cls = 4; c.cs = 1; break; case glb_component_type_r_16u: c.cls = 3; c.cs = 2; break; case glb_component_type_r_32f: c.cls = 2; c.cs = 4; break; default: c.cls = 5; c.cs = 0; break; }
-    if (!a->buffer_view) { c.cls = 0; } else if (!a->buffer_view->buffer->data) { c.cls = 1; }
-    c.base = (c.cls >= 2 && c.cls <= 4) ? (const u8*)a->buffer_view->buffer->data + a->buffer_view->offset + a->offset : NULL;
-    return c;
+    if (!a->buffer_view) { c.cls = 0; } else if (!a->buffer_view->buffer->data) { c.cls = 1; } c.base = (c.cls >= 2 && c.cls <= 4) ? (const u8*)a->buffer_view->buffer->data + a->buffer_view->offset + a->offset : NULL; return c;
 }
 INLINE __attribute__((always_inline)) bool GlbCellGet(const GlbCell* restrict c, size_t i, float* restrict o, size_t es) {
-    if (c->cls == 0) { mset(o, 0, es * sizeof(float)); return true; }
-    if (c->cls == 1 || es < c->nc) { return false; }
-    
-    const u8 *e = c->base + c->stride * i, nrm = c->nrm;
-    for (u8 k = 0; k < c->nc; ++k) { const u8* p = e + (size_t)k * c->cs; float r; switch (c->cls) {  case 2: r = *(const float*)p; break; case 3: r = nrm ? (float)*(const u16*)p / 65535.f : (float)*(const u16*)p; break; case 4: r = nrm ? (float)*(const u8*)p / 255.f : (float)*(const u8*)p;  break; default: r = 0.0f; break; } o[k] = r; }
-    return true;
+    if (c->cls == 0) { mset(o, 0, es * sizeof(float)); return true; } if (c->cls == 1 || es < c->nc) { return false; }
+    const u8 *e = c->base + c->stride * i, nrm = c->nrm; for (u8 k = 0; k < c->nc; ++k) { const u8* p = e + (size_t)k * c->cs; float r; switch (c->cls) {  case 2: r = *(const float*)p; break; case 3: r = nrm ? (float)*(const u16*)p / 65535.f : (float)*(const u16*)p; break; case 4: r = nrm ? (float)*(const u8*)p / 255.f : (float)*(const u8*)p;  break; default: r = 0.0f; break; } o[k] = r; } return true;
 }
 INLINE __attribute__((always_inline)) u64 GlbCellGetIdx(const GlbCell* restrict c, size_t i) { if (c->cls == 3) { return *(const u16*)(c->base + c->stride * i); } if (c->cls == 4) { return *(const u8*) (c->base + c->stride * i); } return 0; }
 static const glb_accessor* glb_find_accessor(const glb_primitive* p, glb_attribute_type t, i32 idx) { for(size_t i=0;i<p->attr_count;++i) { const glb_attribute *a = &p->attr[i]; if (a->type == t && a->index == idx) { return a->data; } } return NULL; }
@@ -129,17 +119,12 @@ static int json_attribute_list(jsmntok_t const* t, int i, const u8* j, i32 tid, 
     if (t[i].type!=JSMN_OBJECT || *out) return -1; *oc=t[i].size; *out=OS_SubArenaAlloc(tid,sizeof(glb_attribute)**oc); ++i;
     for (size_t k=0;k<*oc;++k) {
         if (t[i].type!=JSMN_STRING || !t[i].size) return -1;
-        const char *n=(const char*)j+t[i].start,*end=(const char*)j+t[i].end,*us=n; while (us<end && *us!='_') ++us; size_t l=us-n;
-        glb_attribute* a=&(*out)[k]; a->index=0;
+        const char *n=(const char*)j+t[i].start,*end=(const char*)j+t[i].end,*us=n; while (us<end && *us!='_') ++us; size_t l=us-n; glb_attribute* a=&(*out)[k]; a->index=0;
         a->type=l==8 && !sCompUpToLen(n,"POSITION",8) ? glb_attribute_type_position : l==6 && !sCompUpToLen(n,"NORMAL",6) ? glb_attribute_type_normal : glb_attribute_type_invalid;
         if (l==8 && !sCompUpToLen(n,"TEXCOORD",8)) a->type=glb_attribute_type_texcoord;
         if (l==6 && !sCompUpToLen(n,"JOINTS",6)) a->type=glb_attribute_type_joints;
         if (l==7 && !sCompUpToLen(n,"WEIGHTS",7)) a->type=glb_attribute_type_weights;
-        if (us<end && a->type!=glb_attribute_type_invalid) {
-            const char* v=us+1; while (v<end && cEmpty(*v)) ++v; bool neg=v<end && *v=='-'; if (v<end && (*v=='+' || *v=='-')) ++v;
-            i64 value=0; for (;v<end && *v>='0' && *v<='9';++v) { value=value*10+*v-'0'; if (value>2147483647) { value=neg ? 2147483648LL : 2147483647; break; } }
-            if (neg && value) a->type=glb_attribute_type_invalid; else a->index=(int)value;
-        }
+        if (us<end && a->type!=glb_attribute_type_invalid) { const char* v=us+1; while (v<end && cEmpty(*v)) ++v; bool neg=v<end && *v=='-'; if (v<end && (*v=='+' || *v=='-')) ++v; i64 value=0; for (;v<end && *v>='0' && *v<='9';++v) { value=value*10+*v-'0'; if (value>2147483647) { value=neg ? 2147483648LL : 2147483647; break; } } if (neg && value) a->type=glb_attribute_type_invalid; else a->index=(int)value; }
         ++i; a->data=(glb_accessor*)((size_t)glb_json_to_int(t+i,j)+1); ++i;
     } return i;
 }
@@ -210,52 +195,21 @@ static void glb_parse_json_root(jsmntok_t const* t, int i, const u8* j, i32 tid,
 }
 static jsmntok_t* jsmn_alloc_token(jsmn_parser* p, jsmntok_t* t, size_t n){if(p->toknext>=n)return NULL;jsmntok_t* tok=&t[p->toknext++];tok->start=tok->end=-1;tok->size=0;tok->parent=-1;return tok;}
 static void jsmn_fill_token(jsmntok_t* t, jsmntype_t ty, size_t s, size_t e){t->type=ty;t->start=s;t->end=e;t->size=0;}
-static int jsmn_parse(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, size_t n) {
-    int r, i, cnt = p->toknext;
-    for (; p->pos < l && js[p->pos]; p->pos++) {
-        char c = js[p->pos]; jsmntype_t ty;
-        switch (c) {
-            case '{': case '[': cnt++; if (!t) break; jsmntok_t* tok = jsmn_alloc_token(p, t, n); if (!tok) return JSMN_ERROR_NOMEM; if (p->toksuper != -1) { t[p->toksuper].size++; tok->parent = p->toksuper; } tok->type = (c == '{' ? JSMN_OBJECT : JSMN_ARRAY); tok->start = p->pos; p->toksuper = p->toknext - 1; break;
-            case '}': case ']': if (!t) break; ty = (c == '}' ? JSMN_OBJECT : JSMN_ARRAY); if (p->toknext < 1) return JSMN_ERROR_INVAL; tok = &t[p->toknext - 1]; for (;;) { if (tok->start != -1 && tok->end == -1) { if (tok->type != ty) return JSMN_ERROR_INVAL; tok->end = p->pos + 1; p->toksuper = tok->parent; break; } if (tok->parent == -1) { if (tok->type != ty || p->toksuper != -1) return JSMN_ERROR_INVAL; break; } tok = &t[tok->parent]; } break;
-            case '\"': {
-                size_t s_str = p->pos;
-                p->pos++;
-                for (; p->pos < l && js[p->pos]; p->pos++) {
-                    char c_str = js[p->pos];
-                    if (c_str == '\"') { if (!t) { r = 0; goto str_done; } jsmntok_t* tok_str = jsmn_alloc_token(p, t, n); if (!tok_str) { p->pos = s_str; r = JSMN_ERROR_NOMEM; goto str_done; } jsmn_fill_token(tok_str, JSMN_STRING, s_str + 1, p->pos); tok_str->parent = p->toksuper; r = 0; goto str_done; }
-                    if (c_str == '\\' && p->pos + 1 < l) {
-                        p->pos++;
-                        switch (js[p->pos]) {
-                            case '\"': case '/': case '\\': case 'b': case 'f':  case 'r': case 'n':  case 't': break;
-                            case 'u': p->pos++; for (int i_str = 0; i_str < 4 && p->pos < l && js[p->pos]; i_str++) { if (!((js[p->pos] >= 48 && js[p->pos] <= 57) || (js[p->pos] >= 65 && js[p->pos] <= 70) || (js[p->pos] >= 97 && js[p->pos] <= 102))) { p->pos = s_str; r = JSMN_ERROR_INVAL; goto str_done; } p->pos++; } p->pos--; break;
-                            default: p->pos = s_str; r = JSMN_ERROR_INVAL; goto str_done;
-                        }
-                    }
-                }
-                p->pos = s_str;
-                r = JSMN_ERROR_PART;
-                str_done: if (r < 0) return r; cnt++; if (p->toksuper != -1 && t) t[p->toksuper].size++; break; }
-            case '\t': case '\r': case '\n': case ' ': break;
-            case ':':  p->toksuper = p->toknext - 1;   break;
-            case ',': if (t && p->toksuper != -1 && t[p->toksuper].type != JSMN_ARRAY && t[p->toksuper].type != JSMN_OBJECT) { p->toksuper = t[p->toksuper].parent; for (i = p->toknext - 1; i >= 0; i--) { if (t[i].type == JSMN_ARRAY || t[i].type == JSMN_OBJECT) { if (t[i].start != -1 && t[i].end == -1) { p->toksuper = i; break; } } }  } break;
-            case '-': case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9': case 't': case 'f': case 'n': {
-                if (t && p->toksuper != -1) { jsmntok_t* ot = &t[p->toksuper]; if (ot->type == JSMN_OBJECT || (ot->type == JSMN_STRING && ot->size != 0)) { return JSMN_ERROR_INVAL; } }
-                size_t s_prim = p->pos;
-                for (; p->pos < l && js[p->pos]; p->pos++) { switch (js[p->pos]) { case ':':  case '\t': case '\r': case '\n': case ' ':  case ',':  case ']':  case '}': goto f_prim; } }
-                p->pos = s_prim;
-                r = JSMN_ERROR_PART;
-                goto prim_done;
-                f_prim: if (!t) { p->pos--; r = 0; goto prim_done; } jsmntok_t* tok_prim = jsmn_alloc_token(p, t, n); if (!tok_prim) { p->pos = s_prim; r = JSMN_ERROR_NOMEM; goto prim_done; }
-                jsmn_fill_token(tok_prim, JSMN_PRIMITIVE, s_prim, p->pos);
-                tok_prim->parent = p->toksuper;
-                p->pos--;
-                r = 0;
-                prim_done: if (r < 0) return r; cnt++; if (p->toksuper != -1 && t) t[p->toksuper].size++; break; }
-            default: return JSMN_ERROR_INVAL;
-        }
+static int jsmn_parse(jsmn_parser*p,const char*js,size_t l,jsmntok_t*t,size_t n){
+    int r,i,cnt=p->toknext; size_t s; char c; jsmntype_t ty; jsmntok_t*q,*o;
+    for(;p->pos<l&&js[p->pos];p->pos++){
+        switch(c=js[p->pos]){
+            case '{':case '[': cnt++; if(!t)break; if(!(q=jsmn_alloc_token(p,t,n)))return JSMN_ERROR_NOMEM; if(p->toksuper!=-1){t[p->toksuper].size++;q->parent=p->toksuper;} q->type=c=='{'?JSMN_OBJECT:JSMN_ARRAY; q->start=p->pos; p->toksuper=p->toknext-1; break;
+            case '}':case ']': if(!t)break; ty=c=='}'?JSMN_OBJECT:JSMN_ARRAY; if(p->toknext<1)return JSMN_ERROR_INVAL; q=&t[p->toknext-1]; for(;;){ if(q->start!=-1&&q->end==-1){ if(q->type!=ty)return JSMN_ERROR_INVAL; q->end=p->pos+1; p->toksuper=q->parent; break; } if(q->parent==-1){ if(q->type!=ty||p->toksuper!=-1)return JSMN_ERROR_INVAL; break; } q=&t[q->parent]; } break;
+            case '"': s=p->pos++; for(;p->pos<l&&js[p->pos];p->pos++){ if((c=js[p->pos])=='"'){ if(t){ if(!(q=jsmn_alloc_token(p,t,n))){p->pos=s;r=JSMN_ERROR_NOMEM;goto done;} jsmn_fill_token(q,JSMN_STRING,s+1,p->pos); q->parent=p->toksuper; } r=0; goto done; }
+            if(c=='\\'&&p->pos+1<l){ p->pos++; switch(js[p->pos]){ case '"':case '/':case '\\':case 'b':case 'f':case 'r':case 'n':case 't': break; case 'u': p->pos++; for(i=0;i<4&&p->pos<l&&js[p->pos];i++){ if(!((c=js[p->pos])>='0'&&c<='9'||c>='A'&&c<='F'||c>='a'&&c<='f')){p->pos=s;r=JSMN_ERROR_INVAL;goto done;} p->pos++; } p->pos--; break; default: p->pos=s;r=JSMN_ERROR_INVAL;goto done; } } } p->pos=s; r=JSMN_ERROR_PART; goto done;
+            case '\t':case '\r':case '\n':case ' ': break; case ':': p->toksuper=p->toknext-1; break;
+            case ',': if(t&&p->toksuper!=-1&&t[p->toksuper].type!=JSMN_ARRAY&&t[p->toksuper].type!=JSMN_OBJECT){ p->toksuper=t[p->toksuper].parent; for(i=p->toknext-1;i>=0;i--) if((t[i].type==JSMN_ARRAY||t[i].type==JSMN_OBJECT)&&t[i].start!=-1&&t[i].end==-1){p->toksuper=i;break;} } break;
+            case '-':case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7':case '8':case '9':case 't':case 'f':case 'n': if(t&&p->toksuper!=-1){o=&t[p->toksuper]; if(o->type==JSMN_OBJECT||(o->type==JSMN_STRING&&o->size))return JSMN_ERROR_INVAL;} s=p->pos; for(;p->pos<l&&js[p->pos];p->pos++) switch(js[p->pos]){ case ':':case '\t':case '\r':case '\n':case ' ':case ',':case ']':case '}': goto f; } p->pos=s; r=JSMN_ERROR_PART; goto done;
+            f: if(t){ if(!(q=jsmn_alloc_token(p,t,n))){p->pos=s;r=JSMN_ERROR_NOMEM;goto done;} jsmn_fill_token(q,JSMN_PRIMITIVE,s,p->pos); q->parent=p->toksuper; } p->pos--; r=0; goto done; default: return JSMN_ERROR_INVAL;
+        } continue; done: if(r<0)return r; cnt++; if(t&&p->toksuper!=-1)t[p->toksuper].size++;
     }
-    if (t) { for (i = p->toknext - 1; i >= 0; i--) { if (t[i].start != -1 && t[i].end == -1) return JSMN_ERROR_PART; } }
-    return cnt;
+    if(t) for(i=p->toknext-1;i>=0;i--) if(t[i].start!=-1&&t[i].end==-1)return JSMN_ERROR_PART; return cnt;
 }
 static bool glb_resolve_raw(void* pslot, const void* base, size_t esz, size_t count) { void* v; mcpy(&v, pslot, sizeof(v)); size_t idx = (size_t)v; if (!idx) { return true; } if (idx > count) { return false; } void* re = (void*)((char*)base + (idx - 1) * esz); mcpy(pslot, &re, sizeof(re)); return true; }
 void glb_parse(i32 tid, const void* d, size_t sz, glb_data** out_data) {
@@ -865,8 +819,7 @@ AnimationClip mdlAnimClips[MAXANIM][MAX_ANIMCLIPS] = { // speed, frameStart, fra
     [14]={[A_IDLE_CLOSED]={1.0f,2,2,1719,24},[A_OPENING]={1.0f,2,20,1719,24},[A_IDLE_OPEN]={1.0f,20,20,1737,24},[A_CLOSING]={1.0f,22,41,1738,24}},/*door_elevator1*/            [15]={[A_IDLE_CLOSED]={1.0f,2,2,1758,24},[A_OPENING]={1.5f,2,21,1758,24},[A_IDLE_OPEN]={1.0f,21,21,1777,24},[A_CLOSING]={1.5f,23,41,1778,24}},/*door_elevator2*/
     [16]={[A_IDLE_CLOSED]={1.0f,2,2,1797,24},[A_OPENING]={1.0f,2,22,1797,24},[A_IDLE_OPEN]={1.0f,22,22,1817,24},[A_CLOSING]={1.0f,24,43,1818,24}},/*door_elevator3*/            [17]={[A_IDLE_CLOSED]={1.0f,2,2,1838,24},[A_OPENING]={2.0f,2,32,1838,24},[A_IDLE_OPEN]={1.0f,32,32,1868,24},[A_CLOSING]={2.0f,34,62,1869,24}},/*door_elevator4*/
     [18]={[A_IDLE_CLOSED]={1.0f,2,2,1898,24},[A_OPENING]={1.0f,2,21,1898,24},[A_IDLE_OPEN]={1.0f,21,21,1917,24},[A_CLOSING]={1.0f,23,41,1918,24}},/*door_secret2 (door_wall1)*/ [19]={[A_IDLE_CLOSED]={1.0f,2,2,1937,24},[A_OPENING]={1.0f,2,21,1937,24},[A_IDLE_OPEN]={1.0f,21,21,1956,24},[A_CLOSING]={1.0f,23,41,1957,24}},/*door_secret1 (door_wall2)*/
-    [20]={[A_IDLE_CLOSED]={1.0f,2,2,1976,24},[A_OPENING]={1.0f,2,17,1976,24},[A_IDLE_OPEN]={1.0f,17,17,1991,24},[A_CLOSING]={1.0f,19,33,1992,24}},/*door_secret3 (door_wall3)*/
-    [21]={[A_LOOP_ALL]={1.0f,1,47,2007,24}},/*chunk_eng2_6 (eng_wallpump)*/   [22]={[A_LOOP_ALL]={1.0f,1,50,2054,24}},/*flight_fanwall*/
+    [20]={[A_IDLE_CLOSED]={1.0f,2,2,1976,24},[A_OPENING]={1.0f,2,17,1976,24},[A_IDLE_OPEN]={1.0f,17,17,1991,24},[A_CLOSING]={1.0f,19,33,1992,24}},/*door_secret3 (door_wall3)*/ [21]={[A_LOOP_ALL]={1.0f,1,47,2007,24}},/*chunk_eng2_6 (eng_wallpump)*/   [22]={[A_LOOP_ALL]={1.0f,1,50,2054,24}},/*flight_fanwall*/
     [23]={[A_IDLE]={1.0f,3,3,6877,24},[A_WALK]={1.0f,3,36,6877,24},[A_ATTACK1]={1.0f,38,56,6911,24},[A_ATTACK2]={1.0f,58,81,6930,24},[A_ATTACK3]={1.0f,58,81,6930,24},[A_RUN]={1.0f,3,36,6877,24},[A_PAIN]={1.0f,84,96,6954,24},[A_DYING]={1.0f,99,106,6967,24}},/*npc_bot_cortex_reaver*/
     [24]={[A_IDLE]={1.0f,1,60,2200,24},[A_ATTACK2]={1.0f,62,83,2260,24},[A_ATTACK3]={1.0f,86,122,2282,24},[A_RUN]={1.0f,143,182,2319,24},[A_WALK]={1.0f,143,182,2319,24},[A_PAIN]={1.0f,204,214,2359,24},[A_PAIN2]={1.0f,216,227,2370,24},[A_DYING]={1.0f,229,268,2382,24}},/*npc_cyborgassassin*/
     [25]={[A_IDLE]={1.0f,1,155,2422,30},[A_RUN]={1.0f,190,243,2577,30},[A_WALK]={1.0f,190,243,2577,30},[A_ATTACK2]={1.0f,265,289,2631,30},[A_ATTACK1]={1.0f,291,332,2656,30},[A_DYING]={1.0f,334,417,2698,30}},/*npc_cyborg_diego*/
@@ -877,23 +830,17 @@ AnimationClip mdlAnimClips[MAXANIM][MAX_ANIMCLIPS] = { // speed, frameStart, fra
     [30]={[A_IDLE]={1.0f,1,39,3776,24},[A_WALK]={2.0f,1,39,3776,24},[A_RUN]={2.0f,1,39,3776,24},[A_PAIN]={1.0f,41,73,3815,24},[A_PAIN2]={0.5384f,75,95,3848,24},[A_ATTACK2]={1.0f,97,121,3869,24},[A_ATTACK3]={1.0f,106,121,3878,24}},/*npc_flierbot*/
     [31]={[A_IDLE]={1.0f,1,73,3894,24},[A_WALK]={1.0f,88,130,3967,24},[A_RUN]={1.0f,88,130,3967,24},[A_PAIN]={1.0f,144,159,4010,24},[A_ATTACK1]={1.0f,162,183,4026,24},[A_ATTACK2]={1.0f,186,209,4048,24},[A_DYING]={1.0f,212,237,4072,24}},/*npc_gortiger*/
     [32]={[A_IDLE]={1.0f,1,47,4098,24},[A_WALK]={1.0f,49,87,4145,24},[A_RUN]={1.0f,49,87,4145,24},[A_PAIN]={1.0f,88,107,4184,24},[A_PAIN2]={1.0f,109,125,4204,24},[A_PAIN3]={1.0f,127,144,4221,24},[A_ATTACK2]={1.0f,145,157,4239,24},[A_DYING]={1.0f,160,239,4252,24}},/*npc_hopper*/
-    [33]={[A_IDLE]={1.0f,1,30,4332,24},[A_WALK]={1.0f,1,30,4332,24},[A_RUN]={1.0f,1,30,4332,24},[A_PAIN]={1.0f,35,51,4362,24},[A_ATTACK2]={1.0f,52,72,4379,24},[A_DYING]={1.0f,79,103,4400,24}},/*npc_invisomut*/
-    [34]={[A_IDLE]={1.0f,2,2,4425,24},[A_ATTACK1]={2.0f,2,71,4425,24},[A_WALK]={2.0f,80,107,4495,24},[A_RUN]={2.0f,80,107,4495,24},[A_DYING]={1.0f,117,150,4523,24}},/*npc_maintenancebot*/
-    [35]={[A_IDLE]={2.5f,1,59,4557,24},[A_WALK]={2.5f,1,59,4557,24},[A_RUN]={2.5f,1,59,4557,24},[A_ATTACK1]={1.0f,61,79,4616,24},[A_PAIN]={1.0f,81,93,4635,24},[A_DYING]={1.0f,94,119,4648,24}},/*npc_mutant_avian*/
-    [36]={[A_IDLE]={1.0f,1,78,4674,24},[A_WALK]={1.0f,90,129,4752,24},[A_RUN]={1.0f,90,129,4752,24},[A_ATTACK2]={1.0f,142,185,4792,24},[A_DYING]={1.0f,188,225,4836,24},[A_PAIN]={1.0f,227,235,4874,24}},/*npc_plantmutant*/
-    [37]={[A_IDLE]={1.0f,1,42,4883,24},[A_WALK]={2.0f,58,85,4925,24},[A_RUN]={2.0f,58,85,4925,24},[A_ATTACK1]={1.0f,102,123,4953,24},[A_ATTACK2]={1.0f,126,148,4975,24}},/*npc_repairbot*/
-    [38]={[A_IDLE]={1.0f,1,54,4998,24},[A_WALK]={1.0f,1,54,4998,24},[A_RUN]={1.0f,58,95,5052,24}},/*npc_sec1bot*/
-    [39]={[A_IDLE]={0.333f,1,17,5090,24},[A_WALK]={0.333f,19,38,5107,24},[A_RUN]={0.333f,19,38,5107,24},[A_ATTACK2]={0.25f,39,48,5127,24},[A_ATTACK3]={1.0f,49,56,5137,24},[A_PAIN]={1.0f,58,63,5145,24},[A_DYING]={0.2f,65,66,5151,24}},/*npc_sec2bot*/
-    [40]={[A_IDLE]={0.18f,1,9,5153,24},[A_WALK]={0.333f,1,9,5153,24},[A_RUN]={0.333f,1,9,5153,24},[A_ATTACK1]={0.5f,18,28,5162,24},[A_PAIN]={0.333f,54,63,5173,24},[A_DYING]={0.333f,77,85,5183,24}},/*npc_servbot*/
-    [41]={[A_IDLE]={1.0f,1,66,5192,24},[A_WALK]={2.0f,79,132,5258,24},[A_RUN]={2.5f,79,132,5258,24},[A_PAIN]={1.0f,145,157,5312,24},[A_ATTACK2]={1.0f,159,181,5325,24},[A_DYING]={1.0f,183,221,5348,24}},/*npc_virusmutant*/
-    [42]={[A_IDLE]={1.0f,1,121,5387,24},[A_DYING]={1.0f,121,157,5507,24}},/*npc_zerogmut*/
+    [33]={[A_IDLE]={1.0f,1,30,4332,24},[A_WALK]={1.0f,1,30,4332,24},[A_RUN]={1.0f,1,30,4332,24},[A_PAIN]={1.0f,35,51,4362,24},[A_ATTACK2]={1.0f,52,72,4379,24},[A_DYING]={1.0f,79,103,4400,24}},/*npc_invisomut*/    [34]={[A_IDLE]={1.0f,2,2,4425,24},[A_ATTACK1]={2.0f,2,71,4425,24},[A_WALK]={2.0f,80,107,4495,24},[A_RUN]={2.0f,80,107,4495,24},[A_DYING]={1.0f,117,150,4523,24}},/*npc_maintenancebot*/
+    [35]={[A_IDLE]={2.5f,1,59,4557,24},[A_WALK]={2.5f,1,59,4557,24},[A_RUN]={2.5f,1,59,4557,24},[A_ATTACK1]={1.0f,61,79,4616,24},[A_PAIN]={1.0f,81,93,4635,24},[A_DYING]={1.0f,94,119,4648,24}},/*npc_mutant_avian*/ [36]={[A_IDLE]={1.0f,1,78,4674,24},[A_WALK]={1.0f,90,129,4752,24},[A_RUN]={1.0f,90,129,4752,24},[A_ATTACK2]={1.0f,142,185,4792,24},[A_DYING]={1.0f,188,225,4836,24},[A_PAIN]={1.0f,227,235,4874,24}},/*npc_plantmutant*/
+    [37]={[A_IDLE]={1.0f,1,42,4883,24},[A_WALK]={2.0f,58,85,4925,24},[A_RUN]={2.0f,58,85,4925,24},[A_ATTACK1]={1.0f,102,123,4953,24},[A_ATTACK2]={1.0f,126,148,4975,24}},/*npc_repairbot*/                           [38]={[A_IDLE]={1.0f,1,54,4998,24},[A_WALK]={1.0f,1,54,4998,24},[A_RUN]={1.0f,58,95,5052,24}},/*npc_sec1bot*/
+    [39]={[A_IDLE]={0.333f,1,17,5090,24},[A_WALK]={0.333f,19,38,5107,24},[A_RUN]={0.333f,19,38,5107,24},[A_ATTACK2]={0.25f,39,48,5127,24},[A_ATTACK3]={1.0f,49,56,5137,24},[A_PAIN]={1.0f,58,63,5145,24},[A_DYING]={0.2f,65,66,5151,24}},/*npc_sec2bot*/ [40]={[A_IDLE]={0.18f,1,9,5153,24},[A_WALK]={0.333f,1,9,5153,24},[A_RUN]={0.333f,1,9,5153,24},[A_ATTACK1]={0.5f,18,28,5162,24},[A_PAIN]={0.333f,54,63,5173,24},[A_DYING]={0.333f,77,85,5183,24}},/*npc_servbot*/
+    [41]={[A_IDLE]={1.0f,1,66,5192,24},[A_WALK]={2.0f,79,132,5258,24},[A_RUN]={2.5f,79,132,5258,24},[A_PAIN]={1.0f,145,157,5312,24},[A_ATTACK2]={1.0f,159,181,5325,24},[A_DYING]={1.0f,183,221,5348,24}},/*npc_virusmutant*/                             [42]={[A_IDLE]={1.0f,1,121,5387,24},[A_DYING]={1.0f,121,157,5507,24}},/*npc_zerogmut*/
     [43]={[A_IDLE_CLOSED]={1.0f,1,1,5544,24},[A_OPENING]={1.2f,2,21,5545,24},[A_IDLE_OPEN]={1.0f,21,21,5564,24}},/*puzzlepanel1*/                                               [44]={[A_IDLE_CLOSED]={1.0f,0,0,5565,24},[A_OPENING]={1.2f,1,17,5566,24},[A_IDLE_OPEN]={1.0f,17,17,5582,24},[A_INSTALL]={1.0f,19,30,5584,24},[A_INSTALLED]={1.0f,18,18,5583,24}},/*puzzlepanel2*/
     [45]={[A_IDLE_CLOSED]={1.0f,0,0,5596,24},[A_OPENING]={1.2f,1,17,5597,24},[A_IDLE_OPEN]={1.0f,17,17,5613,24},[A_INSTALLED]={1.0f,18,18,5614,24}},/*puzzlepanel3*/            [46]={[A_LOOP_ALL]={1.0f,1,100,5615,24}},/*sparkingwire*/
     [47]={[A_INACTIVE]={1.0f,2,2,5715,24},[A_ACTIVATE]={1.2f,2,4,5715,24},[A_ACTIVATED]={1.0f,4,4,5717,24},[A_DEACTIVATE]={1.0f,5,6,5718,24}},/*switch4*/                       [48]={[A_INACTIVE]={1.0f,2,2,5720,24},[A_ACTIVATE]={1.2f,2,6,5720,24},[A_ACTIVATED]={1.0f,6,6,5724,24},[A_DEACTIVATE]={1.0f,8,10,5725,24}},/*switch5*/
     [49]={[A_IDLE]={1.0f,1,1,5728,24},[A_ATTACK_MISS]={1.0f,1,13,5728,24},[A_ATTACK_HIT]={1.0f,18,24,5741,24}},/*v_pipe*/                                                       [50]={[A_IDLE]={1.0f,1,1,5748,24},[A_ATTACK_MISS]={0.5f,4,22,5749,24},[A_ATTACK_HIT]={1.0f,4,22,5748,24}},/*v_rapier*/
     [51]={[A_IDLE]={1.0f,1,65,5768,24},[A_WALK]={1.0f,75,98,5833,24},[A_RUN]={1.0f,75,98,5833,24},[A_ATTACK2]={1.0f,109,126,5857,24},[A_ATTACK1]={1.0f,128,142,5875,24},[A_PAIN]={1.0f,144,159,5890,24},[A_PAIN2]={1.0f,161,174,5906,24},[A_DYING]={1.0f,176,243,5920,24}},/*npc_mutant_cyborg*/
-    [52]={[A_LOOP_ALL]={1.0f,1,40,7446,24}},/*g_energmine*/   [53]={[A_LOOP_ALL]={1.0f,1,260,6076,24}},/*cyber_data*/   [54]={[A_LOOP_ALL]={1.0f,1,80,6336,24}},/*cyber_datafrag*/
-    [55]={[A_LOOP_ALL]={1.0f,1,100,6416,24}},/*cyber_exit*/   [56]={[A_LOOP_ALL]={1.0f,1,99,6516,24}},/*cyber_ice*/     [57]={[A_LOOP_ALL]={1.0f,1,260,6615,24}},/*cyber_item*/ [58]={[A_INACTIVE]={1.0f,1,1,80,24},[A_ACTIVATED]={1.0f,2,2,81,24}},/*cyber_switch: 1=off, 2=on*/
+    [52]={[A_LOOP_ALL]={1.0f,1,40,7446,24}},/*g_energmine*/  [53]={[A_LOOP_ALL]={1.0f,1,260,6076,24}},/*cyber_data*/ [54]={[A_LOOP_ALL]={1.0f,1,80,6336,24}},/*cyber_datafrag*/ [55]={[A_LOOP_ALL]={1.0f,1,100,6416,24}},/*cyber_exit*/                  [56]={[A_LOOP_ALL]={1.0f,1,99,6516,24}},/*cyber_ice*/ [57]={[A_LOOP_ALL]={1.0f,1,260,6615,24}},/*cyber_item*/ [58]={[A_INACTIVE]={1.0f,1,1,80,24},[A_ACTIVATED]={1.0f,2,2,81,24}},/*cyber_switch: 1=off, 2=on*/
 };
 void PortalCulling(); bool ToggleDoorPortal(u32,u16,u16);
 void ChangeAnim(Entity* e, u8 c) { if (e->animationNum >= MAXANIM || c >= MAX_ANIMCLIPS) return; AnimationClip* clip=&mdlAnimClips[e->animationNum][c]; if (clip->framerate <= 0 || clip->speed <= 0 || e->clip == c) return; e->clip=c; e->frame=clip->frameStart; e->modelIndex=clip->frameStartModelIndex; e->currentFrameFinished=0.0; }
@@ -902,16 +849,11 @@ extern WeaponFireCtx wfx;
 void UpdateAnims(void) {
     if (World.paused || World.menuActive){return;} static double lastPauseTime=0; if(lastPauseTime == 0.0){lastPauseTime=World.pauseRelativeTime;} double animDT=World.pauseRelativeTime-lastPauseTime; lastPauseTime=World.pauseRelativeTime; if(animDT > 0.1){animDT=0.1;} if(animDT <= 0.0){return;} bool portalsNeedUpdated=false; u8 animTest=Cheats.animTest;
     for (u16 i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
-        if (i == World.weaponVModelIndex) continue;
-        Entity* e = &World.instances[i]; if (e->modelIndex >= MAX_MDLS || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAXANIM || e->ajar) continue;
+        if (i == World.weaponVModelIndex) continue; Entity* e = &World.instances[i]; if (e->modelIndex >= MAX_MDLS || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAXANIM || e->ajar) continue;
         if (animTest == 1) {
-            u8 validClips[MAX_ANIMCLIPS], numValid=0, targetClipIdx=0; double totalDuration = 0.0;
-            for (u8 c = 0; c < MAX_ANIMCLIPS; ++c) { AnimationClip* test = &mdlAnimClips[e->animationNum][c]; if (test->framerate > 0 && test->speed > 0) { validClips[numValid++] = c; double dur = (double)(test->frameEnd - test->frameStart + 1) / ((double)test->framerate * test->speed); totalDuration += dur; } }
+            u8 validClips[MAX_ANIMCLIPS], numValid=0, targetClipIdx=0; double totalDuration = 0.0; for (u8 c = 0; c < MAX_ANIMCLIPS; ++c) { AnimationClip* test = &mdlAnimClips[e->animationNum][c]; if (test->framerate > 0 && test->speed > 0) { validClips[numValid++] = c; double dur = (double)(test->frameEnd - test->frameStart + 1) / ((double)test->framerate * test->speed); totalDuration += dur; } }
             if (numValid == 0) { continue; }
-            e->currentFrameFinished += animDT;
-            while (e->currentFrameFinished >= totalDuration) { e->currentFrameFinished -= totalDuration; }
-            if (e->currentFrameFinished < 0.0) { e->currentFrameFinished = 0.0; }
-            double t = e->currentFrameFinished, clipStartTime = 0.0;
+            e->currentFrameFinished += animDT; while (e->currentFrameFinished >= totalDuration) { e->currentFrameFinished -= totalDuration; } if (e->currentFrameFinished < 0.0) { e->currentFrameFinished = 0.0; } double t = e->currentFrameFinished, clipStartTime = 0.0;
             AnimationClip* activeClip = &mdlAnimClips[e->animationNum][validClips[0]];
             for (u8 j=0;j<numValid;++j) { activeClip=&mdlAnimClips[e->animationNum][validClips[j]]; double activeDur = (double)(activeClip->frameEnd - activeClip->frameStart + 1) / ((double)activeClip->framerate * activeClip->speed); if (t<clipStartTime + activeDur) { targetClipIdx = j; break; }  clipStartTime += activeDur; if (j==numValid - 1) { targetClipIdx = j; t = clipStartTime; } }
             u32 frameCount = activeClip->frameEnd - activeClip->frameStart + 1, frameOffset = (u32)((t - clipStartTime) / (1.0 / ((double)activeClip->framerate * activeClip->speed)));

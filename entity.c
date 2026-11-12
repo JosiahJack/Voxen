@@ -378,34 +378,18 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     if (entIdx < 307 && cardChunk[entIdx]) { World.instances[i].lodIndex = 178;/*card*/ World.col[i]=CT_BOX; World.colliderCenter[i].y=1.32f; World.colliderSize[i]=(V3){2.56f,0.08f,2.56f}; } World.instCount++; return i;
 }
 bool EntIsLodCardConst(u16 entIdx) { return entIdx < 307 && cardChunk[entIdx]; }
-static const char* mm_ptr; static const char* mm_end;
 #define KEY_EQ(lit) (keyLen == (int)(sizeof(lit)-1) && sCompUpToLen(key, lit, sizeof(lit)-1) == 0)
+static const char* mm_ptr; static const char* mm_end;
 static char* MmapGetLine(char* buf, int sz){if(mm_ptr>=mm_end){return NULL;} const char* start=mm_ptr; const char* p=start; while(p<mm_end&&*p!='\n'){++p;} int lineLen=(int)(p-start); if(p<mm_end&&*p =='\n'){mm_ptr=p+1;}else{mm_ptr=mm_end;}if(lineLen >= sz){lineLen=sz-1;} mcpy(buf,(void*)start,lineLen); while(lineLen>0&&(buf[lineLen-1]=='\r' || buf[lineLen - 1]=='\n')){--lineLen;} buf[lineLen]='\0'; return buf;}
 static u16 fwParentSnap[MAX_LEVELS][INSTANCE_COUNT]; static bool fwSnapValid[MAX_LEVELS];/*per-level fwParentOf snapshot: fwParentOf is rewritten by every level load; SetLevelPointers restores the current level's*/
 void SetLevelPointers(u8 lev) {
     if (lev >= MAX_LEVELS) return;
     if (lev != World.curLev && World.curLev < MAX_LEVELS) { World.levelInstCount[World.curLev] = World.instCount; World.levelLAnimCount[World.curLev] = World.lanimCount; }/*preserve dynamically summoned instances across temporary pointer switches (UseTargets/TargetIO level iteration)*/
     if (teleportDestinationsInitialized) mcpy(World.TeleportTouch_allTeleportTouches, teleportDestinations[lev], sizeof(World.TeleportTouch_allTeleportTouches));
-    World.curLev=lev;
-    World.instances=World.levelInstances[lev];
-    World.position=World.levelPosition[lev];
-    World.scale=World.levelScale[lev];
-    World.velocity=World.levelVelocity[lev];
-    World.angularVelocity=World.levelAngularVelocity[lev];
-    World.colliderCenter=World.levelColliderCenter[lev];
-    World.colliderSize=World.levelColliderSize[lev];
-    World.col=World.levelCollider[lev];
-    World.rotation=World.levelRotation[lev];
-    World.layer=World.levelLayer[lev];
-    World.radius=World.levelRadius[lev];
-    World.invInertiaTensor = World.levelInvInertiaTensor[lev];
-    World.invTnsrValid     = World.levelInvTnsrValid[lev];
-    World.colliding        = World.levelColliding[lev];
-    World.instCount        = World.levelInstCount[lev];
-    World.lights           = World.levelLights[lev];
-    World.particles        = &World.levelParticles[lev];
-    if (fwSnapValid[lev]) mcpy(fwParentOf, fwParentSnap[lev], sizeof(fwParentOf));/*func_wall child links are per-level*/
-    World.lanims=World.levelLAnims[lev]; World.lanimLightIdx=World.levelLAnimLightIdx[lev]; World.lanimCount=World.levelLAnimCount[lev]; World.lightTargetnames=World.levelLightTargetnames[lev]; World.lightsNewPosition=World.levelLightsNewPosition[lev]; World.loadedLights=World.levelLoadedLights[lev]; World.weaponVModelIndex=World.levelWepVModel[lev];
+    World.curLev=lev;                                World.instances=World.levelInstances[lev];   World.position=World.levelPosition[lev]; World.scale=World.levelScale[lev];            World.velocity=World.levelVelocity[lev]; World.angularVelocity=World.levelAngularVelocity[lev];     World.colliderCenter=World.levelColliderCenter[lev];
+    World.colliderSize=World.levelColliderSize[lev]; World.col=World.levelCollider[lev];          World.rotation=World.levelRotation[lev]; World.layer=World.levelLayer[lev];            World.radius=World.levelRadius[lev];     World.invInertiaTensor = World.levelInvInertiaTensor[lev]; World.invTnsrValid     = World.levelInvTnsrValid[lev];
+    World.colliding = World.levelColliding[lev];     World.instCount = World.levelInstCount[lev]; World.lights = World.levelLights[lev];   World.particles = &World.levelParticles[lev]; if (fwSnapValid[lev]) { mcpy(fwParentOf, fwParentSnap[lev], sizeof(fwParentOf));/*func_wall child links are per-level*/ }
+    World.lanims = World.levelLAnims[lev]; World.lanimLightIdx = World.levelLAnimLightIdx[lev]; World.lanimCount = World.levelLAnimCount[lev]; World.lightTargetnames = World.levelLightTargetnames[lev]; World.lightsNewPosition = World.levelLightsNewPosition[lev]; World.loadedLights = World.levelLoadedLights[lev]; World.weaponVModelIndex = World.levelWepVModel[lev];
 }
 void CopyPlayerState(u8 srcLevel, u8 dstLevel) {
     if(srcLevel >= MAX_LEVELS || dstLevel >= MAX_LEVELS || srcLevel == dstLevel){return;} u16 s=PLAYER1; World.levelInstances[dstLevel][s]=World.levelInstances[srcLevel][s]; World.levelPosition[dstLevel][s]=World.levelPosition[srcLevel][s]; World.levelScale[dstLevel][s]=World.levelScale[srcLevel][s];
@@ -488,20 +472,14 @@ void LoadLevelMod(u8 lev) {
         u8 fill[41] = {0}; for (u32 f=0;f<sizeof(fields) / sizeof(fields[0]);++f) { u8 tl = ((&fields[f])->count ? (u8)((&fields[f])->len+3u) : (&fields[f])->len); fill[tl]++; } u8 run=0; for (u32 L=0;L<=40;++L) { fieldBucketStart[L]=run; run=(u8)(run+fill[L]); } u8 cursor[41]; for (u32 L=0;L<=40;++L) cursor[L]=fieldBucketStart[L];
         for (u32 f=0;f<sizeof(fields)/sizeof(fields[0]);++f) fieldOrder[cursor[((&fields[f])->count ? (u8)((&fields[f])->len+3u) : (&fields[f])->len)]++]=(u8)f; fieldBucketsBuilt = true;
     }
-    u8 curlevel = vclamp(lev, 0, 13); World.levelCurrentlyLoading = true;/*precondition only, for AddInstance's level-security tally above -- NOT redundant bookkeeping. The tally must not see runtime spawns, and this flag is its only way to tell load-time from run-time. Nothing outside the loader reads it; the main loop gates level changes on the queuedLevelToLoad sentinel instead.*/
-    static const struct { u8 level; V3 pos; Quaternion rot; u8 fov; float near,far; } cameras[]={{0,{-14.16170f,-54.72389f,20.71170f},{0.03959f,0.41918f,-0.01830f,0.90686f},85,0.84f,16.223f},{0,{36.38030f,-57.61589f,-0.30230f},{0.12279f,0.69636f,-0.12279f,0.69636f},50,2.0f,17.05f},{0,{-0.64170f,-54.17389f,-5.37830f},{0.17111f,0.16779f,-0.02959f,0.97041f},65,0.513f,26.13f},
-                                                                                                 {1,{-19.2301f,-42.6604f,-49.7453f},{0.2375f,0.0008f,-0.0002f,0.9713f},75,2.21f,11.5f},{1,{7.664583f,-44.88017f,-14.26742f},{0.0f,0.9999f,0.0129f,0.0f},60,2.192f,20.6f},
-                                                                                                 {2,{36.73389f,-24.66895f,9.47060f},{0.11769f,-0.23125f,0.02819f,0.96534f},75,0.695f,13.73f},
-                                                                                                 {3,{-12.01620f,-28.52930f,33.53500f},{0.54295f,0.45300f,0.54295f,-0.45300f},68,0.868f,14.145f},
-                                                                                                 {4,{-26.93000f,46.56557f,-31.18625f},{0.00000f,0.00000f,0.00000f,1.00000f},68,0.82f,17.56f},
-                                                                                                 {5,{-30.72000f,8.96000f,-53.76000f},{0.00000f,0.70711f,0.70711f,0.00000f},68,2.7f,24.8f},
-                                                                                                 {6,{9.08000f,48.71000f,-47.32400f},{0.00000f,0.99054f,0.00000f,-0.13719f},90,1.2f,11.52f},{6,{-3.90720f,13.90800f,2.47230f},{-0.50000f,0.50000f,0.50000f,0.50000f},90,0.06f,11.87f},
-                                                                                                 {7,{106.87113f,-14.55570f,24.65725f},{0.00000f,0.00000f,0.00000f,1.00000f},68,1.295f,26.01f},{7,{-57.06100f,34.70000f,1.19200f},{0.00000f,-0.65094f,0.00000f,0.75913f},68,1.83f,19.9f},{7,{29.51000f,3.29000f,-9.93000f},{0,0,0,1.f},80,0.77f,9.79f},
-                                                                                                 {8,{69.76093f,30.97230f,-0.84785f},{0.48739f,0.51230f,0.51230f,-0.48739f},85,0.33f,10.05f},{8,{9.95000f,60.11100f,8.59600f},{0.14019f,0.00000f,0.00000f,0.99013f},68,1.0f,10.44f},{8,{-5.55300f,77.60500f,25.11700f},{0.09230f,0.70106f,-0.09230f,0.70106f},68,1.2f,9.4f},{8,{9.99800f,98.27100f,-14.68900f},{0.00000f,0.99255f,-0.12187f,0.00000f},68,0.7f,12.7f},
-                                                                                                 {8,{36.88600f,69.74000f,-3.47000f},{-0.06937f,0.60309f,-0.05276f,-0.79289f},68,1.34f,34.97f},{8,{-24.66100f,82.29600f,2.08200f},{-0.00000f,0.70711f,0.00000f,-0.70711f},85,0.99f,12.53f},{8,{53.26900f,77.89000f,-8.30000f},{-0.12279f,0.69636f,-0.12279f,-0.69636f},71,0.56f,16.38f},
-                                                                                                 {9,{53.36000f,108.73700f,8.72300f},{-0.11027f,0.77231f,-0.13966f,-0.60982f},71,0.5f,16.582f},
-                                                                                                 {10,{6.27000f,137.70000f,20.88000f},{0.05778f,-0.25920f,0.01554f,0.96397f},68,1.3f,9.4f},{10,{24.67000f,136.79999f,-26.02000f},{-0.00879f,-0.90735f,0.01901f,-0.41985f},68,4.0f,13.6f},
-                                                                                                 {12,{35.80700f,196.89301f,-4.98400f},{0.12369f,0.00000f,0.00000f,0.99232f},68,0.7f,4.32f},{12,{-9.23000f,199.00000f,2.98000f},{0.08830f,-0.69488f,0.08661f,0.70841f},68,1.5f,8.04f}};
+    u8 curlevel = vclamp(lev, 0, 13); World.levelCurrentlyLoading = true;
+    static const struct { u8 level; V3 pos; Quaternion rot; u8 fov; float near,far; } cameras[] = {{0,{-14.16170f,-54.72389f,20.71170f},{0.03959f,0.41918f,-0.01830f,0.90686f},85,0.84f,16.223f},{0,{36.38030f,-57.61589f,-0.30230f},{0.12279f,0.69636f,-0.12279f,0.69636f},50,2.0f,17.05f},{0,{-0.64170f,-54.17389f,-5.37830f},{0.17111f,0.16779f,-0.02959f,0.97041f},65,0.513f,26.13f},
+                     {1,{-19.2301f,-42.6604f,-49.7453f},{0.2375f,0.0008f,-0.0002f,0.9713f},75,2.21f,11.5f},{1,{7.664583f,-44.88017f,-14.26742f},{0.0f,0.9999f,0.0129f,0.0f},60,2.192f,20.6f},    {2,{36.73389f,-24.66895f,9.47060f},{0.11769f,-0.23125f,0.02819f,0.96534f},75,0.695f,13.73f},    {3,{-12.01620f,-28.52930f,33.53500f},{0.54295f,0.45300f,0.54295f,-0.45300f},68,0.868f,14.145f},
+                     {4,{-26.93000f,46.56557f,-31.18625f},{0.00000f,0.00000f,0.00000f,1.00000f},68,0.82f,17.56f},    {5,{-30.72000f,8.96000f,-53.76000f},{0.00000f,0.70711f,0.70711f,0.00000f},68,2.7f,24.8f},    {6,{9.08000f,48.71000f,-47.32400f},{0.00000f,0.99054f,0.00000f,-0.13719f},90,1.2f,11.52f},{6,{-3.90720f,13.90800f,2.47230f},{-0.50000f,0.50000f,0.50000f,0.50000f},90,0.06f,11.87f},
+                     {7,{106.87113f,-14.55570f,24.65725f},{0.00000f,0.00000f,0.00000f,1.00000f},68,1.295f,26.01f},{7,{-57.06100f,34.70000f,1.19200f},{0.00000f,-0.65094f,0.00000f,0.75913f},68,1.83f,19.9f},{7,{29.51000f,3.29000f,-9.93000f},{0,0,0,1.f},80,0.77f,9.79f},
+                     {8,{69.76093f,30.97230f,-0.84785f},{0.48739f,0.51230f,0.51230f,-0.48739f},85,0.33f,10.05f},{8,{9.95000f,60.11100f,8.59600f},{0.14019f,0.00000f,0.00000f,0.99013f},68,1.0f,10.44f},{8,{-5.55300f,77.60500f,25.11700f},{0.09230f,0.70106f,-0.09230f,0.70106f},68,1.2f,9.4f},{8,{9.99800f,98.27100f,-14.68900f},{0.00000f,0.99255f,-0.12187f,0.00000f},68,0.7f,12.7f},
+                     {8,{36.88600f,69.74000f,-3.47000f},{-0.06937f,0.60309f,-0.05276f,-0.79289f},68,1.34f,34.97f},{8,{-24.66100f,82.29600f,2.08200f},{-0.00000f,0.70711f,0.00000f,-0.70711f},85,0.99f,12.53f},{8,{53.26900f,77.89000f,-8.30000f},{-0.12279f,0.69636f,-0.12279f,-0.69636f},71,0.56f,16.38f},    {9,{53.36000f,108.73700f,8.72300f},{-0.11027f,0.77231f,-0.13966f,-0.60982f},71,0.5f,16.582f},
+                     {10,{6.27000f,137.70000f,20.88000f},{0.05778f,-0.25920f,0.01554f,0.96397f},68,1.3f,9.4f},{10,{24.67000f,136.79999f,-26.02000f},{-0.00879f,-0.90735f,0.01901f,-0.41985f},68,4.0f,13.6f},    {12,{35.80700f,196.89301f,-4.98400f},{0.12369f,0.00000f,0.00000f,0.99232f},68,0.7f,4.32f},{12,{-9.23000f,199.00000f,2.98000f},{0.08830f,-0.69488f,0.08661f,0.70841f},68,1.5f,8.04f}};
     for (u32 i=0;i<sizeof(cameras)/sizeof(cameras[0]);++i) if (cameras[i].level==curlevel) AddCamView(cameras[i].pos,cameras[i].rot,cameras[i].fov,256,256,cameras[i].near,cameras[i].far);
     sensaroundCamViewCenter=(u8)camViewCount; AddCamView((V3){0.0f,0.0f,0.0f},QUAT_IDENTITY,100u,640u,240u,0.2f,1000.0f);/*Sensaround center rear view (always positioned/oriented per-frame in UpdateSensaroundCamViews)*/
     sensaroundCamViewLeft=(u8)camViewCount;   AddCamView((V3){0.0f,0.0f,0.0f},QUAT_IDENTITY,65u,320u,240u,0.2f,1000.0f);/*Sensaround left side view*/
@@ -513,12 +491,11 @@ void LoadLevelMod(u8 lev) {
         else {
             entCount++; if (entCount >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n", entCount, curlevel); continue; } inst = &entsFromFile[entCount]; mset(inst,0,sizeof(Entity)); mset(&posFromFile[entCount],0,sizeof(V3)); scaleFromFile[entCount] = (V3){1.0f, 1.0f, 1.0f}; rotationFromFile[entCount] = QUAT_IDENTITY; colCtrFromFile[entCount] = (V3){0.0f,0.0f,0.0f}; colSzFromFile[entCount] = (V3){-1.0f,-1.0f,-1.0f};
             for (u8 slot=0;slot<4;++slot) inst->contents[slot]=inst->custIdx[slot]=-1; for (u8 slot=0;slot<7;++slot) inst->randomItem[slot]=inst->randomItemCustIdx[slot]=-1;
-            inst->relayEnabled=true;
-            fwLine=false; fwStage=0; fwCollecting=false; fwCurChild=fwLastChunkSlot=0; fwCurP=NULL; fwCurR=NULL; fwCurS=NULL; ipLine=false; ipBlock=0; ipSubRotSet=false; ipCurP=NULL; ipCurR=NULL; ipCurS=NULL; npcLine=false; npcBlock=0; fwContainerPos=(V3){0.0f,0.0f,0.0f}; fwContainerRot=QUAT_IDENTITY; fwContainerScale=(V3){1.0f,1.0f,1.0f}; fwInfoLocalTmp=(V3){0.0f,0.0f,0.0f};/*relayEnabled is seeded once, at the top of this block (line 582)*/
+            inst->relayEnabled = true; fwLine = false; fwStage = 0; fwCollecting = false; fwCurChild = fwLastChunkSlot = 0; fwCurP = NULL; fwCurR = NULL; fwCurS = NULL; ipLine = false; ipBlock = 0; ipSubRotSet = false; ipCurP = NULL; ipCurR = NULL; ipCurS = NULL; npcLine = false; npcBlock = 0; fwContainerPos = (V3){0.0f,0.0f,0.0f}; fwContainerRot = QUAT_IDENTITY; fwContainerScale = (V3){1.0f,1.0f,1.0f}; fwInfoLocalTmp = (V3){0.0f,0.0f,0.0f};
         }
         bool constIndexRead = false; bool activeStateRead = false; u8 scaleReadMask = 0;
         while (line[0] != '\0') {
-            char* pipe = StringFindFirstCharWithin(line, '|'); char* kvString = line; if (pipe) { *pipe = '\0'; line = pipe + 1; } else { line += slen(line); } if (kvString[0] == '\0') continue; char* colon = StringFindFirstCharWithin(kvString, ':'); if (!colon || colon[1] == '\0') continue; *colon = '\0'; char* key = kvString; char* value = colon + 1; int keyLen = (int)(colon - key); // length is free, no slen()
+            char* pipe = StringFindFirstCharWithin(line, '|'); char* kvString = line; if (pipe) { *pipe = '\0'; line = pipe + 1; } else { line += slen(line); } if (kvString[0] == '\0') continue; char* colon = StringFindFirstCharWithin(kvString,':'); if (!colon || colon[1] == '\0') continue; *colon = '\0'; char* key = kvString; char* value = colon + 1; int keyLen = (int)(colon - key);
             if (isLight) { LoadFieldIntoLight(key,value,lineSpace,lineNum,lit,lanim,lightsIdx);}
             else {
                 bool fieldRead=false;
@@ -528,32 +505,23 @@ void LoadLevelMod(u8 lev) {
                         const LevelField* fd=&fields[fieldOrder[b]]; u8 len=fd->len,element=0; if (fd->count) { if (sCompUpToLen(key,fd->key,len) || key[len]!='[' || key[len+2]!=']' || (u8)(key[len+1]-'0')>=fd->count) continue; element=key[len+1]-'0'; } else { if (key[0]!=fd->key[0] || sCompUpToLen(key,fd->key,len)) continue; } void* dst=(u8*)inst+fd->offset+element*fd->bytes; u32 v=0; float fv;
                         switch (fd->kind) {
                             case 0: fv=parse_float(value,lineSpace,lineNum); mcpy(dst,&fv,sizeof(fv)); break;
-                            case 1: v=(u32)parse_numberi16(value,lineSpace,lineNum); break; case 2: v=parse_numberu16(value,lineSpace,lineNum); break;
-                            case 3: v=parse_numberu8(value,lineSpace,lineNum); break; case 4: v=(u32)parse_numberi8(value,lineSpace,lineNum); break;
-                            case 5: v=(u32)parse_numberi32(value,lineSpace,lineNum); break; case 6: v=parse_numberu32(value,lineSpace,lineNum); break;
-                            case 7: flag_set((u32*)dst,fd->mask,parse_bool(value,lineSpace,lineNum)); break;
-                            case 8: if (parse_bool(value,lineSpace,lineNum)) *(u8*)dst=(u8)fd->mask; break;
+                            case 1: v = (u32)parse_numberi16(value,lineSpace,lineNum); break;    case 2: v = parse_numberu16(value,lineSpace,lineNum); break;    case 3: v = parse_numberu8(value,lineSpace,lineNum);                      break;    case 4: v = (u32)parse_numberi8(value,lineSpace,lineNum);                  break;
+                            case 5: v = (u32)parse_numberi32(value,lineSpace,lineNum); break;    case 6: v = parse_numberu32(value,lineSpace,lineNum); break;    case 7: flag_set((u32*)dst,fd->mask,parse_bool(value,lineSpace,lineNum)); break;    case 8: if (parse_bool(value,lineSpace,lineNum)) *(u8*)dst = (u8)fd->mask; break;
                         }
-                        if (fd->kind>0 && fd->kind<7) mcpy(dst,&v,fd->bytes);
-                        fieldRead=true; break;
+                        if (fd->kind>0 && fd->kind<7) { mcpy(dst,&v,fd->bytes); } fieldRead = true; break;
                     }
                 }
-                if (fieldRead) continue;
-                     if(KEY_EQ("constIndex")){if(!constIndexRead){ constIndexRead=true; inst->index=parse_numberu16(value,lineSpace,lineNum); fwLine=(inst->index == 517); ipLine=(inst->index == 614 || inst->index == 615 || inst->index == 602); npcLine=IdxIsNPC(inst->index);}}
-                else if(keyLen==4 && key[0]=='l' && (key[1]=='P' || key[1]=='R' || key[1]=='S') && key[2]=='.' && key[3]>='w' && key[3]<='z') {
-                    float v=parse_float(value,lineSpace,lineNum);
-                    u32 gk=(((u32)key[1])<<8)|((u32)key[3]);/*'P'/'R'/'S' in the high byte, 'x'/'y'/'z'/'w' in the low byte*/
+                if (fieldRead) { continue; }
+                     if (KEY_EQ("constIndex")){if(!constIndexRead){ constIndexRead=true; inst->index=parse_numberu16(value,lineSpace,lineNum); fwLine=(inst->index == 517); ipLine=(inst->index == 614 || inst->index == 615 || inst->index == 602); npcLine=IdxIsNPC(inst->index);}}
+                else if (keyLen == 4 && key[0] == 'l' && (key[1] == 'P' || key[1] == 'R' || key[1] == 'S') && key[2] == '.' && key[3] >= 'w' && key[3] <= 'z') {
+                    float v = parse_float(value,lineSpace,lineNum); u32 gk = (((u32)key[1]) << 8) | ((u32)key[3]);/*'P'/'R'/'S' in the high byte, 'x'/'y'/'z'/'w' in the low byte*/
                     #define TR_KEY(g,a) ((((u32)(g))<<8)|((u32)(a)))
                     if (gk==TR_KEY('P','x')) {
                         if (fwLine) { FWBeginBlock(entCount); }
-                        else if (ipLine) {
-                            if (ipBlock == 0) { ipCurP=&posFromFile[entCount]; ipCurR=&rotationFromFile[entCount]; ipCurS=&scaleFromFile[entCount]; }
-                            else { ipCurP=&ipSubPos; ipCurR=&ipSubRot; ipCurS=&ipSubScale; if (ipBlock == 1) { ipSubPos=(V3){0.0f,0.0f,0.0f}; ipSubScale=(V3){1.0f,1.0f,1.0f}; ipSubRot=QUAT_IDENTITY; }/*block 1 is InteractablePanel.installationItem*/ }
-                            ipBlock++;
-                        }
+                        else if (ipLine) { if (ipBlock == 0) { ipCurP=&posFromFile[entCount]; ipCurR=&rotationFromFile[entCount]; ipCurS=&scaleFromFile[entCount]; } else { ipCurP=&ipSubPos; ipCurR=&ipSubRot; ipCurS=&ipSubScale; if (ipBlock == 1) { ipSubPos=(V3){0.0f,0.0f,0.0f}; ipSubScale=(V3){1.0f,1.0f,1.0f}; ipSubRot=QUAT_IDENTITY; }/*block 1 is InteractablePanel.installationItem*/ } ipBlock++; }
                         else if (npcLine) { npcBlock++; }
                     }
-                    if (npcLine && npcBlock > 1 && ((gk>>8)=='P' || (gk>>8)=='S' || inst->index != 437)) {}/*NPC sub-mesh blocks: only 437 (servbot) root rotations survive, same keys as before (lP.* and lS.* are swallowed here, lR.* falls through)*/
+                    if (npcLine && npcBlock > 1 && ((gk>>8)=='P' || (gk>>8)=='S' || inst->index != 437)) { /*Preserve servbot oddity*/ }
                     else switch (gk) {
                         case TR_KEY('P','x'): { if(fwLine){ if(fwCurP)fwCurP->x=v; } else if(ipLine){ if(ipCurP)ipCurP->x=v; } else posFromFile[entCount].x=v; } break;
                         case TR_KEY('P','y'): { if(fwLine){ if(fwCurP)fwCurP->y=v; } else if(ipLine){ if(ipCurP)ipCurP->y=v; } else posFromFile[entCount].y=v; } break;
@@ -569,68 +537,40 @@ void LoadLevelMod(u8 lev) {
                     }
                     #undef TR_KEY
                 }
-                else if(KEY_EQ("go.activeSelf"))   { activeStateRead = true; flag_set(&inst->entflags, EF_ACTIVE, parse_bool(value, lineSpace, lineNum)); }
-                else if(KEY_EQ("enabled") && inst->index == 477) inst->camRotateEnabled=parse_bool(value,lineSpace,lineNum);
-                else if(KEY_EQ("currentState"))   inst->currentState=(AIState)vclampi(parse_numberi16(value,lineSpace,lineNum),0,AIState_Dead);
-                else if(KEY_EQ("generateContents")) inst->generateContents = parse_bool(value, lineSpace, lineNum);
-                else if(KEY_EQ("generationDone")) inst->generationDone = parse_bool(value, lineSpace, lineNum);
-                else if(KEY_EQ("searchableInUse")) inst->srchInUse = parse_bool(value, lineSpace, lineNum);
-                else if(KEY_EQ("requireReset"))    inst->requireRecharge = parse_bool(value,lineSpace,lineNum);
-                else if(KEY_EQ("nextthink"))       inst->rechargeFinished = parse_float(value,lineSpace,lineNum) + World.pauseRelativeTime; /*saved as differential against relativeTime (Citadel Utils.SaveRelativeTimeDifferential)*/
-                else if(KEY_EQ("target"))          inst->targetIdx = IOInternName(value);
-                else if(KEY_EQ("targetname"))      inst->targetnameIdx = IOInternName(value);
-                else if(KEY_EQ("targetOnDeath"))   inst->targetOnDeathIdx = IOInternName(value);
-                else if(KEY_EQ("target2"))         inst->target2Idx = IOInternName(value);
-                else if(KEY_EQ("targetIfFalse"))   inst->targetIfFalseIdx = IOInternName(value);
-                else if(KEY_EQ("dontReset"))         inst->dontReset = parse_bool(value,lineSpace,lineNum);
-                else if(KEY_EQ("lockedTarget"))    inst->lockedTargetIdx = IOInternName(value);                                            else if(KEY_EQ("useQuestKeycode1")) inst->useQuestKeycode1 = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("useQuestKeycode2")) inst->useQuestKeycode2 = parse_bool(value, lineSpace, lineNum);
-                        else if(KEY_EQ("active"))          inst->active = parse_bool(value, lineSpace, lineNum);
-                                        else if(KEY_EQ("useRandomTimes")) inst->useRandomTimes = parse_bool(value, lineSpace, lineNum);
-                else if(KEY_EQ("onlyOnce"))        inst->onlyOnce = parse_bool(value, lineSpace, lineNum);                         else if(KEY_EQ("stayOpen"))        inst->stayOpen = parse_bool(value, lineSpace, lineNum);
-                else if(KEY_EQ("startOpen"))       inst->startOpen = parse_bool(value, lineSpace, lineNum);                        else if(KEY_EQ("ajar"))            inst->ajar = parse_bool(value, lineSpace, lineNum);
-                else if(KEY_EQ("open"))            inst->panelOpen      = parse_bool(value,lineSpace,lineNum);/*InteractablePanel cover state (only us_relaypanel/isotopepanel/retinalscanner carry these keys)*/
-                else if(KEY_EQ("installed"))       inst->panelInstalled = parse_bool(value,lineSpace,lineNum);/*InteractablePanel: the required item is already in place*/
-                else if(KEY_EQ("waitBeforeClose")) inst->waitBefClose=parse_float(value,lineSpace,lineNum) + World.pauseRelativeTime;
-                else if(KEY_EQ("doorOpenIfUnlocked") || KEY_EQ("doorToggle")) flag_set(&inst->ioflags,TARG_IOFLAGS_DOOROPENIFUNLOCKED,parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("doorLock") || KEY_EQ("lockElevatorPad")) flag_set(&inst->ioflags, TARG_IOFLAGS_LOCK, parse_bool(value, lineSpace, lineNum));
-                else if(KEY_EQ("doorUnlock") || KEY_EQ("unlockSwitch") || KEY_EQ("unlockElevatorPad") || KEY_EQ("unlockKeycodePad") || KEY_EQ("unlockPuzzlePad")) flag_set(&inst->ioflags,TARG_IOFLAGS_UNLOCK,parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("SpawnManager.active")) inst->active = parse_bool(value, lineSpace, lineNum);
-                  else if(KEY_EQ("countOnlySameIndex"))  inst->countOnlySameIndex = parse_bool(value, lineSpace, lineNum);
-                 else if(KEY_EQ("alertEnemiesOnAwake"))  inst->alertEnemiesOnAwake = parse_bool(value, lineSpace, lineNum);
-                else if(KEY_EQ("index") && inst->index == 702) inst->spawnIndex = parse_numberu16(value, lineSpace, lineNum);
-                     else if(KEY_EQ("playEverywhere")) inst->playEverywhere = parse_bool(value, lineSpace, lineNum);
-                          else if(KEY_EQ("resourceFolder") && *value) inst->texAnimResourceFolderIdx = TexAnimFolderIntern(value);
-                else if(KEY_EQ("codeScreen"))      inst->codeScreen = (u8)parse_bool(value, lineSpace, lineNum);
-                else if(KEY_EQ("text")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd) { u16 k=0; while(value[k] && k<DECAL_INLINE_TEXT_LEN-1) { pd->text[k]=(value[k]=='#')?'\n':value[k]; ++k; } pd->text[k]='\0'; } } }
+                else if(KEY_EQ("go.activeSelf"))  { activeStateRead = true; flag_set(&inst->entflags, EF_ACTIVE, parse_bool(value, lineSpace, lineNum)); }    else if(KEY_EQ("enabled") && inst->index == 477) inst->camRotateEnabled=parse_bool(value,lineSpace,lineNum);                    else if(KEY_EQ("currentState"))    inst->currentState=(AIState)vclampi(parse_numberi16(value,lineSpace,lineNum),0,AIState_Dead);
+                else if(KEY_EQ("generateContents")) inst->generateContents = parse_bool(value, lineSpace, lineNum);                                           else if(KEY_EQ("generationDone"))   inst->generationDone = parse_bool(value, lineSpace, lineNum);                               else if(KEY_EQ("searchableInUse")) inst->srchInUse = parse_bool(value, lineSpace, lineNum);
+                else if(KEY_EQ("requireReset"))     inst->requireRecharge = parse_bool(value,lineSpace,lineNum);                                              else if(KEY_EQ("nextthink"))        inst->rechargeFinished = parse_float(value,lineSpace,lineNum) + World.pauseRelativeTime;    else if(KEY_EQ("target"))          inst->targetIdx = IOInternName(value);
+                else if(KEY_EQ("targetname"))       inst->targetnameIdx = IOInternName(value);                                                                else if(KEY_EQ("targetOnDeath"))    inst->targetOnDeathIdx = IOInternName(value);                                               else if(KEY_EQ("target2"))         inst->target2Idx = IOInternName(value);
+                else if(KEY_EQ("targetIfFalse"))    inst->targetIfFalseIdx = IOInternName(value);                                                             else if(KEY_EQ("dontReset"))        inst->dontReset = parse_bool(value,lineSpace,lineNum);                                      else if(KEY_EQ("lockedTarget"))    inst->lockedTargetIdx = IOInternName(value);
+                else if(KEY_EQ("useQuestKeycode1")) inst->useQuestKeycode1 = parse_bool(value, lineSpace, lineNum);                                           else if(KEY_EQ("useQuestKeycode2")) inst->useQuestKeycode2 = parse_bool(value, lineSpace, lineNum);                             else if(KEY_EQ("active")) inst->active = parse_bool(value, lineSpace, lineNum);
+                else if(KEY_EQ("useRandomTimes"))   inst->useRandomTimes = parse_bool(value, lineSpace, lineNum);                                             else if(KEY_EQ("onlyOnce"))         inst->onlyOnce = parse_bool(value, lineSpace, lineNum);                                     else if(KEY_EQ("stayOpen"))        inst->stayOpen = parse_bool(value, lineSpace, lineNum);
+                else if(KEY_EQ("startOpen"))        inst->startOpen = parse_bool(value, lineSpace, lineNum);                                                  else if(KEY_EQ("ajar"))             inst->ajar = parse_bool(value, lineSpace, lineNum);                                         else if(KEY_EQ("open"))            inst->panelOpen      = parse_bool(value,lineSpace,lineNum);
+                else if(KEY_EQ("installed"))        inst->panelInstalled = parse_bool(value,lineSpace,lineNum);                                               else if(KEY_EQ("waitBeforeClose")) inst->waitBefClose=parse_float(value,lineSpace,lineNum) + World.pauseRelativeTime;           else if(KEY_EQ("doorOpenIfUnlocked") || KEY_EQ("doorToggle")) flag_set(&inst->ioflags,TARG_IOFLAGS_DOOROPENIFUNLOCKED,parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("doorLock") || KEY_EQ("lockElevatorPad")) flag_set(&inst->ioflags, TARG_IOFLAGS_LOCK, parse_bool(value, lineSpace, lineNum));  else if(KEY_EQ("doorUnlock") || KEY_EQ("unlockSwitch") || KEY_EQ("unlockElevatorPad") || KEY_EQ("unlockKeycodePad") || KEY_EQ("unlockPuzzlePad")) flag_set(&inst->ioflags,TARG_IOFLAGS_UNLOCK,parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("SpawnManager.active")) inst->active = parse_bool(value, lineSpace, lineNum);                                                  else if(KEY_EQ("countOnlySameIndex"))  inst->countOnlySameIndex = parse_bool(value, lineSpace, lineNum);                        else if(KEY_EQ("alertEnemiesOnAwake"))  inst->alertEnemiesOnAwake = parse_bool(value, lineSpace, lineNum);
+                else if(KEY_EQ("index") && inst->index == 702) inst->spawnIndex = parse_numberu16(value, lineSpace, lineNum);                                 else if(KEY_EQ("playEverywhere")) inst->playEverywhere = parse_bool(value, lineSpace, lineNum);                                 else if(KEY_EQ("resourceFolder") && *value) inst->texAnimResourceFolderIdx = TexAnimFolderIntern(value);
+                else if(KEY_EQ("codeScreen"))       inst->codeScreen = (u8)parse_bool(value, lineSpace, lineNum);                                             else if(KEY_EQ("text")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd) { u16 k=0; while(value[k] && k<DECAL_INLINE_TEXT_LEN-1) { pd->text[k]=(value[k]=='#')?'\n':value[k]; ++k; } pd->text[k]='\0'; } } }
                 else if(KEY_EQ("tA")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd){ i16 v=parse_numberi16(value,lineSpace,lineNum); pd->anchor=(u8)(v<0?0:(v>8?8:v)); } } }
                 else if(KEY_EQ("tAl")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd){ i16 v=parse_numberi16(value,lineSpace,lineNum); pd->align=(u8)(v<0?0:(v>2?2:v)); } } }
                 else if(KEY_EQ("tLs")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd) pd->lineSp=parse_float(value,lineSpace,lineNum); } }
-                else if(keyLen==23 && sCompUpToLen(key,"currentPositionsLeft[",21)==0 && key[21]>='0' && key[21]<='6' && key[22]==']') inst->wireCurL[key[21]-'0']=(i8)parse_numberi16(value, lineSpace, lineNum);/*us_puz_panel_*_wire (741..745)*/
+                else if(keyLen==23 && sCompUpToLen(key,"currentPositionsLeft[",21)==0 && key[21]>='0' && key[21]<='6' && key[22]==']') inst->wireCurL[key[21]-'0']=(i8)parse_numberi16(value, lineSpace, lineNum);
                 else if(keyLen==24 && sCompUpToLen(key,"currentPositionsRight[",22)==0 && key[22]>='0' && key[22]<='6' && key[23]==']') inst->wireCurR[key[22]-'0']=(i8)parse_numberi16(value, lineSpace, lineNum);
-                else if(sCompUpToLen(key,"grid[",5)==0 && keyLen>=7 && key[keyLen-1]==']') { int gi=0; bool gok=true; for (int k=5;k<keyLen-1;++k) { if (key[k]<'0'||key[k]>'9') { gok=false; break; } gi=gi*10+(key[k]-'0'); } if (gok && gi<35) Entity_SetGridCell(inst,gi,parse_bool(value,lineSpace,lineNum)); }/*PuzzleGridPuzzle.grid[0..34], key width varies with the index*/
-                else if(KEY_EQ("fired"))          inst->puzzleFired = parse_bool(value,lineSpace,lineNum);
-                else if(KEY_EQ("relayEnabled"))    inst->relayEnabled = parse_bool(value, lineSpace, lineNum);
-                else if(KEY_EQ("onSecond"))        inst->branchOnSecond = parse_bool(value, lineSpace, lineNum);                                           else if(KEY_EQ("onceEver"))        inst->relayOnceEver = parse_bool(value, lineSpace, lineNum);
-                                                else if(KEY_EQ("testQuestBitIsOn"))    inst->questTestMode = parse_bool(value,lineSpace,lineNum) ? 1 : inst->questTestMode;
-                else if(KEY_EQ("testQuestBitIsOff"))   inst->questTestMode = parse_bool(value,lineSpace,lineNum) ? 2 : inst->questTestMode;                else if(KEY_EQ("ForceBridge.activated")) inst->active = parse_bool(value,lineSpace,lineNum);
-                else if(KEY_EQ("x")) inst->forceFieldDirectionX = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("y")) inst->forceFieldDirectionY = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("z")) inst->forceFieldDirectionZ = parse_bool(value, lineSpace, lineNum);
-                else if(KEY_EQ("fieldColor"))          { u8 fc = parse_numberu8(value, lineSpace, lineNum); inst->fieldColor = (fc >= 1 && fc <= 5) ? (ForceFieldColor)(fc-1) : ForceFieldColor_Red; }                      else if(KEY_EQ("touchEnabled")) inst->touchEnabled = parse_bool(value,lineSpace,lineNum);
-                else if(KEY_EQ("center.x")) colCtrFromFile[entCount].x = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("center.y")) colCtrFromFile[entCount].y = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("center.z")) colCtrFromFile[entCount].z = parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("size.x")) colSzFromFile[entCount].x = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("size.y")) colSzFromFile[entCount].y = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("size.z")) colSzFromFile[entCount].z = parse_float(value,lineSpace,lineNum);
-                 else if(KEY_EQ("autoPlayEmail")) inst->autoPlayEmail = parse_bool(value,lineSpace,lineNum);
-                else if(KEY_EQ("justUsed")) inst->justUsed = parse_float(value,lineSpace,lineNum) + World.pauseRelativeTime;
-                else if(KEY_EQ("allDone")) inst->allDone = parse_bool(value,lineSpace,lineNum);
-                else if(KEY_EQ("iceActive")) inst->iceActive = parse_bool(value,lineSpace,lineNum);
-                else if(KEY_EQ("broken")) inst->broken = parse_bool(value,lineSpace,lineNum);
-                else if(KEY_EQ("despawnInstead")) inst->despawnInstead = parse_bool(value,lineSpace,lineNum);
-                else if(KEY_EQ("chunkIDs.Length")) { fwCollecting=true; fwCurChild=0; fwLastChunkSlot=0; }
-                else if(keyLen > 9 && sCompUpToLen(key,"chunkIDs[",9) == 0) { u16 idx=parse_numberu16(value,lineSpace,lineNum); if(fwCurChild<FW_MAX_CHILDREN){lwPrefab[fwCurChild]=idx; fwLastChunkSlot=fwCurChild; fwCurChild++;} }
+                else if(sCompUpToLen(key,"grid[",5)==0 && keyLen>=7 && key[keyLen-1]==']') { int gi=0; bool gok=true; for (int k=5;k<keyLen-1;++k) { if (key[k]<'0'||key[k]>'9') { gok=false; break; } gi=gi*10+(key[k]-'0'); } if (gok && gi<35) Entity_SetGridCell(inst,gi,parse_bool(value,lineSpace,lineNum)); }
+                else if(KEY_EQ("fired"))            inst->puzzleFired = parse_bool(value,lineSpace,lineNum);                                                  else if(KEY_EQ("relayEnabled"))    inst->relayEnabled = parse_bool(value, lineSpace, lineNum);                                  else if(KEY_EQ("onSecond"))        inst->branchOnSecond = parse_bool(value, lineSpace, lineNum);
+                else if(KEY_EQ("onceEver"))         inst->relayOnceEver = parse_bool(value, lineSpace, lineNum);                                              else if(KEY_EQ("testQuestBitIsOn"))    inst->questTestMode = parse_bool(value,lineSpace,lineNum) ? 1 : inst->questTestMode;     else if(KEY_EQ("testQuestBitIsOff"))   inst->questTestMode = parse_bool(value,lineSpace,lineNum) ? 2 : inst->questTestMode;
+                else if(KEY_EQ("ForceBridge.activated")) inst->active = parse_bool(value,lineSpace,lineNum);                                                  else if(KEY_EQ("x")) inst->forceFieldDirectionX = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("y")) inst->forceFieldDirectionY = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("z")) inst->forceFieldDirectionZ = parse_bool(value, lineSpace, lineNum);
+                else if(KEY_EQ("fieldColor")) { u8 fc = parse_numberu8(value, lineSpace, lineNum); inst->fieldColor = (fc >= 1 && fc <= 5) ? (ForceFieldColor)(fc-1) : ForceFieldColor_Red; }                                                                                                 else if(KEY_EQ("touchEnabled")) inst->touchEnabled = parse_bool(value,lineSpace,lineNum);
+                else if(KEY_EQ("center.x")) colCtrFromFile[entCount].x = parse_float(value,lineSpace,lineNum);                                                else if(KEY_EQ("center.y")) colCtrFromFile[entCount].y = parse_float(value,lineSpace,lineNum);                                  else if(KEY_EQ("center.z")) colCtrFromFile[entCount].z = parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("size.x")) colSzFromFile[entCount].x = parse_float(value,lineSpace,lineNum);                                                   else if(KEY_EQ("size.y")) colSzFromFile[entCount].y = parse_float(value,lineSpace,lineNum);                                     else if(KEY_EQ("size.z")) colSzFromFile[entCount].z = parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("autoPlayEmail")) inst->autoPlayEmail = parse_bool(value,lineSpace,lineNum);                                                   else if(KEY_EQ("justUsed")) inst->justUsed = parse_float(value,lineSpace,lineNum) + World.pauseRelativeTime;                    else if(KEY_EQ("allDone")) inst->allDone = parse_bool(value,lineSpace,lineNum);
+                else if(KEY_EQ("iceActive")) inst->iceActive = parse_bool(value,lineSpace,lineNum);                                                           else if(KEY_EQ("broken")) inst->broken = parse_bool(value,lineSpace,lineNum);                                                   else if(KEY_EQ("despawnInstead")) inst->despawnInstead = parse_bool(value,lineSpace,lineNum);
+                else if(KEY_EQ("chunkIDs.Length")) { fwCollecting=true; fwCurChild=0; fwLastChunkSlot=0; }                                                    else if(keyLen > 9 && sCompUpToLen(key,"chunkIDs[",9) == 0) { u16 idx=parse_numberu16(value,lineSpace,lineNum); if(fwCurChild<FW_MAX_CHILDREN){lwPrefab[fwCurChild]=idx; fwLastChunkSlot=fwCurChild; fwCurChild++;} }
             }
         }
         if (ipLine && ipBlock>=2) { entsFromFile[entCount].panelItemPos=ipSubPos; entsFromFile[entCount].panelItemRot=ipSubRotSet?ipSubRot:rotationFromFile[entCount]; }
         if (!isLight && !activeStateRead) flag_set(&entsFromFile[entCount].entflags,EF_ACTIVE,true);
         if (!isLight && entsFromFile[entCount].index >= 595 && entsFromFile[entCount].index <= 601) { if (!(scaleReadMask&1u)) scaleFromFile[entCount].x = 1.0f; if (!(scaleReadMask&2u)) scaleFromFile[entCount].y = 1.0f; if (!(scaleReadMask&4u)) scaleFromFile[entCount].z = 1.0f; }
-        if (!isLight && entsFromFile[entCount].index == 517) { // func_wall: stash base transform + chunk children for spawn below
+        if (!isLight && entsFromFile[entCount].index == 517) { // func_wall
             fwBasePos[entCount]=fwContainerPos; fwBaseRot[entCount]=fwContainerRot; fwBaseScale[entCount]=fwContainerScale; fwInfoLocal[entCount]=fwInfoLocalTmp; u16 n = fwCurChild < FW_MAX_CHILDREN ? fwCurChild : FW_MAX_CHILDREN, start=fwPoolUsed; 
             for (u16 k=0;k<n;++k) { if (fwPoolUsed >= FW_POOL_MAX) { DualLogError("FuncWall chunk pool exhausted on line %u!\n",lineNum); break; } fwPoolPrefab[fwPoolUsed]=lwPrefab[k]; fwPoolPos[fwPoolUsed]=lwPos[k]; fwPoolRot[fwPoolUsed]=lwRot[k]; fwPoolScale[fwPoolUsed]=lwScale[k]; fwPoolUsed++; } fwSlotStart[entCount]=start; fwSlotCount[entCount]=(u16)(fwPoolUsed-start);
         }
@@ -639,16 +579,17 @@ void LoadLevelMod(u8 lev) {
     for (i32 e=0;e<totalEnts;++e) {
         Entity* src = &entsFromFile[e]; u16 entIdx = src->index; u16 parent = AddInstance(entIdx,posFromFile[e]); Entity* par = &World.instances[parent]; par->lastPosition = posFromFile[e]; World.rotation[parent] = rotationFromFile[e]; if (!IdxIsDynamicObject(entIdx)) {World.scale[parent] = scaleFromFile[e];}
         if (IdxIsNPC(entIdx) && npcTable[entIdx-419].type != NPCType_Cyber) { par->forward = V3_Normalize(quat_rot_v3(World.rotation[parent], (V3){0.0f,0.0f,1.0f})); }
-        bool srcActive=(src->entflags & EF_ACTIVE)!=0; par->entflags|= src->entflags;
-        flag_set(&par->entflags,EF_ACTIVE,srcActive);
-        if (IdxIsNPC(entIdx)) { par->currentState=src->currentState; par->currentDestination=src->currentDestination; par->idealPos=src->idealPos; par->idealTransformForward=src->idealTransformForward; par->targettingPosition=src->targettingPosition; par->attack1SoundTime=src->attack1SoundTime; par->attack2SoundTime=src->attack2SoundTime; par->attack3SoundTime=src->attack3SoundTime; } par->ioflags=src->ioflags; par->ammo=src->ammo; par->ammo2=src->ammo2; par->lookUpIndex=src->lookUpIndex; par->customIndex=src->customIndex;
+        bool srcActive=(src->entflags & EF_ACTIVE)!=0; par->entflags|= src->entflags; flag_set(&par->entflags,EF_ACTIVE,srcActive);
+        if (IdxIsNPC(entIdx)) { par->currentState=src->currentState; par->currentDestination=src->currentDestination; par->idealPos=src->idealPos; par->idealTransformForward=src->idealTransformForward; par->targettingPosition=src->targettingPosition; par->attack1SoundTime=src->attack1SoundTime; par->attack2SoundTime=src->attack2SoundTime; par->attack3SoundTime=src->attack3SoundTime; } par->ioflags=src->ioflags; par->ammo=src->ammo; par->ammo2=src->ammo2;
+        par->lookUpIndex=src->lookUpIndex; par->customIndex=src->customIndex;
         for (u8 slot=0;slot<4;++slot) { par->contents[slot]=src->contents[slot]; par->custIdx[slot]=src->custIdx[slot]; } for (u8 slot=0;slot<7;++slot) { par->randomItem[slot]=src->randomItem[slot]; par->randomItemCustIdx[slot]=src->randomItemCustIdx[slot]; par->randomItemDropChance[slot]=src->randomItemDropChance[slot]; }
         par->generateContents=src->generateContents; par->generationDone=src->generationDone; par->maxRandomItems=src->maxRandomItems; par->srchInUse=src->srchInUse;
         par->amount=src->amount; par->resetTime=src->resetTime; par->minSecurityLevel=src->minSecurityLevel; par->keycode=src->keycode; par->damage=src->damage; par->delay=src->delay; par->active=src->active; par->activatedScale=src->activatedScale;
         par->forceFieldDirectionX=src->forceFieldDirectionX; par->forceFieldDirectionY=src->forceFieldDirectionY; par->forceFieldDirectionZ=src->forceFieldDirectionZ; par->fieldColor=src->fieldColor; par->timeInterval=src->timeInterval;
         par->randomMin=src->randomMin; par->randomMax=src->randomMax; par->useRandomTimes=src->useRandomTimes; if(src->health>=0.0f)par->health=src->health; if(src->cyberHealth>=0.0f)par->cyberHealth=src->cyberHealth; par->radiation=src->radiation; par->idleTime=src->idleTime;
         par->timeSinceMovedEnough=src->timeSinceMovedEnough; par->waitBefClose=src->waitBefClose; par->onlyOnce=src->onlyOnce; par->stayOpen=src->stayOpen; par->startOpen=src->startOpen; par->ajar=src->ajar; par->ajarPercentage=src->ajarPercentage; par->timeBeforeLasersOn=src->timeBeforeLasersOn;
-        par->changeLayerOnOpenClose=src->changeLayerOnOpenClose; par->securityThreshold=src->securityThreshold; par->messageLingdex=src->messageLingdex; par->targetIdx=src->targetIdx; par->targetOnDeathIdx=src->targetOnDeathIdx; par->target2Idx=src->target2Idx; par->camStartYAngle=src->camStartYAngle; par->camEndYAngle=src->camEndYAngle; par->camWaitTime=src->camWaitTime; par->camRotatePositive=src->camRotatePositive; par->camRotateEnabled=src->camRotateEnabled;
+        par->changeLayerOnOpenClose=src->changeLayerOnOpenClose; par->securityThreshold=src->securityThreshold; par->messageLingdex=src->messageLingdex; par->targetIdx=src->targetIdx; par->targetOnDeathIdx=src->targetOnDeathIdx; par->target2Idx=src->target2Idx; par->camStartYAngle=src->camStartYAngle; par->camEndYAngle=src->camEndYAngle; par->camWaitTime=src->camWaitTime; par->camRotatePositive=src->camRotatePositive;
+        par->camRotateEnabled=src->camRotateEnabled;
         if (entIdx == 279) par->glowIndex = src->glowIndex;
         if (entIdx == 592 || entIdx == 593 || entIdx == 279) par->texIndex = src->texIndex;
         else if (entIdx == 112 && src->texIndex > 0 && src->texIndex < MAXTEX) par->texIndex = src->texIndex;
@@ -657,15 +598,17 @@ void LoadLevelMod(u8 lev) {
         if (entIdx == 592 || entIdx == 593) { DecalPend* pd=NULL; for (u16 k=0;k<pendDecalCount;++k) { if (pendDecals[k].ent == (u16)e) { pd=&pendDecals[k]; break; } } if (pd) { i16 li = (i16)src->messageLingdex;
             if (li <= 0 || li >= T_LOGSTR_CNT) { if (decalInlineTextCount < DECAL_INLINE_TEXT_MAX) { mcpy(decalInlineText[decalInlineTextCount],pd->text,DECAL_INLINE_TEXT_LEN); decalInlineTextLevel[decalInlineTextCount]=curlevel; decalInlineTextInst[decalInlineTextCount]=parent; ++decalInlineTextCount; } else DualLogError("Too many inline text decals\n"); }
             if (pd->anchor != 0 || pd->align != 0 || pd->lineSp != 1.0f) { if (decalStyleCount < DECAL_STYLE_MAX) { decalStyles[decalStyleCount]=(DecalStyle){curlevel,parent,pd->anchor,pd->align,pd->lineSp}; ++decalStyleCount; } else DualLogError("Too many decal styles\n"); } } }
-        par->panelItemPos=src->panelItemPos; par->panelItemRot=src->panelItemRot; par->targetnameIdx=src->targetnameIdx; par->targetIfFalseIdx=src->targetIfFalseIdx; par->questBitID=src->questBitID; par->lockedTargetIdx=src->lockedTargetIdx; par->deferredIoflags=src->deferredIoflags; par->deferredIoflagsHi=src->deferredIoflagsHi; par->useQuestKeycode1=src->useQuestKeycode1; par->useQuestKeycode2=src->useQuestKeycode2; par->questTestMode=src->questTestMode; par->branchOnSecond=src->branchOnSecond; par->relayEnabled=src->relayEnabled;
+        par->panelItemPos=src->panelItemPos; par->panelItemRot=src->panelItemRot; par->targetnameIdx=src->targetnameIdx; par->targetIfFalseIdx=src->targetIfFalseIdx; par->questBitID=src->questBitID; par->lockedTargetIdx=src->lockedTargetIdx; par->deferredIoflags=src->deferredIoflags; par->deferredIoflagsHi=src->deferredIoflagsHi; par->useQuestKeycode1=src->useQuestKeycode1; par->useQuestKeycode2=src->useQuestKeycode2;
+        par->questTestMode=src->questTestMode; par->branchOnSecond=src->branchOnSecond; par->relayEnabled=src->relayEnabled;
         par->relayOnceEver=src->relayOnceEver; par->relayAlreadyDone=src->relayAlreadyDone; par->startPosition=src->startPosition; par->targetPosition=src->targetPosition; par->funcState=src->funcState; par->speed=src->speed; par->codeScreen=src->codeScreen;
         par->gridCellsBits=src->gridCellsBits; mcpy(par->wireCurL,src->wireCurL,sizeof(par->wireCurL)); mcpy(par->wireCurR,src->wireCurR,sizeof(par->wireCurR));
         par->puzzleFired=src->puzzleFired; par->emailIndex=src->emailIndex; par->autoPlayEmail=src->autoPlayEmail; par->logIndex=src->logIndex; par->textIndex=src->textIndex; par->trackType=src->trackType; par->rechargeMsgLingdex=src->rechargeMsgLingdex;
         par->teleportID=src->teleportID; par->targetDestinationID=src->targetDestinationID; par->justUsed=src->justUsed;
         par->allDone=src->allDone; par->iceActive=src->iceActive; par->broken=src->broken; par->despawnInstead=src->despawnInstead; par->panelOpen=src->panelOpen; par->panelInstalled=src->panelInstalled; par->requireRecharge=src->requireRecharge; par->rechargeFinished=src->rechargeFinished; par->SFXLockedIndex=src->SFXLockedIndex; par->usedMsgLingdex=src->usedMsgLingdex;
         par->dir.x=src->dir.x; par->dir.y=src->dir.y; par->dir.z=src->dir.z; par->force=src->force;
-        par->reverbMaxDist=src->reverbMaxDist; par->reverbPreset=src->reverbPreset; par->requiredAccessCard=src->requiredAccessCard; par->musicType=src->musicType; par->messageIndex=src->messageIndex; par->counter=src->counter; par->countToTrigger=src->countToTrigger; par->dontReset=src->dontReset; par->ioflagsHi=src->ioflagsHi; par->spawnIndex=src->spawnIndex; par->numberToSpawn=src->numberToSpawn; par->numberActive=src->numberActive; par->countOnlySameIndex=src->countOnlySameIndex; par->alertEnemiesOnAwake=src->alertEnemiesOnAwake; par->minDelayBetweenSpawns=src->minDelayBetweenSpawns; par->maxDelayBetweenSpawns=src->maxDelayBetweenSpawns; par->allSpawnedResetDelay=src->allSpawnedResetDelay; par->lockedMessageLingdex=src->lockedMessageLingdex; par->SFXIndex=src->SFXIndex; par->playEverywhere=src->playEverywhere; par->touchEnabled=src->touchEnabled; par->doorOpen=src->doorOpen; par->percentMoved=src->percentMoved;
-        par->texAnimResourceFolderIdx = src->texAnimResourceFolderIdx;
+        par->reverbMaxDist=src->reverbMaxDist; par->reverbPreset=src->reverbPreset; par->requiredAccessCard=src->requiredAccessCard; par->musicType=src->musicType; par->messageIndex=src->messageIndex; par->counter=src->counter; par->countToTrigger=src->countToTrigger; par->dontReset=src->dontReset; par->ioflagsHi=src->ioflagsHi; par->spawnIndex=src->spawnIndex; par->numberToSpawn=src->numberToSpawn; par->numberActive=src->numberActive;
+        par->countOnlySameIndex=src->countOnlySameIndex; par->alertEnemiesOnAwake=src->alertEnemiesOnAwake; par->minDelayBetweenSpawns=src->minDelayBetweenSpawns; par->maxDelayBetweenSpawns=src->maxDelayBetweenSpawns; par->allSpawnedResetDelay=src->allSpawnedResetDelay; par->lockedMessageLingdex=src->lockedMessageLingdex; par->SFXIndex=src->SFXIndex; par->playEverywhere=src->playEverywhere; par->touchEnabled=src->touchEnabled; par->doorOpen=src->doorOpen;
+        par->percentMoved=src->percentMoved; par->texAnimResourceFolderIdx = src->texAnimResourceFolderIdx;
         if (entIdx == 517) { /*func_wall*/
             V3 sp = par->startPosition;
             if (sp.x == 0.0f && sp.y == 0.0f && sp.z == 0.0f) { sp = V3Add(fwBasePos[e],posFromFile[e]); par->startPosition = sp; } /*fallback for entries lacking startPosition*/
@@ -745,14 +688,10 @@ void LoadAllLevels() {
         SetLevelPointers(lev);
         World.invP1.makingNoise = World.decoyActive = false; World.decoyInstance = U16_MAX;
         mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); World.instCount = 3;
-        mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LANIM_MAX * sizeof(LightAnimation)); mset(World.lanimLightIdx,0,LANIM_MAX * sizeof(u16)); World.lanimCount = 0; World.loadedLights = 0;
-        mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
-        mset(camViews,0,64 * sizeof(CamView));
-        camViewCount=0;
+        mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LANIM_MAX * sizeof(LightAnimation)); mset(World.lanimLightIdx,0,LANIM_MAX * sizeof(u16)); World.lanimCount = 0; World.loadedLights = 0; mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
+        mset(camViews,0,64 * sizeof(CamView)); camViewCount=0;
         char filename[20]; sFormat(filename,sizeof(filename),"./Data/level%d.txt",lev); FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename,&fh,&fsize); if (!fbuf) { OS_Exit(1); }
-        mm_ptr = (const char*)fbuf;
-        mm_end = mm_ptr + fsize;
-        mset(fwParentOf,0,sizeof(fwParentOf));
+        mm_ptr = (const char*)fbuf; mm_end = mm_ptr + fsize; mset(fwParentOf,0,sizeof(fwParentOf));
         LoadLevelMod(lev); // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< THE ACTUAL LOAD
         GravityLiftSyncAllVisuals();
         PSysAddLevelLoops();

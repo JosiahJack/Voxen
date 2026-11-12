@@ -172,12 +172,9 @@ void CycleWeaponSlot(int),CloseFullmap(),UI_AutomapClick(bool,int),UpdateScreenS
     i32 IsWindowsVersionOrGreaterWin32(u16 major, u16 minor, u16 sp) { OSVERSIONINFOEXW o={0}; o.s=sizeof(o), o.maj=major, o.min=minor, o.sp=sp; u64 c=VerSetConditionMask(VerSetConditionMask(VerSetConditionMask(0,0x2,3),0x1,3),0x20,3); return WinSys.win32.ntdll.RtlVerifyVersionInfo(&o,0x23,c)==0; }
     static i32 __stdcall monitorCallback(void* h, void* c, RECT* r, i64 d) { (void)c; (void)r; MONITORINFOEXW mi; mset(&mi,0,sizeof(mi)); mi.cbSize = sizeof(mi); if (GetMonitorInfoW(h,(MONITORINFO*)&mi)) { WSMon* m = (WSMon*)d; u16* dn = m->win32.displayName[0] ? m->win32.displayName : m->win32.adapterName; int match=1; for(int k=0;;++k){ if(!dn[k]){break;} if(mi.szDevice[k]!=dn[k]){match=0; break;} } if (match) m->win32.handle = h; } return 1; }
     static WSMon* createMonitor(DISPLAY_DEVICEW* a, DISPLAY_DEVICEW* d) {
-        WSMon* m; void* dc; RECT r; DEVMODEW dm; mset(&dm,0,sizeof(dm)); dm.dmSize=sizeof(dm);
-        EnumDisplaySettingsW(a->DeviceName,0xFFFFFFFFU,&dm);
-        dc = CreateDCW(L"DISPLAY",a->DeviceName,NULL,NULL); DeleteDC(dc);
-        m = OS_Alloc(sizeof(WSMon)); m->win32.isPrimary = ((a->StateFlags & 0x4) || (d && (d->StateFlags & 0x4))) ? 1 : 0; wcscpy(m->win32.adapterName, a->DeviceName); if (d) wcscpy(m->win32.displayName,d->DeviceName);
-        r.l=dm.dmPosition.x; r.t=dm.dmPosition.y; r.r=dm.dmPosition.x + dm.dmPelsWidth; r.b=dm.dmPosition.y + dm.dmPelsHeight; EnumDisplayMonitors(NULL,&r,monitorCallback,(i64)m); 
-        return m;
+        WSMon* m; void* dc; RECT r; DEVMODEW dm; mset(&dm,0,sizeof(dm)); dm.dmSize=sizeof(dm); EnumDisplaySettingsW(a->DeviceName,0xFFFFFFFFU,&dm); dc = CreateDCW(L"DISPLAY",a->DeviceName,NULL,NULL); DeleteDC(dc);
+        m = OS_Alloc(sizeof(WSMon));
+        m->win32.isPrimary = ((a->StateFlags & 0x4) || (d && (d->StateFlags & 0x4))) ? 1 : 0; wcscpy(m->win32.adapterName, a->DeviceName); if (d) wcscpy(m->win32.displayName,d->DeviceName); r.l=dm.dmPosition.x; r.t=dm.dmPosition.y; r.r=dm.dmPosition.x + dm.dmPelsWidth; r.b=dm.dmPosition.y + dm.dmPelsHeight; EnumDisplayMonitors(NULL,&r,monitorCallback,(i64)m); return m;
     }
     void WinSysPollMonitorsWin32() {
         int i, dC = WinSys.monitorCount; WSMon** d = NULL; u32 aI,dI; DISPLAY_DEVICEW a, dp; WSMon* m;
@@ -1812,7 +1809,7 @@ void InitalizeEnvironment() {
     game_start_time = get_time();
     random_range_rng = (u32)game_start_time;
     console_log_file = OS_OpenWriteonly("./voxen.log");
-    DualLog("=========== Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed ===========\nGame: Citadel, the System Shock (1994) Fan Remake                                1/03/2013 - 11/5/2026\n\nOpenGL 4.3+, libc 2.7(Linux) / none(Windows), depdendencies: ALSA/WASAPI, X11/GDI, dlopen+dlsym / none\nEntity byte size:%u\n",sizeof(Entity) + (6*4) + 4+4+1+1+4+4+4+4+(4*4)+1+(3*4)+(3*4)+(3*4)+(3*4)+(3*4)+(3*4));
+    DualLog("=========== Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed ===========\nGame: Citadel, the System Shock (1994) Fan Remake                                1/03/2013 - 11/5/2026\nOpenGL 4.3+, libc 2.7(Linux) / none(Windows), depdendencies: ALSA/WASAPI, X11/GDI, dlopen+dlsym / none\n");
     scratch_base = OS_Alloc(SCRATCH_ARENA_SIZE); scratch_cur = scratch_base; scratch_end = scratch_base + SCRATCH_ARENA_SIZE; /*Temporary scratch arena for all initializations.*/
     SetLevelPointers(0);
     #if defined(_WIN32)
@@ -1951,7 +1948,7 @@ void InitalizeEnvironment() {
     if (playIntroAtBoot && World.menuActive) ChangeMenuPage(MPG_INTRO); else if (World.menuActive) { PlayMenuMusic(); } else { PlayTrack(TT_Walking, MT_Walking); }
     DualLog("Audio and Menu init.................................................................took %.6f secs\n",get_time() - initAudioStart);
     DualLog("Scratch arena total peak: %u MB, ", (u32)(scratch_peak >> 20)); OS_Free(scratch_base,SCRATCH_ARENA_SIZE); // Free the initialization scratch arena.
-    DebugRAMPeak(); DualLog(".......Game Initialization TOTAL %.6f secs\n",get_time() - game_start_time); DebugRAMActual("init"); DualLog("\n");
+    DebugRAMPeak(); DualLog(".......Game Initialization TOTAL %.6f secs\n",get_time() - game_start_time); DebugRAMActual("init");
 }
 void RessurectionTextUpdate() { static int lastStage = -1; double fin = World.invP1.ressurectingFinished; if (fin <= World.pauseRelativeTime) { lastStage = -1; return; } double el = World.pauseRelativeTime - (fin - 3.0); int stage = (int)(el * 8.0 / 3.0); if (stage < 0) stage = 0; if (stage > 7) stage = 7; if (stage != lastStage) { lastStage = stage; CenterStatusPrint("%s", Sys_Text.stringTable[860 + stage]); } }
 void Physics(float),UpdateAnims(),UpdateAudio(),AudioUpdateMix(),PSys_Update(float),BioMonitorUpdate();

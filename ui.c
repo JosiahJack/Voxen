@@ -1219,31 +1219,23 @@ static void RenderUI() {
             }
             RenderTextL(1270,78,T_WHITE,FONT_NORMAL,0.8,"0"); RenderTextL(1308,78,T_WHITE,FONT_NORMAL,0.8,"0"); RenderSearchFX();
         }
-        if (EditSelIsActive()) {/*Edit mode selection highlight + object info panel*/
-            u16 sel=editModeSelection; Entity* e=&World.instances[sel];
-            float sx,sy; if (WorldToScreenPoint(V3_AsubB(World.position[sel],World.position[PLAYER1]),&sx,&sy)) RenderUIImage((i16)(sx-24.0f),(i16)(sy-24.0f),48,48,1051);
-            RenderUIImage(966,84,400,600,1025);/*Edit object info panel bg (non-interactive backdrop)*/
-            RenderTextL(982,104,T_YELLOW,FONT_NORMAL,1.0f,"EDIT OBJECT #%u",sel); {char v[40];sFormat(v,40,"%u",e->index);RenderTextL(982,132,T_GREEN,FONT_NORMAL,1.0f,"const index"); RenderTextL(1108,132,T_GREEN,FONT_NORMAL,1.0f,"%s",v);} bool caretOn=((u32)(get_time()*2.0f)&1)!=0;
-            for(int i=0;i<EF_LAST;++i){u8 slot=(u8)i;i16 y=efRowY[i];char v[40];EditFieldValueText(slot,sel,v,40);
-                bool editingThis=editFieldEditing&&editFieldSlot==slot; RenderTextL(982,y,editingThis?T_RED:T_GREEN,FONT_NORMAL,1.0f,"%s",efRowLabel[i]);
-                if(editingThis){char buf[44];sFormat(buf,44,"%s%s",editFieldBuffer,caretOn?"|":"");RenderTextL(1108,y,T_RED,FONT_NORMAL,1.0f,"%s",buf);}
-                else { float w=MeasureLineAdvance(v,FONT_NORMAL); UIR(UI_ID_CMFD_EDIT_ROW_0+i,1108,y,(i16)w,26); bool hov=UIOver(UI_ID_CMFD_EDIT_ROW_0+i); RenderTextL(1108,y,hov?T_YELLOW:(i<EF_TEX?T_WHITE:T_GREEN),FONT_NORMAL,1.0f,"%s",v); }
+        if (EditSelIsActive() || EditLightSelIsActive()) {
+            const bool isObj = EditSelIsActive(); u16 sel = isObj ? editModeSelection : editModeLightSelection; float sx, sy; V3 worldPos = isObj ? World.position[sel] : World.lights[sel].pos; if (WorldToScreenPoint(V3_AsubB(worldPos, World.position[PLAYER1]), &sx, &sy)) { RenderUIImage((i16)(sx - 24.0f), (i16)(sy - 24.0f), 48, 48, 1051); }
+            RenderUIImage(966, 84, 400, 600, 1025); RenderTextL(982, 104, T_YELLOW, FONT_NORMAL, 1.0f, isObj ? "EDIT OBJECT #%u" : "EDIT LIGHT #%u", sel); char v[40];
+            if (isObj) { Entity* e = &World.instances[sel]; sFormat(v, 40, "%u", e->index); RenderTextL(982, 132, T_GREEN, FONT_NORMAL, 1.0f, "const index"); } else { Light* L = &World.lights[sel]; sFormat(v, 40, "0x%x %s", L->lflags, (L->lflags & LIGHTON) ? "on" : "off"); RenderTextL(982, 132, T_GREEN, FONT_NORMAL, 1.0f, "flags"); }
+            RenderTextL(1108, 132, T_GREEN, FONT_NORMAL, 1.0f, "%s", v);
+            bool caretOn = ((u32)(get_time() * 2.0f) & 1) != 0; const int last = isObj ? EF_LAST : LF_LAST;
+            for (int i = 0; i < last; ++i) {
+                u8 slot = (u8)i; i16 y = efRowY[i]; char v2[40]; if (isObj) { EditFieldValueText(slot,sel,v2,40); } else { LightFieldValueText(slot,sel,v2,40); }
+                bool editingThis = editFieldEditing && editFieldSlot == slot; RenderTextL(982, y, editingThis ? T_RED : T_GREEN, FONT_NORMAL, 1.0f, "%s", isObj ? efRowLabel[i] : lfRowLabel[i]);
+                if (editingThis) { char buf[44]; sFormat(buf,44,"%s%s",editFieldBuffer,caretOn ? "|" : ""); RenderTextL(1108,y,T_RED,FONT_NORMAL,1.0f,"%s",buf); } else { float w = MeasureLineAdvance(v,FONT_NORMAL); UIR(UI_ID_CMFD_EDIT_ROW_0 + i, 1108, y, (i16)w, 26); bool h = UIOver(UI_ID_CMFD_EDIT_ROW_0 + i); u32 c = h ? T_YELLOW : (isObj ? (i < EF_TEX ? T_WHITE : T_GREEN) : T_WHITE); RenderTextL(1108,y,c,FONT_NORMAL,1.0f,"%s",v); }
             }
-            if(editFieldEditing&&Sys_Input.scrollDelta!=0.0f){EditFieldStep((float)Sys_Input.scrollDelta);Sys_Input.scrollDelta=0.0f;}
-            if(sel==World.weaponVModelIndex){int wep16=Get16WeaponIndexFromConstIndex(e->index);if(wep16>=0&&wep16<16){V3 offs=vWepOfs[wep16];offs.y+=wfx.reloadContainerPos.y;RenderTextL(982,580,T_GREEN,FONT_NORMAL,1.0f,"vm offset");RenderTextL(1108,580,T_YELLOW,FONT_NORMAL,1.0f,"%.5f %.5f %.5f",offs.x,offs.y,offs.z);}}
-        } else if (EditLightSelIsActive()) {/*Edit mode light info panel: same dialogue, light properties instead of entity fields*/
-            u16 li=editModeLightSelection; Light* L=&World.lights[li];
-            float sx,sy; if (WorldToScreenPoint(V3_AsubB(L->pos,World.position[PLAYER1]),&sx,&sy)) RenderUIImage((i16)(sx-24.0f),(i16)(sy-24.0f),48,48,1051);
-            RenderUIImage(966,84,400,600,1025);/*Edit object info panel bg (non-interactive backdrop)*/
-            RenderTextL(982,104,T_YELLOW,FONT_NORMAL,1.0f,"EDIT LIGHT #%u",li); {char v[40];sFormat(v,40,"0x%x %s",L->lflags,(L->lflags&LIGHTON)?"on":"off");RenderTextL(982,132,T_GREEN,FONT_NORMAL,1.0f,"flags"); RenderTextL(1108,132,T_GREEN,FONT_NORMAL,1.0f,"%s",v);} bool caretOn=((u32)(get_time()*2.0f)&1)!=0;
-            for(int i=0;i<LF_LAST;++i){u8 slot=(u8)i;i16 y=efRowY[i];char v[40];LightFieldValueText(slot,li,v,40);
-                bool editingThis=editFieldEditing&&editFieldSlot==slot; RenderTextL(982,y,editingThis?T_RED:T_GREEN,FONT_NORMAL,1.0f,"%s",lfRowLabel[i]);
-                if(editingThis){char buf[44];sFormat(buf,44,"%s%s",editFieldBuffer,caretOn?"|":"");RenderTextL(1108,y,T_RED,FONT_NORMAL,1.0f,"%s",buf);}
-                else { float w=MeasureLineAdvance(v,FONT_NORMAL); UIR(UI_ID_CMFD_EDIT_ROW_0+i,1108,y,(i16)w,26); bool hov=UIOver(UI_ID_CMFD_EDIT_ROW_0+i); RenderTextL(1108,y,hov?T_YELLOW:T_WHITE,FONT_NORMAL,1.0f,"%s",v); }
+            if (editFieldEditing && Sys_Input.scrollDelta != 0.0f) { EditFieldStep((float)Sys_Input.scrollDelta); Sys_Input.scrollDelta = 0.0f; } 
+            if (isObj) { if (sel == World.weaponVModelIndex) { Entity* e = &World.instances[sel]; int wep16 = Get16WeaponIndexFromConstIndex(e->index); if (wep16 >= 0 && wep16 < 16) { V3 offs = vWepOfs[wep16]; offs.y += wfx.reloadContainerPos.y; RenderTextL(982, 580, T_GREEN, FONT_NORMAL, 1.0f, "vm offset"); RenderTextL(1108, 580, T_YELLOW, FONT_NORMAL, 1.0f, "%.5f %.5f %.5f", offs.x, offs.y, offs.z); } } }
+            else {
+                Light* L = &World.lights[sel]; RenderTextL(982, 596, T_GREEN, FONT_NORMAL, 1.0f, "type"); UIRImg(UI_ID_CMFD_EDIT_LIGHT_TYPE, 1108, 596, 120, 28, 1087); bool hov = UIOver(UI_ID_CMFD_EDIT_LIGHT_TYPE); RenderTextC(1108 + 60, 602, hov ? T_YELLOW : T_GREEN, FONT_NORMAL, 0.8f, "%s",(L->lflags & LSPOT) ? "spot" : "point"); static const char* lfDirLbl[6] = {"N", "E", "S", "W", "Up", "Dn"};
+                for (int d = 0; d < 6; ++d) { i16 bx = (i16)(982 + d * 36); u32 bid = UI_ID_CMFD_EDIT_LIGHT_DIR_N + d; UIRImg(bid, bx, 644, 28, 28, 1087); hov = UIOver(bid); RenderTextC(bx + 14, 650, hov ? T_YELLOW : (LightDirIs((u8)d) ? T_YELLOW : T_GREEN),FONT_NORMAL, 0.8f, "%s", lfDirLbl[d]); }
             }
-            RenderTextL(982,596,T_GREEN,FONT_NORMAL,1.0f,"type"); UIRImg(UI_ID_CMFD_EDIT_LIGHT_TYPE,1108,596,120,28,1087); {bool hov=UIOver(UI_ID_CMFD_EDIT_LIGHT_TYPE); RenderTextC(1108 + 60,602,hov?T_YELLOW:T_GREEN,FONT_NORMAL,0.8f,"%s",(L->lflags&LSPOT)?"spot":"point");}
-            static const char* lfDirLbl[6]={"N","E","S","W","Up","Dn"}; for(int d=0;d<6;++d){i16 bx=(i16)(982 + d*36); u32 bid=UI_ID_CMFD_EDIT_LIGHT_DIR_N+d; UIRImg(bid,bx,644,28,28,1087); bool hov=UIOver(bid); RenderTextC(bx+14,650,hov?T_YELLOW:(LightDirIs((u8)d)?T_YELLOW:T_GREEN),FONT_NORMAL,0.8f,"%s",lfDirLbl[d]);}
-            if(editFieldEditing&&Sys_Input.scrollDelta!=0.0f){EditFieldStep((float)Sys_Input.scrollDelta);Sys_Input.scrollDelta=0.0f;}
         }
     }
     if (World.Sys_UI.vmailActive) {
