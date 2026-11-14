@@ -4,10 +4,10 @@
 #include "Shaders/shaders.h"
 GlobalContext World = {0}; // Full game state
 double game_start_time, game_actual_start_time, shadowTime, physTime, renderTime, prePhys, gameTime, raycastMs;
-float rasterPerspectiveProjection[16],modelMatrices[INSTANCE_COUNT*16],*world_from_mdl = modelMatrices,modelBounds[MAX_MDLS],**physPos,lightView[MAX_SHADOWMAPS][6][4][4],lightViewProj[MAX_SHADOWMAPS][6][16],shadowmapsPerspectiveProjection[16],sunShadowMatrix[16],berserkSeedTime;
+float rasterPerspectiveProjection[16],modelMatrices[INSTANCE_CNT*16],*world_from_mdl = modelMatrices,modelBounds[MAX_MDLS],**physPos,lightView[MAX_SHADOWMAPS][6][4][4],lightViewProj[MAX_SHADOWMAPS][6][16],shadowmapsPerspectiveProjection[16],sunShadowMatrix[16],berserkSeedTime;
 static float shakeAmp = 0.15f,amMapScaleX,amMapScaleY,amMapOffsetX;
 static u32 globalframesPerLastSecond,inputImageID,inputUIID,inputDepthID,inputSpecID,inputNormalID,outputImageID,gBufferFBO,uiSP,depthPrepassSP,chunkSP,chunkVAO,matricesBufferID,ssrSP,rtSP,rtCopySP,imageBlitSP,quadVAO,quadVBO,rtInstanceInfoID,rtCellCountsID,rtCellListsID,rtGeomID,rtOrderBufID,gpuQ[5][5],wireVertCount,raycastPickMode;
-u32 globalframe,threadCnt = 1,*physVertCounts,*rtSrcVertCounts,uiFBO,textDecalVBO[MAX_LEVELS][INSTANCE_COUNT],textSP,textVAO,textVBO,textDecalVertexCount[MAX_LEVELS][INSTANCE_COUNT],lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,cellVisibleDataID,shadowmapsSP,shadowMapSSBO,shadowMapsIndirectionID,sunShadowFBO,sunShadowTex,shadowmapIndirectionList[LIGHT_COUNT],colorBufferID,texPalID,texPalOfsID,textureOffsetsID,textureSizesID,psysInstancesID,
+u32 globalframe,threadCnt = 1,*physVertCounts,*rtSrcVertCounts,uiFBO,textDecalVBO[MAX_LEVELS][INSTANCE_CNT],textSP,textVAO,textVBO,textDecalVertexCount[MAX_LEVELS][INSTANCE_CNT],lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,cellVisibleDataID,shadowmapsSP,shadowMapSSBO,shadowMapsIndirectionID,sunShadowFBO,sunShadowTex,shadowmapIndirectionList[LIGHT_CNT],colorBufferID,texPalID,texPalOfsID,textureOffsetsID,textureSizesID,psysInstancesID,
     psysTrailsID,psysquadVAO,psysquadVBO,particleSP,trailSP,camViewTextures[64],levelCamViewTextures[14][64],drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal,biomTexId,biomFBO,raycastCalls,debugUnlitSP,debugLinesVAO,debugLinesVBO,wireLinesVAO,wireLinesVBO;
 u16 **modelTriangles, modelTriangleCounts[MAX_MDLS], mdlsCnt, **physTris, texCnt, decalStyleCount, decalInlineTextLevel[DECAL_INLINE_TEXT_MAX], decalInlineTextInst[DECAL_INLINE_TEXT_MAX], decalInlineTextCount;
 static u8 currentPlayerNameLength,currentMenuPage,resDropdownCount,resSelectedIdx,gpuQFrame,uiMouseCaptured;
@@ -15,7 +15,7 @@ static i8 currentMenuItem,currentMenuTab, menuItemCount = 4, menuTabCount = 1, r
 u8 particleBlendTexture[MAXTEX],camViewCount,levelCamViewCount[14];
 char decalInlineText[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN];
 bool doubleSidedTexture[MAXTEX],transparentTexture[MAXTEX],shadowBuffersCreated,resDropdownOpen,mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause,fovSliderActive,gammaSliderActive,masterVolumeSliderActive,musicVolumeSliderActive,messageVolumeSliderActive,sfxVolumeSliderActive,ssrResSliderActive,mouseSensSliderActive,enteringPlayerName;
-typedef struct { u32 nodeBase,triBase,vtxBase,uvBase,orderBase; } ModelRTInfo; typedef struct { u32 geom[4]; u32 info[4]; float iscl2[4]; } InstanceRTInfo; static InstanceRTInfo rtInstanceInfo[INSTANCE_COUNT]; static InstanceRTInfo rtPrevInfo[INSTANCE_COUNT]; static ModelRTInfo rtModelInfo[MAX_MDLS];
+typedef struct { u32 nodeBase,triBase,vtxBase,uvBase,orderBase; } ModelRTInfo; typedef struct { u32 geom[4]; u32 info[4]; float iscl2[4]; } InstanceRTInfo; static InstanceRTInfo rtInstanceInfo[INSTANCE_CNT]; static InstanceRTInfo rtPrevInfo[INSTANCE_CNT]; static ModelRTInfo rtModelInfo[MAX_MDLS];
 V3 modelMin[MAX_MDLS], modelMax[MAX_MDLS],sunDirection={0.0f,1.0f,0.0f}; FrustumPlane lightFrustumPlanes[MAX_SHADOWMAPS][6][6],playerFrustumPlanes[6],sunShadowFrustum[6]; DecalStyle decalStyles[DECAL_STYLE_MAX]; CamView camViews[64], levelCamViews[14][64];
 typedef struct {int w,h;} ResMode; ResMode resModes[16];
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
@@ -493,7 +493,7 @@ void TextEntry(i32 k) {
     if (k == KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { World.playerName[0] = '\0'; currentPlayerNameLength = 0; return; } if (k == KEY_ENTER || k == KEY_KP_ENTER) { currentMenuItem++; return; } if (k == KEY_BACKSPACE && currentPlayerNameLength > 0) { World.playerName[--currentPlayerNameLength] = '\0'; return; } if (currentPlayerNameLength >= 26) return;
     char c = (k >= KEY_A && k <= KEY_Z) ? 'a' + (k - KEY_A) : ((k >= KEY_1 && k <= KEY_9) ? '1' + (k - KEY_1) : ((k == KEY_0) ? '0' : ((k == KEY_SPACE) ? ' ' : 0))); if (c) { World.playerName[currentPlayerNameLength] = c; World.playerName[++currentPlayerNameLength] = '\0'; }
 }
-void ConsoleEmulator(i32 keycode); extern bool editFieldEditing; extern void EditFieldKey(i32 keycode); extern bool enteringSaveName; extern void SaveNameEntry(i32 keycode); extern void KeycodeEntryKey(i32 keycode);
+void ConsoleEmulator(i32 keycode); extern bool editFieldEditing; extern void EditFieldKey(i32 keycode); extern bool enteringSaveName; extern void SaveNameEntry(i32 keycode); extern void KeycodeEntryKey(i32 keycode); extern float cyberWallFade[INSTANCE_CNT];
 void InputKey(char* keys,int key,int action) {
     if (key >= 0 && key < WS_KEYCOUNT) { if (action == INPUT_RELEASE && keys[key] == INPUT_RELEASE) { return; } if (action == INPUT_PRESS && keys[key] == INPUT_PRESS) { action = INPUT_REPEAT; } else { keys[key] = action; } }
     if (key == KEY_F10 && action) OS_Exit(0); if (!window_has_focus && action != INPUT_RELEASE) return;
@@ -511,15 +511,15 @@ void InputCursorPos(double* x, double* y, double xpos, double ypos) {
     World.currentMouse_dx += (i32)(xpos - last_mouse_x); World.currentMouse_dy += (i32)(ypos - last_mouse_y); last_mouse_x = xpos; last_mouse_y = ypos;
     if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused) {/*Uses UI baseline resolution 1366x768*/ i32 newX = vclampi(World.cursorPos_x + World.currentMouse_dx,0,UI_W); if (newX != World.cursorPos_x) {mouseMovementThisFrame = true;} World.cursorPos_x = newX; i32 newY = vclampi(World.cursorPos_y + World.currentMouse_dy,0,UI_H); if (newY != World.cursorPos_y) {mouseMovementThisFrame = true;} World.cursorPos_y = newY;}
 }
-static bool GetKeyRiseEdgeOrHeld(int sI, bool onRise) { i32 i = Sys_Settings.InputCodeSettings[sI]; if (i == 127) {return !uiWheelBlocked && Sys_Input.scrollDelta > 0;} if (i == 128) {return !uiWheelBlocked && Sys_Input.scrollDelta < 0;} KeyState* k = GetCodeMapping(sI); return onRise ? k->pressed : k->down; }
-static bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
-static bool GetKeyPressed(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
+bool GetKeyRiseEdgeOrHeld(int sI, bool onRise) { i32 i = Sys_Settings.InputCodeSettings[sI]; if (i == 127) {return !uiWheelBlocked && Sys_Input.scrollDelta > 0;} if (i == 128) {return !uiWheelBlocked && Sys_Input.scrollDelta < 0;} KeyState* k = GetCodeMapping(sI); return onRise ? k->pressed : k->down; }
+bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
+bool GetKeyPressed(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
 bool Forward() { return GetKey(0); }                bool StrafeLeft() { return GetKey(1); }             bool Backpedal() { return GetKey(2); }            bool StrafeRight() { return GetKey(3); }            bool Jump() { return GetKey(4); }                   bool JumpDown() { return GetKeyPressed(4); }
 bool Crouch() { return GetKeyPressed(5); }          bool Prone() { return GetKeyPressed(6); }           bool LeanLeft() { return GetKey(7); }             bool LeanRight() { return GetKey(8); }              bool Sprint() { return GetKey(9); }                 bool TurnLeft() { return GetKey(10); }
 bool TurnRight() { return GetKey(11); }             bool LookUp() { return GetKey(12); }                bool LookDown() { return GetKey(13); }            bool RecentLog() { return GetKeyPressed(14); }
 bool Attack() { return GetKey(23); }         bool Use() { return GetKeyPressed(24); }            bool Menu() { return GetKeyPressed(25); }         bool Reload() { return GetKeyPressed(27); }
 bool Grenade() { return GetKeyPressed(30); }        bool GrenCycUp() { return GetKeyPressed(31); }      bool GrenCycDn() { return GetKeyPressed(32); }    bool ChangeAmmoType() { return GetKeyPressed(33); } bool Patch() { return GetKeyPressed(34); }
-bool PatchCycUp() { return GetKeyPressed(35); }     bool PatchCycDown() { return GetKeyPressed(36); }   bool SwimUp() {return (Cheats.noclip || World.curLev == LEVEL_CYBERSPACE) && GetKey(38);}             bool SwimDn() {return (Cheats.noclip || World.curLev == LEVEL_CYBERSPACE) && GetKey(39);}
+bool PatchCycUp() { return GetKeyPressed(35); }     bool PatchCycDown() { return GetKeyPressed(36); }
 bool DoubleTapLeanLeft(void)  { if(!GetKeyPressed(7)){ return false; } if (World.pauseRelativeTime < World.invP1.leanLTapFinished) { World.invP1.leanLTapFinished = 0.0; return true; } World.invP1.leanLTapFinished = World.pauseRelativeTime + 0.5; return false; }
 bool DoubleTapLeanRight(void) { if(!GetKeyPressed(8)){ return false; } if (World.pauseRelativeTime < World.invP1.leanRTapFinished) { World.invP1.leanRTapFinished = 0.0; return true; } World.invP1.leanRTapFinished = World.pauseRelativeTime + 0.5; return false; } 
 void ForceShootMode() { if (Sys_Settings.NoShootMode){ return; } if (World.inventoryMode) { World.cursorPos_x = 663; World.cursorPos_y = 364; ignore_next_mouse_delta = true; } World.Sys_UI.mouseClickHeldOverGUI=World.inventoryMode = false; CloseFullmap(); World.Sys_UI.vmailActive = 0; }
@@ -528,7 +528,7 @@ void ToggleInventoryMode() { if (World.inventoryMode) { ForceShootMode();} else 
 void ToggleConsole() { static bool imWasActPrior = false; editFieldEditing = false; if (!Cheats.consoleActive) {imWasActPrior = World.inventoryMode;} Cheats.consoleActive = !Cheats.consoleActive; World.paused = !World.paused; if (Cheats.consoleActive) { World.inventoryMode = true; } else if (!imWasActPrior && World.inventoryMode) {ForceShootMode();} }
 void SaveGame(u8,const char*),LoadGame(u8),ApplyPlayerMovements(float);
 void HwToggle(u8);
-extern V3 debugWepOffset;
+V3 debugWepOffset;
 void InputProcessing() {
     for (int i=0;i<MAX_MOUSE_BUTTONS;++i) { if(!Sys_Input.mouseButtons[i].down){uiMouseCaptured &= ~(1u<<i);} }
     mouseMovementThisFrame = false; Sys_Input.scrollDelta = 0.0f; PollEvents(); World.Sys_UI.mouseClickHeldOverGUI = false; uiWheelBlocked = window_has_focus && UIInteractions(); World.uiIsBlocking = uiWheelBlocked;
@@ -758,15 +758,15 @@ void ConsoleEmulator(i32 keycode) {
 RaycastHit RayTriangle(V3 origin, V3 dir, V3 A, V3 B, V3 C) {
     RaycastHit miss = { .hit = false }; V3 AB = V3_AsubB(B, A), AC = V3_AsubB(C, A); V3 n = V3_Cross(AB, AC); V3 ao = V3_AsubB(origin, A); float det = (-V3_dot(dir, n)); float invDet = 1.0f / det; float d = V3_dot(ao,n)*invDet; if (d < 0.0f) return miss;
     V3 dao = V3_Cross(ao, dir); float u = V3_dot(AC,dao) * invDet; if (u < 0.0f) return miss; float v = (-V3_dot(AB, dao)) * invDet; if (v < 0.0f) return miss; float w = 1.0f - u-v; if (w < 0.0f) return miss;
-    return (RaycastHit){.point = V3Add(origin, V3_ScaleByF(dir, d)), .normal = V3_Normalize(n), .distance = d, .hitInstanceIndex = INSTANCE_COUNT, .hit = vabs(det) >= 0.00000001f};
+    return (RaycastHit){.point = V3Add(origin, V3_ScaleByF(dir, d)), .normal = V3_Normalize(n), .distance = d, .hitInstanceIndex = INSTANCE_CNT, .hit = vabs(det) >= 0.00000001f};
 }
 INLINE RaycastHit RaySphere(V3 origin, V3 dir, ShapeSphere sph, float maxDist) {
-    RaycastHit h = {.distance=maxDist,.hitInstanceIndex=INSTANCE_COUNT}; float r = sph.rad; if (r < 0.0001f) return h; V3 oc = V3_AsubB(origin, sph.ctr); float b=V3_dot(oc,dir), c=V3_dot(oc,oc) - r * r; float disc=b*b - c; if (disc < 0.0f) return h; float s = vsqrtf(disc); float t = -b - s; if (t < 0.0f) t = -b + s; if (t < 0.0f || t > maxDist) return h;
+    RaycastHit h = {.distance=maxDist,.hitInstanceIndex=INSTANCE_CNT}; float r = sph.rad; if (r < 0.0001f) return h; V3 oc = V3_AsubB(origin, sph.ctr); float b=V3_dot(oc,dir), c=V3_dot(oc,oc) - r * r; float disc=b*b - c; if (disc < 0.0f) return h; float s = vsqrtf(disc); float t = -b - s; if (t < 0.0f) t = -b + s; if (t < 0.0f || t > maxDist) return h;
     h.hit = true; h.distance = t; h.point = V3Add(origin, V3_ScaleByF(dir, t)); h.normal = V3_ScaleByF(V3_AsubB(h.point, sph.ctr), 1.0f / r); return h;
 }
 u16 EditModePickLight(V3 o, V3 dir, float maxDist, float* outDist) { u16 best = U16_MAX; float bd = maxDist; for (u16 i = 0; i < World.loadedLights; ++i) { Light* L = &World.lights[i]; if ((L->lflags & (LSPOT | LDIR)) || L->range <= 0.001f) { continue; } RaycastHit h = RaySphere(o,dir,(ShapeSphere){L->pos,0.02f*L->range},maxDist); if (h.hit && h.distance < bd) { best = i; bd = h.distance; } } if (outDist) { *outDist = bd; } return best; }
 INLINE RaycastHit RayCapsule(V3 origin, V3 dir, ShapeCapsule cap, float maxDist) {
-    RaycastHit h={.hit=false,.distance=maxDist,.point={0},.normal={0},.hitInstanceIndex=INSTANCE_COUNT}; float r = cap.rad; if (r < 0.0001f) return h; V3 ba = V3_AsubB(cap.tip,cap.base), oa = V3_AsubB(origin,cap.base), nBest = {0}; float baba = V3_dot(ba,ba); if (baba < 0.00001f) return RaySphere(origin, dir, (ShapeSphere){cap.base, r}, maxDist);
+    RaycastHit h={.hit=false,.distance=maxDist,.point={0},.normal={0},.hitInstanceIndex=INSTANCE_CNT}; float r = cap.rad; if (r < 0.0001f) return h; V3 ba = V3_AsubB(cap.tip,cap.base), oa = V3_AsubB(origin,cap.base), nBest = {0}; float baba = V3_dot(ba,ba); if (baba < 0.00001f) return RaySphere(origin, dir, (ShapeSphere){cap.base, r}, maxDist);
     float bard = V3_dot(ba,dir), baoa = V3_dot(ba,oa), tBest=-1.0f; float a = baba - bard * bard, b = baba * V3_dot(dir,oa) - baoa * bard, c = baba * V3_dot(oa,oa) - baoa * baoa - r * r * baba; float disc = b * b - a * c;
     if (vabs(a) >= 0.00001f && disc >= 0.0f) {
         float sh = vsqrtf(disc); float t0 = (-b - sh) / a; float y0 = baoa + t0 * bard; 
@@ -780,7 +780,7 @@ INLINE RaycastHit RayCapsule(V3 origin, V3 dir, ShapeCapsule cap, float maxDist)
     if (tBest >= 0.0f) { h.hit = true; h.distance = tBest; h.point = V3Add(origin, V3_ScaleByF(dir, tBest)); h.normal = nBest; } return h;
 }
 INLINE RaycastHit RayBox(V3 origin, V3 dir, ShapeBox box, float maxDist) {
-    RaycastHit h = {.hit=false,.distance=maxDist,.point={0},.normal={0},.hitInstanceIndex=INSTANCE_COUNT}; Quaternion inv = {-box.rot.x,-box.rot.y,-box.rot.z,box.rot.w}; V3 lo = quat_rot_v3(inv, V3_AsubB(origin, box.ctr)), ld = quat_rot_v3(inv, dir);
+    RaycastHit h = {.hit=false,.distance=maxDist,.point={0},.normal={0},.hitInstanceIndex=INSTANCE_CNT}; Quaternion inv = {-box.rot.x,-box.rot.y,-box.rot.z,box.rot.w}; V3 lo = quat_rot_v3(inv, V3_AsubB(origin, box.ctr)), ld = quat_rot_v3(inv, dir);
     float o[3] = {lo.x, lo.y, lo.z}, d[3] = {ld.x, ld.y, ld.z}, he[3] = {box.hExt.x, box.hExt.y, box.hExt.z}; float tmin = 0.0f, tmax = maxDist; int axis = -1; float asign = 0.0f;
     for (int a = 0; a < 3; ++a) { if (vabs(d[a]) < 0.000001f) { if (vabs(o[a]) > he[a]) return h; } else { float t1 = (-he[a] - o[a]) / d[a], t2 = (he[a] - o[a]) / d[a]; float tNear = vmin(t1,t2), tFar = vmax(t1,t2), ns = (d[a] > 0.0f) ? -1.0f : 1.0f; if (tNear > tmin) { tmin = tNear; axis = a; asign = ns; } if (tFar < tmax) { tmax = tFar; } if (tmin > tmax) { return h; } } }
     if (axis < 0) { h.hit = true; h.distance = 0.0f; h.point = origin; h.normal = V3_ScaleByF(dir, -1.0f); return h; } V3 ln = {0.0f, 0.0f, 0.0f}; if (axis == 0) { ln.x = asign; } else if (axis == 1) { ln.y = asign; } else { ln.z = asign; } h.hit = true; h.distance = tmin; h.point = V3Add(origin, V3_ScaleByF(dir, tmin)); h.normal = quat_rot_v3(box.rot, ln); return h;
@@ -791,10 +791,10 @@ float BvhRayAABBHit(V3 o, V3 d, V3 a, V3 b, float m) {
     if (vabs(d.y) < 0.00000001f) { if (o.y < a.y || o.y > b.y) return -1.0f; } else { float inv=1.0f/d.y; float t1=(a.y - o.y) * inv, t2=(b.y - o.y) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > mn){mn=t1;} if(t2 < mx){mx=t2;} if (mn > mx) return -1.0f; } /*Y slab*/
     if (vabs(d.z) < 0.00000001f) { if (o.z < a.z || o.z > b.z) return -1.0f; } else { float inv=1.0f/d.z; float t1=(a.z - o.z) * inv, t2=(b.z - o.z) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > mn){mn=t1;} if(t2 < mx){mx=t2;} if (mn > mx) return -1.0f; } /*Z slab*/ return mn;
 }
-static u16 rayCellHeads[ARRSIZE],rayNext[INSTANCE_COUNT]; static u32 rayGridFrame=U32_MAX;
-INLINE void RayGridRebuild(void) { rayGridFrame = globalframe; for (u32 c=0;c<ARRSIZE;++c) { rayCellHeads[c] = INSTANCE_COUNT; } for (u16 i=0;i<World.instCount;++i){ u16 c=(u16)World.instances[i].cellIndex; if (c>=ARRSIZE){ c = (u16)PosGetCellCoords(World.position[i].x, World.position[i].z); } rayNext[i] = rayCellHeads[c]; rayCellHeads[c] = i; } }
+static u16 rayCellHeads[ARRSIZE],rayNext[INSTANCE_CNT]; static u32 rayGridFrame=U32_MAX;
+INLINE void RayGridRebuild(void) { rayGridFrame = globalframe; for (u32 c=0;c<ARRSIZE;++c) { rayCellHeads[c] = INSTANCE_CNT; } for (u16 i=0;i<World.instCount;++i){ u16 c=(u16)World.instances[i].cellIndex; if (c>=ARRSIZE){ c = (u16)PosGetCellCoords(World.position[i].x, World.position[i].z); } rayNext[i] = rayCellHeads[c]; rayCellHeads[c] = i; } }
 RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
-    double rStart = get_time(); const float maxDistSq = maxDist * maxDist; dir = V3_Normalize(dir); RaycastHit result = {.hit = false,.distance = maxDist,.point = origin,.normal = dir,.hitInstanceIndex = INSTANCE_COUNT}; if (unlikely(rayGridFrame != globalframe)) { RayGridRebuild(); }
+    double rStart = get_time(); const float maxDistSq = maxDist * maxDist; dir = V3_Normalize(dir); RaycastHit result = {.hit = false,.distance = maxDist,.point = origin,.normal = dir,.hitInstanceIndex = INSTANCE_CNT}; if (unlikely(rayGridFrame != globalframe)) { RayGridRebuild(); }
     float wx = World.worldMin_x[World.curLev], wz = World.worldMin_z[World.curLev], ex = origin.x + dir.x*maxDist, ez = origin.z + dir.z*maxDist;
     float xA = vmin(origin.x, ex) - 24.0f, xB = vmax(origin.x, ex) + 24.0f, zA = vmin(origin.z, ez) - 24.0f, zB = vmax(origin.z, ez) + 24.0f;
     i32 b0x = (i32)vfloor((xA - wx + CELLXHALF) / CELLSZ), b1x = (i32)vfloor((xB - wx + CELLXHALF) / CELLSZ), b0z = (i32)vfloor((zA - wz + CELLXHALF) / CELLSZ), b1z = (i32)vfloor((zB - wz + CELLXHALF) / CELLSZ);
@@ -802,7 +802,7 @@ RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
     for (i32 cz=b0z;cz<=b1z;++cz) {
         for (i32 cx=b0x;cx<=b1x;++cx) {
             u32 cellP = (u32)cz*WORLDX + (u32)cx;
-            for (u16 i=rayCellHeads[cellP]; i<INSTANCE_COUNT; i=rayNext[i]) {
+            for (u16 i=rayCellHeads[cellP]; i<INSTANCE_CNT; i=rayNext[i]) {
                 if (!(layerMask & World.layer[i])){ continue; } if (!(World.instances[i].entflags & EF_ACTIVE)){ continue; }
                 u16 mindex = World.instances[i].modelIndex;
                 V3 objPos = World.position[i];
@@ -934,7 +934,6 @@ void UpdateScreenSize(i32 width, i32 height) {
 Quaternion vWepRot[16]={{0,.67623f,.73802f,0},{-.67623f,0,0,.73802f},{.10363f,0,0,.99456f},{0,.66976f,.74389f,0},{0,.68903f,.72611f,0},     {0,0,0,1},     {0,0,0,1},{.63662f,0,0,-.77238f},{0,.63662f,.77238f,0},{-.67623f,0,0,.73802f},{0,-.70781f,-.70781f,0},{0,-.65003f,-.76116f,0},{-.44581f,-.44581f,-.55061f,.55061f},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0}};                        
         V3 vWepOfs[16]={{      0,-.54f,.451f},        {0,-.5f,0.28f},  {-.015f,-.34f,.18f},       {0,-.43f,.27f},     {0,-0.57f,0.56f},{-.2f,.5f,.8f},  {0,-.3f,.7f},        {0,-.39f,.02f},       {0,-.54f,.44f},        {0,-.58f,.43f},     {-.02f,-.64f,.79f},         {0,-.46f,.43f},                       {0,-.5f,.08f},       {0,-.62f,.69f},       {0,-.55f,.58f},       {0,-.56f,.55f}};
 extern const u16 wepModelIndices[16];
-extern WeaponFireCtx wfx; // weapon view model: needed by RenderUI (ui.c)
 static bool clearRenderTargetsOnNextFrame = false;
 // CPU automap, side MFD, 320x200
 static u8 amPx[AM_W*AM_H*4],amFullPx[AM_FULL_W*AM_FULL_H*4],amBuiltLev=255,amMdlState[MAX_MDLS]/*0=unknown,1=ok,2=no mesh*/,amMdlWall[MAX_MDLS]/*1=wall-like (draw), 0=floor-like (skip)*/,amHullN[MAX_MDLS],amCardState[MAX_MDLS]/*0=unknown,1=ok*/,amRadCells[ARRSIZE],amElevCells[ARRSIZE],amDiagCell[ARRSIZE],amDoorXR[256]/*1=X-running span, 0=Z-running*/;
@@ -1146,7 +1145,7 @@ extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artif
 extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_xor_ps(__m256 __A, __m256 __B) { return (__m256)((__m256i)__A ^ (__m256i)__B); }
 extern __inline int __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_movemask_ps(__m256 __A) { return __builtin_ia32_movmskps256((__v8sf)__A); }
 extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_setzero_ps(void) { return (__m256){ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f }; }
-u16 shadowCasterIndices[SC_MAX], candidates[MAX_SHADOWMAPS]; static __attribute__((aligned(64))) float sc_posX[SC_MAX],sc_posY[SC_MAX],sc_posZ[SC_MAX],sc_radius[SC_MAX],sc_shadRadius[SC_MAX]; static u16 sc_origIdx[SC_MAX], shadowSlot[LIGHT_COUNT]; static u8 shadowFaces[LIGHT_COUNT]; static float shadowPosSum[LIGHT_COUNT]; static u32 shadowIdSum[LIGHT_COUNT];
+u16 shadowCasterIndices[SC_MAX], candidates[MAX_SHADOWMAPS]; static __attribute__((aligned(64))) float sc_posX[SC_MAX],sc_posY[SC_MAX],sc_posZ[SC_MAX],sc_radius[SC_MAX],sc_shadRadius[SC_MAX]; static u16 sc_origIdx[SC_MAX], shadowSlot[LIGHT_CNT]; static u8 shadowFaces[LIGHT_CNT]; static float shadowPosSum[LIGHT_CNT]; static u32 shadowIdSum[LIGHT_CNT];
 static const u32 shadClearSentinel = 0xFFFFFFFFu;
 static i8 shadowLevel=-1; u32 shadowNextSlot=0; static const i8 faceAxis[6] = {0,0,1,1,2,2}; static const float faceSign[6] = {1.f,-1.f,1.f,-1.f,1.f,-1.f};
 static const __m256i faceBitVecs[6] = { (__m256i){0x100000001LL,0x100000001LL,0x100000001LL,0x100000001LL}, (__m256i){0x200000002LL,0x200000002LL,0x200000002LL,0x200000002LL}, (__m256i){0x400000004LL,0x400000004LL,0x400000004LL,0x400000004LL}, (__m256i){0x800000008LL,0x800000008LL,0x800000008LL,0x800000008LL}, (__m256i){0x1000000010LL,0x1000000010LL,0x1000000010LL,0x1000000010LL}, (__m256i){0x2000000020LL,0x2000000020LL,0x2000000020LL,0x2000000020LL}};
@@ -1180,7 +1179,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         float dotResult = (dx*pf.x + dy*pf.y + dz*pf.z); if (dotResult < 0.0f && distSqrdToPlayer > (range * range) && !camViewCandidate) { continue; }
         candidates[numCandidates++] = i; if (numCandidates >= MAX_SHADOWMAPS) break;
     }
-    for (u16 i=0;i<World.loadedLights;++i) { shadowmapIndirectionList[i] = (shadowSlot[i] != U16_MAX) ? (u32)shadowSlot[i] : LIGHT_COUNT; }
+    for (u16 i=0;i<World.loadedLights;++i) { shadowmapIndirectionList[i] = (shadowSlot[i] != U16_MAX) ? (u32)shadowSlot[i] : LIGHT_CNT; }
     if (numCandidates == 0) { glBindBuffer(GL_SSBO, shadowMapsIndirectionID); glBufferSubData(GL_SSBO, 0, World.loadedLights*sizeof(u32), shadowmapIndirectionList); shadowTime = get_time() - shadowStartTime; return; }
     u16 unslotted=0;
     for (u16 c=0;c<numCandidates;++c) { if (shadowSlot[candidates[c]]==U16_MAX) { ++unslotted; } }
@@ -1249,7 +1248,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
                 u16 instIdx = sc_origIdx[k]; nearbyMeshCount += AddShadMsh(&localMeshes[nearbyMeshCount],instIdx,&posSum,&idSum,&anyMoved,faceMaskScalar); if (nearbyMeshCount >= SHADOW_NEARMESH_MAX) { DualLogWarn("Shadowmapping ran out of nearMeshes at %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); break; }
             }
         }
-        if (nearbyMeshCount == 0) { shadowmapIndirectionList[lightIdx] = LIGHT_COUNT; if (slotNew) { shadowSlot[lightIdx] = U16_MAX; shadowNextSlot--; } continue; }
+        if (nearbyMeshCount == 0) { shadowmapIndirectionList[lightIdx] = LIGHT_CNT; if (slotNew) { shadowSlot[lightIdx] = U16_MAX; shadowNextSlot--; } continue; }
         bool contentDirty = (anyMoved || posSum != shadowPosSum[lightIdx] || idSum != shadowIdSum[lightIdx] || slot == U16_MAX);
         u8 needFaces = (u8)(faceMask & ~shadowFaces[lightIdx]);
         if (contentDirty || needFaces) {
@@ -1327,7 +1326,7 @@ void RenderSunShadowmap(void) {
     }
     glEnable(GL_CULL_FACE); glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
 }
-static DepthSort visibleInstances[INSTANCE_COUNT];
+static DepthSort visibleInstances[INSTANCE_CNT];
 __attribute__((pure)) i32 dsort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
 __attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (da > db) - (da < db); }
 void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT, u16* curG, u16* curS, u16* curM, float* curV, bool grayscaleEnabled) {
@@ -1375,7 +1374,6 @@ void mat4_inverse(const float* m, float* out) {
 }
 void PSys_Render(float*,V3,V3,V3,V3,u32,float,float,float,float);
 static void ClearAll() { glClearColor(0.0f,0.0f,0.0f,0.0f); glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glClear(GL_COLOR_BUFFER_BIT); glBindFramebuffer(GL_FRAMEBUFFER,amFBO); glClear(GL_COLOR_BUFFER_BIT); glBindFramebuffer(GL_FRAMEBUFFER,amFullFBO); glClear(GL_COLOR_BUFFER_BIT); glBindFramebuffer(GL_FRAMEBUFFER,biomFBO); glClear(GL_COLOR_BUFFER_BIT); }
-V3 debugWepOffset = {0, 0, 0}; // debug weapon view offset
 static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u16 swidth, sheight; float sfov, snear, sfar;
     if (camView) { CamView* cv = &camViews[camViewIdx]; swidth  = cv->width;                sheight = cv->height;                sfov = (float)cv->fov;          snear = cv->near; sfar = cv->far; }
@@ -1404,7 +1402,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glDisable(GL_BLEND);/*Opaques*/
     u16 currentTexIndex = U16_MAX, currentNormIndex = U16_MAX, currentGlowIndex = U16_MAX, currentSpecIndex = U16_MAX, currentModelType = U16_MAX, opaqueCount = 0;
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
-    static DepthSort tmpTransparent[INSTANCE_COUNT];
+    static DepthSort tmpTransparent[INSTANCE_CNT];
     u16 tcnt = 0;
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { // Determine base visibility
         if (i == World.weaponVModelIndex || EntNotVisible(i,false)) { continue; }
@@ -1420,14 +1418,14 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
             if (!(gridCellStates[e->cellIndex] & CELL_OPEN) && distSqrd >= 943.7184f) { continue; /*30.72 * 30.72, 12 cells*/ }
         }
         if (World.instances[i].camView != 255) camViews[World.instances[i].camView].visible = true;
-        if (transparentTexture[World.instances[i].texIndex]) { if (tcnt < INSTANCE_COUNT) { tmpTransparent[tcnt].index = i; tmpTransparent[tcnt].depth = distSqrd; tcnt++; } } else { visibleInstances[opaqueCount].index = i; visibleInstances[opaqueCount].depth = distSqrd; opaqueCount++; }
+        if (transparentTexture[World.instances[i].texIndex]) { if (tcnt < INSTANCE_CNT) { tmpTransparent[tcnt].index = i; tmpTransparent[tcnt].depth = distSqrd; tcnt++; } } else { visibleInstances[opaqueCount].index = i; visibleInstances[opaqueCount].depth = distSqrd; opaqueCount++; }
     }
-    if (World.shields[0] < U16_MAX && skyVisible && World.instCount < (INSTANCE_COUNT - 4)) { for (u8 k=0;k<4;++k) { visibleInstances[opaqueCount].index=World.shields[k]; visibleInstances[opaqueCount++].depth=300.0f; } }
+    if (World.shields[0] < U16_MAX && skyVisible && World.instCount < (INSTANCE_CNT - 4)) { for (u8 k=0;k<4;++k) { visibleInstances[opaqueCount].index=World.shields[k]; visibleInstances[opaqueCount++].depth=300.0f; } }
     if (editModeSelection < U16_MAX && Cheats.editMode) {
         u16 selIdx=World.instances[editModeSelection].index;
         if (selIdx != 592 && selIdx != 593) { /* decals have no mesh: baked 3D text drawn in decal pass; force-draw would hit modelIndex U16_MAX */
             if (transparentTexture[World.instances[editModeSelection].texIndex]) {
-                if (tcnt < INSTANCE_COUNT) {          tmpTransparent[tcnt].index = editModeSelection;          tmpTransparent[tcnt].depth = 1.28f;        tcnt++; }
+                if (tcnt < INSTANCE_CNT) {          tmpTransparent[tcnt].index = editModeSelection;          tmpTransparent[tcnt].depth = 1.28f;        tcnt++; }
             } else                         { visibleInstances[opaqueCount].index = editModeSelection; visibleInstances[opaqueCount].depth = 1.28f; opaqueCount++; }
         }
     }
@@ -1516,7 +1514,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glBindTexture(GL_TEXTURE_2D, 0);
     glUniform1ui(32, 0u); /* restore chunkSP font-atlas off for subsequent draws */
     u16 wvi = World.weaponVModelIndex;
-    if (wvi > 0 && wvi < INSTANCE_COUNT) {
+    if (wvi > 0 && wvi < INSTANCE_CNT) {
         int wep16 = Get16WeaponIndexFromConstIndex(World.instances[wvi].index);
         if (wep16 >= 0 && wep16 < 16 && World.instances[wvi].modelIndex < MAX_MDLS) { // Offset in player-local space (right,down,forward), rotated into world by the player view; reload/swap dip added on Y.  Pivot = player position, weapon stays locked to view.
             V3 weaponViewOffset=vWepOfs[wep16];
@@ -1578,7 +1576,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glDisable(GL_DEPTH_TEST);
     glDrawArrays(0x6/*GL_TRIANGLE_FAN*/, 0, 4); drawCalls++; vertsRendered += 4; /*Just a quad for the final composite*/
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
-    if (Cheats.editMode && editModeSelection < U16_MAX && World.editTextInstanceIndex < INSTANCE_COUNT) {
+    if (Cheats.editMode && editModeSelection < U16_MAX && World.editTextInstanceIndex < INSTANCE_CNT) {
         World.position[World.editTextInstanceIndex]=World.position[editModeSelection];
         float wx = World.position[editModeSelection].x, wy = World.position[editModeSelection].y, wz = World.position[editModeSelection].z;
         float clipX = viewProj[0]*wx + viewProj[4]*wy + viewProj[8]*wz + viewProj[12], clipY = viewProj[1]*wx + viewProj[5]*wy + viewProj[9]*wz + viewProj[13], clipW = viewProj[3]*wx + viewProj[7]*wy + viewProj[11]*wz + viewProj[15];
@@ -1617,16 +1615,16 @@ void UpdateInstanceMatrix4x4s() {
     }
     if (World.instCount > INSTS_1ST_IDX) { glBindBuffer(GL_SSBO,matricesBufferID); u32 offsetFloats=(u32)INSTS_1ST_IDX * 16; u32 countFloats=((u32)World.instCount - (u32)INSTS_1ST_IDX) * 16; glBufferSubData(GL_SSBO, offsetFloats * 4, countFloats * 4, modelMatrices + offsetFloats); }
     if (Sys_Settings.Reflections == 2u) {
-        u32 chFirst = INSTANCE_COUNT, chLast = 0u;
+        u32 chFirst = INSTANCE_CNT, chLast = 0u;
         for (u32 i=0; i<World.instCount; ++i) {
             u16 mi = World.instances[i].modelIndex; if ((instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && World.instances[i].lodIndex < mdlsCnt) mi = World.instances[i].lodIndex;
             SetRTInstance(i, (mi < mdlsCnt) ? mi : 0xFFFFFFFFu, World.instances[i].texIndex, World.instances[i].glowIndex, (World.instances[i].entflags & EF_ACTIVE) ? 1u : 0u, vabs(World.scale[i].x), vabs(World.scale[i].y), vabs(World.scale[i].z));
             InstanceRTInfo* cur = &rtInstanceInfo[i], *prev = &rtPrevInfo[i];
             if (cur->geom[0]!=prev->geom[0] || cur->geom[1]!=prev->geom[1] || cur->geom[2]!=prev->geom[2] || cur->geom[3]!=prev->geom[3] || cur->info[0]!=prev->info[0] || cur->info[1]!=prev->info[1] || cur->info[2]!=prev->info[2] || cur->info[3]!=prev->info[3] || cur->iscl2[0]!=prev->iscl2[0] || cur->iscl2[1]!=prev->iscl2[1] || cur->iscl2[2]!=prev->iscl2[2] || cur->iscl2[3]!=prev->iscl2[3]) {
-                if (chFirst == INSTANCE_COUNT) chFirst = i; chLast = i; mcpy(prev, cur, sizeof(InstanceRTInfo));
+                if (chFirst == INSTANCE_CNT) chFirst = i; chLast = i; mcpy(prev, cur, sizeof(InstanceRTInfo));
             }
         }
-        if (chFirst != INSTANCE_COUNT) { glBindBuffer(GL_SSBO, rtInstanceInfoID); glBufferSubData(GL_SSBO, (size_t)chFirst * sizeof(InstanceRTInfo), (size_t)(chLast - chFirst + 1u) * sizeof(InstanceRTInfo), rtInstanceInfo + chFirst); }
+        if (chFirst != INSTANCE_CNT) { glBindBuffer(GL_SSBO, rtInstanceInfoID); glBufferSubData(GL_SSBO, (size_t)chFirst * sizeof(InstanceRTInfo), (size_t)(chLast - chFirst + 1u) * sizeof(InstanceRTInfo), rtInstanceInfo + chFirst); }
         glBindBuffer(GL_SSBO,rtCellCountsID); glBufferData(GL_SSBO,ARRSIZE * sizeof(u16),NULL,GL_DYNAMIC_DRAW);                glBufferSubData(GL_SSBO,0,ARRSIZE * sizeof(u16),cellCounts);
         glBindBuffer(GL_SSBO,rtCellListsID);  glBufferData(GL_SSBO,(size_t)ARRSIZE * 128u * sizeof(u16),NULL,GL_DYNAMIC_DRAW); glBufferSubData(GL_SSBO,0,(size_t)ARRSIZE * 128u * sizeof(u16),cellLists);
     }
@@ -1643,13 +1641,13 @@ bool MdlIsWinMemberSet(u16,u8); void MdlSwapWindowDisposeData(u16);
 void MdlBuildLevelConvexAdjacency(u8 lev) {
     if (lev >= MAX_LEVELS) return;
     for (u32 i = 0; i < World.levelInstCount[lev]; ++i) {
-        World.levelInstances[lev][i].adjacencyIdx = U16_MAX;
-        if (World.levelCollider[lev][i] == CT_CVX) {
-            u16 colMeshIdx = World.levelInstances[lev][i].colMeshIndex;
-            if (colMeshIdx > MAX_MDLS) {DualLogWarn("Improper convex mesh colMeshIndex on level %u, instance %u with constindex %u for convex mesh uniques, colMeshIndex: %u\n",lev,i,World.levelInstances[lev][i].index,World.levelInstances[lev][i].colMeshIndex); continue;}
+        World.levInstances[lev][i].adjacencyIdx = U16_MAX;
+        if (World.levCol[lev][i] == CT_CVX) {
+            u16 colMeshIdx = World.levInstances[lev][i].colMeshIndex;
+            if (colMeshIdx > MAX_MDLS) {DualLogWarn("Improper convex mesh colMeshIndex on level %u, instance %u with constindex %u for convex mesh uniques, colMeshIndex: %u\n",lev,i,World.levInstances[lev][i].index,World.levInstances[lev][i].colMeshIndex); continue;}
             bool isUnique = true; u32 foundIdx = U16_MAX;
-            for (u32 u=0;u<uniqueCvxMeshCount;++u) { if (uniqueCvxMeshIndices[u] == colMeshIdx) { isUnique = false; foundIdx = u; World.levelInstances[lev][i].adjacencyIdx = (u16)foundIdx; break; } }
-            if (isUnique) { if (uniqueCvxMeshCount >= MAX_UNIQUE_CVX_MESHES) { DualLogWarn("Exceeded MAX_UNIQUE_CVX_MESHES!\n"); World.levelInstances[lev][i].adjacencyIdx = U16_MAX; continue; } uniqueCvxMeshIndices[uniqueCvxMeshCount] = colMeshIdx; World.levelInstances[lev][i].adjacencyIdx = (u16)uniqueCvxMeshCount; uniqueCvxMeshCount++; }
+            for (u32 u=0;u<uniqueCvxMeshCount;++u) { if (uniqueCvxMeshIndices[u] == colMeshIdx) { isUnique = false; foundIdx = u; World.levInstances[lev][i].adjacencyIdx = (u16)foundIdx; break; } }
+            if (isUnique) { if (uniqueCvxMeshCount >= MAX_UNIQUE_CVX_MESHES) { DualLogWarn("Exceeded MAX_UNIQUE_CVX_MESHES!\n"); World.levInstances[lev][i].adjacencyIdx = U16_MAX; continue; } uniqueCvxMeshIndices[uniqueCvxMeshCount] = colMeshIdx; World.levInstances[lev][i].adjacencyIdx = (u16)uniqueCvxMeshCount; uniqueCvxMeshCount++; }
         }
     }
     for (u32 u = 0; u < uniqueCvxMeshCount; ++u) {
@@ -1771,7 +1769,7 @@ void EnsureReflectionResources(void) {
         if (rtOrderBufID == 0) { rtOrderBufID = MakeSSBO(&rtOrderBufID, 19, (size_t)rtCapOrderU16 * sizeof(u16), orderAll, GL_STATIC_DRAW); } else { glBindBuffer(GL_SSBO, rtOrderBufID); glBindBufferBase(GL_SSBO, 19, rtOrderBufID); glBufferSubData(GL_SSBO, 0, (size_t)((size_t)(orderFill + 2u) * sizeof(u16)), orderAll); } /*re-enable path (should only happen if the first build ran before pools existed)*/
         OS_Free(orderAll, (size_t)rtCapOrderU16 * sizeof(u16));
         for (u32 m=0; m<mdlsCnt; ++m) { if (rtModelInfo[m].nodeBase != 0xFFFFFFFFu) RtDispatchModelCopy((u16)m); }
-        rtInstanceInfoID = MakeSSBO(&rtInstanceInfoID, 21, (size_t)INSTANCE_COUNT * sizeof(InstanceRTInfo), NULL, GL_DYNAMIC_DRAW);
+        rtInstanceInfoID = MakeSSBO(&rtInstanceInfoID, 21, (size_t)INSTANCE_CNT * sizeof(InstanceRTInfo), NULL, GL_DYNAMIC_DRAW);
         rtCellCountsID   = MakeSSBO(&rtCellCountsID,   23, (size_t)ARRSIZE * sizeof(u16), NULL, GL_DYNAMIC_DRAW);
         rtCellListsID    = MakeSSBO(&rtCellListsID,    24, (size_t)ARRSIZE * 128 * sizeof(u16), NULL, GL_DYNAMIC_DRAW);
         rtAccelBuilt = true; RtSwapPatchModels(); DualLog("Raytraced reflections upload........................................................took %.6f secs\n",get_time() - startTime);
@@ -1915,10 +1913,10 @@ void InitalizeEnvironment() {
     double initSSBOStart = get_time();
     glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); u32 drawBuffers[] = {GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1,GL_COLOR_ATTACHMENT2}; glDrawBuffers(3,drawBuffers);
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1}; mcpy(&modelMatrices[0],mat,16 * sizeof(float)); 
-    matricesBufferID  = MakeSSBO(&matricesBufferID,1,INSTANCE_COUNT*16*sizeof(float),modelMatrices,GL_STATIC_DRAW);
+    matricesBufferID  = MakeSSBO(&matricesBufferID,1,INSTANCE_CNT*16*sizeof(float),modelMatrices,GL_STATIC_DRAW);
     voxListCntsID     = MakeSSBO(&voxListCntsID,2,VOXEL_COUNT*sizeof(u32),NULL,GL_STATIC_DRAW);
     voxelLightListsID = MakeSSBO(&voxelLightListsID,3,VOXEL_COUNT*MAX_LIGHTS_PER_VOXEL*sizeof(u32),NULL,GL_STATIC_DRAW);
-    lightsID          = MakeSSBO(&lightsID,4,LIGHT_COUNT*sizeof(Light),NULL,GL_STATIC_DRAW);
+    lightsID          = MakeSSBO(&lightsID,4,LIGHT_CNT*sizeof(Light),NULL,GL_STATIC_DRAW);
     if (Sys_Settings.Shadows) { CreateShadowBuffers();/*5,6*/ InitSunShadowmap(); }
     cellVisibleDataID = MakeSSBO(&cellVisibleDataID,7,ARRSIZE*sizeof(u32),NULL,GL_STATIC_DRAW);
     texPalID          = MakeSSBO(&texPalID,8,MAX_UNIQUE_COLORS*sizeof(u32),NULL,GL_STATIC_DRAW);
@@ -1929,7 +1927,7 @@ void InitalizeEnvironment() {
     textureOffsetsID  = MakeSSBO(&textureOffsetsID,14,MAXTEX * sizeof(u32),NULL,GL_STATIC_DRAW);
     textureSizesID    = MakeSSBO(&textureSizesID,15,MAXTEX*2*sizeof(i32),NULL,GL_STATIC_DRAW);
     glUseProgram(shadowmapsSP); glUniform1ui( 9, SHADOW_MAP_SIZE); // Set permanent uniforms on shaders (keeps c in sync with glsl for constants)
-    glUseProgram(chunkSP);      glUniform1ui(21, SHADOW_MAP_SIZE); glUniform1f(22, (float)SHADOW_MAP_SIZE); glUniform1ui(23, LIGHT_COUNT); glUniform1ui(24, (u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11, SHADOW_MAP_SIZE * SHADOW_MAP_SIZE); glUniform1i(29,6); glUniform1i(31,9); glUniform1i(36,10);
+    glUseProgram(chunkSP);      glUniform1ui(21, SHADOW_MAP_SIZE); glUniform1f(22, (float)SHADOW_MAP_SIZE); glUniform1ui(23, LIGHT_CNT); glUniform1ui(24, (u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11, SHADOW_MAP_SIZE * SHADOW_MAP_SIZE); glUniform1i(29,6); glUniform1i(31,9); glUniform1i(36,10);
     glUseProgram(ssrSP);        glUniform1i(5,3); glUseProgram(rtSP); glUniform1i(5,3);
     for (int q=0;q<5;++q) { glGenQueries(5,gpuQ[q]); }
     DualLog("SSBO and shadow buffer setup........................................................took %.6f secs\n",get_time() - initSSBOStart);

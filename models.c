@@ -316,7 +316,7 @@ static void SampleQuat(const glbanim_samp* samp, float t, float* outq /* xyzw */
     float d = q0[0]*q1[0] + q0[1]*q1[1] + q0[2]*q1[2] + q0[3]*q1[3];
     d = d > 1.0f ? 1.0f : (d < -1.0f ? -1.0f : d);
     if (d < 0.0f) { qb[0] = -q1[0]; qb[1] = -q1[1]; qb[2] = -q1[2]; qb[3] = -q1[3]; d = -d; } else mcpy(qb, q1, sizeof(float) * 4);
-    if (d > 0.9995f) { for (int c=0;c<4;++c) { outq[c] = q0[c] + (qb[c] - q0[c]) * frac; } } else { float theta0 = vacosf(d), theta = theta0 * frac; float s1 = sinf(theta) / sinf(theta0), s0 = cosf(theta) - d * s1; for (int c=0;c<4;++c) { outq[c] = q0[c]*s0 + qb[c]*s1; } }
+    if (d > 0.9995f) { for (int c=0;c<4;++c) { outq[c] = q0[c] + (qb[c] - q0[c]) * frac; } } else { float theta0 = vacosf(d), theta = theta0 * frac; float s1 = vsinf(theta) / vsinf(theta0), s0 = vcosf(theta) - d * s1; for (int c=0;c<4;++c) { outq[c] = q0[c]*s0 + qb[c]*s1; } }
     float inv = 1.0f / vsqrtf(outq[0]*outq[0] + outq[1]*outq[1] + outq[2]*outq[2] + outq[3]*outq[3]); for (int c=0;c<4;++c) outq[c] *= inv;
 }
 static void NodeLocalMatrixAtTime(const GltfMesh* gm, glb_node* node, float t, float* outM) {
@@ -847,11 +847,10 @@ AnimationClip mdlAnimClips[MAXANIM][MAX_ANIMCLIPS] = { // speed, frameStart, fra
 };
 void PortalCulling(); bool ToggleDoorPortal(u32,u16,u16);
 void ChangeAnim(Entity* e, u8 c) { if (e->animationNum >= MAXANIM || c >= MAX_ANIMCLIPS) return; AnimationClip* clip=&mdlAnimClips[e->animationNum][c]; if (clip->framerate <= 0 || clip->speed <= 0 || e->clip == c) return; e->clip=c; e->frame=clip->frameStart; e->modelIndex=clip->frameStartModelIndex; e->currentFrameFinished=0.0; }
-bool SpawnImpactParticleForPrefab(u16,V3,V3), ai_effect_flash(V3,Color3,float,float,double);
 extern WeaponFireCtx wfx;
 void UpdateAnims(void) {
     if (World.paused || World.menuActive){return;} static double lastPauseTime=0; if(lastPauseTime == 0.0){lastPauseTime=World.pauseRelativeTime;} double animDT=World.pauseRelativeTime-lastPauseTime; lastPauseTime=World.pauseRelativeTime; if(animDT > 0.1){animDT=0.1;} if(animDT <= 0.0){return;} bool portalsNeedUpdated=false; u8 animTest=Cheats.animTest;
-    for (u16 i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
+    for (u16 i = INSTS_1ST_IDX; i < INSTANCE_CNT; ++i) {
         if (i == World.weaponVModelIndex) continue; Entity* e = &World.instances[i]; if (e->modelIndex >= MAX_MDLS || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAXANIM || e->ajar) continue;
         if (animTest == 1) {
             u8 validClips[MAX_ANIMCLIPS], numValid=0, targetClipIdx=0; double totalDuration = 0.0; for (u8 c = 0; c < MAX_ANIMCLIPS; ++c) { AnimationClip* test = &mdlAnimClips[e->animationNum][c]; if (test->framerate > 0 && test->speed > 0) { validClips[numValid++] = c; double dur = (double)(test->frameEnd - test->frameStart + 1) / ((double)test->framerate * test->speed); totalDuration += dur; } }
@@ -890,5 +889,5 @@ void UpdateAnims(void) {
             if (IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, mdlAnimClips[e->animationNum][A_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;
         }
     } if (portalsNeedUpdated){PortalCulling();}
-    if (World.weaponVModelIndex > 0 && World.weaponVModelIndex < INSTANCE_COUNT) { Entity* e = &World.instances[World.weaponVModelIndex]; if (wfx.pendingMeleeFinished > 0.0 && World.pauseRelativeTime >= wfx.pendingMeleeFinished) { e->animationNum = (Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex) == 5) ? 50 : 49; e->clip = A_IDLE; e->frame = mdlAnimClips[e->animationNum][A_IDLE].frameStart; e->currentFrameFinished = 0.0; } }
+    if (World.weaponVModelIndex > 0 && World.weaponVModelIndex < INSTANCE_CNT) { Entity* e = &World.instances[World.weaponVModelIndex]; if (wfx.pendingMeleeFinished > 0.0 && World.pauseRelativeTime >= wfx.pendingMeleeFinished) { e->animationNum = (Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex) == 5) ? 50 : 49; e->clip = A_IDLE; e->frame = mdlAnimClips[e->animationNum][A_IDLE].frameStart; e->currentFrameFinished = 0.0; } }
 }

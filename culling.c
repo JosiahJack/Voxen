@@ -1,7 +1,7 @@
 // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
 #include "common.h"
 typedef struct { u16 x,z; } PortalCell; typedef struct { PortalCell cellA,cellB; bool portalNS,open,dirty; u8 lev;} Portal;
-u32 gridCellStates[ARRSIZE]; static u32 precomputedVisibleCellsFromHere[524288];/*4096 * 4096 / 32*/ u16 playerCellIdx = 0u; bool instanceIsLODArray[INSTANCE_COUNT]; static Portal activePortals[MAX_PORTALS]; u32 numActivePortals = 0; bool cullVisibilityValid;
+u32 gridCellStates[ARRSIZE]; static u32 precomputedVisibleCellsFromHere[524288];/*4096 * 4096 / 32*/ u16 playerCellIdx = 0u; bool instanceIsLODArray[INSTANCE_CNT]; static Portal activePortals[MAX_PORTALS]; u32 numActivePortals = 0; bool cullVisibilityValid;
 bool get_cull_bit(const u32* arr, int idx) { return (arr[idx >> 5] >> (idx & 31)) & 1; }
 INLINE void set_cull_bit(u32* arr, int idx, bool val) {u32* w = arr + (idx >> 5); u32 m = 1U << (idx & 31); *w = val ? (*w | m) : (*w & ~m);}
 bool PositionVisibleFromPlayerCell(float x, float z) { return (get_cull_bit(precomputedVisibleCellsFromHere,((playerCellIdx * ARRSIZE)/*cellIdx*/ + PosGetCellCoords(x,z)/*subIdx*/)/*flat_idx*/)); }
@@ -117,7 +117,7 @@ void PortalCulling() { // Called just once at end of animation loop for the fram
     for (u32 p=0;p<numActivePortals;++p) if (activePortals[p].lev==World.curLev && activePortals[p].dirty) { dirty=true; break; }
     if (cullVisibilityValid && previousCell==cell && previousLevel==World.curLev && !dirty) return;
     cullVisibilityValid=true; previousCell=cell; previousLevel=World.curLev;
-    bool previousLightVisible[LIGHT_COUNT]; mset(previousLightVisible,false,LIGHT_COUNT * sizeof(bool));
+    bool previousLightVisible[LIGHT_CNT]; mset(previousLightVisible,false,LIGHT_CNT * sizeof(bool));
     for (u16 i=0;i<World.loadedLights;++i) { i32 lcell = PosGetCellCoords(World.lights[i].pos.x, World.lights[i].pos.z); if (lcell >= 0 && lcell < ARRSIZE && (gridCellStates[lcell] & CELL_VISIBLE)) {previousLightVisible[i]=true;} }
     for (u32 portalIdx=0;portalIdx<numActivePortals;++portalIdx) {
         Portal* prt = &activePortals[portalIdx]; if (!prt->dirty || prt->lev != World.curLev) continue;

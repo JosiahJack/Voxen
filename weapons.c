@@ -69,7 +69,6 @@ bool SpawnImpactParticleForPrefab(u16 prefab, V3 pos, V3 normal) {
     for (u32 i=0;i<sizeof(impactEffectTypes)/sizeof(*impactEffectTypes);++i) { if (impactEffectTypes[i].prefab != prefab || impactEffectTypes[i].type == type) { continue; } const PSysDef* cd = PSysTypeGet(impactEffectTypes[i].type); if (!cd) { continue; } PSysDef cdef = *cd; cdef.pos = def.pos; cdef.rotation = def.rotation; PSysAddInternal(&cdef,U16_MAX,U16_MAX); }
     return true;
 }
-void SpawnImpactEffectParticle(u16 prefab, V3 pos, V3 normal) { if (!SpawnImpactParticleForPrefab(prefab,pos,normal)) { u16 fx=SpawnDynamicObject(prefab); if(EntIdxIsValid(fx)){World.position[fx]=V3Add(pos,V3_ScaleByF(normal,wfx.hitOffset)); World.rotation[fx]=QuatFromToRotation((V3){0,1,0},normal);} } }
 void SpawnBeamTrail(u16 presetType, V3 from, V3 to, Color c) {
     const PSysDef* preset=PSysTypeGet(presetType); if(!preset)return; V3 delta=V3_AsubB(to,from); float dist=V3_Mag(delta); if(dist<0.01f)return;
     const int BEAM_SEGS=8;
@@ -92,7 +91,6 @@ void SpawnBeamTrail(u16 presetType, V3 from, V3 to, Color c) {
         def.emitRate=0.0f; def.burstCount=1; def.duration=life+0.05f; PSysAddInternal(&def,U16_MAX,U16_MAX);
     }
 }
-void SpawnTargetingLaser(V3 from, V3 to) { SpawnBeamTrail(167,from,to,(Color){1.0f,0.15f,0.18f,1.0f}); }
 static const struct { u16 proj; u8 type; } projectileImpactTypes[] = { { 481, 177 }/* proj_enemshot2: impact_enemshot2 */, { 482, 169 }, { 482, 170 }/* magpulse: magpulse_center, sparks_spits */, { 483, 171 }, { 483, 182 }/* stungun: stungun_impacts, sparkssmall */, { 484, 172 }, { 484, 173 }, { 484, 174 }, { 484, 175 }/* railgun: root, centerumbra, shockwave, smoke */, { 485, 176 }, { 485, 183 }/* plasma: plasmarifle_hit, sparkssmall */,
                                                                        { 486, 181 }, { 486, 173 }, { 486, 182 }, { 486, 174 }/* enemshot6: root, centerumbra, sparkssmall, shockwave */, { 487, 180 }/* enemshot5: the one AlphaBlend emitter in the game */, { 488, 178 }, { 488, 179 }/* enemshot4: root, particle_spits */, { 489, 182 }/* proj_throwingstar: PoolType.SparksSmall */, { 490, 169 }, { 490, 170 }/* magpulsenpc: same pool as 482 */,
                                                                        { 491, 172 }, { 491, 173 }, { 491, 174 }, { 491, 175 }/* railnpc: same pool as 484 */, { 492, 190 }, { 492, 191 }, { 493, 190 }, { 493, 191 }, { 494, 190 }, { 494, 191 }, { 495, 190 }, { 495, 191 }};
@@ -156,16 +154,16 @@ void MeleeHitUpdate(void) {
 }
 void FireMelee(int wep16, bool isRapier, bool silent, u16 hitSnd, u16 missSnd, u16 fleshSnd) {
     wfx.fireDistance = 3.2f; bool hit = DidRayHit(wep16); wfx.fireDistance = 200.0f; u16 t = wfx.tempHitEnt; double dt = World.pauseRelativeTime + (isRapier ? 0.28 : 0.15);
-    if (hit) { u16 wvi = World.weaponVModelIndex; if (wvi > 0 && wvi < INSTANCE_COUNT) { World.instances[wvi].animationNum = isRapier ? 50 : 49; World.instances[wvi].clip = A_ATTACK_HIT; } wfx.pendingMeleeWep16 = wep16; wfx.pendingMeleeTarget = t; wfx.pendingMeleeIsRapier = isRapier; wfx.pendingMeleeSilent = silent; wfx.pendingMeleeHitSnd = hitSnd; wfx.pendingMeleeFleshSnd = fleshSnd; wfx.pendingMeleeFinished = dt; return; }
+    if (hit) { u16 wvi = World.weaponVModelIndex; if (wvi > 0 && wvi < INSTANCE_CNT) { World.instances[wvi].animationNum = isRapier ? 50 : 49; World.instances[wvi].clip = A_ATTACK_HIT; } wfx.pendingMeleeWep16 = wep16; wfx.pendingMeleeTarget = t; wfx.pendingMeleeIsRapier = isRapier; wfx.pendingMeleeSilent = silent; wfx.pendingMeleeHitSnd = hitSnd; wfx.pendingMeleeFleshSnd = fleshSnd; wfx.pendingMeleeFinished = dt; return; }
     V3 p = World.position[PLAYER1], look = V3_Normalize(ScreenPointToRay(World.instances[PLAYER1].forward, World.instances[PLAYER1].right));
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; i++) {
         Entity *in = &World.instances[i]; if(!(in->entflags & EF_ACTIVE) || in->health <= 0.0f || V3_Dist(World.position[i],p) >= 3.2f || V3_dot(look,V3_Normalize(V3_AsubB(World.position[i],p))) <= 0.666f){continue;}/*outside ~+-48deg cone*/
-        u16 wvi = World.weaponVModelIndex; if (wvi > 0 && wvi < INSTANCE_COUNT) { World.instances[wvi].animationNum = isRapier ? 50 : 49; World.instances[wvi].clip = A_ATTACK_HIT; }
+        u16 wvi = World.weaponVModelIndex; if (wvi > 0 && wvi < INSTANCE_CNT) { World.instances[wvi].animationNum = isRapier ? 50 : 49; World.instances[wvi].clip = A_ATTACK_HIT; }
         wfx.pendingMeleeWep16 = wep16; wfx.pendingMeleeTarget = i; wfx.pendingMeleeIsRapier = isRapier; wfx.pendingMeleeSilent = silent; wfx.pendingMeleeHitSnd = hitSnd;
         wfx.pendingMeleeFleshSnd = fleshSnd; wfx.pendingMeleeFinished = dt; return;
     }
     if(!silent)play_wav(sounds[missSnd], AppliedFXVol(1.0f), World.position[PLAYER1], false);
-    u16 wvi = World.weaponVModelIndex; if (wvi > 0 && wvi < INSTANCE_COUNT) { World.instances[wvi].animationNum = isRapier ? 50 : 49; World.instances[wvi].clip = isRapier ? A_ATTACK_MISS : A_ATTACK_MISS; }
+    u16 wvi = World.weaponVModelIndex; if (wvi > 0 && wvi < INSTANCE_CNT) { World.instances[wvi].animationNum = isRapier ? 50 : 49; World.instances[wvi].clip = isRapier ? A_ATTACK_MISS : A_ATTACK_MISS; }
 }
 void FireRapier(int wep16) { FireMelee(wep16, true,  false, 246, 247, 246); } // wlaserrapier_hit/swing
 void FirePipe(int wep16)   { FireMelee(wep16, false, false, 253, 254, 252); } // wpipe_hit/swing/dmg

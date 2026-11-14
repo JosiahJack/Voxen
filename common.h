@@ -14,7 +14,6 @@ typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTPTR_TYPE__ intptr_t;
 #define likely(x)   __builtin_expect(!!(x),1)
 #define unlikely(x) __builtin_expect(!!(x),0)
 #define NULL ((void *)0)
-#define MAX_FILE_MAP_BYTES (64u*1024u*1024u)
 enum{U16_MAX=65535,U32_MAX=0xFFFFFFFFU,U64_MAX=0xFFFFFFFFFFFFFFFFULL};
 typedef __builtin_va_list va_list;
 extern size_t g_mmap_live; /* diagnostics (lib.c): live bytes from OS_AllocateRAM */
@@ -60,33 +59,10 @@ void DualLogError(const char*, ...), DualLog(const char*, ...), DualLogWarn(cons
     #define DLL_IMP __declspec (dllimport)
     #define WINAPI __stdcall
     #define INVALID_FHANDLE ((void*) (i64)-1)
-    typedef struct { void* handle; } OS_Thread;
-    DLL_IMP void* WINAPI GetStdHandle(u32);
-    typedef i64 (WINAPI *PROC)();
-    typedef i64 (WINAPI *FARPROC)();
-    typedef i64 (WINAPI *NEARPROC)();
-    typedef struct { int unused; } *HINSTANCE;
-    typedef HINSTANCE HMODULE;
-    typedef struct { u32 nLength; void* lpSecurityDescriptor; i32 bInheritHandle; } *LPSECURITY_ATTRIBUTES;
-    typedef struct { i64 QuadPart; } LARGE_INTEGER;
-    typedef LARGE_INTEGER *PLARGE_INTEGER;
-    DLL_IMP void* WINAPI CreateFileMappingA(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,const char*);
-    DLL_IMP i32 WINAPI VirtualFree(void*,u64,u32);
-    DLL_IMP void* WINAPI VirtualAlloc(void*,u64,u32,u32);
-    DLL_IMP i32 WINAPI ReadFile(void*,void*,u32,u32*,void*);
-    DLL_IMP i32 WINAPI GetFileSizeEx(void*,PLARGE_INTEGER);
-    DLL_IMP i32 WINAPI UnmapViewOfFile(void*);
-    DLL_IMP void* WINAPI CreateFileA(const char*,u32,u32,LPSECURITY_ATTRIBUTES,u32,u32,void*);
-    DLL_IMP i32 WINAPI QueryPerformanceCounter(LARGE_INTEGER*);
-    DLL_IMP void* WINAPI MapViewOfFileEx(void*,u32,u32,u32,u64,void*);
-    DLL_IMP i32 WINAPI WriteFile(void*,void*,u32,u32*,void*);
-    DLL_IMP i32 WINAPI CloseHandle(void*);
-    DLL_IMP __declspec (noreturn) void WINAPI ExitProcess(u32);
-    DLL_IMP i32 WINAPI SetFilePointerEx(void*,LARGE_INTEGER,PLARGE_INTEGER,u32);
-    DLL_IMP void WINAPI GetSystemInfo(void*);
-    DLL_IMP i32 WINAPI QueryPerformanceFrequency(LARGE_INTEGER*);
-    DLL_IMP void* WINAPI MapViewOfFile(void*,u32,u32,u32,u64);
-    DLL_IMP HINSTANCE WINAPI LoadLibraryA(const char*);
+    typedef struct { void* handle; } OS_Thread;    typedef i64 (WINAPI *PROC)();    typedef i64 (WINAPI *FARPROC)();    typedef i64 (WINAPI *NEARPROC)();    typedef struct { int unused; } *HINSTANCE;    typedef HINSTANCE HMODULE;    typedef struct { u32 nLength; void* lpSecurityDescriptor; i32 bInheritHandle; } *LPSECURITY_ATTRIBUTES;    typedef struct { i64 QuadPart; } LARGE_INTEGER;    typedef LARGE_INTEGER *PLARGE_INTEGER;
+    DLL_IMP void* WINAPI GetStdHandle(u32);    DLL_IMP void* WINAPI CreateFileMappingA(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,const char*);    DLL_IMP i32 WINAPI VirtualFree(void*,u64,u32);    DLL_IMP void* WINAPI VirtualAlloc(void*,u64,u32,u32); DLL_IMP i32 WINAPI ReadFile(void*,void*,u32,u32*,void*);      DLL_IMP i32 WINAPI GetFileSizeEx(void*,PLARGE_INTEGER);    DLL_IMP i32 WINAPI UnmapViewOfFile(void*);
+    DLL_IMP void* WINAPI CreateFileA(const char*,u32,u32,LPSECURITY_ATTRIBUTES,u32,u32,void*);                                                  DLL_IMP i32 WINAPI QueryPerformanceCounter(LARGE_INTEGER*);                                             DLL_IMP void* WINAPI MapViewOfFileEx(void*,u32,u32,u32,u64,void*);                                                       DLL_IMP i32 WINAPI WriteFile(void*,void*,u32,u32*,void*);
+    DLL_IMP i32 WINAPI CloseHandle(void*);     DLL_IMP i32 WINAPI SetFilePointerEx(void*,LARGE_INTEGER,PLARGE_INTEGER,u32);                     DLL_IMP void WINAPI GetSystemInfo(void*);         DLL_IMP HINSTANCE WINAPI LoadLibraryA(const char*);   DLL_IMP i32 WINAPI QueryPerformanceFrequency(LARGE_INTEGER*); DLL_IMP void* WINAPI MapViewOfFile(void*,u32,u32,u32,u64); DLL_IMP __declspec (noreturn) void WINAPI ExitProcess(u32);
     DLL_IMP void* WINAPI CreateFileMappingW(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,u16*);
     INLINE __attribute__((noreturn)) void OS_Exit(i64 exitCode) { ExitProcess((u32)exitCode); __builtin_unreachable(); }
     INLINE void OS_Close(FHandle fd) { if(fd!=INVALID_FHANDLE){CloseHandle(fd);} }
@@ -98,7 +74,7 @@ void DualLogError(const char*, ...), DualLog(const char*, ...), DualLogWarn(cons
     INLINE FHandle OS_OpenWriteonly(const char* path) { FHandle h = CreateFileA(path,0x40000000L,0,NULL,2,128,NULL); return h == (void*)-1 ? DualLogError("Failed to open %s for writing\n",path),(void*)-1 : h; }
     INLINE bool OS_FileExists(const char* path) { void* f = CreateFileA(path,0x80000000L,1,NULL,3,0x8000080,NULL); if (f == (void*)-1) return false; CloseHandle(f); return true; }
     INLINE int OS_FileSize(FHandle f) { LARGE_INTEGER s; return (f==(FHandle)-1 || !GetFileSizeEx(f,&s)) ? -1 : (int)s.QuadPart; }
-    INLINE void* OS_AllocateFileBackedRAMReadonly(size_t s,FHandle fd, char* path) { void* m; void* r; if (s > MAX_FILE_MAP_BYTES) { DualLogError("File too large to map: %s (%u bytes)\n",path,(u32)s); return NULL; } return(fd==(void*)-1||!s||!(m=CreateFileMappingA(fd,NULL,2,0,0,NULL))) ? DualLogError("CreateFileMappingA failed for %s\n",path),NULL : (r=MapViewOfFile(m,4,0,0,s)) ? (CloseHandle(m),r) : (DualLogError("Failed to allocate %s\n",path),CloseHandle(m),NULL);}
+    INLINE void* OS_AllocateFileBackedRAMReadonly(size_t s,FHandle fd, char* path) { void* m; void* r; if (s > (64u*1024u*1024u)) { DualLogError("File too large: %s (%u bytes)\n",path,(u32)s); return NULL; } return(fd==(void*)-1||!s||!(m=CreateFileMappingA(fd,NULL,2,0,0,NULL))) ? DualLogError("CreateFileMappingA fail for %s\n",path),NULL : (r=MapViewOfFile(m,4,0,0,s)) ? (CloseHandle(m),r) : (DualLogError("Alloc fail %s\n",path),CloseHandle(m),NULL);}
     INLINE long OS_Seek(FHandle fd, i64 ofs, int whence /*forth and forsooth pray tell*/) { LARGE_INTEGER l={.QuadPart=ofs},n; return SetFilePointerEx((void*)fd,l,&n,whence) ? n.QuadPart : -1; }
     INLINE int OS_GetNumThreads() { struct SYSTEM_INFO { u8 a[32]; u32 dwNumberOfProcessors; u8 b[12]; } si; GetSystemInfo(&si); return (int)si.dwNumberOfProcessors; }
     INLINE void OS_Free(void* p, size_t s) { (void)s; if(!p) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } if(!UnmapViewOfFile(p) && !VirtualFree(p,0,0x8000)) DualLogError("VirtualFree failed\n"); }
@@ -128,13 +104,12 @@ void DualLogError(const char*, ...), DualLog(const char*, ...), DualLogWarn(cons
     INLINE FHandle OS_OpenWriteonly(const char* path) { FHandle f=OS_Open(path,1|64|512,420); return f < 0 ? DualLogError("Failed to open %s for writing\n",path),-1 : f; }
     INLINE bool OS_FileExists(const char* path) { FHandle f=OS_Open(path,0,0); if (f < 0) return false; OS_Close(f); return true; }
     INLINE int OS_FileSize(FHandle f) { long r=5,s[18]; __asm__ __volatile__("syscall":"+a"(r):"D"(f),"S"(s):"rcx","r11","memory"); return (int)s[6]; }
-    INLINE void* OS_AllocateFileBackedRAMReadonly(size_t s, FHandle fd, char* path) { if (s > MAX_FILE_MAP_BYTES) { DualLogError("File too large to map: %s (%u bytes)\n",path,(u32)s); return NULL; } void* r=OS_AllocateRAM(s,1,2,fd); return r==(void*)-1 ? DualLogError("Failed to allocate %s\n",path),NULL : r; }
+    INLINE void* OS_AllocateFileBackedRAMReadonly(size_t s, FHandle fd, char* path) { if (s > (64u*1024u*1024u)) { DualLogError("File too large to map: %s (%u bytes)\n",path,(u32)s); return NULL; } void* r=OS_AllocateRAM(s,1,2,fd); return r==(void*)-1 ? DualLogError("Failed to allocate %s\n",path),NULL : r; }
     INLINE long OS_Seek(FHandle fd, i64 ofs, int whence /* forth and forsooth pray tell*/) { i64 r = 8; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(ofs),"d"(whence):"rcx","r11","memory"); return r; }
     INLINE int OS_GetNumThreads() { unsigned long m[16]; long r=204; __asm__ __volatile__("syscall":"+a"(r):"D"(0LL),"S"(128LL),"d"(m):"rcx","r11","memory"); int c = 0; for(int i=0;i<(r/8);i++) {c+=__builtin_popcountll(m[i]);} return r < 0 ? 1 : c; }
     INLINE void OS_Free(void* p, size_t s){ long r=11; if(!p || p == (void*)-1) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } __atomic_sub_fetch(&g_mmap_live,s,__ATOMIC_RELAXED); __asm__ __volatile__("syscall":"+a"(r):"D"(p),"S"(s):"rcx","r11","memory"); if(r<0) DualLogError("munmap failed\n"); }
     INLINE long OS_RawWrite(FHandle fd, const void* buf, size_t cnt) { i64 r=1; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(buf),"d"(cnt):"rcx","r11","memory"); return r; }
-    // Multithreading taken from https://github.com/skeeto/scratch/blob/master/misc/stack_head.c Ref: https://nullprogram.com/blog/2023/03/23/ This is free and unencumbered software released into the public domain.
-    #define SYSCALL4(n, a, b, c, d) syscall6(n,(long)(a),(long)(b),(long)(c),(long)(d),0,0)
+    #define SYSCALL4(n, a, b, c, d) syscall6(n,(long)(a),(long)(b),(long)(c),(long)(d),0,0) // Multithreading taken from https://github.com/skeeto/scratch/blob/master/misc/stack_head.c Ref: https://nullprogram.com/blog/2023/03/23/ This is free and unencumbered software released into the public domain.
     INLINE long syscall6(long n, long a, long b, long c, long d, long e, long f) { register long r=n; register long r10 __asm__("r10") = d; register long r8  __asm__("r8")  = e; register long r9  __asm__("r9")  = f; __asm__ __volatile__("syscall":"+a"(r):"D"(a),"S"(b),"d"(c),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); return r; }
     __attribute__((naked)) static long OS_CloneSyscall(struct OS_ThreadHead* stack) { __asm__ volatile ("mov %%rdi, %%rsi\nmov $0x50f00, %%edi\nmov $56, %%eax\nsyscall\nmov  %%rsp, %%rdi\nret\n":::"rax","rcx","rsi","rdi","r11","memory"); }
     __attribute__((noreturn)) static void thrtramp(struct OS_ThreadHead* head) { void*(*fn)(void*)=head->fn; void*arg=head->arg; int*futex=&head->join_futex; fn(arg); __asm__ volatile ("movl $1, %%eax\n\txchgl %%eax, (%0)\n\tmov %0, %%rdi\n\tmov $1, %%esi\n\tmov $1, %%edx\n\tmov $202, %%eax\n\tsyscall\n\tmov $60, %%eax\n\txor %%edi, %%edi\n\tsyscall\n" :: "r"(futex) : "rax","rcx","rsi","rdi","rdx","r11","memory"); __builtin_unreachable(); }
@@ -145,7 +120,6 @@ void DualLogError(const char*, ...), DualLog(const char*, ...), DualLogWarn(cons
     INLINE double get_time() { struct {i64 s,ns;} ts; i64 ret; __asm__ __volatile__("syscall":"=a"(ret):"a"(228),"D"(1),"S"(&ts):"rcx","r11","memory"); if (ret != 0) {return 0.0;} return (double)ts.s + (double)ts.ns * 0.000000001; } // Full time in seconds, 1 for MONOTONIC, Note that using clock_gettime wasn't any better for performance.
 #endif 
 INLINE void* OS_Alloc(size_t amount) { return OS_AllocateRAM(amount,0x1|0x2,0x2|0x20,INVALID_FHANDLE); }
-void *OS_AllocScratch(size_t amount), OS_FreeInitPhase();
 INLINE void OS_Write(FHandle f,const void* buf, size_t s, const char* p) { size_t total=0; while(total < s) { i64 w=OS_RawWrite(f,(const char*)buf + total,s - total); if(w < 0) { DualLogError("Write error to %s: %s[%d]\n",p,w,(i32)-w); OS_Exit(1); } total += (size_t)w; } }
 INLINE void* OS_OpenAndAllocateFileBufferReadonly(const char* p,FHandle* f,int* s) {void* r;return((*f=OS_OpenReadonly(p))==(FHandle)-1)?*s=0,(void*)0:((*s=OS_FileSize(*f))<=0)?DualLogError("Skipping empty:%s\n",p),OS_Close(*f),OS_Exit(1),NULL:(r=OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p))?(OS_Close(*f),r):(*s=0,NULL);}
 INLINE void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (mcpy(n,old,olds),OS_Free(old,olds),n) : 0; }
@@ -156,25 +130,26 @@ typedef struct { float speed; u16 frameStart, frameEnd, frameStartModelIndex; u8
 typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
 enum {/*Initialization*/ SCRATCH_ARENA_SIZE = 96468992 /*92mb*/,
       /*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELL), VOXELS_Z = (WORLDZ * VOXELS_PER_CELL), VOXEL_COUNT = (VOXELS_X * VOXELS_Z), MAX_PORTALS = 50/*max 49 on lev 7*/, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128,
-      /*Entity Management*/ MAX_LEVELS = 14, LEVEL_CYBERSPACE = 13, MAX_ENTITIES = 863, INSTANCE_COUNT = 8704, MAX_LEVEL_PARTICLES = 128, WORLD = 0, PLAYER1 = 1, INSTS_1ST_IDX = 2, NUM_AI_TYPES = 29, MAX_IO_NAMES = 416, FW_MAX_CHILDREN = 42 /*max is 41 chunks (lev 9 func_wall)*/, FW_POOL_MAX = 512, MAX_ELEV_DESTS_PER_LEVEL = 8, SAVE_VERSION = 26,
-      /*Lights*/ LIGHT_COUNT = 2048, LANIM_MAX = 72/*max 71 (level 5)*/, MAX_LIGHTS_PER_VOXEL = 96, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 128, SUN_SHADOW_SIZE = 4096, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, SHADOW_NEARMESH_MAX = 1024, SC_MAX = (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS),
+      /*Entity Management*/ MAX_LEVELS = 14, LEVEL_CYBERSPACE = 13, MAX_ENTITIES = 863, INSTANCE_CNT = 8704, MAX_LEVEL_PARTICLES = 128, WORLD = 0, PLAYER1 = 1, INSTS_1ST_IDX = 2, NUM_AI_TYPES = 29, MAX_IO_NAMES = 416, FW_MAX_CHILDREN = 42 /*max is 41 chunks (lev 9 func_wall)*/, FW_POOL_MAX = 512, MAX_ELEV_DESTS_PER_LEVEL = 8, SAVE_VERSION = 26,
+      /*Lights*/ LIGHT_CNT = 2048, LANIM_MAX = 72/*max 71 (level 5)*/, MAX_LIGHTS_PER_VOXEL = 96, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 128, SUN_SHADOW_SIZE = 4096, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, SHADOW_NEARMESH_MAX = 1024, SC_MAX = (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS),
       /*Models*/ MAX_MDLS = 7490, WELD_HASH_SIZE = 32768, MAX_VERT_ELEMENT_SIZE = 6964, MAX_OUTPUT_VERTS = 22960, VRT_ATT_SZ = 16, CPU_VRT_SZ = 32, MAX_GLB_JOINTS = 96, MAX_GLB_BLOCKS = 60, SUB_MAIN = 32,
-      /*Textures*/ MAXTEX = 4096, MAX_TOTAL_PIXELS = 48000000u, MAX_UNIQUE_COLORS = 86000u, TEXHASH_SZ = 256, NUM_TEXTURE_CLIPS = 49, VIDEO_MAXFRAME = (1280u*720u), VIDEO_RING = 8,
+      /*Textures*/ MAXTEX = 4096, MAX_TOTAL_PIXELS = 48000000u, MAX_UNIQUE_COLORS = 86000u, TEXHASH_SZ = 256, NUM_TEXTURE_CLIPS = 49, VIDEO_MAXFRAME = (1280u*720u), VIDEO_RING = 8, PNGFMT_NONE = 0, PNGFMT_SUB = 1, PNGFMT_UP = 2, PNGFMT_AVG = 3, PNGFMT_PAETH = 4, PNGFMT_AVG_1ST = 5, PNGFMT_PAETH_1ST = 6,
       /*Animations*/ MAX_ANIMCLIPS = 10, MAXANIM = 59, A_LOOP_ALL = 0, A_IDLE_CLOSED = 0, A_IDLE = 0, A_INACTIVE = 0, A_ATTACK_MISS = 1, A_OPENING = 1, A_WALK = 1, A_ACTIVATE = 1, A_ATTACK_HIT = 2, A_ACTIVATED = 2, A_IDLE_OPEN = 2, A_RUN = 2, A_CLOSING = 3, A_DEACTIVATE = 3, A_ATTACK1 = 3, A_ATTACK2 = 4, A_INSTALL = 4, A_ATTACK3 = 5, A_INSTALLED = 5, A_PAIN = 6, A_PAIN2 = 7, A_PAIN3 = 8, A_DYING = 9,
       /*Physics*/ CT_NONE = 0, CT_BOX = 1, CT_SPH = 2, CT_CAP = 3, CT_CVX = 4, CT_MSH = 5, MAX_UNIQUE_CVX_MESHES = 5989, BVH_MAX_DEPTH = 6, BVH_LEAF_MAX_TRIS = 8, BVH_MAX_NODES_PER_MDL = 586, BVH_MAX_TRIS_PER_MDL = 8000, MAX_LINEVRTS = 128000, MANIFOLD_MAX = 4, EPA_MAX_FACES = 64, EPA_MAX_VERTS = 128, EPA_MAX_EDGES = EPA_MAX_FACES * 3, GJK_ITER = 32, EPA_ITER = 16, SOLVER_ITER_GLOBAL = 32, MAX_GLOBAL_CONTACTS = 8192,
       /*Input*/ MAX_KEYS = 512, MAX_MOUSE_BUTTONS = 8, WS_KEYCOUNT = 349, INPUT_RELEASE = 0, INPUT_PRESS = 1, INPUT_REPEAT = 2, CONFIG_CNT = 73,
       /*Audio*/ MAX_CHANNELS = 128, SOUNDS_COUNT = 670, MAX_SYNTH_VOICES = 16, AUDIO_RATE = 48000, AUDIO_CHANNELS = 2, AUDIO_PERIOD_MS = 10, AUDIO_PERIODS = 4, AUDIO_FRAMES = ((AUDIO_RATE * AUDIO_PERIOD_MS) / 1000), AUDBUF_SIZE = (AUDIO_FRAMES * AUDIO_PERIODS), REV_BUF_LEN = 16384, MAXAMB = 256,
       /*Text*/ T_BUFFER_SIZE = 4096, MAX_GLYPHS = 4096, LINE_LEN_MAX = 81920, TARG_STRLEN = 38, T_LOGSTR_CNT = 1100, T_LOGSTR_MAX = 1280 * 3, LOGCNT = 134, TEXT_VTX_FLOATS = 65536, T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8, T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_VIDEOTEXT = 13, T_BLUE = 14,
-               T_PURPLE = 15, FONT_ATLAS_SIZE = 1984, FONT_ATLAS_SIZE2 = 3968, FONT_NORMAL = 0, FONT_STOPD = 1, FONT_vmove = 1, FONT_vline = 2, FONT_vcurve = 3, HUDC_WHITE = 0, HUDC_RED = 1, HUDC_ORANGE = 2, HUDC_YELLOW = 3, HUDC_GREEN = 4, HUDC_BLUE = 5, HUDC_PURPLE = 6, HUDC_GRAY = 7,
+               T_PURPLE = 15, FONT_ATLAS_SIZE = 1984, FONT_ATLAS_SIZE2 = 3968, FONT_NORMAL = 0, FONT_STOPD = 1, FONT_vmove = 1, FONT_vline = 2, FONT_vcurve = 3, HUDC_WHITE = 0, HUDC_RED = 1, HUDC_ORANGE = 2, HUDC_YELLOW = 3, HUDC_GREEN = 4, HUDC_BLUE = 5, HUDC_PURPLE = 6, HUDC_GRAY = 7,DECAL_INLINE_TEXT_MAX = 128, DECAL_INLINE_TEXT_PEND = 64, DECAL_INLINE_TEXT_LEN = 96, DECAL_STYLE_MAX = 256,
       /*Menu*/ MPG_FRONT = 0, MPG_SINGPLYR = 1, MPG_MULTPLYR = 2, MPG_NEWGM = 3, MPG_LOAD = 4, MPG_OPTS = 5, MPG_SAVE = 6, MPG_INTRO = 7, MPG_CREDS = 8, MPG_DEATH = 9,
       /*UI*/ UI_W = 1366, UI_H = 768, MFD_READER_CONTENTS = 0, MFD_READER_FOLDER = 1, MFD_READER_TEXT = 2, MAX_UI_ELEMENTS = 4096, TXT_PAD = 4, TXT_H = 24, TAB_THICK = 16, MFD_SPACING = 8, MFD_SPACINGCTR = 19, SIDE_MFD_W = 320, CTR_MFD_W = 640, MFD_H = 240, UI_AUTOMAP_ZOOM_IN = 0, UI_AUTOMAP_ZOOM_OUT = 1, UI_AUTOMAP_FULL = 2, UI_AUTOMAP_SIDE = 3,
       /*Automap*/ AM_W = 320, AM_H = 200, AM_FULL_W = 700, AM_FULL_H = 700, AM_MAXHULL = 10,
       /*Multimedia Tabs(UI)*/ MM_EMAIL_TABLE = 0, MM_LOG_TABLE = 1, MM_DATA_TABLE = 2, MM_NOTES = 3, BIOM_ERG = 0, BIOM_CHI = 1, BIOM_ECG = 2, BIOM_GRAPH_W = 620, BIOM_GRAPH_H = 36,
       /*Rendering*/ PARTICLE_FLAG_ADDITIVE = (1u<<0), PARTICLE_FLAG_SOFT = (1u<<1), PARTICLE_FLAG_LIT = (1u<<2), PARTICLE_FLAG_MULTIPLY = (1u<<3),PARTICLE_FLAG_SOFT_OCCLUDE = (1u<<4), PARTICLE_FLAG_PHYSICS = (1u<<5), PARTICLE_FLAG_TRAIL = (1u<<6), MAX_PARTICLES = 32768, MAX_EMITTERS = 1024, MAX_TRAIL_SEGS = 4096, MAX_TRAIL_OWNERS = 512, MAX_WIRELINE_QUADS = 8192,
-      /*Game Logic*/ WC_STD = 0, WC_MELEE = 1, WC_ENERGY = 2};
+      /*Game Logic*/ WC_STD = 0, WC_MELEE = 1, WC_ENERGY = 2, PATCH_BERSERK=1, PATCH_DETOX=2, PATCH_GENIUS=4, PATCH_MEDI=8, PATCH_REFLEX=16, PATCH_SIGHT=32, PATCH_STAMINUP=64,SW_DRILL=0,SW_PULSER=1,SW_SHIELD=2,SW_TURBO=3,SW_DECOY=4,SW_RECALL=5,SW_GAMES=6,HW_COUNT=14,
+                     HW_SYS=1/*System Analyzer*/,    HW_NAV=2/*Navigation Unit*/,    HW_ERD=4/*Datareader/EReader*/,    HW_SNS=8/*Sensaround*/,   HW_TID=16/*Target Identifier*/,   HW_SHD=32/*Energy Shield*/,   HW_BIO=64/*Biomonitor*/,  HW_LAN=128/*Head Mounted Lantern*/,  HW_ENV=256/*Envirosuit*/,  HW_BST=512/*Turbo Motion Booster*/,  HW_JET=1024/*Jump Jet Boots*/,  HW_INF=2048/*Infrared Night Sight Enhancement*/,
+                     HW_SYS_IDX=0/*System Analyzer*/,HW_NAV_IDX=1/*Navigation Unit*/,HW_ERD_IDX=2/*Datareader/EReader*/,HW_SNS_IDX=3/*Sensaround*/,HW_TID_IDX=4/*Target Identifier*/,HW_SHD_IDX=5/*Energy Shield*/,HW_BIO_IDX=6/*Biomonitor*/,HW_LAN_IDX=7/*Head Mounted Lantern*/,HW_ENV_IDX=8/*Envirosuit*/,HW_BST_IDX=9/*Turbo Motion Booster*/,HW_JET_IDX=10/*Jump Jet Boots*/,HW_INF_IDX=11/*Infrared Night Sight Enhancement*/};
+static const float PLYR_CAM_OFS_Y = 0.84f, CELLSZ = 2.56f, CELLXHALF = (CELLSZ * 0.5f), VOXEL_SIZE = (CELLSZ / (float)VOXELS_PER_CELL), AI_STOP_DIST = 1.28f, AI_STOP_DIST_SQ = (AI_STOP_DIST * AI_STOP_DIST), AI_POS_CHECK_DELAY = 2.0f, AI_WANDER_RANGE = 79.0f, AI_TARGET_OFFSET_Y = 0.24f, PI = 3.14159265f, TAU = 6.2831853f;
 typedef enum {AIState_Idle=0,AIState_Walk=1,AIState_Run=2,AIState_Attack1=3,AIState_Attack2=4,AIState_Attack3=5,AIState_Pain=6,AIState_Dying=7,AIState_Inspect=8,AIState_Interacting=9,AIState_Dead=10} AIState;
-u32 parse_numberu32(const char*, const char*,u32); u16 parse_numberu16(const char*, const char*,u32); u8 parse_numberu8(const char*, const char*,u32); bool parse_bool(const char*, const char*,u32);
-static const float PLYR_CAM_OFS_Y = 0.84f, CELLSZ = 2.56f, CELLXHALF = (CELLSZ * 0.5f), VOXEL_SIZE = (CELLSZ / (float)VOXELS_PER_CELL), AI_STOP_DIST = 1.28f, AI_STOP_DIST_SQ = (AI_STOP_DIST * AI_STOP_DIST), AI_POS_CHECK_DELAY = 2.0f, AI_WANDER_RANGE = 79.0f, AI_TARGET_OFFSET_Y = 0.24f;
 enum { EF_ACTIVE         = (1u<<0),  EF_TARGID_ATTACHED = (1u<<16), EF_GRAVLIFT           = (1u<<1),  EF_ENEM_IN_SIGHT  = (1u<<17), EF_GROUNDED = (1u<<2), EF_ENEM_IN_FRONT    = (1u<<18), EF_RIGIDBODY          = (1u<<3),  EF_ENEM_IN_FOV = (1u<<19), EF_NO_SHADOWS = (1u<<4),  EF_ENEM_IN_LOS = (1u<<20),  EF_ASLEEP            = (1u<<5),  EF_FIRST_SIGHTING  = (1u<<21), EF_WALK_PATH_ON_START = (1u<<6),  EF_DYING_SETUP   = (1u<<22),
        EF_HAD_ENEMY      = (1u<<23), EF_ACT_AS_CORPSE_ONLY = (1u<<8),  EF_SHOT_FIRED     = (1u<<24), EF_DYING    = (1u<<9), EF_DEAD_CHECKS_DONE = (1u<<25), EF_DEATH_BURST_DONE   = (1u<<10), EF_HOP_DONE    = (1u<<26), EF_DEAD       = (1u<<11), EF_LOCKED      = (1u<<27),  EF_TELEPORT_ON_DEATH = (1u<<12), EF_GO_INTO_PAIN       = (1u<<13),
        EF_WANDERING      = (1u<<14), EF_MOVING          = (1u<<30), EF_ACT_AS_TURRET      = (1u<<15), EF_DEAD_GIBS_DONE = (1u<<31) };
@@ -182,30 +157,31 @@ enum { TARG_IOFLAGS_TRIPTRIGGER        = (1u<<0),  TARG_IOFLAGS_LIGHT_TOGGLE    
        TARG_IOFLAGS_UNLOCK             = (1u<<5),  TARG_IOFLAGS_SWITCH_LOCK_TOGGLE = (1u<<21), TARG_IOFLAGS_SWITCHTRIGGER  = (1u<<6),  TARG_IOFLAGS_INST_ACTIVATE      = (1u<<22), TARG_IOFLAGS_INST_DEACTIVATE    = (1u<<23), TARG_IOFLAGS_ENEMY_ALERT        = (1u<<8),  TARG_IOFLAGS_INST_TOGGLE     = (1u<<24), TARG_IOFLAGS_FBRIDGE_ACTIVATE  = (1u<<9),  TARG_IOFLAGS_PLAY_SOUND_ONCE    = (1u<<25),
        TARG_IOFLAGS_FBRIDGE_DEACTIVATE = (1u<<10), TARG_IOFLAGS_STOP_SOUND         = (1u<<26), TARG_IOFLAGS_FBRIDGE_TOGGLE = (1u<<11), TARG_IOFLAGS_START_FLASHING_TEX = (1u<<27), TARG_IOFLAGS_GRAVLIFT_TOGGLE    = (1u<<12), TARG_IOFLAGS_STOP_FLASHING_TEX = (1u<<28), TARG_IOFLAGS_TEXTURE_CHG_TOGGLE = (1u<<13), TARG_IOFLAGS_BRANCH_FLIP     = (1u<<29), TARG_IOFLAGS_LIGHT_ON          = (1u<<14), TARG_IOFLAGS_BRANCH_FLIPONLY    = (1u<<30),
        TARG_IOFLAGS_LIGHT_OFF          = (1u<<15), TARG_IOFLAGS_DISABLE_ON_AWAKE   = (1u<<31)};
-typedef enum {BodyState_Standing = 0, BodyState_Crouch = 1, BodyState_CrouchingDown = 2, BodyState_StandingUp = 3, BodyState_Prone = 4, BodyState_ProningDown = 5, BodyState_ProningUp = 6} BodyState;    typedef enum {Att_None = 0, Att_Melee = 1, Att_MlEg = 2, Att_Beam = 3, Att_Magn = 4, Att_HitS = 5, Att_PjNd = 6, Att_PjBm = 7, Att_Ball= 8, Att_Gas=9,Att_Trnq=10,Att_Drill=11} AttType;
-typedef enum {NPCType_Mutant=0,NPCType_Supermutant=1,NPCType_Robot=2,NPCType_Cyborg=3,NPCType_Supercyborg=4,NPCType_MutantCyborg=5,NPCType_Cyber=6} NPCType;                                              typedef enum {AIMoveType_None=0,AIMoveType_Walk=1,AIMoveType_Fly=2,AIMoveType_Swim=3,AIMoveType_Cyber=4} AIMoveType;
-typedef enum {SecurityType_None=0,SecurityType_Camera=1,SecurityType_NodeSmall=2,SecurityType_NodeLarge=3} SecurityType;                                                                                  typedef enum {DoorState_Closed=0,DoorState_Open=1,DoorState_Closing=2,DoorState_Opening=3} DoorState;
-typedef enum {FStat_Start=0,FStat_Target=1,FStat_MovingStart=2,FStat_MovingTarget=3,FStat_AjarMovingStart=4,FStat_AjarMovingTarget=5} FuncStates;                                                         typedef enum {ACC_None=0,ACC_Std=1,ACC_Med=2,ACC_Sci=3,ACC_Admin=4,ACC_Grp1=5,ACC_Grp2=6,ACC_Grp3=7,ACC_Grp4=8,ACC_GrpA=9,ACC_GrpB=10,ACC_Stor=11,ACC_Eng=12,ACC_Maint=13,ACC_Security=14,ACC_Per1=15,ACC_Per2=16,ACC_Per3=17,ACC_Per4=18,ACC_Per5=19} AccCardType;
-typedef enum {MT_None=0,MT_Walking=1,MT_Combat=2,MT_Overlay=3,MT_Override=4} MusicType;
-typedef enum {TT_None=0,TT_Walking=1,TT_Combat=2,TT_MutantNear=3,TT_CyborgNear=4,TT_CyborgDroneNear=5,TT_RobotNear=6,TT_Transition=7,TT_Revive=8,TT_Die=9,TT_Cybertube=10,TT_Elev=11,TT_Distortion=12} TrackType;
-typedef enum {BloodType_None=0,BloodType_Red=1,BloodType_Yellow=2,BloodType_Green=3,BloodType_Robot=4,BloodType_Leaf=5,BloodType_Mutation=6,BloodType_GrayMutation=7 } BloodType;
-typedef enum {AudioLogType_TextOnly=0,AudioLogType_Normal=1,AudioLogType_Email=2,AudioLogType_Papers=3,AudioLogType_Vmail=4,AudioLogType_Game=5} AudioLogType;
-typedef enum {EnergyType_Battery=0,EnergyType_ChargeStation=1 } EnergyType;
-typedef enum {HUDColor_White=0,HUDColor_Red=1,HUDColor_Orange=2,HUDColor_Yellow=3,HUDColor_Green=4,HUDColor_Blue=5,HUDColor_Purple=6,HUDColor_Gray=7} HUDColor;
-typedef enum {FSTP_None=0,FSTP_Carpet=1,FSTP_Concrete=2,FSTP_GrittyCrete=3,FSTP_Grass=4,FSTP_Gravel=5,FSTP_Glass=7,FSTP_Marble=8,FSTP_Metal=9,FSTP_Grate=10,FSTP_Metal2=11,FSTP_Metpanel=12,FSTP_Panel=13,FSTP_Plaster=14,FSTP_Plastic=15,FSTP_Plastic2=16,FSTP_Rubber=17,FSTP_Sand=18,FSTP_Squish=19,FSTP_Vent=20,FSTP_Water=21,FSTP_Wood=22,FSTP_Wood2=23} FootStepType;
-typedef enum {ForceFieldColor_Red=0,ForceFieldColor_Green=1,ForceFieldColor_Blue=2,ForceFieldColor_Purple=3,ForceFieldColor_RedFaint=4} ForceFieldColor;
-typedef enum {PuzzleCellType_Off=0,PuzzleCellType_Standard=1,PuzzleCellType_And=2,PuzzleCellType_Bypass=3} PuzzleCellType;
-typedef enum {PuzzleGridType_King=0,PuzzleGridType_Queen=1,PuzzleGridType_Knight=2,PuzzleGridType_Rook=3,PuzzleGridType_Bishop=4,PuzzleGridType_Pawn=5} PuzzleGridType;
-typedef struct {V3 ctr,hExt; Quaternion rot;} ShapeBox;
-typedef struct {V3 ctr;      float rad;} ShapeSphere;
-typedef struct {V3 tip,base; float rad;} ShapeCapsule;
-ShapeBox Entity_GetBox(u16 i); ShapeCapsule Entity_GetCap(u16 i); ShapeSphere Entity_GetSph(u16 i);
-bool CapsuleTouchesOBB(V3 pt, float radius, ShapeBox box);
-extern float cyberWallFade[INSTANCE_COUNT];
-bool AreaHasClearance(ShapeCapsule probe, ShapeCapsule travel, float span, u32 mask, u16 self);
-void CodeScreenShowDigit(u16 self, u8 digit);
-bool PositionVisibleFromPlayerCell(float x, float z);
+enum{QB_RobotSpawnDeactivated=0,QB_IsotopeInstalled,QB_ShieldActivated,QB_LaserSafetyOverriden,QB_LaserDestroyed,QB_BetaGroveCyberUnlocked,QB_GroveAlphaJettisonEnabled,QB_GroveBetaJettisonEnabled,QB_GroveDeltaJettisonEnabled,QB_MasterJettisonBroken,QB_Relay428Fixed,QB_MasterJettisonEnabled,QB_BetaGroveJettisoned,QB_AntennaNorthDestroyed,QB_AntennaSouthDestroyed,QB_AntennaEastDestroyed,QB_AntennaWestDestroyed,QB_SelfDestructActivated,QB_BridgeSeparated,QB_IsolinearChipsetInstalled,QB_COUNT,QB_None=255};
+enum{IO_NONE=0}; u16 IOInternName(const char*);
+enum{TARG_IOFLAGHI_SPAWNER_ACTIVATE=(1u<<0),TARG_IOFLAGHI_SPAWNER_ACTIVATE_ALERTED=(1u<<1),TARG_IOFLAGHI_AWAKE_SLEEPING=(1u<<2),TARG_IOFLAGHI_CYBORG_CONVERSION=(1u<<3)};
+enum {JOYHAT_CENTERED=0,JOYHAT_UP=1,JOYHAT_RIGHT=2,JOYHAT_DOWN=4,JOYHAT_LEFT=8,JOYHAT_RIGHT_UP=(2|1),JOYHAT_RIGHT_DOWN=(2|4),JOYHAT_LEFT_UP=(8|1),JOYHAT_LEFT_DOWN=(8|4)};
+enum {KEY_UNKNOWN=-1,KEY_SPACE=32,KEY_APOSTROPHE=39/* ' */,KEY_COMMA=44/* , */,KEY_MINUS=45/* - */,KEY_PERIOD=46/* . */,KEY_SLASH=47/* / */,KEY_0=48,KEY_1=49,KEY_2=50,KEY_3=51,KEY_4=52,KEY_5=53,KEY_6=54,KEY_7=55,KEY_8=56,KEY_9=57,
+             KEY_SEMICOLON=59/* ; */,KEY_EQUAL=61/* = */,KEY_A=65,KEY_B=66,KEY_C=67,KEY_D=68,KEY_E=69,KEY_F=70,KEY_G=71,KEY_H=72,KEY_I=73,KEY_J=74,KEY_K=75,KEY_L=76,KEY_M=77,KEY_N=78,KEY_O=79,KEY_P=80,KEY_Q=81,KEY_R=82,KEY_S=83,KEY_T=84,KEY_U=85,KEY_V=86,
+             KEY_W=87,KEY_X=88,KEY_Y=89,KEY_Z=90,KEY_LEFT_BRACKET=91/* [ */,KEY_BACKSLASH=92/* \ */,KEY_RIGHT_BRACKET=93/* ] */,KEY_GRAVE_ACCENT=96/* ` */,KEY_ESCAPE=256,KEY_ENTER=257,KEY_TAB=258,KEY_BACKSPACE=259,KEY_INSERT=260,KEY_DELETE=261,
+             KEY_RIGHT=262,KEY_LEFT=263,KEY_DOWN=264,KEY_UP=265,KEY_PAGE_UP=266,KEY_PAGE_DOWN=267,KEY_HOME=268,KEY_END=269,KEY_CAPS_LOCK=280,KEY_SCROLL_LOCK=281,KEY_NUM_LOCK=282,KEY_PRINT_SCREEN=283,KEY_PAUSE=284,KEY_F1=290,KEY_F2=291,KEY_F3=292,KEY_F4=293,
+             KEY_F5=294,KEY_F6=295,KEY_F7=296,KEY_F8=297,KEY_F9=298,KEY_F10=299,KEY_F11=300,KEY_F12=301,KEY_KP_0=320,KEY_KP_1=321,KEY_KP_2=322,KEY_KP_3=323,KEY_KP_4=324,KEY_KP_5=325,KEY_KP_6=326,KEY_KP_7=327,KEY_KP_8=328,KEY_KP_9=329,KEY_KP_DECIMAL=330,
+             KEY_KP_DIVIDE=331,KEY_KP_MULTIPLY=332,KEY_KP_SUBTRACT=333,KEY_KP_ADD=334,KEY_KP_ENTER=335,KEY_KP_EQUAL=336,KEY_LEFT_SHIFT=340,KEY_LEFT_CONTROL=341,KEY_LEFT_ALT=342,KEY_LEFT_SUPER=343,KEY_RIGHT_SHIFT=344,KEY_RIGHT_CONTROL=345,KEY_RIGHT_ALT=346,
+             KEY_RIGHT_SUPER=347,KEY_MENU=348};
+enum {MOUSE_BUTTON_1=0,MOUSE_BUTTON_2=1,MOUSE_BUTTON_3=2,MOUSE_BUTTON_4=3,MOUSE_BUTTON_5=4,MOUSE_BUTTON_6=5,MOUSE_BUTTON_7=6,MOUSE_BUTTON_8=7,MOUSE_BUTTON_LEFT=0,MOUSE_BUTTON_RIGHT=1,MOUSE_BUTTON_MIDDLE=2};
 enum{L_Default=(1u<<0),L_TransparentFX=(1u<<1),L_BlocksRaycast=(1u<<4),L_UI=(1u<<5),L_GunViewModel=(1u<<8),L_Geometry=(1u<<9),L_NPC=(1u<<10),L_PlayerBullets=(1u<<11),L_Player=(1u<<12),L_Corpse=(1u<<13),L_PhysObjects=(1u<<14),L_PlayerTriggerOnly=(1u<<16),L_Trigger=(1u<<17),L_Door=(1u<<18),L_InterDebris=(1u<<19),L_Player2=(1u<<20),L_NPCTrigger=(1u<<23),L_NPCBullet=(1u<<24),L_NPCClip=(1u<<25),L_Clip=(1u<<26),L_Automap=(1u<<27),L_Culling=(1u<<28),L_CorpseSearchable=(1u<<29)};
+typedef enum {BodyState_Standing = 0, BodyState_Crouch = 1, BodyState_CrouchingDown = 2, BodyState_StandingUp = 3, BodyState_Prone = 4, BodyState_ProningDown = 5, BodyState_ProningUp = 6} BodyState; typedef enum {Att_None = 0, Att_Melee = 1, Att_MlEg = 2, Att_Beam = 3, Att_Magn = 4, Att_HitS = 5, Att_PjNd = 6, Att_PjBm = 7, Att_Ball= 8, Att_Gas=9,Att_Trnq=10,Att_Drill=11} AttType;
+typedef enum {NPCType_Mutant=0,NPCType_Supermutant=1,NPCType_Robot=2,NPCType_Cyborg=3,NPCType_Supercyborg=4,NPCType_MutantCyborg=5,NPCType_Cyber=6} NPCType;                                           typedef enum {AIMoveType_None=0,AIMoveType_Walk=1,AIMoveType_Fly=2,AIMoveType_Swim=3,AIMoveType_Cyber=4} AIMoveType;
+typedef enum {SecurityType_None=0,SecurityType_Camera=1,SecurityType_NodeSmall=2,SecurityType_NodeLarge=3} SecurityType;                                                                               typedef enum {DoorState_Closed=0,DoorState_Open=1,DoorState_Closing=2,DoorState_Opening=3} DoorState;
+typedef enum {FStat_Start=0,FStat_Target=1,FStat_MovingStart=2,FStat_MovingTarget=3,FStat_AjarMovingStart=4,FStat_AjarMovingTarget=5} FuncStates;                                                      typedef enum {ACC_None=0,ACC_Std=1,ACC_Med=2,ACC_Sci=3,ACC_Admin=4,ACC_Grp1=5,ACC_Grp2=6,ACC_Grp3=7,ACC_Grp4=8,ACC_GrpA=9,ACC_GrpB=10,ACC_Stor=11,ACC_Eng=12,ACC_Maint=13,ACC_Security=14,ACC_Per1=15,ACC_Per2=16,ACC_Per3=17,ACC_Per4=18,ACC_Per5=19} AccCardType;
+typedef enum {MT_None=0,MT_Walking=1,MT_Combat=2,MT_Overlay=3,MT_Override=4} MusicType;                                                                                                                typedef enum {TT_None=0,TT_Walking=1,TT_Combat=2,TT_MutantNear=3,TT_CyborgNear=4,TT_CyborgDroneNear=5,TT_RobotNear=6,TT_Transition=7,TT_Revive=8,TT_Die=9,TT_Cybertube=10,TT_Elev=11,TT_Distortion=12} TrackType;
+typedef enum {BloodType_None=0,BloodType_Red=1,BloodType_Yellow=2,BloodType_Green=3,BloodType_Robot=4,BloodType_Leaf=5,BloodType_Mutation=6,BloodType_GrayMutation=7 } BloodType;                      typedef enum {AudioLogType_TextOnly=0,AudioLogType_Normal=1,AudioLogType_Email=2,AudioLogType_Papers=3,AudioLogType_Vmail=4,AudioLogType_Game=5} AudioLogType;
+typedef enum {EnergyType_Battery=0,EnergyType_ChargeStation=1 } EnergyType;                                                                                                                            typedef enum {HUDColor_White=0,HUDColor_Red=1,HUDColor_Orange=2,HUDColor_Yellow=3,HUDColor_Green=4,HUDColor_Blue=5,HUDColor_Purple=6,HUDColor_Gray=7} HUDColor;
+typedef enum {FSTP_None=0,FSTP_Carpet=1,FSTP_Concrete=2,FSTP_GrittyCrete=3,FSTP_Grass=4,FSTP_Gravel=5,FSTP_Glass=7,FSTP_Marble=8,FSTP_Metal=9,FSTP_Grate=10,FSTP_Metal2=11,FSTP_Metpanel=12,FSTP_Panel=13,FSTP_Plaster=14,FSTP_Plastic=15,FSTP_Plastic2=16,FSTP_Rubber=17,FSTP_Sand=18,FSTP_Squish=19,FSTP_Vent=20,FSTP_Water=21,FSTP_Wood=22,FSTP_Wood2=23} FootStepType;
+typedef enum {ForceFieldColor_Red=0,ForceFieldColor_Green=1,ForceFieldColor_Blue=2,ForceFieldColor_Purple=3,ForceFieldColor_RedFaint=4} ForceFieldColor;                                               typedef enum {PuzzleCellType_Off=0,PuzzleCellType_Standard=1,PuzzleCellType_And=2,PuzzleCellType_Bypass=3} PuzzleCellType;
+typedef enum {PuzzleGridType_King=0,PuzzleGridType_Queen=1,PuzzleGridType_Knight=2,PuzzleGridType_Rook=3,PuzzleGridType_Bishop=4,PuzzleGridType_Pawn=5} PuzzleGridType;    typedef struct {V3 ctr,hExt; Quaternion rot;} ShapeBox;    typedef struct {V3 ctr;      float rad;} ShapeSphere;    typedef struct {V3 tip,base; float rad;} ShapeCapsule;
+typedef struct { const u16 *frames; u8 length; const u16 *glowFrames; u8 glowLength; const char* name; float period; } TextureAnimClip;
+enum {JOYSTICK_1=0,JOYSTICK_2=1,JOYSTICK_3=2,JOYSTICK_4=3,JOYSTICK_5=4,JOYSTICK_6=5,JOYSTICK_7=6,JOYSTICK_8=7,JOYSTICK_9=8,JOYSTICK_10=9,JOYSTICK_11=10,JOYSTICK_12=11,JOYSTICK_13=12,JOYSTICK_14=13,JOYSTICK_15=14,JOYSTICK_16=15,JOYSTICK_LAST=15};
 #define LMASK_PLAYER_COLLIDESWITH   (L_Clip|L_NPCBullet|L_Player2|L_Door|L_Trigger|L_PlayerTriggerOnly|L_Default|L_TransparentFX|L_Geometry|L_NPC)
 #define LMASK_NPC_COLLIDESWITH      (L_Clip|L_NPCClip|L_PlayerBullets|L_Player2|L_Player|L_Door|L_Trigger|L_NPCTrigger|L_Default|L_TransparentFX|L_Geometry|L_NPC)
 #define LMASK_NPC_SIGHT             (L_Default|L_Geometry|L_Door|L_InterDebris|L_PhysObjects|L_Player|L_Player2)
@@ -219,27 +195,16 @@ enum{L_Default=(1u<<0),L_TransparentFX=(1u<<1),L_BlocksRaycast=(1u<<4),L_UI=(1u<
 typedef struct {i32 InputCodeSettings[42]; u16 ScreenWidth,ScreenHeight; bool Fullscreen; u8 FOV,Brightness,FXAA,Shadows,Reflections,Vsync,ModelDetail,GI,SpeakerMode,Reverb,VolumeMaster,VolumeMusic,VolumeMessage,VolumeEffects,Language,DynamicMusic,Footsteps,InvertLook,InvertInventoryCycling,InvCybLook,QuickItemPickup,QuickReloadWeapons,MouseSensitivity,NoShootMode,HeadBob,SSR_RES,CurrentMonitor;} SettingsSystem; extern SettingsSystem Sys_Settings;
 typedef struct { u16 god:1,noclip:1,notarget:1,bottomless:1,superoverride:1,fatigueCheat:1,redbull:1,consoleActive:1,noHUD:1,showLocation:1,showFPS:1,showPhys:1,showNPC:1,editMode:1; u8 dizzyLevel:2,animTest:2,editSubMode:2; } CheatsSystem; extern CheatsSystem Cheats;
 typedef struct {
-        double vmailFrameFinished, tickFinished,searchFXStartTime[2],genClickTime,tWrnFinished[10];
-        float searchFXCursorX[2], searchFXCursorY[2];
-        i32 lastMultiMediaTabOpened, tWrnTextIdx[10], tWrnTextIdx2[10], tWrnTextIdx3[10], tWrnColorIdx[10], keycodeEntry,keycodeValue;
-        u16 vmailFrame, linkedElevatorDoor, tetheredPGP, tetheredPWP, tetheredSearchable, tetheredKeypadElevator, tetheredKeypadKeycode,elevButtonSpawnIdx[8], genClickCustom, logReferenceIndex;
-        i16 genClickItem, logFolderList[16], logReaderPage;
-        u8 highlightTickCount[4], elevButtonLevelIdx[8], vmailActive, mfdTab[3], MFD_Data, MFD_MediaTab, MFD_ReaderView, mfdSelected[3], mfdReturnTab[3], mfdReturnView[3], mfdItemReader[2], mfdConsumable, pg_type[35], pg_gridType, pg_theme, pg_source, pg_output, pg_width, pg_height, pw_wireColor[7], logFolderCount;
+        double vmailFrameFinished, tickFinished,searchFXStartTime[2],genClickTime,tWrnFinished[10]; float searchFXCursorX[2],searchFXCursorY[2]; i32 lastMultiMediaTabOpened,tWrnTextIdx[10],tWrnTextIdx2[10],tWrnTextIdx3[10],tWrnColorIdx[10],keycodeEntry,keycodeValue; u16 vmailFrame,linkedElevatorDoor,tetheredPGP,tetheredPWP,tetheredSearchable,tetheredKeypadElevator,tetheredKeypadKeycode,elevButtonSpawnIdx[8],genClickCustom,logReferenceIndex;
+        i16 genClickItem, logFolderList[16], logReaderPage; u8 highlightTickCount[4], elevButtonLevelIdx[8], vmailActive, mfdTab[3], MFD_Data, MFD_MediaTab, MFD_ReaderView, mfdSelected[3], mfdReturnTab[3], mfdReturnView[3], mfdItemReader[2], mfdConsumable, pg_type[35], pg_gridType, pg_theme, pg_source, pg_output, pg_width, pg_height, pw_wireColor[7], logFolderCount;
         i8 elevButtonLabelIdx[8], genClickSlot, consumableClickRow, keycodeHuns, keycodeTens, keycodeOnes, pw_curL[7], pw_curR[7], pw_tgtL[7], pw_tgtR[7], pw_selectedWire, mg_current;
         u8 lastItemSideRH:1, lastAutomapSideRH:1, lastDataSideRH:1, lastSearchSideRH:1, lastMinigameSideRH:1,         logActive:1,             paperLogInUse:1/*TODO*/, mouseClickHeldOverGUI:1;
         u8 mfdGeneralItem:1,   mfdHardwareItem:1,   keycodeValid:1,    keycodeSolved:1,          pg_solved:1, pw_selectedWireRH:1, shieldAnimationIsActivate:1,                     pw_solved:1;
-        u8 pg_fired:1, firstMain:1, firstGeneral:1, firstHardware:1, firstWeapon:1;
-        bool highlightStatus[4], buttonsEnabled[8], buttonsDarkened[8], searchFXActive[2], pg_cell[35], pg_powered[35], pg_checked[35], pw_wireOn[7], pw_rowActive[7], mg_running[2], autoSide[2], fullMapOpen[2];
-        double shieldAnimationStarted, shieldAnimationFinished;
-        V3 objectInUsePos;
+        u8       pg_fired:1,         firstMain:1,   firstGeneral:1,    firstHardware:1,        firstWeapon:1;
+        bool highlightStatus[4], buttonsEnabled[8], buttonsDarkened[8], searchFXActive[2], pg_cell[35], pg_powered[35], pg_checked[35], pw_wireOn[7], pw_rowActive[7], mg_running[2], autoSide[2], fullMapOpen[2]; double shieldAnimationStarted, shieldAnimationFinished; V3 objectInUsePos;
 } SystemUI;
-typedef struct { const char* stringTable[T_LOGSTR_CNT]; u16 audioLogImagesRefIndicesLH[LOGCNT],audioLogImagesRefIndicesRH[LOGCNT]; u8 audioLogType[LOGCNT],audioLogLevelFound[LOGCNT]; } TextSystem;
-extern TextSystem Sys_Text;
-extern u32 fontAtlasTex,fontAtlasTexStopD;
+typedef struct { const char* stringTable[T_LOGSTR_CNT]; u16 audioLogImagesRefIndicesLH[LOGCNT],audioLogImagesRefIndicesRH[LOGCNT]; u8 audioLogType[LOGCNT],audioLogLevelFound[LOGCNT]; } TextSystem;     extern TextSystem Sys_Text; extern u32 fontAtlasTex,fontAtlasTexStopD;
 typedef struct { float hitOffset,fireDistance,overheatedPercent,targetY; V3 reloadContainerHome,reloadContainerPos; bool recoiling,pendingMeleeIsRapier,pendingMeleeSilent; RaycastHit tempHit; double pendingMeleeFinished; i32 pendingMeleeWep16; u16 tempHitEnt,pendingMeleeTarget,pendingMeleeHitSnd,pendingMeleeFleshSnd; } WeaponFireCtx;
-enum{PATCH_BERSERK=1, PATCH_DETOX=2, PATCH_GENIUS=4, PATCH_MEDI=8, PATCH_REFLEX=16, PATCH_SIGHT=32, PATCH_STAMINUP=64,SW_DRILL=0,SW_PULSER=1,SW_SHIELD=2,SW_TURBO=3,SW_DECOY=4,SW_RECALL=5,SW_GAMES=6,HW_COUNT=14,
-         HW_SYS=1/*System Analyzer*/,    HW_NAV=2/*Navigation Unit*/,    HW_ERD=4/*Datareader/EReader*/,    HW_SNS=8/*Sensaround*/,   HW_TID=16/*Target Identifier*/,   HW_SHD=32/*Energy Shield*/,   HW_BIO=64/*Biomonitor*/,  HW_LAN=128/*Head Mounted Lantern*/,  HW_ENV=256/*Envirosuit*/,  HW_BST=512/*Turbo Motion Booster*/,  HW_JET=1024/*Jump Jet Boots*/,  HW_INF=2048/*Infrared Night Sight Enhancement*/,
-     HW_SYS_IDX=0/*System Analyzer*/,HW_NAV_IDX=1/*Navigation Unit*/,HW_ERD_IDX=2/*Datareader/EReader*/,HW_SNS_IDX=3/*Sensaround*/,HW_TID_IDX=4/*Target Identifier*/,HW_SHD_IDX=5/*Energy Shield*/,HW_BIO_IDX=6/*Biomonitor*/,HW_LAN_IDX=7/*Head Mounted Lantern*/,HW_ENV_IDX=8/*Envirosuit*/,HW_BST_IDX=9/*Turbo Motion Booster*/,HW_JET_IDX=10/*Jump Jet Boots*/,HW_INF_IDX=11/*Infrared Night Sight Enhancement*/};
 typedef struct { // Hw referenceIndex,ref14Index::Sys 21,0 Nav 22,1 Ere 23,2 Sen 24,3 Trg 25,4 Shi 26,5 Bio 27,6 Lan 28,7 Env 29,8 Boo 30,9 Jum 31,10 Nig 32,11
     double nitroTimeSetting, earthShakerTimeSetting, justFired, waitTilNextFire, reloadFinished, dropFinished, berserkFinished, berserkIncTime, detoxFinished, geniusFinished, mediFinished, reflexFinishedTime, sightFinishedTime, jumpJetSuckFinished, doubleJumpFinished, noiseFinished, radBleedFinished,
            leanLTapFinished, leanRTapFinished, sightSideEffectFinishedTime, staminupFinishedTime, turboCyberTime, turboFinished, energyDrainTickFinished, painSoundFinished, radSoundFinished, fatigueBleedoffFinished, fatigueMoveFinished, footstepFinished, rustleFinished, fallPainFinished, ressurectingFinished, mediPatchPulseFinished;
@@ -260,143 +225,71 @@ typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width, height; fl
 extern CamView camViews[64],levelCamViews[14][64]; extern u8 camViewCount,levelCamViewCount[14]; extern u32 camViewTextures[64],levelCamViewTextures[14][64];
 extern u8 sensaroundCamViewCenter,sensaroundCamViewLeft,sensaroundCamViewRight; void UpdateSensaroundCamViews();
 typedef struct { AttType type; float damage,range,speed,timeToActual,timeBetween,waitMin,waitMax,waitChance,projectileSpeed; bool hasLaser; int projectilePrefab; } NPCAttack;
-typedef struct {
-    const char* name; NPCAttack attack[3]; float health,healthCyb,def; AIMoveType moveType; float yawSpeed,fov,fovStartMovement,distToSeeBehind,sightRange,walkSpeed,runSpeed,attack3Force,attack3Radius,timeToPain,timeBetweenPain,timeTillDead,timeToChangeEnemy,timeIdleSFXMin,timeIdleSFXMax; bool explodeOnAttack3; double huntTime; float flightHt; bool flightHtIsPerc,switchMaterialOnDeath; float hearingRange,timeForTranq; bool hops; NPCType type;
-} NPCTable; // Keep initializer order in npcTable!
+typedef struct { const char* name; NPCAttack attack[3]; float health,healthCyb,def; AIMoveType moveType; float yawSpeed,fov,fovStartMovement,distSeeBhnd,sightRange,walkSpeed,runSpeed,attack3Force,attack3Radius,tToPain,tBtwPain,tTillDead,tToChangeEnemy,tIdleSFXMin,tIdleSFXMax; bool explodeOnAttack3; double huntTime; float flightHt; bool flightHtIsPerc,switchMaterialOnDeath; float hearingRange,timeForTranq; bool hops; NPCType type; } NPCTable;
 extern const NPCTable npcTable[NUM_AI_TYPES];
 bool TargetIDShouldRender(u16); bool TargetIDInPlayerPVS(u16); i16 TargetIDGetText(u16);
-typedef struct Particle { V3 pos,vel; float age,invLifetime,baseSize,rotation,angularVelocity; u32 color,emitterIndex,trailOwner; u16 flags,textureIndex,animFrame; u8 blendMode; V3 trailSample; u16 trailHead; } Particle; typedef struct { u32 sortKey; u16 index; } PartSortEntry;
-typedef struct Emitter { 
-    u8 active:1,looping:1,useMesh:1; /* bit-packed bools via comma-op */ 
-    V3 position; 
-    Quaternion orientation; 
-    float emitAccumulator,emitRate,age,duration; 
-    u16 aliveCount; 
-    u8 physicsMode,trail,shapeType; 
-    u16 trailTexture; 
-    float shapeRadius,shapeAngle,lifetimeMin,lifetimeMax,sizeMin,sizeMax,speedMin,speedMax,rotMin,rotMax,aVelMin,aVelMax,gravity,trailLifetime,trailWidthStart,trailWidthEnd,trailVertexDistance; 
-    u32 trailColorStart,trailColorEnd,texBaseIdx,textureFrameCount; 
-    u8 blendMode, colorMode; 
-    u16 burstRemaining,meshInstance,meshModelIdx,parentIdx; 
-    float animWindow,softness,scaleCurve[32],velocityCurve[32],rotationCurve[32],emissionCurve[32]; 
-    u32 colorRamp[64];
-} Emitter;
-typedef struct GpuPartInst { float x,y,z,size; u32 color,data0,data1,pad; } GpuPartInst;
-typedef struct TrlSegInst { float p0x,p0y,p0z,padA,p1x,p1y,p1z,padB; float c00x,c00y,c00z,c00w,c01x,c01y,c01z,c01w,c10x,c10y,c10z,c10w,c11x,c11y,c11z,c11w; u32 color0,color1,uvData; float deathTime; float trailWidthStart,trailWidthEnd; u32 chainIndex,trailOwner; } TrlSegInst;
-typedef struct { u16 emitters[MAX_LEVEL_PARTICLES],count; } LevelParticles;
-typedef struct { double combatImpulseFinished; bool inZone,distortion,cyberTube,elevator,levelEntry; TrackType zoneTrack; MusicType zoneMusic; } MusicSystem;
+typedef struct { u16 level,inst; u8 anchor,align; float lineSp; } DecalStyle;    typedef struct { u16 modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex; float mass; u8 animationNum; ColliderType col; V3 colCtr,colSz; } EPerms;    typedef struct { V3 normal; float d; } FrustumPlane;    typedef struct PngArena { u8*base,*cursor,*end; } PngArena; extern PngArena png_arena_main;    typedef struct { int width,height; u8* pixels; } WinSysIcon;
+typedef struct{bool initialized,active;V2 min,max;double lastLMB,lastRMB;}UIComponent;typedef struct Particle { V3 pos,vel; float age,invLifetime,baseSize,rotation,angularVelocity; u32 color,emitterIndex,trailOwner; u16 flags,textureIndex,animFrame; u8 blendMode; V3 trailSample; u16 trailHead; } Particle; typedef struct { u32 sortKey; u16 index; } PartSortEntry;
+typedef struct GpuPartInst { float x,y,z,size; u32 color,data0,data1,pad; } GpuPartInst;    typedef struct TrlSegInst { float p0x,p0y,p0z,padA,p1x,p1y,p1z,padB; float c00x,c00y,c00z,c00w,c01x,c01y,c01z,c01w,c10x,c10y,c10z,c10w,c11x,c11y,c11z,c11w; u32 color0,color1,uvData; float deathTime; float trailWidthStart,trailWidthEnd; u32 chainIndex,trailOwner; } TrlSegInst;    typedef struct { u16 emitters[MAX_LEVEL_PARTICLES],count; } LevelParticles;
+typedef struct PSysDef { V3 pos; const u16* textures; u8 textureCount; float emitRate,duration,sizeMin,sizeMax,speedMin,speedMax,lifetimeMin,lifetimeMax,gravity,animWindow,softness,shapeRadius,shapeAngle; u8 shapeType; Color colStart,colEnd; const Color* rampColors; const float* rampTimes; u8 rampCount; const float *scaleKeys,*scaleTimes; u8 scaleCount; const float *velKeys,*velTimes; u8 velCount; const float *rotKeys,*rotTimes;
+                         u8 rotCount; const float *emissKeys,*emissTimes; u8 emissCount; u8 trail; u32 trailTexture; Color trailColorStart,trailColorEnd; float trailLifetime,trailWidthStart,trailWidthEnd,trailVertDist; bool looping; u8 blendMode; bool blendModeOverride; u8 rotationMode,colorMode; u16 burstCount; Quaternion rotation; bool useMesh; } PSysDef;
+typedef struct { double combatImpulseFinished; bool inZone,distortion,cyberTube,elevator,levelEntry; TrackType zoneTrack; MusicType zoneMusic; } MusicSystem;    typedef struct {bool down, pressed;} KeyState;    typedef struct {const char* name; int value;} InputElement;    typedef struct {double scrollDelta; KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS]; bool isCapsLockOn;} InputSystem;
 typedef /*FAT*/ struct  {
-    u32 entflags,ioflags,ioflagsHi; u16 modelIndex,index,portalIndex;
-    u32 deferredIoflags,deferredIoflagsHi; V3 forward,right,lastPosition,targetPosition,startPosition,activatedScale,dir; u16 texIndex,glowIndex,specIndex,normIndex,lodIndex,colMeshIndex;
-    i32 cellIndex; i16 cellX,cellZ;
-    u8 clip,animationNum,texAnimClip,camView,securityThreshold,maxRandomItems,questBitID,questTestMode;
-    float shadRadius,health,cyberHealth,radiation,speed,ajarPercentage,percentMoved,gracePeriodFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime,timeTillEnemyChangeFinished,timeTillDeadFinished,timeTillPainFinished,huntFinished,randWaitAtt1Finished,randWaitAtt2Finished,randWaitAtt3Finished,
-          attackFinished,deathBurstFinished,tranquilizeFinished,wanderFinished,timeSinceMovedEnough,posCheckFinished,currentFrameFinished,animFinished,animSwapFinished,switchAnimFinished,delay,panelTimer,damage,itemLifeTime,randomMin,randomMax,timeInterval,cyberTimer,intervalFinished,delayFinished,
-          tickFinished,aiThinkFinished,useFinished,waitBefClose,amount,resetTime,minSecurityLevel,rechargeFinished,camStartYAngle,camEndYAngle,camWaitTime,camWaitingFinished,camYaw,camYaw0,timeBeforeLasersOn,force,strength,offStrengthFactor,distancePaddingToTopPoint,initialBurstFinished,justUsed,timerFinished,randomItemDropChance[7],reverbMaxDist,deathAnimationStart;
+    u32 entflags,ioflags,ioflagsHi; u16 modelIndex,index,portalIndex,texIndex,glowIndex,specIndex,normIndex,lodIndex,colMeshIndex; u32 deferredIoflags,deferredIoflagsHi; V3 forward,right,lastPosition,targetPosition,startPosition,activatedScale,dir; i32 cellIndex; i16 cellX,cellZ;
+    float shadRadius,health,cyberHealth,radiation,speed,ajarPercentage,percentMoved,gracePeriodFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime,timeTillEnemyChangeFinished,tTillDeadFinished,timeTillPainFinished,huntFinished,randWaitAtt1Finished,randWaitAtt2Finished,randWaitAtt3Finished,attackFinished,deathBurstFinished,tranquilizeFinished,wanderFinished,timeSinceMovedEnough,posCheckFinished,currentFrameFinished,animFinished,
+          animSwapFinished,switchAnimFinished,delay,panelTimer,damage,itemLifeTime,randomMin,randomMax,timeInterval,cyberTimer,intervalFinished,delayFinished,tickFinished,aiThinkFinished,useFinished,waitBefClose,amount,resetTime,minSecurityLevel,rechargeFinished,camStartYAngle,camEndYAngle,camWaitTime,camWaitingFinished,camYaw,camYaw0,timeBeforeLasersOn,force,strength,offStrengthFactor,distancePaddingToTopPoint,initialBurstFinished,justUsed,timerFinished,
+          randomItemDropChance[7],reverbMaxDist,deathAnimationStart,minDelayBetweenSpawns,maxDelayBetweenSpawns,allSpawnedResetDelay;
     Quaternion camBaseRot;
-    V3 accumulatedForce,currentDestination,targettingPosition,idealTransformForward,idealPos;    
-    u16 enemy,messageIndex,teleportID,targetDestinationID,keycode,recentMostActivator,countToTrigger,counter,messageLingdex,lockedMessageLingdex,rechargeMsgLingdex,usedMsgLingdex,frame,texFrame,texGlowFrame,texAnimLight,texAnimLight2,lookUpIndex,deathBurst,adjacencyIdx,targetIdx,target2Idx,targetIfFalseIdx,currentTargetIdx,targetnameIdx,reverbPreset,npcNumber,targetOnDeathIdx,lockedTargetIdx;
-    u16 spawnIndex,numberToSpawn,numberActive; float minDelayBetweenSpawns,maxDelayBetweenSpawns,allSpawnedResetDelay;
+    V3 accumulatedForce,currentDestination,targettingPosition,idealTransformForward,idealPos;
+    u16 enemy,messageIndex,teleportID,targetDestinationID,keycode,recentMostActivator,countToTrigger,counter,messageLingdex,lockedMessageLingdex,rechargeMsgLingdex,usedMsgLingdex,frame,texFrame,texGlowFrame,texAnimLight,texAnimLight2,lookUpIndex,deathBurst,adjacencyIdx,targetIdx,target2Idx,targetIfFalseIdx,currentTargetIdx,targetnameIdx,reverbPreset,npcNumber,targetOnDeathIdx,lockedTargetIdx,spawnIndex,numberToSpawn,numberActive,texAnimResourceFolderIdx;
     i16 customIndex,version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,logIndex,ammo,ammo2,contents[4],custIdx[4],randomItem[7],randomItemCustIdx[7];
+    u64 gridCellsBits;
     u64 countOnlySameIndex:1,alertEnemiesOnAwake:1,playEverywhere:1,srchInUse:1,generateContents:1,generationDone:1,dontReset:1,onlyOnce:1,allDone:1,curTex:1,useRandomTimes:1,active:1,panelOpen:1,panelInstalled:1,panelArmed:1,touchEnabled:1,broken:1,requireRecharge:1,stayOpen:1,startOpen:1,targetAlreadyDone:1,targettingOnlyUnlocks:1,changeLayerOnOpenClose:1,despawnInstead:1,doSelfAfterList:1,iceActive:1,forceFieldDirectionX:1,forceFieldDirectionY:1,
         forceFieldDirectionZ:1,heldObjectLoadedAlternate:1,lerping:1,onlyTargetOnce:1,autoPlayEmail:1,textureAnimating:1,texAnimStopsAtDie:1,texAnimInReverse:1,texAnimRandom:1,ajar:1,deathAnimationActive:1,puzzleFired:1,puzzleSolved:1,codeScreen:1,camRotatePositive:1,camRotateEnabled:1,camSweepInit:1,branchOnSecond:1,relayEnabled:1,relayOnceEver:1,relayAlreadyDone:1,useQuestKeycode1:1,useQuestKeycode2:1,hasGrav:1,massScaled:1;
     V3 panelItemPos; Quaternion panelItemRot;
-    u64 gridCellsBits;
-    u16 texAnimResourceFolderIdx; u8 attackType,requiredAccessCard,bloodType,doorOpen,fieldColor,trackType,musicType,doorState,currentState,funcState,bodyState;
+    u8 clip,animationNum,texAnimClip,camView,securityThreshold,maxRandomItems,questBitID,questTestMode,attackType,requiredAccessCard,bloodType,doorOpen,fieldColor,trackType,musicType,doorState,currentState,funcState,bodyState;
     i8 wireCurL[7],wireCurR[7];
 } Entity; // phew what a porker of a struct, it's been a eatin!
-_Static_assert(AIState_Dead <= 255, "AIState fits in u8");
-_Static_assert(BodyState_ProningUp <= 255, "BodyState fits in u8");
-_Static_assert(Att_Drill <= 255, "AttType fits in u8");
-_Static_assert(DoorState_Opening <= 255, "DoorState fits in u8");
-_Static_assert(FStat_AjarMovingTarget <= 255, "FuncStates fits in u8");
-_Static_assert(ACC_Per5 <= 255, "AccCardType fits in u8");
-_Static_assert(MT_Override <= 255, "MusicType fits in u8");
-_Static_assert(TT_Distortion <= 255, "TrackType fits in u8");
-_Static_assert(BloodType_GrayMutation <= 255, "BloodType fits in u8");
-_Static_assert(ForceFieldColor_RedFaint <= 255, "ForceFieldColor fits in u8");
 INLINE bool Entity_GetGridCell(const Entity* e, int i) { return (bool)((e->gridCellsBits >> i) & 1u); }
 INLINE void Entity_SetGridCell(Entity* e, int i, bool v) { if (v) e->gridCellsBits |= (1ull << i); else e->gridCellsBits &= ~(1ull << i); }
-typedef struct{bool initialized,active;V2 min,max;double lastLMB,lastRMB;}UIComponent;
 typedef struct {
     double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_physics_time,dt,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp,gpuFrameMs,gpuShadowMs,gpuPreMs,gpuMainMs,gpuSsrMs,gpuCompMs,automapNextRaster;
-    float farPlane[MAX_LEVELS],damageDealt,damageReceived,timeScale,worldMin_x[MAX_LEVELS],worldMin_z[MAX_LEVELS],voxMinCtrX[MAX_LEVELS],voxMinCtrZ[MAX_LEVELS],misTimerFinished,misTimerT,painStaticAlpha,empStaticAlpha,levelRadius[MAX_LEVELS][INSTANCE_COUNT],levelInvInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6];
-    u32 lastFrameSecCount,lineVertCnt,shotsFired,grenadesThrown,savesScummed,levelLayer[MAX_LEVELS][INSTANCE_COUNT];
-    u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount,shields[4],weaponVModelIndex,levelWepVModel[MAX_LEVELS],TeleportTouch_allTeleportTouches[8],levelInstCount[MAX_LEVELS],levelLoadedLights[MAX_LEVELS],editTextInstanceIndex,misTimerMission;
+    float farPlane[MAX_LEVELS],damageDealt,damageReceived,timeScale,worldMin_x[MAX_LEVELS],worldMin_z[MAX_LEVELS],voxMinCtrX[MAX_LEVELS],voxMinCtrZ[MAX_LEVELS],misTimerFinished,misTimerT,painStaticAlpha,empStaticAlpha,levelRadius[MAX_LEVELS][INSTANCE_CNT],levelInvInertiaTensor[MAX_LEVELS][INSTANCE_CNT][6],*radius,(*invInertiaTensor)[6],cam_pitch,cam_yaw,cam_roll;
+    u32 lastFrameSecCount,lineVertCnt,shotsFired,grenadesThrown,savesScummed,levelLayer[MAX_LEVELS][INSTANCE_CNT],missionBits,*layer,targetIOActivatorIoflags,targetIOActivatorIoflagsHi;
+    u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount,shields[4],weaponVModelIndex,levelWepVModel[MAX_LEVELS],TeleportTouch_allTeleportTouches[8],levelInstCount[MAX_LEVELS],levelLoadedLights[MAX_LEVELS],editTextInstanceIndex,misTimerMission,levelLightTargetnames[MAX_LEVELS][LIGHT_CNT],*lightTargetnames,loadedLights,decoyInstance,*lanimLightIdx,levelLAnimLightIdx[MAX_LEVELS][LANIM_MAX];
     i32 fogFac,cursorPos_x,cursorPos_y,currentMouse_dx,currentMouse_dy;
-    u32 missionBits;
+    u8 lanimCount,automapExplored[MAX_LEVELS][ARRSIZE],automapZoom,physSleep[INSTANCE_CNT],physQuiet[INSTANCE_CNT],substeps,levelSecurity[MAX_LEVELS],curLev,creditsPageIndex,diffCbt,diffPuz,diffMis,diffCyb,levelCameraCount[MAX_LEVELS],levelSmallNodeCount[MAX_LEVELS],levelLargeNodeCount[MAX_LEVELS],levCamDestroyedCnt[MAX_LEVELS],levSmNodeDestroyedCnt[MAX_LEVELS],levNodeDestroyedCnt[MAX_LEVELS],targetIOQuestTestMode,levelLAnimCount[MAX_LEVELS];
     u8 inventoryMode:1, levelCurrentlyLoading:1,         paused:1,   menuActive:1,   gameFinished:1,   creditsActive:1, decoyActive:1;
     u8  uiIsBlocking:1,          geniusActive:1, targetIOActive:1, misTimerLast:1, misTimerCurIdx:1, misTimerTimesUP:1 /*unused bit:1*/;
-    bool *invTnsrValid,*colliding,questNotesActive[18],questNotesChecked[18];
-    u8 lanimCount,automapExplored[MAX_LEVELS][ARRSIZE],automapZoom,physSleep[INSTANCE_COUNT],physQuiet[INSTANCE_COUNT],substeps,levelSecurity[MAX_LEVELS],curLev,creditsPageIndex,diffCbt,diffPuz,diffMis,diffCyb,levelCameraCount[MAX_LEVELS],levelSmallNodeCount[MAX_LEVELS],levelLargeNodeCount[MAX_LEVELS],levCamDestroyedCnt[MAX_LEVELS],levSmNodeDestroyedCnt[MAX_LEVELS],levNodeDestroyedCnt[MAX_LEVELS];
     i8 lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode,cyberReturnLevel;
-    InventorySystem invP1; SystemUI Sys_UI; MusicSystem Sys_Music; Entity levelInstances[MAX_LEVELS][INSTANCE_COUNT];
-    UIComponent uiComponents[MAX_UI_ELEMENTS];
-    V3 debugLine_start,debugLine_end,cyberspaceRecallPoint,cyberReturnPos,levelPosition[MAX_LEVELS][INSTANCE_COUNT],levelScale[MAX_LEVELS][INSTANCE_COUNT],levelVelocity[MAX_LEVELS][INSTANCE_COUNT],levelAngularVelocity[MAX_LEVELS][INSTANCE_COUNT],levelColliderCenter[MAX_LEVELS][INSTANCE_COUNT],levelColliderSize[MAX_LEVELS][INSTANCE_COUNT]/*xyz for Box,x=Sph r,else xyz for Capsule r,h,dir(0=X,1=Y,2=Z)*/,levelLightsNewPosition[MAX_LEVELS][LIGHT_COUNT];
-    ColliderType/*u8*/ levelCollider[MAX_LEVELS][INSTANCE_COUNT];
-    Quaternion levelRotation[MAX_LEVELS][INSTANCE_COUNT];
-    bool levelInvTnsrValid[MAX_LEVELS][INSTANCE_COUNT],levelColliding[MAX_LEVELS][INSTANCE_COUNT];
-    Light levelLights[MAX_LEVELS][LIGHT_COUNT];
-    LightAnimation levelLAnims[MAX_LEVELS][LANIM_MAX]; u16 levelLAnimLightIdx[MAX_LEVELS][LANIM_MAX]; u8 levelLAnimCount[MAX_LEVELS]; LevelParticles levelParticles[MAX_LEVELS];
-    Entity *instances; u8 targetIOQuestTestMode;
-    LevelParticles *particles;
-    V3 *position,*scale,*velocity,*angularVelocity,*colliderCenter,*colliderSize,*lightsNewPosition;
-    ColliderType* col;
-    Quaternion* rotation;
-    u32* layer,targetIOActivatorIoflags,targetIOActivatorIoflagsHi;
-    float* radius,(*invInertiaTensor)[6],cam_pitch,cam_yaw,cam_roll;
-    u16 levelLightTargetnames[MAX_LEVELS][LIGHT_COUNT],*lightTargetnames,loadedLights,decoyInstance;
-    Light *lights; LightAnimation *lanims;
-    u16 *lanimLightIdx;
-    Color fogColor[MAX_LEVELS];
+    bool *invTnsrValid,*colliding,questNotesActive[18],questNotesChecked[18],levelInvTnsrValid[MAX_LEVELS][INSTANCE_CNT],levelColliding[MAX_LEVELS][INSTANCE_CNT];
+    V3 debugLine_start,debugLine_end,cybRecallPnt,cybRetPos,levelPosition[MAX_LEVELS][INSTANCE_CNT],levelScale[MAX_LEVELS][INSTANCE_CNT],levelVelocity[MAX_LEVELS][INSTANCE_CNT],levelAngularVelocity[MAX_LEVELS][INSTANCE_CNT],levColCenter[MAX_LEVELS][INSTANCE_CNT],levColSize[MAX_LEVELS][INSTANCE_CNT],levLightsNewPosition[MAX_LEVELS][LIGHT_CNT],*position,*scale,*velocity,*angularVelocity,*colliderCenter,*colliderSize,*lightsNewPosition;
+    InventorySystem invP1; SystemUI Sys_UI; MusicSystem Sys_Music; Entity levInstances[MAX_LEVELS][INSTANCE_CNT],*instances; UIComponent uiComponents[MAX_UI_ELEMENTS]; ColliderType levCol[MAX_LEVELS][INSTANCE_CNT],*col; Quaternion levRot[MAX_LEVELS][INSTANCE_CNT],*rotation; Light levLights[MAX_LEVELS][LIGHT_CNT],*lights; LightAnimation levLAnims[MAX_LEVELS][LANIM_MAX],*lanims; Color fogColor[MAX_LEVELS]; LevelParticles levParticles[MAX_LEVELS],*particles;
     char playerName[27]; const char *audiologNames[LOGCNT],*audiologSubjects[LOGCNT],*audiologSenders[LOGCNT],*audioLogSpeech2Text[LOGCNT];
 } GlobalContext; // Savable complete game state data
-extern GlobalContext World; extern float modelMatrices[INSTANCE_COUNT*16],**physPos,*world_from_mdl,modelBounds[MAX_MDLS]; extern V3 modelMin[MAX_MDLS],modelMax[MAX_MDLS];extern u32 modelVertexCounts[MAX_MDLS],uniqueCvxMeshCount,globalframe,*physVertCounts,modelVBO,modelIBO,drawCalls,vertsRendered,voxelUpdateSP,lightsID,cellVisibleDataID,colorBufferID,texPalID,textureOffsetsID,textureSizesID,texPalOfsID,threadCnt,shadowmapIndirectionList[LIGHT_COUNT],*cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES];
-extern V3 cyberSpaceEntryLocations[8]; extern u16 mdlsCnt,modelTriangleCounts[MAX_MDLS],**modelTriangles,*cvxAdjLists[MAX_UNIQUE_CVX_MESHES],cvxAdjStart[MAX_UNIQUE_CVX_MESHES],playerCellIdx,texCnt,cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX],uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES],**physTris,modelBVHNodeCounts[MAX_MDLS];
-extern u32* rtSrcVertCounts,mdlVboOfs[MAX_MDLS],mdlIboOfs[MAX_MDLS],rtCapNodeWords,rtCapTriWords,rtCapOrderU16,rtPersistNodeWords,rtPersistTriWords,rtPersistOrderU16; extern u16** modelBVHTriOrder; extern u32 modelBVHTriOrderCounts[MAX_MDLS]; extern u8 mdlPersistentSet[MAX_MDLS];
+extern GlobalContext World;
+extern InputSystem Sys_Input;
+extern double last_mouse_x,last_mouse_y;
+extern float modelMatrices[INSTANCE_CNT*16],**physPos,*world_from_mdl,modelBounds[MAX_MDLS],berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[MAX_SHADOWMAPS][6][4][4],lightViewProj[MAX_SHADOWMAPS][6][16];
 extern size_t cvxAdjOffsetBytes[MAX_UNIQUE_CVX_MESHES],cvxAdjListBytes[MAX_UNIQUE_CVX_MESHES];
-extern u32 textDecalVBO[MAX_LEVELS][INSTANCE_COUNT]; extern u32 textDecalVertexCount[MAX_LEVELS][INSTANCE_COUNT];
-#define DECAL_INLINE_TEXT_MAX 128
-#define DECAL_INLINE_TEXT_PEND 64
-#define DECAL_INLINE_TEXT_LEN 96
-extern char decalInlineText[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN]; extern u16 decalInlineTextLevel[DECAL_INLINE_TEXT_MAX],decalInlineTextInst[DECAL_INLINE_TEXT_MAX],decalInlineTextCount;
-#define DECAL_STYLE_MAX 256
-typedef struct { u16 level,inst; u8 anchor,align; float lineSp; } DecalStyle;
-extern DecalStyle decalStyles[DECAL_STYLE_MAX]; extern u16 decalStyleCount;
-extern AnimationClip mdlAnimClips[MAXANIM][MAX_ANIMCLIPS]; bool FrobHeldItemIntoPanel(V3 p,V3 f,V3 r); extern BvhNode** modelBVHNodes; extern FHandle console_log_file; extern const char* sounds[SOUNDS_COUNT]; extern V3 lanternPos; extern u16 headmountedLanternLight; extern double last_mouse_x,last_mouse_y;
-typedef struct { u16 modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex; float mass; u8 animationNum; ColliderType col; V3 colCtr,colSz; } EPerms;
-void Mat4FromTRS(const float*,const float*,const float*,float*);
-extern EPerms EDefs[MAX_ENTITIES]; extern u16 fwParentOf[INSTANCE_COUNT]; extern const char* audioLogs[LOGCNT]; extern u32 gridCellStates[ARRSIZE];
-INLINE float EntMass(u16 i) { if (i == 0) return 0.0f; const Entity* e = &World.instances[i]; float m = EDefs[e->index].mass > 0.0f ? EDefs[e->index].mass : 1.0f; return e->massScaled ? m * 10.0f : m; }
-extern float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[MAX_SHADOWMAPS][6][4][4],lightViewProj[MAX_SHADOWMAPS][6][16]; extern V3 ressurectionLocations[]; extern void PlayTrack(TrackType,MusicType);
-typedef struct { V3 normal; float d; } FrustumPlane; extern FrustumPlane lightFrustumPlanes[MAX_SHADOWMAPS][6][6],playerFrustumPlanes[6];
-typedef struct PngArena { u8*base,*cursor,*end; } PngArena; extern PngArena png_arena_main;
-extern bool cullVisibilityValid,instanceIsLODArray[INSTANCE_COUNT],doubleSidedTexture[MAXTEX],transparentTexture[MAXTEX],window_has_focus,ignore_next_mouse_delta,returnToPause,mouseMovementThisFrame,firstFrameMouselook; extern u8 particleBlendTexture[MAXTEX];
-typedef struct { int width,height; u8* pixels; } WinSysIcon;
-RaycastHit Raycast(V3,V3,float,u32); RaycastHit RaycastEditPick(V3,V3,float,u32); u16 EditModePickLight(V3,V3,float,float*); V3 ScreenPointToRay(V3,V3),ScreenPointToRayPixels(V3,V3,float,float); void SpawnImpactEffectParticle(u16,V3,V3),SpawnBeamTrail(u16,V3,V3,Color),DrawCrossedLine(V3,V3,V3,float,Color),SpawnTargetingLaser(V3,V3),ProjectileEffectImpactOnCollision(u16,u16,V3,V3),ProjectileEffectImpactInitAfterLoad(u16),SpawnProjectileImpactParticles(u16,V3,V3); u8 GetCurrentLevelSecurity(),*PngLoad(const u8*,int,int*,int*,PngArena*);
-u16 AddInstance(u16,V3),SpawnDynamicObject(int),GetCursorTexture(),DoorFrameFromProgress(AnimationClip,float);
-void AutomapTick(), AutomapNewGame(), AutomapOnLoad();
-void DrawSphereWireframe(Color,ShapeSphere), BioMonitorClearGraphs(), BioMonitorAlignCursors();
-void CyberSwitchInitAfterLoad(u16), synth_set_reverb_preset(u16), MFD_ResetGeneral();
-bool HudHeatTickOn(int);
-double get_time();
-float Tranquilize(u16,float,bool),TakeDamage(u16,DamageData),MeasureLineAdvance(const char*,u8);
-void ApplyImpactForceSphere(DamageData*,V3,float,float);
-void UseTargets(u16,u16),AddForce(u16,V3,bool),TriggerTrippedUpdate(u16),CyberItemOnTriggerEnter(u16,u16),CyberMineOnTriggerEnter(u16,u16),CenterStatusPrint(const char * restrict fmt, ...),GameEndSequence(),GameDeathSequence(),DebugRAMActual(const char*),DebugRAMPeak(),play_wav(const char*,float,V3,bool),play_wav_ext(const char*,float,V3,bool,float),play_message(const char*),PlaySparkSound(V3),LoadLevel(u8,V3),SetLevelPointers(u8),
-     CopyPlayerState(u8,u8),DeleteInstance(u16),MenuGoBack(),GoIntoGame(),ScreenShake(),TakeEnergy(float),CreateTargetIDInstance(float,u16,float),InputProcessing(),LoadAllLevels(),DrawLine(V3,V3,Color),ForceInventoryMode(),ForceShootMode(),PlayVmail(u8),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),UpdateLights(),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),LoadTextForLanguage(u8),
-     RenderTextL(i16,i16,u32,u8,float,const char* restrict,...),RenderTextC(i16,i16,u32,u8,float,const char* restrict,...),RenderText3DC(V3,u32,u8,float,const char* restrict,...),BuildTextDecalMeshes(),CullCore(),PngArenaInit(PngArena*),AppendTextWarning(i32,i32,i32,i32,i32),ChangeAnim(Entity*,u8),ForceDoorPortalOpen(u16),QuestBitSet(u8),QuestBitClear(u8),QuestBitToggle(u8);
-bool VidMenuKeyArmed();
-size_t AudioLiveBytes();
-const char *JumpSound(FootStepType),*JumpLandSound(FootStepType); FootStepType GetFootstepTypeForPrefab(int); char* StringFindFirstCharWithin(const char*,char);
-enum{QB_RobotSpawnDeactivated=0,QB_IsotopeInstalled,QB_ShieldActivated,QB_LaserSafetyOverriden,QB_LaserDestroyed,QB_BetaGroveCyberUnlocked,QB_GroveAlphaJettisonEnabled,QB_GroveBetaJettisonEnabled,QB_GroveDeltaJettisonEnabled,QB_MasterJettisonBroken,QB_Relay428Fixed,QB_MasterJettisonEnabled,QB_BetaGroveJettisoned,QB_AntennaNorthDestroyed,QB_AntennaSouthDestroyed,QB_AntennaEastDestroyed,QB_AntennaWestDestroyed,QB_SelfDestructActivated,QB_BridgeSeparated,QB_IsolinearChipsetInstalled,QB_COUNT,QB_None=255};
-enum{IO_NONE=0}; u16 IOInternName(const char*);
-enum{TARG_IOFLAGHI_SPAWNER_ACTIVATE=(1u<<0),TARG_IOFLAGHI_SPAWNER_ACTIVATE_ALERTED=(1u<<1),TARG_IOFLAGHI_AWAKE_SLEEPING=(1u<<2),TARG_IOFLAGHI_CYBORG_CONVERSION=(1u<<3)};
-bool QuestBitIsSet(u8),PlayerIsMoving(),Forward(),StrafeLeft(),Backpedal(),StrafeRight(),Jump(),JumpDown(),Crouch(),Prone(),LeanLeft(),Sprint(),DoubleTapLeanLeft(),LeanRight(),DoubleTapLeanRight(),Attack(),Use(),Menu(),Reload(),Grenade(),GrenCycUp(),GrenCycDn(),ChangeAmmoType(),Patch(),PatchCycUp(),PatchCycDown(),/*Go*/Map()/*!*/,SwimUp(),SwimDn(),Console(),NeighborhoodInPVS(u16,u16,u8),AICheckPain(u16),SkyIsVisible(),SkySunIsVisible(),HasHealth(u16)/*ai.c:216, reads cyberHealth for Cyber-type NPCs and health for the rest*/;
-void SpawnManagerActivate(u16 self,bool alerted),SpawnManagerUpdate(u16 self);
+extern u32 modelVertexCounts[MAX_MDLS],uniqueCvxMeshCount,globalframe,*physVertCounts,modelVBO,modelIBO,drawCalls,vertsRendered,voxelUpdateSP,lightsID,cellVisibleDataID,colorBufferID,texPalID,textureOffsetsID,textureSizesID,texPalOfsID,threadCnt,shadowmapIndirectionList[LIGHT_CNT],*cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES],*rtSrcVertCounts,mdlVboOfs[MAX_MDLS],mdlIboOfs[MAX_MDLS],rtCapNodeWords,rtCapTriWords,rtCapOrderU16,rtPersistNodeWords,rtPersistTriWords,
+           rtPersistOrderU16,modelBVHTriOrderCounts[MAX_MDLS],textDecalVBO[MAX_LEVELS][INSTANCE_CNT],textDecalVertexCount[MAX_LEVELS][INSTANCE_CNT],gridCellStates[ARRSIZE];
+extern u16 **modelBVHTriOrder,mdlsCnt,modelTriangleCounts[MAX_MDLS],**modelTriangles,*cvxAdjLists[MAX_UNIQUE_CVX_MESHES],cvxAdjStart[MAX_UNIQUE_CVX_MESHES],playerCellIdx,texCnt,cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX],uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES],**physTris,modelBVHNodeCounts[MAX_MDLS],headmountedLanternLight,decalInlineTextLevel[DECAL_INLINE_TEXT_MAX],decalInlineTextInst[DECAL_INLINE_TEXT_MAX],decalInlineTextCount,
+           decalStyleCount,fwParentOf[INSTANCE_CNT];
+extern u8 mdlPersistentSet[MAX_MDLS],particleBlendTexture[MAXTEX];
+extern char decalInlineText[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN],statusText[T_BUFFER_SIZE];
+extern bool cullVisibilityValid,instanceIsLODArray[INSTANCE_CNT],doubleSidedTexture[MAXTEX],transparentTexture[MAXTEX],window_has_focus,ignore_next_mouse_delta,returnToPause,mouseMovementThisFrame,firstFrameMouselook;
+extern V3 modelMin[MAX_MDLS],modelMax[MAX_MDLS],cyberSpaceEntryLocations[8],lanternPos,ressurectionLocations[];
+extern DecalStyle decalStyles[DECAL_STYLE_MAX];
+extern AnimationClip mdlAnimClips[MAXANIM][MAX_ANIMCLIPS];
+extern BvhNode** modelBVHNodes;
+extern FHandle console_log_file;
+extern const char *audioLogs[LOGCNT],*sounds[SOUNDS_COUNT];
+extern EPerms EDefs[MAX_ENTITIES];
+extern FrustumPlane lightFrustumPlanes[MAX_SHADOWMAPS][6][6],playerFrustumPlanes[6];
+extern const PSysDef particleTypeDefs[192];
+extern WeaponFireCtx wfx;
 // Math, Vectors, Quaternions
-float sinf(float x); float tanf(float x); float cosf(float x);
-#define PI 3.14159265f
-#define TAU 6.2831853f
 #define vabs(x) ((x) < 0 ? -(x) : (x))
 #define vmin(a,b) ((a) < (b) ? (a) : (b))
 #define vmax(a,b) ((a) > (b) ? (a) : (b))
@@ -408,7 +301,7 @@ INLINE float vceil(float x) { return __builtin_ceilf(x); }
 INLINE float vsinf(float x) { x -= TAU * vfloor(x * (1.0f / TAU)); if (x > PI) { x -= TAU; } float s = (4/PI)*x - (4/(PI*PI))*x*vabs(x); return 0.225f*(s*vabs(s) - s) + s; }
 INLINE float vcosf(float x) { return vsinf(x + 1.57079632f); }
 INLINE float vacosf(float x) { float negate = (x < 0.0f) ? 1.0f : 0.0f; x=vabs(x); float ret=(-0.0187293f*x + 0.0742610f)*x - 0.2121144f; ret=(ret*x + 1.5707288f)*vsqrtf(1.0f - x); ret=ret - 2.0f*negate*ret; return negate*PI + (1.0f - 2.0f*negate) * ret; }
-INLINE float vtan(float x) { return tanf(x)/*vsinf(x) / vcosf(x)*/; }
+INLINE float vtan(float x) { return vsinf(x) / vcosf(x); }
 INLINE float vcot(float x) { float x2 = x * x; float t = x + (x2 * x) * 0.33333333f; return 1.0f / t; }
 INLINE float deg2rad(float degrees) { return degrees * (PI / 180.0f); }
 INLINE float vexp2f(float x){float ip=vfloor(x); float fp=x - ip; float p=1.0f + fp*(0.69314718f + fp*(0.24022651f + fp*0.05550411f)); /*poly approx 2^fp on [0,1]*/ int ei=(int)ip + 127; u32 bits=(u32)(ei << 23); union{u32 i; float f;}u={bits}; return u.f*p;}
@@ -417,16 +310,6 @@ INLINE float vlog2f(float x) { /* assume x > 0 */ union { float f; u32 i; } u = 
 INLINE float vpow(float x, float y) { return x <= 0.01f || y <= 0.01f ? 0.0f : vexp2f(y * vlog2f(x)); }
 INLINE i32 vclampi(i32 val, i32 min, i32 max) { return (val > max) ? max : ((val < min) ? min : val); }
 INLINE float vround(float val) { return (val >= 0.0f) ? (float)(int)(val + 0.5f) : (float)(int)(val - 0.5f); }
-INLINE void hudColorToRGB(u8 hud, float* r, float* g, float* b) { float inv=1.0f/(222.0f/255.0f); switch (hud) {
-    case HUDC_RED:    *r=0.9215687f;  *g=0.13725491f; *b=0.16862746f; break;
-    case HUDC_ORANGE: *r=1.0f;        *g=0.6f;        *b=0.0f;        break;
-    case HUDC_YELLOW: *r=0.89019614f; *g=0.8745099f;  *b=0.0f;        break;
-    case HUDC_GREEN:  *r=0.37254903f; *g=0.654902f;   *b=0.16862746f; break;
-    case HUDC_BLUE:   *r=0.0f;        *g=0.039215688f;*b=0.8352942f;  break;
-    case HUDC_PURPLE: *r=0.5468646f;  *g=0.1527234f;  *b=0.8301887f;  break;
-    default:          *r=0.9215687f;  *g=0.13725491f; *b=0.16862746f; break;/*White and Gray both fall out of GetColor onto actualColorRed*/ }
-    *r*=inv; *g*=inv; *b*=inv; }
-INLINE u8 hudColorToText(u8 hud) { switch (hud) { case HUDC_WHITE:return T_WHITE; case HUDC_RED:return T_RED; case HUDC_ORANGE:return T_ORANGE; case HUDC_YELLOW:return T_YELLOW; case HUDC_GREEN:return T_GREEN; case HUDC_BLUE:return T_BLUE; case HUDC_PURPLE:return T_PURPLE; default:return T_RED;/*Gray: PuzzleWire.GetColor has no Gray case and falls through to actualColorRed*/ } }
 INLINE V3 V3Add(V3 a, V3 b) { return (V3){a.x + b.x, a.y + b.y, a.z + b.z}; }
 INLINE V3 V3_AsubB(V3 a, V3 b) { return (V3){a.x - b.x, a.y - b.y, a.z - b.z}; }
 INLINE V3 V3_ScaleByF(V3 v, float s) { return (V3){v.x * s, v.y * s, v.z * s}; }
@@ -443,7 +326,6 @@ INLINE V3 V3_Normalize(V3 v) { float len_sq = V3_dot(v,v); if (len_sq < 0.000001
 INLINE Quaternion quat_multiply(Quaternion q1, Quaternion q2){float aw=q1.w,ax=q1.x,ay=q1.y,az=q1.z,bw=q2.w,bx=q2.x,by=q2.y,bz=q2.z; return (Quaternion){aw*bx+ax*bw+ay*bz-az*by,aw*by-ax*bz+ay*bw+az*bx,aw*bz+ax*by-ay*bx+az*bw,aw*bw-ax*bx-ay*by-az*bz};}
 INLINE V3 quat_rot_v3(Quaternion q, V3 v) {float x=q.x,y=q.y,z=q.z,w=q.w; float vx=v.x,vy=v.y,vz=v.z; float tx=2.0f*(y*vz-z*vy); float ty=2.0f*(z*vx-x*vz); float tz=2.0f*(x*vy-y*vx); return (V3){vx+w*tx+(y*tz-z*ty),vy+w*ty+(z*tx-x*tz),vz+w*tz+(x*ty-y*tx)};}
 INLINE Quaternion QuatFromToRotation(V3 from,V3 to) { V3 f=V3_Normalize(from),t=V3_Normalize(to); float d=V3_dot(f,t); if (d > 0.999999f) return QUAT_IDENTITY; if (d < -0.999999f) { V3 ax=V3_Cross((V3){1.0f,0.0f,0.0f},f); if (V3_Mag(ax) < 0.000001f) ax=V3_Cross((V3){0.0f,1.0f,0.0f},f); ax=V3_Normalize(ax); return (Quaternion){ax.x,ax.y,ax.z,0.0f}; } V3 ax=V3_Cross(f,t); float s=vsqrtf((1.0f+d)*2.0f), invs=1.0f/s; return (Quaternion){ax.x*invs,ax.y*invs,ax.z*invs,s*0.5f}; }
-Quaternion quat_look_rotation(V3 fwd, V3 up);
 // Game Typechecks (what, it's simple, don't hate it, just does the thing)
 INLINE bool IdxIsPortalBlockingDoor(u16 entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }/*All doors except see-through doors.*/
 INLINE bool IdxInBounds(int c) { return (c >= 0 && c <= 858); } 
@@ -461,9 +343,8 @@ INLINE bool IdxIsUsableObject(u16 c) { return ((c >= 307 && c <= 404) || c == 41
 INLINE bool IdxIsAccessCard(u16 c) { return (c == 341 || c == 388 || (c >= 390 && c <= 398) || c == 417); }
 INLINE bool IdxIsGenericItem(u16 c) { return (c >= 307 && c <= 312) || c == 340 || c == 342 || (c >= 359 && c <= 365) || c == 368 || c == 369 || c == 371 || (c >= 399 && c <= 401); }
 INLINE bool IdxIsDynamicObject(u16 c) { return (c >= 307 && c <= 406) || c == 417 || (c >= 419 && c <= 447) || (c >= 458 && c <= 463) || (c >= 471 && c <= 476) || (c >= 768 && c <= 855); }
-static const u64 npcSearchColliderMask = 0xB3E3D6ULL;
-INLINE bool ai_has_search_collider(u16 npcID) { return npcID < 64 && (npcSearchColliderMask >> npcID) & 1u; }
-INLINE bool InstIsFuncWallChild(u32 inst) { u16 p=(inst<(u32)INSTANCE_COUNT)?fwParentOf[inst]:0; return p!=0 && p<World.instCount && World.instances[p].index==517; }
+INLINE bool ai_has_search_collider(u16 npcID) { return npcID < 64 && (0xB3E3D6ULL >> npcID) & 1u; }
+INLINE bool InstIsFuncWallChild(u32 inst) { u16 p=(inst<(u32)INSTANCE_CNT)?fwParentOf[inst]:0; return p!=0 && p<World.instCount && World.instances[p].index==517; }
 INLINE bool EntIdxIsValid(u16 idx) { return idx != 0 && idx < World.instCount; }
 INLINE bool IdxIsWeapon(int c) { return (c >= 343 && c <= 358); }
 INLINE int Get16WeaponIndexFromConstIndex(int i) { return (i >= 343 && i <= 358) ? (i - 343) : -1; }
@@ -474,7 +355,6 @@ INLINE int ItemStringIdx(int c){return UseableFromConst(c)+326;}
 INLINE bool CurrentWeaponUsesEnergy() { int i = World.invP1.weaponIndex; return i==344 || i==347 || i==353 || i==357 || i==358; }
 INLINE u16 GetImpactType(u16 instanceIdx){ switch(World.instances[instanceIdx].bloodType){ case BloodType_None: return 729; case BloodType_Red: return 721; case BloodType_Yellow: return 723; case BloodType_Green: return 722; case BloodType_Robot: return 730; case BloodType_Leaf: return 756; case BloodType_Mutation: return 757; case BloodType_GrayMutation: return 758; } return 729; }
 INLINE void HealthManagerHealingBed(u16 playerIdx, float amount) { Entity* p = &World.instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
-void UI_PuzzleGridClose(),UI_BlockedClose(),PGEvalPuzzle();
 INLINE u16 PGThemeOffset(HUDColor t){ return t==HUDColor_Red||t==HUDColor_Green ? 1u : t==HUDColor_Orange||t==HUDColor_Purple ? 2u : t==HUDColor_Yellow||t==HUDColor_Blue ? 3u : 0u; }
 INLINE float SfxMaster(){return vclamp((float)Sys_Settings.VolumeMaster/100.f,0,1.f);}
 INLINE float SfxMusic(){ return vclamp((float)Sys_Settings.VolumeMusic /100.f,0,1.f);}
@@ -485,65 +365,50 @@ INLINE float AppliedMsgVol(float v){return vclamp(v*SfxMaster()*SfxMsg(),0,1.f);
 INLINE float AppliedMusicVol(float v){return vclamp(v*SfxMaster()*SfxMusic(),0,1.f);}
 INLINE const char* SoundPath(i32 id) { return (id >= 0 && id < (i32)SOUNDS_COUNT) ? sounds[id] : ""; }
 INLINE const char* AudioLogPath(i32 id) { return (id >= 0 && id < (i32)LOGCNT) ? audioLogs[id] : ""; }
-/*GL*/enum{GL_ARRAY_BUFFER=0x8892,GL_DEPTH_BUFFER_BIT=0x100,GL_READ_WRITE=0x88BA,GL_SSBO=0x90D2,GL_CULL_FACE=0xB44,GL_BLEND=0xBE2,GL_DEPTH_TEST=0xB71,GL_RGB=0x1907,GL_TEXTURE0=0x84C0,GL_COLOR_ATTACHMENT0=0x8CE0,GL_RG16F=0x822F,GL_TEXTURE1=0x84C1,GL_TEXTURE6=0x84C6,GL_COLOR_ATTACHMENT1=0x8CE1,GL_ELEMENT_ARRAY_BUFFER=0x8893,GL_TEXTURE2=0x84C2,GL_TEXTURE_2D=0xDE1,GL_COLOR_ATTACHMENT2=0x8CE2,GL_FALSE=0,GL_RGBA=0x1908,GL_TEXTURE3=0x84C3,GL_UNSIGNED_BYTE=0x1401,
-           GL_FLOAT=0x1406,GL_TEXTURE4=0x84C4,GL_FRAMEBUFFER=0x8D40,GL_READ_FRAMEBUFFER=0x8CA8,GL_DRAW_FRAMEBUFFER=0x8CA9,GL_LINEAR=0x2601,GL_UNSIGNED_SHORT=0x1403,GL_RGBA8=0x8058,GL_COLOR_BUFFER_BIT=0x4000,GL_STATIC_DRAW=0x88E4,GL_DYNAMIC_DRAW=0x88E8,GL_TRIANGLE_STRIP=0x5,GL_LESS=0x201,GL_LEQUAL=0x203,GL_ONE=1,GL_SRC_ALPHA=0x302,GL_ONE_MINUS_SRC_ALPHA=0x303,GL_DST_COLOR=0x306,GL_ZERO=0,GL_TRUE=1,GL_DEPTH_COMPONENT24=0x81A6,
-           GL_DEPTH_COMPONENT=0x1902,GL_UNSIGNED_INT=0x1405,GL_R32UI=0x822E,GL_RED_INTEGER=0x8D94,GL_TEXTURE_MIN_FILTER=0x2801,GL_TEXTURE_MAG_FILTER=0x2800,GL_TEXTURE_WRAP_S=0x2802,GL_TEXTURE_WRAP_T=0x2803,GL_CLAMP_TO_BORDER=0x812D,GL_TEXTURE_BORDER_COLOR=0x1004,GL_TEXTURE_COMPARE_MODE=0x884C,GL_COMPARE_REF_TO_TEXTURE=0x884E,GL_TEXTURE_COMPARE_FUNC=0x884D,GL_DEPTH_ATTACHMENT=0x8D00,GL_TEXTURE10=0x84CA,GL_ACTIVE_TEXTURE=0x84E0};
-// Particles
-typedef struct PSysDef { V3 pos; const u16* textures; u8 textureCount; float emitRate,duration,sizeMin,sizeMax,speedMin,speedMax,lifetimeMin,lifetimeMax,gravity,animWindow,softness,shapeRadius,shapeAngle; u8 shapeType; Color colStart,colEnd; const Color* rampColors; const float* rampTimes; u8 rampCount; const float *scaleKeys,*scaleTimes; u8 scaleCount; const float *velKeys,*velTimes; u8 velCount; const float *rotKeys,*rotTimes;
-                         u8 rotCount; const float *emissKeys,*emissTimes; u8 emissCount; u8 trail; u32 trailTexture; Color trailColorStart,trailColorEnd; float trailLifetime,trailWidthStart,trailWidthEnd,trailVertexDistance; bool looping; u8 blendMode; bool blendModeOverride; u8 rotationMode,colorMode; u16 burstCount; Quaternion rotation; bool useMesh; } PSysDef;
-const PSysDef* PSysTypeGet(u16);
-u16 PSysAddInternal(const PSysDef* pd, u16 meshInstance, u16 parentIdx); void PSysAddLevelLoops(),PSysClearLevel(u8); extern const PSysDef particleTypeDefs[192];
+INLINE float EntMass(u16 i) { if (i == 0) return 0.0f; const Entity* e = &World.instances[i]; float m = EDefs[e->index].mass > 0.0f ? EDefs[e->index].mass : 1.0f; return e->massScaled ? m * 10.0f : m; }
+INLINE void hudColorToRGB(u8 hud, float* r, float* g, float* b) { float inv=1.0f/(222.0f/255.0f); switch (hud) {
+    case HUDC_RED: *r=0.9215687f; *g=0.13725491f; *b=0.16862746f; break; case HUDC_ORANGE: *r=1.0f; *g=0.6f; *b=0.0f; break; case HUDC_YELLOW: *r=0.89019614f; *g=0.8745099f; *b=0.0f; break; case HUDC_GREEN: *r=0.37254903f; *g=0.654902f; *b=0.16862746f; break; case HUDC_BLUE: *r=0.0f; *g=0.039215688f;*b=0.8352942f; break; case HUDC_PURPLE: *r=0.5468646f; *g=0.1527234f; *b=0.8301887f; break; default: *r=0.9215687f; *g=0.13725491f; *b=0.16862746f; break; }
+    *r*=inv; *g*=inv; *b*=inv;
+}
+INLINE u8 hudColorToText(u8 hud) { switch (hud) { case HUDC_WHITE:return T_WHITE; case HUDC_RED:return T_RED; case HUDC_ORANGE:return T_ORANGE; case HUDC_YELLOW:return T_YELLOW; case HUDC_GREEN:return T_GREEN; case HUDC_BLUE:return T_BLUE; case HUDC_PURPLE:return T_PURPLE; default:return T_RED; } }
+enum{GL_ARRAY_BUFFER=0x8892,GL_DEPTH_BUFFER_BIT=0x100,GL_READ_WRITE=0x88BA,GL_SSBO=0x90D2,GL_CULL_FACE=0xB44,GL_BLEND=0xBE2,GL_DEPTH_TEST=0xB71,GL_RGB=0x1907,GL_TEXTURE0=0x84C0,GL_COLOR_ATTACHMENT0=0x8CE0,GL_RG16F=0x822F,GL_TEXTURE1=0x84C1,GL_TEXTURE6=0x84C6,GL_COLOR_ATTACHMENT1=0x8CE1,GL_ELEMENT_ARRAY_BUFFER=0x8893,GL_TEXTURE2=0x84C2,GL_TEXTURE_2D=0xDE1,GL_COLOR_ATTACHMENT2=0x8CE2,GL_FALSE=0,GL_RGBA=0x1908,GL_TEXTURE3=0x84C3,GL_UNSIGNED_BYTE=0x1401,
+     GL_FLOAT=0x1406,GL_TEXTURE4=0x84C4,GL_FRAMEBUFFER=0x8D40,GL_READ_FRAMEBUFFER=0x8CA8,GL_DRAW_FRAMEBUFFER=0x8CA9,GL_LINEAR=0x2601,GL_UNSIGNED_SHORT=0x1403,GL_RGBA8=0x8058,GL_COLOR_BUFFER_BIT=0x4000,GL_STATIC_DRAW=0x88E4,GL_DYNAMIC_DRAW=0x88E8,GL_TRIANGLE_STRIP=0x5,GL_LESS=0x201,GL_LEQUAL=0x203,GL_ONE=1,GL_SRC_ALPHA=0x302,GL_ONE_MINUS_SRC_ALPHA=0x303,GL_DST_COLOR=0x306,GL_ZERO=0,GL_TRUE=1,GL_DEPTH_COMPONENT24=0x81A6,
+     GL_DEPTH_COMPONENT=0x1902,GL_UNSIGNED_INT=0x1405,GL_R32UI=0x822E,GL_RED_INTEGER=0x8D94,GL_TEXTURE_MIN_FILTER=0x2801,GL_TEXTURE_MAG_FILTER=0x2800,GL_TEXTURE_WRAP_S=0x2802,GL_TEXTURE_WRAP_T=0x2803,GL_CLAMP_TO_BORDER=0x812D,GL_TEXTURE_BORDER_COLOR=0x1004,GL_TEXTURE_COMPARE_MODE=0x884C,GL_COMPARE_REF_TO_TEXTURE=0x884E,GL_TEXTURE_COMPARE_FUNC=0x884D,GL_DEPTH_ATTACHMENT=0x8D00,GL_TEXTURE10=0x84CA,GL_ACTIVE_TEXTURE=0x84E0};
 typedef void(*FGL_AT)(u32),(*FGL_F)(),    (*FGL_FF)(u32),  (*FGL_AS)(u32,u32),  (*FGL_VAB)(u32,u32), (*FGL_GT)(i32,u32*),   (*FGL_DA)(u32,i32,i32),     (*FGL_CC)(float,float,float,float),(*FGL_BD)(u32,size_t,const void*,u32),   (*FGL_U4F)(i32,float,float,float,float),        (*FGL_BBB)(u32,u32,u32),  *(*FGL_MBR)(u32,intptr_t,size_t,u32);
 typedef void(*FGL_C)(u32),                (*FGL_EVAA)(u32),(*FGL_BB)(u32,u32),  (*FGL_BT)(u32,u32),  (*FGL_U1F)(i32,float), (*FGL_BFS)(u32,u32,u32,u32),(*FGL_DE)(u32,i32,u32,const void*),(*FGL_UM4FV)(i32,i32,bool,const float*), (*FGL_BSD)(u32,intptr_t,intptr_t,const void*),  (*FGL_DB)(i32,const u32*), (*FGL_CM)(bool,bool,bool,bool);
 typedef void(*FGL_CS)(u32),(*FGL_BVA)(u32), (*FGL_GVA)(i32,u32*),(*FGL_U1I)(i32,i32), (*FGL_DC)(u32,u32,u32),(*FGL_MB)(u32),(*FGL_CPIV)(u32,u32,i32*),  (*FGL_BVB)(u32,u32,intptr_t,i32),  (*FGL_RP)(i32,i32,i32,i32,u32,u32,void*),(*FGL_SS)(u32,i32,const char*const*,const i32*),(*FGL_U2UI)(i32,u32,u32);
-typedef void(*FGL_E)(u32), (*FGL_DF)(u32),(*FGL_LP)(u32),  (*FGL_GB)(i32,u32*), (*FGL_BFB)(u32,u32), (*FGL_GFS)(i32,u32*),  (*FGL_TPI)(u32,u32,i32), (*FGL_TPFV)(u32,u32,const float*),    (*FGL_FBT2D)(u32,u32,u32,u32,i32), (*FGL_GSIL)(u32,i32,i32*,char*), (*FGL_GPIL)(u32,i32,i32*,char*),        (*FGL_BIT)(u32,u32,i32,bool,i32,u32,u32),       (*FGL_VP)(i32,i32,i32,i32),(*FGL_T2D)(u32,i32,i32,i32,i32,i32,u32,u32,const void*);
+typedef void(*FGL_E)(u32), (*FGL_DF)(u32),(*FGL_LP)(u32),  (*FGL_GB)(i32,u32*), (*FGL_BFB)(u32,u32), (*FGL_GFS)(i32,u32*),  (*FGL_TPI)(u32,u32,i32), (*FGL_TPFV)(u32,u32,const float*),    (*FGL_FBT2D)(u32,u32,u32,u32,i32), (*FGL_GSIL)(u32,i32,i32*,char*), (*FGL_GPIL)(u32,i32,i32*,char*),        (*FGL_BIT)(u32,u32,i32,bool,i32,u32,u32),   (*FGL_VP)(i32,i32,i32,i32),(*FGL_T2D)(u32,i32,i32,i32,i32,i32,u32,u32,const void*);
 typedef void(*FGL_UP)(u32),(*FGL_D)(u32), (*FGL_DM)(bool), (*FGL_LW)(float),    (*FGL_GIV)(u32,i32*),(*FGL_U1UI)(i32,u32),  (*FGL_GSIV)(u32,u32,i32*),  (*FGL_VAF)(u32,i32,u32,bool,u32),  (*FGL_UM3FV)(i32,i32,bool,const float*), (*FGL_U3F)(i32,float,float,float),              (*FGL_U2F)(i32,float,float);
 typedef u32(*FGL_CP)(), (*FGL_GERR)(), (*FGL_CRS)(u32); typedef bool(*FGL_UB)(u32); typedef void(*FGL_GIQ)(i32,u32*),(*FGL_GQOU64)(u32,u32,u64*); typedef void(*FGL_DAI)(u32,i32,i32,i32); typedef void(*FGL_BF)(i32,i32,i32,i32,i32,i32,i32,i32,u32,u32); typedef void(*FGL_GTKP)(u32,i32,u32,i32*); typedef void(*FGL_CISD)(u32,u32,i32,i32,i32,i32,u32,u32,i32,i32,i32,i32,i32,i32,i32);
+typedef void(*FGL_BQ)(u32,u32); extern FGL_BQ glBeginQuery; extern FGL_D glEndQuery; typedef void(*FGL_CBSD)(u32,u32,intptr_t,intptr_t,size_t); extern FGL_CBSD glCopyBufferSubData; typedef void(*FGL_CLBSD)(u32,u32,intptr_t,intptr_t,u32,u32,const void*);    typedef void(*FGL_BBR)(u32,u32,u32,intptr_t,size_t);    typedef void(*FGL_GBSD)(u32,intptr_t,size_t,void*);
 extern FGL_GTKP glGetTexLevelParameteriv; extern FGL_BF glBlitFramebuffer; extern FGL_T2D glTexSubImage2D; extern FGL_BFB glBindFramebuffer; extern FGL_GFS glGenFramebuffers; extern FGL_FBT2D glFramebufferTexture2D; extern FGL_GT glGenTextures; extern FGL_T2D glTexImage2D;
-extern u32 uiFBO; void GenerateAndBindTexture(u32*,i32,i32,i32,u32,u32,i32,u8*),EnsureReflectionResources(),VideoInit(),QueueVideoFrame(u32,bool),QueueVideoFrame(u32,bool),ParseAllModels(),LoadModels(),LoadPerLevelModels(u8),RtSwapPatchModels(),MdlBuildLevelConvexAdjacency(u8); bool EntIsLodCardConst(u16); u32 VideoFrameTexIndex(u32),VideoPeekFrame(u32);
+extern u32 uiFBO; void GenerateAndBindTexture(u32*,i32,i32,i32,u32,u32,i32,u8*),EnsureReflectionResources(),QueueVideoFrame(u32,bool),QueueVideoFrame(u32,bool),ParseAllModels(),LoadModels(),LoadPerLevelModels(u8),RtSwapPatchModels(),MdlBuildLevelConvexAdjacency(u8); bool EntIsLodCardConst(u16); u32 VideoFrameTexIndex(u32),VideoPeekFrame(u32);
 extern FGL_GB glGenBuffers; extern FGL_BB glBindBuffer; extern FGL_BD glBufferData; extern FGL_UB glUnmapBuffer; extern FGL_MBR glMapBufferRange; extern FGL_U2F glUniform2f; extern FGL_U1F glUniform1f; extern FGL_U1UI glUniform1ui; extern FGL_UP glUseProgram; extern FGL_RP glReadPixels; extern FGL_U3F glUniform3f; extern FGL_DC glDispatchCompute; extern FGL_DA glDrawArrays; extern FGL_MB glMemoryBarrier;
 extern FGL_AT glActiveTexture; extern FGL_BVA glBindVertexArray; extern FGL_U1I glUniform1i; extern FGL_E glEnable; extern FGL_U4F glUniform4f; extern FGL_BT glBindTexture; extern FGL_GERR glGetError; extern FGL_GVA glGenVertexArrays; extern FGL_VAF glVertexAttribFormat; extern FGL_VAB glVertexAttribBinding;
 extern FGL_EVAA glEnableVertexAttribArray; extern FGL_BVB glBindVertexBuffer; extern FGL_BSD glBufferSubData; extern FGL_UM4FV glUniformMatrix4fv; extern FGL_DM glDepthMask; extern FGL_DF glDepthFunc; extern FGL_D glDisable; extern FGL_LW glLineWidth; extern FGL_GIQ glGenQueries; extern FGL_GQOU64 glGetQueryObjectui64v; extern FGL_DAI glDrawArraysInstanced; extern FGL_TPFV glTexParameterfv;
-extern FGL_F glFinish; extern FGL_BBB glBindBufferBase; extern FGL_BB glBlendFunc; typedef void(*FGL_BQ)(u32,u32); extern FGL_BQ glBeginQuery; extern FGL_D glEndQuery; typedef void(*FGL_CBSD)(u32,u32,intptr_t,intptr_t,size_t); extern FGL_CBSD glCopyBufferSubData; typedef void(*FGL_CLBSD)(u32,u32,intptr_t,intptr_t,u32,u32,const void*); extern FGL_CLBSD glClearBufferSubData; extern FGL_CISD glCopyImageSubData; extern FGL_CPIV glGetBufferParameteriv; typedef void(*FGL_GBSD)(u32,intptr_t,size_t,void*); extern FGL_GBSD glGetBufferSubData; extern FGL_GB glDeleteBuffers;
-typedef void(*FGL_BBR)(u32,u32,u32,intptr_t,size_t); extern FGL_BBR glBindBufferRange;
-// Input
-enum {JOYHAT_CENTERED=0,JOYHAT_UP=1,JOYHAT_RIGHT=2,JOYHAT_DOWN=4,JOYHAT_LEFT=8,JOYHAT_RIGHT_UP=(2|1),JOYHAT_RIGHT_DOWN=(2|4),JOYHAT_LEFT_UP=(8|1),JOYHAT_LEFT_DOWN=(8|4)};
-enum {KEY_UNKNOWN=-1,KEY_SPACE=32,KEY_APOSTROPHE=39/* ' */,KEY_COMMA=44/* , */,KEY_MINUS=45/* - */,KEY_PERIOD=46/* . */,KEY_SLASH=47/* / */,KEY_0=48,KEY_1=49,KEY_2=50,KEY_3=51,KEY_4=52,KEY_5=53,KEY_6=54,KEY_7=55,KEY_8=56,KEY_9=57,
-             KEY_SEMICOLON=59/* ; */,KEY_EQUAL=61/* = */,KEY_A=65,KEY_B=66,KEY_C=67,KEY_D=68,KEY_E=69,KEY_F=70,KEY_G=71,KEY_H=72,KEY_I=73,KEY_J=74,KEY_K=75,KEY_L=76,KEY_M=77,KEY_N=78,KEY_O=79,KEY_P=80,KEY_Q=81,KEY_R=82,KEY_S=83,KEY_T=84,KEY_U=85,KEY_V=86,
-             KEY_W=87,KEY_X=88,KEY_Y=89,KEY_Z=90,KEY_LEFT_BRACKET=91/* [ */,KEY_BACKSLASH=92/* \ */,KEY_RIGHT_BRACKET=93/* ] */,KEY_GRAVE_ACCENT=96/* ` */,KEY_ESCAPE=256,KEY_ENTER=257,KEY_TAB=258,KEY_BACKSPACE=259,KEY_INSERT=260,KEY_DELETE=261,
-             KEY_RIGHT=262,KEY_LEFT=263,KEY_DOWN=264,KEY_UP=265,KEY_PAGE_UP=266,KEY_PAGE_DOWN=267,KEY_HOME=268,KEY_END=269,KEY_CAPS_LOCK=280,KEY_SCROLL_LOCK=281,KEY_NUM_LOCK=282,KEY_PRINT_SCREEN=283,KEY_PAUSE=284,KEY_F1=290,KEY_F2=291,KEY_F3=292,KEY_F4=293,
-             KEY_F5=294,KEY_F6=295,KEY_F7=296,KEY_F8=297,KEY_F9=298,KEY_F10=299,KEY_F11=300,KEY_F12=301,KEY_KP_0=320,KEY_KP_1=321,KEY_KP_2=322,KEY_KP_3=323,KEY_KP_4=324,KEY_KP_5=325,KEY_KP_6=326,KEY_KP_7=327,KEY_KP_8=328,KEY_KP_9=329,KEY_KP_DECIMAL=330,
-             KEY_KP_DIVIDE=331,KEY_KP_MULTIPLY=332,KEY_KP_SUBTRACT=333,KEY_KP_ADD=334,KEY_KP_ENTER=335,KEY_KP_EQUAL=336,KEY_LEFT_SHIFT=340,KEY_LEFT_CONTROL=341,KEY_LEFT_ALT=342,KEY_LEFT_SUPER=343,KEY_RIGHT_SHIFT=344,KEY_RIGHT_CONTROL=345,KEY_RIGHT_ALT=346,
-             KEY_RIGHT_SUPER=347,KEY_MENU=348};
-enum {MOUSE_BUTTON_1=0,MOUSE_BUTTON_2=1,MOUSE_BUTTON_3=2,MOUSE_BUTTON_4=3,MOUSE_BUTTON_5=4,MOUSE_BUTTON_6=5,MOUSE_BUTTON_7=6,MOUSE_BUTTON_8=7,MOUSE_BUTTON_LEFT=0,MOUSE_BUTTON_RIGHT=1,MOUSE_BUTTON_MIDDLE=2};
-enum {JOYSTICK_1=0,JOYSTICK_2=1,JOYSTICK_3=2,JOYSTICK_4=3,JOYSTICK_5=4,JOYSTICK_6=5,JOYSTICK_7=6,JOYSTICK_8=7,JOYSTICK_9=8,JOYSTICK_10=9,JOYSTICK_11=10,JOYSTICK_12=11,JOYSTICK_13=12,JOYSTICK_14=13,JOYSTICK_15=14,JOYSTICK_16=15,JOYSTICK_LAST=15};
-typedef struct {bool down, pressed;} KeyState;
-typedef struct {const char* name; int value;} InputElement;
-typedef struct {double scrollDelta; KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS]; bool isCapsLockOn;} InputSystem;
-extern InputSystem Sys_Input;
-// LibC Replacement
-#define RAND_MAX 65535
+extern FGL_F glFinish; extern FGL_BBB glBindBufferBase; extern FGL_BB glBlendFunc; extern FGL_CLBSD glClearBufferSubData; extern FGL_CISD glCopyImageSubData; extern FGL_CPIV glGetBufferParameteriv; extern FGL_GBSD glGetBufferSubData; extern FGL_GB glDeleteBuffers; extern FGL_BBR glBindBufferRange;
 INLINE void flag_setu16(u16 *flags, u16 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 INLINE void flag_set(u32 *flags, u32 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 INLINE bool BvhHasBVH(u16 m) { return (m < MAX_MDLS && modelBVHNodeCounts[m] && modelBVHNodes[m] != NULL); }
 INLINE float fast_atof(const char** p) { const char* c=*p; while (*c == ' ' || *c == '\t') {c++;} float s=1.0f; if(*c == '-'){s=-1.0f; c++;} float v=0.0f; while (*c >= '0' && *c <= '9') { v=v * 10.0f + (*c - '0'); c++; } if (*c == '.') { c++; float sub=0.1f; while (*c >= '0' && *c <= '9') { v += (*c - '0') * sub; sub*=0.1f; c++; } } *p=c; return s * v; }
 INLINE i32 fast_atoi(const char** p) { const char* c = *p; while (*c == ' ' || *c == '\t') {c++;} i32 s=1; if(*c == '-'){s=-1; c++;} i32 v = 0; while (*c >= '0' && *c <= '9') { v = v * 10 + (*c - '0'); c++; } *p = c; return v * s; }
-void *mcpy(void *dst, const void *src, size_t n), *mset(void *dst, int c, size_t n); i32 PosGetCellCoordX(float x), PosGetCellCoordZ(float z), PosGetCellCoords(float x, float z);
-u32 PosGetCellCoordsP(i32 cx, i32 cz); size_t slen(const char* s);
-char* data_parser_trim(char* s);
-i32 s2i32(const char *str);
-bool cEmpty(const char),sEqual(const char*,const char*);
-int sCompUpToLen(const char* s1, const char* s2, size_t n);
-void scpy_to_a_from_b(char* a, const char* b, size_t bufsz),sCpy2aSubFromb(char* a, size_t subsz, const char* b, size_t bufsz);
-char c2Lower(const char c), *sFindSub(const char* s, const char* sub),*StringFindFirstCharWithin(const char *s, char c);
-const char* StringFindLastChar(const char* str, const char c);
-void double2str(char* dest, double value, int decs, size_t bufsz);
-int sFormatV(char* buf, size_t bufsz, const char* f, va_list args), sFormat(char* buffer, size_t bufsz, const char* format, ...);
-char* sUpToEndLine(char* buf, int sz, FHandle fd);
-void DualLog(const char*, ...),DualLogWarn(const char*, ...),DualLogError(const char*, ...),CenterStatusPrint(const char* restrict, ...),BmpWrite(char const*,int,int,const void*), Screenshot();
-extern char statusText[T_BUFFER_SIZE];
-u8 random_range_u8(u8,u8); u32 random_range_u32(u32,u32); float random_range(float,float); u32 rand();
-float lerp(float,float,float),inverse_lerp(float,float,float);
-void qsort_new(void* base, size_t nel, size_t w, cmpfun cmp);
-INLINE int  mcmp(const void *s1, const void *s2, size_t n) { const u8 *p1 = (const u8 *)s1; const u8 *p2 = (const u8 *)s2; while (n--) { if (*p1 != *p2) {return *p1 - *p2;} p1++; p2++; } return 0; }/*memcmp replacement*/
+INLINE i32  mcmp(const void *s1, const void *s2, size_t n) { const u8 *p1 = (const u8 *)s1; const u8 *p2 = (const u8 *)s2; while (n--) { if (*p1 != *p2) {return *p1 - *p2;} p1++; p2++; } return 0; }/*memcmp replacement*/
 INLINE void* mmov(void *dst, const void *src, size_t n) { u8 *d = (u8*)dst; const u8* s = (const u8*)src; if (d < s) { while (n--) { *d++ = *s++; } } else if (d > s) { d += n; s += n; while (n--) { *--d = *--s; } } return dst; }/*memmove replacement*/
+void SpawnBeamTrail(u16,V3,V3,Color),ProjectileEffectImpactOnCollision(u16,u16,V3,V3),ProjectileEffectImpactInitAfterLoad(u16),SpawnProjectileImpactParticles(u16,V3,V3),DrawSphereWireframe(Color,ShapeSphere),BioMonitorClearGraphs(),BioMonitorAlignCursors(),CyberSwitchInitAfterLoad(u16),
+     synth_set_reverb_preset(u16),MFD_ResetGeneral(),PSysAddLevelLoops(),PSysClearLevel(u8),PlayTrack(TrackType,MusicType),AutomapTick(),AutomapNewGame(),AutomapOnLoad(),ApplyImpactForceSphere(DamageData*,V3,float,float),UseTargets(u16,u16),AddForce(u16,V3,bool),TriggerTrippedUpdate(u16),CyberItemOnTriggerEnter(u16,u16),CyberMineOnTriggerEnter(u16,u16),CenterStatusPrint(const char * restrict fmt, ...),GameEndSequence(),GameDeathSequence(),
+     DebugRAMActual(const char*),DebugRAMPeak(),play_wav(const char*,float,V3,bool),play_wav_ext(const char*,float,V3,bool,float),play_message(const char*),PlaySparkSound(V3),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),MenuGoBack(),GoIntoGame(),ScreenShake(),TakeEnergy(float),CreateTargetIDInstance(float,u16,float),InputProcessing(),LoadAllLevels(),DrawLine(V3,V3,Color),ForceInventoryMode(),ForceShootMode(),
+     PlayVmail(u8),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),UpdateLights(),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),LoadTextForLanguage(u8),RenderTextL(i16,i16,u32,u8,float,const char* restrict,...),RenderTextC(i16,i16,u32,u8,float,const char* restrict,...),RenderText3DC(V3,u32,u8,float,const char* restrict,...),BuildTextDecalMeshes(),CullCore(),PngArenaInit(PngArena*),
+     AppendTextWarning(i32,i32,i32,i32,i32),ChangeAnim(Entity*,u8),ForceDoorPortalOpen(u16),QuestBitSet(u8),QuestBitClear(u8),QuestBitToggle(u8),SpawnManagerActivate(u16,bool),SpawnManagerUpdate(u16),DualLog(const char*, ...),DualLogWarn(const char*, ...),DualLogError(const char*, ...),CenterStatusPrint(const char* restrict, ...),Screenshot(),qsort_new(void*,size_t,size_t,cmpfun),double2str(char*,double,i32,size_t),
+     scpy_to_a_from_b(char*,const char*,size_t),sCpy2aSubFromb(char*,size_t,const char*,size_t),UI_PuzzleGridClose(),UI_BlockedClose(),PGEvalPuzzle(),*mcpy(void*,const void*,size_t),*mset(void*,i32,size_t),*OS_AllocScratch(size_t),OS_FreeInitPhase(),ai_effect_flash(V3,Color3,float,float,double);
+double get_time();
+float Tranquilize(u16,float,bool),TakeDamage(u16,DamageData),MeasureLineAdvance(const char*,u8),lerp(float,float,float),inverse_lerp(float,float,float),random_range(float,float);
+size_t AudioLiveBytes(),slen(const char*);
+u32 parse_numberu32(const char*, const char*,u32),rand(),random_range_u32(u32,u32),PosGetCellCoordsP(i32,i32);
+i32 sFormatV(char*,size_t,const char*,va_list),sFormat(char*,size_t,const char*,...),PosGetCellCoordX(float),PosGetCellCoordZ(float),PosGetCellCoords(float,float),sCompUpToLen(const char*, const char*,size_t),s2i32(const char*);
+u16 parse_numberu16(const char*, const char*,u32),AddInstance(u16,V3),SpawnDynamicObject(i32),GetCursorTexture(),DoorFrameFromProgress(AnimationClip,float),PSysAddInternal(const PSysDef*,u16,u16),EditModePickLight(V3,V3,float,float*);
+u8 parse_numberu8(const char*, const char*,u32),GetCurrentLevelSecurity(),*PngLoad(const u8*,i32,i32*,i32*,PngArena*),random_range_u8(u8,u8);
+bool parse_bool(const char*, const char*,u32),CapsuleTouchesOBB(V3,float,ShapeBox),AreaHasClearance(ShapeCapsule,ShapeCapsule,float,u32,u16),PositionVisibleFromPlayerCell(float,float),FrobHeldItemIntoPanel(V3,V3,V3),HudHeatTickOn(i32),VidMenuKeyArmed(),QuestBitIsSet(u8),PlayerIsMoving(),Forward(),StrafeLeft(),Backpedal(),StrafeRight(),Jump(),JumpDown(),Crouch(),Prone(),LeanLeft(),Sprint(),DoubleTapLeanLeft(),LeanRight(),DoubleTapLeanRight(),Attack(),
+     Use(),Menu(),Reload(),Grenade(),GrenCycUp(),GrenCycDn(),ChangeAmmoType(),Patch(),PatchCycUp(),PatchCycDown(),Console(),NeighborhoodInPVS(u16,u16,u8),AICheckPain(u16),SkyIsVisible(),SkySunIsVisible(),HasHealth(u16),GetKey(i32),cEmpty(const char),sEqual(const char*,const char*),SpawnImpactParticleForPrefab(u16,V3,V3);
+char *StringFindFirstCharWithin(const char*,char),*data_parser_trim(char*),c2Lower(const char),*sFindSub(const char*,const char*),*StringFindFirstCharWithin(const char*,char),*sUpToEndLine(char*,i32,FHandle);
+const char *JumpSound(FootStepType),*JumpLandSound(FootStepType),*StringFindLastChar(const char*,const char);
+RaycastHit Raycast(V3,V3,float,u32);    RaycastHit RaycastEditPick(V3,V3,float,u32);    V3 ScreenPointToRay(V3,V3),ScreenPointToRayPixels(V3,V3,float,float);    ShapeBox Entity_GetBox(u16);    ShapeCapsule Entity_GetCap(u16);    ShapeSphere Entity_GetSph(u16);    FootStepType GetFootstepTypeForPrefab(i32);    PSysDef* PSysTypeGet(u16);    Quaternion quat_look_rotation(V3,V3);

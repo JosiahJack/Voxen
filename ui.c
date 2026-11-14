@@ -100,7 +100,7 @@ __attribute__((noinline)) void MenuGoBack() {
     else if (currentMenuPage == MPG_DEATH) { currentMenuPage = MPG_FRONT; }
     if (leavingClipPage) { currentMenuItem = currentMenuTab = 0; if (toPause) StopVideoPageMusic(); else PlayMenuMusic(); }
 }
-static void CreateShadowBuffers() { shadowMapSSBO = MakeSSBO(&shadowMapSSBO, 5, (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32), NULL, GL_STATIC_DRAW); shadowMapsIndirectionID = MakeSSBO(&shadowMapsIndirectionID, 6, LIGHT_COUNT * sizeof(u32), NULL, GL_STATIC_DRAW);  shadowBuffersCreated = true; }
+static void CreateShadowBuffers() { shadowMapSSBO = MakeSSBO(&shadowMapSSBO, 5, (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32), NULL, GL_STATIC_DRAW); shadowMapsIndirectionID = MakeSSBO(&shadowMapsIndirectionID, 6, LIGHT_CNT * sizeof(u32), NULL, GL_STATIC_DRAW);  shadowBuffersCreated = true; }
 // Menu Video Playback
 static double introVidStart = 0.0, creditsVidStart = 0.0, deathVidStart = 0.0;
 static const float introTextAt[15] = {0.0f,6.7f,9.9f,19.2f,30.7f,37.9f,43.7f,48.1f,59.3f,69.1f,74.5f,81.2f,89.2f,98.4f,105.0f};
