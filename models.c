@@ -97,7 +97,11 @@ typedef struct { const u8* base; size_t stride; u8 nc, cs, cls, nrm; } GlbCell;
 static GlbCell GlbCellInit(const glb_accessor* a) {
     GlbCell c; c.stride = a->stride; c.nrm = (u8)a->normalized; switch (a->type) { case glbv2: c.nc = 2; break; case glbv3: c.nc = 3; break; case glbv4: c.nc = 4; break; case glbmat4: c.nc = 16; break; default: c.nc = 1;  break; }
     switch (a->component_type) { case glb_component_type_r_8u: c.cls = 4; c.cs = 1; break; case glb_component_type_r_16u: c.cls = 3; c.cs = 2; break; case glb_component_type_r_32f: c.cls = 2; c.cs = 4; break; default: c.cls = 5; c.cs = 0; break; }
-    if (!a->buffer_view) { c.cls = 0; } else if (!a->buffer_view->buffer->data) { c.cls = 1; } c.base = (c.cls >= 2 && c.cls <= 4) ? (const u8*)a->buffer_view->buffer->data + a->buffer_view->offset + a->offset : NULL; return c;
+    c.base = NULL; if (!a->buffer_view) { c.cls = 0; } else if (!a->buffer_view->buffer->data) { c.cls = 1; }
+    if (c.cls >= 2 && c.cls <= 4) {
+        const glb_buffer* buf = a->buffer_view->buffer; size_t start = a->buffer_view->offset + a->offset; size_t stride = c.stride ? c.stride : (size_t)c.nc * c.cs; size_t extent = (size_t)c.nc * c.cs;
+        if (a->count) { size_t n = a->count - 1; if (stride && n > buf->size / stride) { c.cls = 0; return c; } extent += stride * n; } if (start > buf->size || extent > buf->size - start) { c.cls = 0; return c; } c.base = (const u8*)buf->data + start;
+    } return c;
 }
 INLINE __attribute__((always_inline)) bool GlbCellGet(const GlbCell* restrict c, size_t i, float* restrict o, size_t es) {
     if (c->cls == 0) { mset(o, 0, es * sizeof(float)); return true; } if (c->cls == 1 || es < c->nc) { return false; }
@@ -202,7 +206,7 @@ static int jsmn_parse(jsmn_parser*p,const char*js,size_t l,jsmntok_t*t,size_t n)
             case '{':case '[': cnt++; if(!t)break; if(!(q=jsmn_alloc_token(p,t,n)))return JSMN_ERROR_NOMEM; if(p->toksuper!=-1){t[p->toksuper].size++;q->parent=p->toksuper;} q->type=c=='{'?JSMN_OBJECT:JSMN_ARRAY; q->start=p->pos; p->toksuper=p->toknext-1; break;
             case '}':case ']': if(!t)break; ty=c=='}'?JSMN_OBJECT:JSMN_ARRAY; if(p->toknext<1)return JSMN_ERROR_INVAL; q=&t[p->toknext-1]; for(;;){ if(q->start!=-1&&q->end==-1){ if(q->type!=ty)return JSMN_ERROR_INVAL; q->end=p->pos+1; p->toksuper=q->parent; break; } if(q->parent==-1){ if(q->type!=ty||p->toksuper!=-1)return JSMN_ERROR_INVAL; break; } q=&t[q->parent]; } break;
             case '"': s=p->pos++; for(;p->pos<l&&js[p->pos];p->pos++){ if((c=js[p->pos])=='"'){ if(t){ if(!(q=jsmn_alloc_token(p,t,n))){p->pos=s;r=JSMN_ERROR_NOMEM;goto done;} jsmn_fill_token(q,JSMN_STRING,s+1,p->pos); q->parent=p->toksuper; } r=0; goto done; }
-            if(c=='\\'&&p->pos+1<l){ p->pos++; switch(js[p->pos]){ case '"':case '/':case '\\':case 'b':case 'f':case 'r':case 'n':case 't': break; case 'u': p->pos++; for(i=0;i<4&&p->pos<l&&js[p->pos];i++){ if(!((c=js[p->pos])>='0'&&c<='9'||c>='A'&&c<='F'||c>='a'&&c<='f')){p->pos=s;r=JSMN_ERROR_INVAL;goto done;} p->pos++; } p->pos--; break; default: p->pos=s;r=JSMN_ERROR_INVAL;goto done; } } } p->pos=s; r=JSMN_ERROR_PART; goto done;
+            if(c=='\\'&&p->pos+1<l){ p->pos++; switch(js[p->pos]){ case '"':case '/':case '\\':case 'b':case 'f':case 'r':case 'n':case 't': break; case 'u': p->pos++; for(i=0;i<4&&p->pos<l&&js[p->pos];i++){ if(!(((c=js[p->pos])>='0'&&c<='9')||(c>='A'&&c<='F')||(c>='a'&&c<='f'))){p->pos=s;r=JSMN_ERROR_INVAL;goto done;} p->pos++; } p->pos--; break; default: p->pos=s;r=JSMN_ERROR_INVAL;goto done; } } } p->pos=s; r=JSMN_ERROR_PART; goto done;
             case '\t':case '\r':case '\n':case ' ': break; case ':': p->toksuper=p->toknext-1; break;
             case ',': if(t&&p->toksuper!=-1&&t[p->toksuper].type!=JSMN_ARRAY&&t[p->toksuper].type!=JSMN_OBJECT){ p->toksuper=t[p->toksuper].parent; for(i=p->toknext-1;i>=0;i--) if((t[i].type==JSMN_ARRAY||t[i].type==JSMN_OBJECT)&&t[i].start!=-1&&t[i].end==-1){p->toksuper=i;break;} } break;
             case '-':case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7':case '8':case '9':case 't':case 'f':case 'n': if(t&&p->toksuper!=-1){o=&t[p->toksuper]; if(o->type==JSMN_OBJECT||(o->type==JSMN_STRING&&o->size))return JSMN_ERROR_INVAL;} s=p->pos; for(;p->pos<l&&js[p->pos];p->pos++) switch(js[p->pos]){ case ':':case '\t':case '\r':case '\n':case ' ':case ',':case ']':case '}': goto f; } p->pos=s; r=JSMN_ERROR_PART; goto done;
@@ -214,11 +218,9 @@ static int jsmn_parse(jsmn_parser*p,const char*js,size_t l,jsmntok_t*t,size_t n)
 static bool glb_resolve_raw(void* pslot, const void* base, size_t esz, size_t count) { void* v; mcpy(&v, pslot, sizeof(v)); size_t idx = (size_t)v; if (!idx) { return true; } if (idx > count) { return false; } void* re = (void*)((char*)base + (idx - 1) * esz); mcpy(pslot, &re, sizeof(re)); return true; }
 void glb_parse(i32 tid, const void* d, size_t sz, glb_data** out_data) {
     if (!d || sz < 20) return;
-    const u8* ptr=(const u8*)d; const u8* jc=ptr+12; u32 jl; mcpy(&jl,jc,4); jc += 8; const void* bin = NULL; size_t bsz = 0;
-    if (8 <= sz - 20 - jl) { const u8* bc = jc + jl; u32 bl; mcpy(&bl,bc,4); bc += 8; bin = bc; bsz = bl; }
-    jsmn_parser p = {0}; int tc = jsmn_parse(&p,(const char*)jc,jl,NULL,0);
-    jsmntok_t* t = OS_SubArenaAlloc(tid,sizeof(jsmntok_t)*(tc+1));
-    p.pos=0; p.toknext=0; p.toksuper=-1;
+    const u8* ptr=(const u8*)d; const u8* jc=ptr+12; u32 jl; mcpy(&jl,jc,4); jc += 8; const void* bin = NULL; size_t bsz = 0;    
+    if ((size_t)jl > sz - 20) { DualLogError("glb: JSON chunk length overruns file\n"); OS_Exit(1); } if (8 <= sz - 20 - jl) { const u8* bc = jc + jl; u32 bl; mcpy(&bl,bc,4); bc += 8; if ((size_t)bl > sz - 20 - jl - 8) { DualLogError("glb: BIN chunk length overruns file\n"); OS_Exit(1); } bin = bc; bsz = bl; }
+    jsmn_parser p = {0}; int tc = jsmn_parse(&p,(const char*)jc,jl,NULL,0); jsmntok_t* t = OS_SubArenaAlloc(tid,sizeof(jsmntok_t)*(tc+1)); p.pos=0; p.toknext=0; p.toksuper=-1;
     tc = jsmn_parse(&p,(const char*)jc,jl,t,tc); if(tc<=0){DualLogError("No tokens in glb\n");OS_Exit(1);}
     t[tc].type=0; glb_data* data=OS_SubArenaAlloc(tid,sizeof(glb_data)); glb_parse_json_root(t,0,jc,tid,data);
     for (size_t m=0;m<data->meshes_count;++m) { for (size_t n=0;n<data->meshes[m].primitives_count;++n) { glb_primitive* pr =&data->meshes[m].primitives[n]; if (!glb_resolve_raw(&pr->indices,data->accessors,sizeof(glb_accessor),data->accessors_count)) { return; } for(size_t k=0;k<pr->attr_count;++k){ if(!pr->attr[k].data || !glb_resolve_raw(&pr->attr[k].data,data->accessors,sizeof(glb_accessor),data->accessors_count)) { return; } } } }
@@ -295,6 +297,7 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex,co
             for (int k=1; k<nv-1; ++k) {
                 u32 tri[3] = {0, (u32)k, (u32)(k+1)};
                 for (int t=0; t<3; ++t) {
+                    if (unlikely(ec >= MAX_OUTPUT_VERTS)) { DualLogError("obj:vertex overflow (model %u)\n",mindex); return false; }
                     int ix = tri[t]; u32 v = (vi[ix] && vi[ix] <= pc) ? vi[ix]-1 : 0; u32 tex = (ti[ix] && ti[ix] <= uc) ? ti[ix]-1 : 0; u32 nrm = (ni[ix] && ni[ix] <= nc) ? ni[ix]-1 : 0; float* dst = work->verts + (ec<<3);
                     dst[0]=-work->pos[v*3]; dst[1]=work->pos[v*3+1]; dst[2]=work->pos[v*3+2]; dst[3]=(nrm < nc) ? -work->nrm[nrm*3] : 0; dst[4]=(nrm < nc) ? work->nrm[nrm*3+1] : 0; dst[5]=(nrm < nc) ? work->nrm[nrm*3+2] : 0; dst[6]=(tex < uc) ? work->uv[tex*2] : 0; dst[7]=(tex < uc) ? work->uv[tex*2+1] : 0; __m128 pos_v=_mm_loadu_ps(dst); mn_v=_mm_min_ps(mn_v,pos_v); mx_v=_mm_max_ps(mx_v,pos_v); ++ec;
                 }
@@ -307,12 +310,12 @@ static void FindBracket(const glbanim_samp* s, float t, u32* i0, float* f) {
 }
 static void SampleV3(const glbanim_samp* s, float t, float* o3) { GlbCell outC = GlbCellInit(s->output); u32 i0; float f, v0[3], v1[3]; FindBracket(s, t, &i0, &f); GlbCellGet(&outC, i0, v0, 3); if (f <= 0.0f || s->interpolation == glb_interp_step) { o3[0] = v0[0]; o3[1] = v0[1]; o3[2] = v0[2]; return; } GlbCellGet(&outC, i0 + 1, v1, 3); o3[0] = v0[0] + (v1[0] - v0[0]) * f; o3[1] = v0[1] + (v1[1] - v0[1]) * f; o3[2] = v0[2] + (v1[2] - v0[2]) * f; }
 static void SampleQuat(const glbanim_samp* samp, float t, float* outq /* xyzw */) {
-	GlbCell outC = GlbCellInit(samp->output);
-	u32 i0; float frac, q0[4], q1[4], qb[4]; FindBracket(samp, t, &i0, &frac); GlbCellGet(&outC, i0, q0, 4); if (frac <= 0.0f || samp->interpolation == glb_interp_step) { mcpy(outq, q0, sizeof(float)*4); return; }
+    GlbCell outC = GlbCellInit(samp->output);
+    u32 i0; float frac, q0[4], q1[4], qb[4]; FindBracket(samp, t, &i0, &frac); GlbCellGet(&outC, i0, q0, 4); if (frac <= 0.0f || samp->interpolation == glb_interp_step) { mcpy(outq, q0, sizeof(float)*4); return; }
     GlbCellGet(&outC, i0 + 1, q1, 4);
     float d = q0[0]*q1[0] + q0[1]*q1[1] + q0[2]*q1[2] + q0[3]*q1[3];
     d = d > 1.0f ? 1.0f : (d < -1.0f ? -1.0f : d);
-	if (d < 0.0f) { qb[0] = -q1[0]; qb[1] = -q1[1]; qb[2] = -q1[2]; qb[3] = -q1[3]; d = -d; } else mcpy(qb, q1, sizeof(float) * 4);
+    if (d < 0.0f) { qb[0] = -q1[0]; qb[1] = -q1[1]; qb[2] = -q1[2]; qb[3] = -q1[3]; d = -d; } else mcpy(qb, q1, sizeof(float) * 4);
     if (d > 0.9995f) { for (int c=0;c<4;++c) { outq[c] = q0[c] + (qb[c] - q0[c]) * frac; } } else { float theta0 = vacosf(d), theta = theta0 * frac; float s1 = sinf(theta) / sinf(theta0), s0 = cosf(theta) - d * s1; for (int c=0;c<4;++c) { outq[c] = q0[c]*s0 + qb[c]*s1; } }
     float inv = 1.0f / vsqrtf(outq[0]*outq[0] + outq[1]*outq[1] + outq[2]*outq[2] + outq[3]*outq[3]); for (int c=0;c<4;++c) outq[c] *= inv;
 }
@@ -323,7 +326,7 @@ static void NodeLocalMatrixAtTime(const GltfMesh* gm, glb_node* node, float t, f
     size_t ni = (size_t)(node - gm->gltf->nodes); const glb_anim_chan *ct = gm->chanMap[ni*3+0], *cr = gm->chanMap[ni*3+1], *cs = gm->chanMap[ni*3+2]; if (ct) { SampleV3(ct->sampler, t, T); } if (cr) { SampleQuat(cr->sampler, t, R); } if (cs) { SampleV3(cs->sampler, t, S); }
     Mat4FromTRS(T, R, S, outM);
 }
-static void NodeGlobalMatrixAtTime(const GltfMesh* gm, glb_node* node, float t, float* outM) { float l[16]; NodeLocalMatrixAtTime(gm,node, t, l); if (!node->parent) { mcpy(outM, l, sizeof(l)); return; } float p[16]; NodeGlobalMatrixAtTime(gm, node->parent, t, p); mul_mat4(outM,p, l); }
+static void NodeGlobalMatrixAtTime(const GltfMesh* gm, glb_node* node, float t, float* outM, int depth) { float l[16]; NodeLocalMatrixAtTime(gm,node, t, l); if (!node->parent || depth >= 64) { mcpy(outM,l,sizeof(l)); return; } float p[16]; NodeGlobalMatrixAtTime(gm, node->parent,t,p,depth + 1); mul_mat4(outM,p,l); }
 bool IsGLBSourcePath(const char* path) { const char* dot = StringFindLastChar(path, '.'); return dot && sEqual(dot, ".glb"); }
 static void GlbChanMapFill(glb_anim_chan** map, const glb_data* data, const glb_animt* anim) {
     for (size_t c = 0; c < anim->channels_count; ++c) { const glb_anim_chan* ch = &anim->channels[c]; if (!ch->target_node) { continue; } size_t ni = (size_t)(ch->target_node - data->nodes); if (ni < data->nodes_count && ch->target_path >= glb_animpthtype_translation && ch->target_path <= glb_animpthtype_scale) { map[ni*3 + (size_t)(ch->target_path - glb_animpthtype_translation)] = (glb_anim_chan*)ch; } }
@@ -387,7 +390,7 @@ static void GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
         }
     }
 }
-static void SkinNodeGlobal(const GltfMesh* gm, glb_node* node, float t, float (*glob)[16], u8* state) { size_t ni = (size_t)(node - gm->gltf->nodes); if (state[ni]) { return; } float l[16]; NodeLocalMatrixAtTime(gm, node, t, l); if (node->parent) { size_t pi = (size_t)(node->parent - gm->gltf->nodes); SkinNodeGlobal(gm, node->parent, t, glob, state); mul_mat4(glob[ni],glob[pi], l); } else { mcpy(glob[ni], l, sizeof(l)); } state[ni] = 1; }
+static void SkinNodeGlobal(const GltfMesh* gm, glb_node* node, float t, float (*glob)[16], u8* state) { size_t ni = (size_t)(node - gm->gltf->nodes); if (state[ni]) { return; } state[ni] = 1; float l[16]; NodeLocalMatrixAtTime(gm,node,t,l); if (node->parent) { size_t pi = (size_t)(node->parent - gm->gltf->nodes); SkinNodeGlobal(gm,node->parent,t,glob,state); mul_mat4(glob[ni],glob[pi],l); } else { mcpy(glob[ni],l,sizeof(l)); } state[ni] = 2; }
 typedef struct { GltfMesh* mesh; u32 modelIndex; float timelineFrame; } GltfFrameTask;
 typedef struct { GltfFrameTask* tasks; u32 start, end; int tid; } GltfBakeTask;
 static void* GltfBakeWorker(void* arg) {
@@ -397,7 +400,7 @@ static void* GltfBakeWorker(void* arg) {
         if (t->mesh->isTrAnim) { 
             GltfMesh* restrict gm = t->mesh; float timeline_t = t->timelineFrame; rng.mn = _mm_set1_ps(1000000000.0f); rng.mx = _mm_set1_ps(-1000000000.0f); ec = 0;
             for (u32 s = 0; s < gm->submshCnt; ++s) {
-                float gm_mat[16]; NodeGlobalMatrixAtTime(gm,gm->meshNodes[s],timeline_t,gm_mat); const float* restrict spos = gm->subPos[s]; const float* restrict snrm = gm->subNrm[s]; const float* restrict suv = gm->subUv[s]; const u32* restrict sidx = gm->subIndices[s]; u32 cornerCount = gm->subTriCount[s] * 3;
+                float gm_mat[16]; NodeGlobalMatrixAtTime(gm,gm->meshNodes[s],timeline_t,gm_mat,0); const float* restrict spos = gm->subPos[s]; const float* restrict snrm = gm->subNrm[s]; const float* restrict suv = gm->subUv[s]; const u32* restrict sidx = gm->subIndices[s]; u32 cornerCount = gm->subTriCount[s] * 3;
                 for (u32 k = 0; k < cornerCount; ++k) { if (unlikely(ec + 1 > MAX_OUTPUT_VERTS)) { DualLogError("glbanim:vert overflow\n"); goto bvh_bake_done; } u32 vi = sidx[k]; if (vi >= gm->subVertCnt[s]) { continue; } float pt[3], n[3]; Mat4TransformPoint(gm_mat, &spos[vi * 3], pt); Mat4TransformDir(gm_mat, &snrm[vi * 3], n); rng = GlbBakeEmit(sv + (ec << 3), rng, pt[0], pt[1], pt[2], n[0], n[1], n[2], suv[vi * 2 + 0], suv[vi * 2 + 1]); ++ec; }
             } bvh_bake_done:;
         } else { 
@@ -525,11 +528,11 @@ static void* ModelParsingWorker(void* arg) {
 }
 void ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
     FHandle fd; int sz; char* buf = OS_OpenAndAllocateFileBufferReadonly(fn, &fd, &sz); char *c = buf, *e = buf + sz; u32 maxidx = 0, ln = 0;
-    while (c < e) {/*first pass to find max index*/ char* s = c; while (c < e && *c != '\n' && *c != '\r') ++c; if (c - s > 5) { while (cEmpty(*s)) {++s;} char* col = StringFindFirstCharWithin(s, ':'); if (col && sCompUpToLen(s, "index", col - s) == 0) { u32 idx = parse_numberu32(col+1, s, ln); if(idx > maxidx){maxidx=idx;} } } if (c < e && *c == '\r') ++c; if (c < e && *c == '\n') ++c; ++ln; }
+    while (c < e) {/*first pass to find max index*/ char* s = c; while (c < e && *c != '\n' && *c != '\r') ++c; if (c - s > 5) { while (s < c && cEmpty(*s)) {++s;} if (s < c) { char* col = StringFindFirstCharWithin(s, ':'); if (col && sCompUpToLen(s, "index", col - s) == 0) { u32 idx = parse_numberu32(col+1, s, ln); if(idx > maxidx){maxidx=idx;} } } } if (c < e && *c == '\r') ++c; if (c < e && *c == '\n') ++c; ++ln; }
     if (!maxidx) { DualLogWarn("No entries in %s\n", fn); OS_Exit(1); } if (maxidx >= maxSz) { DualLogWarn("Index too large in %s\n", fn); OS_Exit(1); }
     u32 cnt = maxidx + 1; ModelData* ents = OS_AllocScratch(cnt * sizeof(ModelData)); p->entries = ents; p->count = cnt; for (u32 i=0; i<cnt; ++i) {ents[i] = (ModelData){U16_MAX,false,255,NULL,0,{0}};} ModelData cur = {U16_MAX,false,255,NULL,0,{0}}; c = buf; e = buf+sz; ln = 0;
     while (c < e) {
-        char* s = c; while (c < e && *c != '\n' && *c != '\r') ++c; size_t len = c - s; ++ln; if (len < 3) { if (c<e && (*c=='\r'||*c=='\n')) ++c; continue; } while (cEmpty(*s)) ++s; char* le = s + len - 1; while (le > s && cEmpty(*le)) --le; if (*s == '/' && s[1] == '/') goto next;
+        char* s = c; while (c < e && *c != '\n' && *c != '\r') ++c; size_t len = c - s; ++ln; if (len < 3) { if (c<e && (*c=='\r'||*c=='\n')) ++c; continue; } while (s < c && cEmpty(*s)) ++s; if (s >= c) { if (c<e && (*c=='\r'||*c=='\n')) ++c; continue; } char* le = s + len - 1; while (le > s && cEmpty(*le)) --le; if (*s == '/' && s + 1 < c && s[1] == '/') goto next;
         if (*s == '#') { if (cur.path[0] && cur.index != U16_MAX && cur.index < cnt) ents[cur.index] = cur; cur = (ModelData){U16_MAX,false,255,NULL,0,{0}}; if (le > s) { size_t pl=le - s; if(pl >= sizeof(cur.path)){pl=sizeof(cur.path)-1;} mcpy(cur.path,s+1,pl); cur.path[pl] = 0; } goto next; } char* col = StringFindFirstCharWithin(s, ':');
         if (col) {
             char k[256]={0}, v[256]={0}; sCpy2aSubFromb(k, col-s, s, 256); sCpy2aSubFromb(v, le-col, col+1, 256); 

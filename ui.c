@@ -973,13 +973,10 @@ static const char* swLabels[7]={"I.C.E. DRILL","PULSER","CYBER SHIELD","TURBO","
 void CenterMFD() { //640x240
     if (Cheats.noHUD) return;
     static const i16 centerX[4]={400,480,560,902};
-    for (u8 i=0;i<4;++i) { if (World.curLev == LEVEL_CYBERSPACE && i != 3) continue; /*Unity EnterCyberspace hides the Main/Hardware/General center tab buttons; only Software remains*/ UIRImg(UI_ID_CMFD_TAB_MAIN+i,centerX[i],752,64,32,(World.Sys_UI.mfdSelected[0]==i+1 && World.Sys_UI.mfdTab[0]!=5) ? 1024 : 1021); }/*Main/Hardware/General/Software center tab buttons*/
+    for (u8 i=0;i<4;++i) { if (World.curLev == LEVEL_CYBERSPACE && i != 3) continue; UIRImg(UI_ID_CMFD_TAB_MAIN+i,centerX[i],752,64,32,(World.Sys_UI.mfdSelected[0]==i+1 && World.Sys_UI.mfdTab[0]!=5) ? 1024 : 1021); }/*Main/Hardware/General/Software center tab buttons*/
     if (World.inventoryMode && World.invP1.holdingObject) { UIR(UI_ID_CMFD_ADD_TO_INVENTORY,345,552,676,308); if (UIOver(UI_ID_CMFD_ADD_TO_INVENTORY)) { RenderUIImage(345,557,676,210,1075); RenderTextL(586,558,T_GREEN,FONT_NORMAL,0.8f,Sys_Text.stringTable[878]/*ADD TO INVENTORY*/); } }
-    if (World.curLev != LEVEL_CYBERSPACE && (World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 0) { /*Unity EnterCyberspace hides Sensaround, so the Softs are not covered by the rear view*/
-        i16 sx=TAB_THICK+MFD_SPACING+SIDE_MFD_W+MFD_SPACINGCTR, sy=UI_H-TAB_THICK-TXT_PAD-MFD_H;/*SensaroundCenter rearview over the center MFD content area*/
-        UIR(UI_ID_SENSA_CTR,sx,sy,CTR_MFD_W,MFD_H);
-        DrawSensaroundQuad(sx,sy,CTR_MFD_W,MFD_H,sensaroundCamViewCenter);
-    } else {
+    if (World.curLev != LEVEL_CYBERSPACE && (World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 0) { i16 sx = TAB_THICK + MFD_SPACING + SIDE_MFD_W + MFD_SPACINGCTR, sy = UI_H - TAB_THICK - TXT_PAD - MFD_H; UIR(UI_ID_SENSA_CTR,sx,sy,CTR_MFD_W,MFD_H); DrawSensaroundQuad(sx,sy,CTR_MFD_W,MFD_H,sensaroundCamViewCenter); }
+    else {
         i16 hdrH=UI_H-TAB_THICK-TXT_PAD-184+TXT_PAD;
         if (World.Sys_UI.mfdTab[0]==1) {/*Main*/
             /*Column Hdrs*/UIRText(UI_ID_CMFD_WEAPON_HEADER,372,hdrH,T_RED,FONT_NORMAL,0.8f,200,Sys_Text.stringTable[870]/*"WEAPONS"*/); UIRText(UI_ID_CMFD_SHOTS_HEADER,574,hdrH,T_RED,FONT_NORMAL,0.8f,120,Sys_Text.stringTable[871]/*"SHOTS"*/); UIRText(UI_ID_CMFD_GREN_HEADER,722,hdrH,T_RED,FONT_NORMAL,0.8f,120,Sys_Text.stringTable[872/*GRENADES*/]); UIRText(UI_ID_CMFD_PATCH_HEADER,868,hdrH,T_RED,FONT_NORMAL,0.8f,120,Sys_Text.stringTable[873/*PATCHES*/]);
@@ -1134,13 +1131,12 @@ void UI_ProcessNavigation(void) {
 }
 u16 GetCrosshairTexture() { static const u16 crosshairByWeapon[359] = {[0 ... 358]=1260,/*green*/[343]=1121,[345]=1121,[350]=1121,[352]=1121,[355]=1121,/*red*/[344]=1253,[347]=1253,[357]=1253,/*blue*/[348]=1066,[349]=1066,/*orange*/[351]=1122,[354]=1122,/*yellow*/[353]=1161,[358]=1161/*teal*/}; int wi = World.invP1.weaponIndex; return (wi >= 0 && wi < 359) ? crosshairByWeapon[wi] : 1260; }
 u16 GetItemFrobTexture(u16 index) {
-    static const u16 frobTex[418] = {[0 ... 417]=MAXTEX,
-                                     [307]=1250,[308]=838,[309]=764,[310]=767,[311]=981,[312]=605,[313]=606,[314]=853,[315]=849,[316]=851,[317]=850,[318]=860,[319]=861,[320]=859,[321]=974,[322]=975,[323]=976,[324]=977,[325]=978,[326]=979,[327]=980,[328]=882,[329]=907,[330]=902,[331]=909,[332]=935,[333]=911,[334]=900,[335]=906,[336]=903,[337]=901,[338]=905,[339]=904,[340]=966,[341]=626,[342]=845,[343]=988,[344]=982,[345]=983,[346]=984,
-                                     [347]=985,[348]=1034,[349]=990,[350]=986,[351]=987,[352]=1010,[353]=1019,[354]=1027,[355]=1035,[356]=1036,[357]=1052,[358]=1065,[359]=965,[360]=968,[361]=972,[362]=967,[363]=973,[364]=969,[365]=766,[366]=969,[367]=549,[368]=971,[369]=765,[370]=853,[371]=970,[372]=849,[373]=420,[374]=602,[375]=593,[376]=597,[377]=411,[378]=561,[379]=419,[380]=421,[381]=417,[382]=577,[383]=422,[384]=551,[385]=552,[386]=418,
-                                     [387]=851,[388]=762,[389]=850,[390]=610,[391]=621,[392]=609,[393]=610,[394]=635,[395]=760,[396]=632,[397]=608,[398]=624,[399]=872,[400]=862,[401]=872,[402]=860,[403]=861,[404]=859,[417]=760};
-    return index < 418 ? frobTex[index] : MAXTEX;/*405-416 intentionally stay MAXTEX (no frob icons exist for those consts)*/
+    static const u16 frobTex[418] = {[0 ... 417]=MAXTEX,[307]=1250,[308]=838,[309]=764,[310]=767,[311]=981,[312]=605,[313]=606,[314]=853,[315]=849,[316]=851,[317]=850,[318]=860,[319]=861,[320]=859,[321]=974,[322]=975,[323]=976,[324]=977,[325]=978,[326]=979,[327]=980,[328]=882,[329]=907,[330]=902,[331]=909,[332]=935,[333]=911,[334]=900,[335]=906,[336]=903,[337]=901,[338]=905,[339]=904,[340]=966,[341]=626,[342]=845,[343]=988,[344]=982,[345]=983,[346]=984,
+                                     [347]=985,[348]=1034,[349]=990,[350]=986,[351]=987,[352]=1010,[353]=1019,[354]=1027,[355]=1035,[356]=1036,[357]=1052,[358]=1065,[359]=965,[360]=968,[361]=972,[362]=967,[363]=973,[364]=969,[365]=766,[366]=969,[367]=549,[368]=971,[369]=765,[370]=853,[371]=970,[372]=849,[373]=420,[374]=602,[375]=593,[376]=597,[377]=411,[378]=561,[379]=419,[380]=421,[381]=417,[382]=577,[383]=422,[384]=551,[385]=552,[386]=418,[387]=851,
+                                     [388]=762,[389]=850,[390]=610,[391]=621,[392]=609,[393]=610,[394]=635,[395]=760,[396]=632,[397]=608,[398]=624,[399]=872,[400]=862,[401]=872,[402]=860,[403]=861,[404]=859,[417]=760};
+    return index < 418 ? frobTex[index] : MAXTEX;
 }
-static u16 CursorClickTexture(void) { return (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down) ? 2147 : 1261; }/*busy-hand cursor over clickable UI*/
+static u16 CursorClickTexture(void) { return (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down) ? 2147 : 1261; }
 u16 GetCursorTexture() { if (World.paused || World.menuActive) { return CursorClickTexture(); } if (World.invP1.holdingObject) { u16 t = GetItemFrobTexture(World.invP1.heldObjectIndex); return t < MAXTEX ? t : 1250; } if (World.uiIsBlocking || World.Sys_UI.mouseClickHeldOverGUI) { return CursorClickTexture(); } return GetCrosshairTexture(); }
 static void RenderUI() {
     drawCallsNormal = drawCalls; UiClickGate(); UI_BeginFrame();

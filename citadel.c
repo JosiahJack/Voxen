@@ -1,4 +1,4 @@
-// citadel.c - Game logic.
+// citadel.c - Game logic
 #include "common.h"
 __attribute__((used, visibility("default"))) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; /*Must be always visible for AutoSplitter tools to find it.*/
 void PatchDisableAll(),BiomonitorEnergyPulse(float),BioMonitorClearGraphs(),TextureSequenceInit(u16,char*); bool RecentLog(); extern double lerpStartTime; extern V3 queuedLevelPos; extern u8 queuedLevelToLoad; extern u16 editModeSelection;
@@ -12,13 +12,13 @@ V3 ScreenPointToRay(V3 fwd, V3 rt) {
 static i16 GrenadeTypeFromConst(u16 idx) { switch(idx) { case 370:return 7; case 372:return 8; case 387:return 9; case 389:return 10; case 402:return 11; case 403:return 12; case 404:return 13; default:return -1; } }
 bool IsLiveGrenade(u16 idx) { return GrenadeTypeFromConst(idx) >= 7; }
 static const float grenadeDamage[7]={150,325,80,375,230,200,150},grenadePenetration[7]={20,35,100,50,35,25,100},grenadeOffense[7]={3,6,3,6,5,3,3},grenadeRadius[7]={4,7,6,7.5f,5.1f,5.12f,4}; static const AttType grenadeAttackType[7]={Att_HitS,Att_HitS,Att_Magn,Att_HitS,Att_HitS,Att_HitS,Att_Gas};
-void GrenadeInit(u16 self) { i16 idx=GrenadeTypeFromConst(World.instances[self].index)-7; if(idx<0||idx>=7)return; Entity* e=&World.instances[self]; if(e->damage<=0.0f)e->damage=grenadeDamage[idx]; if(e->strength<=0.0f)e->strength=grenadePenetration[idx]; if(e->speed<=0.0f)e->speed=grenadeOffense[idx]; if(e->attackType==Att_None)e->attackType=grenadeAttackType[idx]; }
+void GrenadeInit(u16 s) { Entity* e = &World.instances[s]; i16 idx = GrenadeTypeFromConst(e->index) - 7; if (idx< 0 || idx >= 7) { return; } if (e->damage <= 0.0f) { e->damage = grenadeDamage[idx]; } if (e->strength <= 0.0f) { e->strength = grenadePenetration[idx]; } if (e->speed <= 0.0f) { e->speed = grenadeOffense[idx]; } if (e->attackType == Att_None) { e->attackType = grenadeAttackType[idx]; } }
 void GrenadeActivate(u16 s) { Entity* e = &World.instances[s]; i16 i = GrenadeTypeFromConst(e->index); if (i == 10) { World.invP1.earthShakerTimeSetting = vclamp((float)World.invP1.earthShakerTimeSetting,4.0f,60.0f); } else if (i == 12) { World.invP1.nitroTimeSetting = vclamp((float)World.invP1.nitroTimeSetting,2.0f,60.0f); } e->timerFinished = World.pauseRelativeTime + ((i == 10) ? World.invP1.earthShakerTimeSetting : World.invP1.nitroTimeSetting); }
 void ResetHeldItem() { World.invP1.heldObjectIndex=World.invP1.heldObjectCustIdx=U16_MAX; World.invP1.heldAmmo=World.invP1.heldAmmo2=0; World.invP1.heldObjectLoadedAlternate=World.invP1.holdingObject=World.invP1.grenActive=false; }
 void DropHeldItem() {
     if (World.invP1.heldObjectIndex >= World.instCount) { ResetHeldItem(); return; }    if (World.invP1.dropFinished > World.pauseRelativeTime) {return;} World.invP1.dropFinished = World.pauseRelativeTime + 0.2;/*Prevent immediate re-grab at high fps*/ u16 n = AddInstance(World.invP1.heldObjectIndex,World.position[PLAYER1]);
     Entity* e = &World.instances[n]; e->customIndex = World.invP1.heldObjectCustIdx; e->ammo = World.invP1.heldAmmo; e->ammo2 = World.invP1.heldAmmo2; e->heldObjectLoadedAlternate = World.invP1.heldObjectLoadedAlternate;
-    flag_set(&e->entflags,EF_RIGIDBODY,true); bool liveGrenade=IsLiveGrenade(e->index); if(liveGrenade){World.layer[n]=L_PlayerBullets; e->recentMostActivator=PLAYER1; GrenadeInit(n);} V3 tossDir = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right); World.position[n] = V3Add(World.position[PLAYER1],V3_ScaleByF(tossDir,0.48f)); World.velocity[n] = V3_ScaleByF(tossDir,10.0f); if(liveGrenade)GrenadeActivate(n); ResetHeldItem();
+    flag_set(&e->entflags,EF_RIGIDBODY,true); bool liveGrenade=IsLiveGrenade(e->index); if(liveGrenade){World.layer[n]=L_PlayerBullets; e->recentMostActivator=PLAYER1; GrenadeInit(n);} Entity* p = &World.instances[PLAYER1]; V3 tossDir = ScreenPointToRay(p->forward,p->right); World.position[n] = V3Add(World.position[PLAYER1],V3_ScaleByF(tossDir,0.48f)); World.velocity[n] = V3_ScaleByF(tossDir,10.0f); if(liveGrenade)GrenadeActivate(n); ResetHeldItem();
 }
 void PatchUse(int patchSlot) {
     if (patchSlot < 0 || patchSlot > 6) return; if (World.invP1.patchCounts[patchSlot] <= 0) { CenterStatusPrint("%s", Sys_Text.stringTable[324]); return; } if (patchSlot == 3 && World.instances[PLAYER1].health >= 255.0f) { CenterStatusPrint("%s", Sys_Text.stringTable[304]); return; }
@@ -151,7 +151,7 @@ void AddItemToInventory(int index, int custIdx) {
 }
 void CyberTimerInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; e->cyberTimer = 600.0f; e->timerFinished = World.pauseRelativeTime + 1.0; }
 void CyberTimerReset(u16 self, int diff) { Entity* e = &World.instances[self]; switch (diff) { case 0: e->cyberTimer = 600.0f; break; case 1: e->cyberTimer = 300.0f; break; case 2: e->cyberTimer = 240.0f; break; case 3: e->cyberTimer = 180.0f; break; } }
-void ExitCyberspace() { if (World.curLev != LEVEL_CYBERSPACE) return; if (World.instances[PLAYER1].cyberHealth <= 0.0f) World.instances[PLAYER1].cyberHealth = 1.0f; play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false); LoadLevel((World.cyberReturnLevel >= 0 && (u8)World.cyberReturnLevel < MAX_LEVELS) ? (u8)World.cyberReturnLevel : (World.startLevel < MAX_LEVELS ? World.startLevel : 0), World.cyberReturnPos); }
+void ExitCyberspace() { if (World.curLev != LEVEL_CYBERSPACE) return; Entity* p = &World.instances[PLAYER1]; if (p->cyberHealth <= 0.0f) { p->cyberHealth = 1.0f; } play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false); LoadLevel((World.cyberReturnLevel >= 0 && (u8)World.cyberReturnLevel < MAX_LEVELS) ? (u8)World.cyberReturnLevel : 1, World.cyberReturnPos); }
 void CyberTimerUpdate(u16 self) { if(World.curLev != LEVEL_CYBERSPACE){return;} Entity* e = &World.instances[self]; if (e->timerFinished >= World.pauseRelativeTime) { return; } e->cyberTimer-=1.0f; e->timerFinished = World.pauseRelativeTime + 1.0; if (e->cyberTimer <= 0.0f) { ExitCyberspace(); return; } }
 float cyberWallFade[INSTANCE_COUNT]; static u8 cyberWallWasTouching[INSTANCE_COUNT];
 typedef struct { V3 ctr, tip, base; float rad, bound; u8 isCap; } CyberWallToucher; static CyberWallToucher cyberWallTouchers[128]; static u16 cyberWallToucherCount;
@@ -228,10 +228,7 @@ void TextureChangerToggle(u16 self) {
     if (e->curTex) { e->texIndex = EDefs[e->index].texIndex; e->glowIndex = EDefs[e->index].glowIndex; } else { e->texIndex = alt; e->glowIndex = glowAlt; } e->curTex = !e->curTex;
 }
 static u16 NearestGravityLiftForVisual(u16 visual) { u16 n = U16_MAX; float nd = 64.0f; for (u16 lift=INSTS_1ST_IDX;lift<World.instCount;++lift) { if (World.instances[lift].index != 596) continue; float dx=World.position[visual].x-World.position[lift].x; float dy=World.position[visual].y-World.position[lift].y; float dz=World.position[visual].z-World.position[lift].z; float dd=dx*dx+dy*dy+dz*dz; if (dd < nd) { n = lift; nd = dd; } } return n; }
-void GravityLiftSyncVisuals(u16 lift) {
-    if (lift < INSTS_1ST_IDX || lift >= World.instCount || World.instances[lift].index != 596) { return; } bool active=World.instances[lift].active; u16 texture=active ? 1246 : 1248, glow=active ? 1247 : 1249;
-    for (u16 visual=INSTS_1ST_IDX;visual<World.instCount;++visual) { if (World.instances[visual].index == 112 && NearestGravityLiftForVisual(visual) == lift) { World.instances[visual].texIndex=texture; World.instances[visual].glowIndex=glow; } }
-}
+void GravityLiftSyncVisuals(u16 lift) { Entity* lif = &World.instances[lift]; if (lift < INSTS_1ST_IDX || lift >= World.instCount || lif->index != 596) { return; } bool act = lif->active; u16 tx = act ? 1246 : 1248, gl = act ? 1247 : 1249; for (u16 visual=INSTS_1ST_IDX;visual<World.instCount;++visual) { Entity* v = &World.instances[visual]; if (v->index == 112 && NearestGravityLiftForVisual(visual) == lift) { v->texIndex = tx; v->glowIndex = gl; } } }
 void GravityLiftSyncAllVisuals() { for (u16 v=INSTS_1ST_IDX;v<World.instCount;++v) { if (World.instances[v].index != 112) continue; if (World.instances[v].texIndex == 1248) { World.instances[v].glowIndex=1249; continue; } u16 lift=NearestGravityLiftForVisual(v); if (lift != U16_MAX) { bool active=World.instances[lift].active; World.instances[v].texIndex=active ? 1246 : 1248; World.instances[v].glowIndex=active ? 1247 : 1249; } } }
 void LogicTimerUseTargets(u16 self) { UseTargets(self,World.instances[self].targetIdx); }
 void LogicTimerUpdate(u16 self) { Entity* e=&World.instances[self]; if(!e->active || e->intervalFinished >= World.pauseRelativeTime){return;} e->intervalFinished=World.pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval); LogicTimerUseTargets(self); }
@@ -374,7 +371,7 @@ static bool CPUNodesRemainOnLevel() { for (u16 i = INSTS_1ST_IDX; i < World.inst
 void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNormal) {
     if(self>=World.instCount||hitIdx>=World.instCount)return; Entity* e = &World.instances[self]; if (hitIdx == e->recentMostActivator) return; e->counter++;
     DamageData dd={.damage=e->damage,.penetration=e->strength,.offense=e->speed,.defense=0,.impactVelocity=e->damage*1.5f,.attacknormal=hitNormal,.hitpoint=hitPos,.attackType=e->attackType,.owner=e->recentMostActivator,.isOtherNPC=IdxIsNPC(World.instances[hitIdx].index),.berserkActive=(e->recentMostActivator==PLAYER1&&(World.invP1.patchActive & PATCH_BERSERK)!=0)};
-    Entity* hit = &World.instances[hitIdx]; if (IdxIsNPC(hit->index)) { const NPCTable* nt = &npcTable[hit->index - 419]; dd.defense = nt->defense; }
+    Entity* hit = &World.instances[hitIdx]; if (IdxIsNPC(hit->index)) { const NPCTable* nt = &npcTable[hit->index - 419]; dd.defense = nt->def; }
     dd.damage = GetDamageTakeAmount(&dd);
     if (e->lookUpIndex == 5) { ApplyImpactForceSphere(&dd, World.position[self], 3.2f, 1.0f); World.fogFac += 4; }
     SpawnProjectileImpactParticles(e->index,hitPos,hitNormal);
@@ -595,16 +592,16 @@ void TargetLight(u16 activator, u16 lightIdx) {
 void UseTargets(u16 activator, u16 targetIdx) {
     if (targetIdx==IO_NONE) { return; }
     static bool tioTargetInFlight[MAX_IO_NAMES]; static u32 tioNestDepth = 0; if (targetIdx < (u16)MAX_IO_NAMES && tioTargetInFlight[targetIdx]) { return; }
-    if (tioNestDepth >= 64) { DualLogWarn("Target IO cascade nested %u deep (target %s): suppressed\n",tioNestDepth,(targetIdx<ioNameCount)?ioNames[targetIdx]:"?"); return; }/*Backstop so no other data cycle, however indirect, can exhaust the stack.*/
+    if (tioNestDepth >= 64) { DualLogWarn("Target IO cascade nested %u deep (target %s): suppressed\n",tioNestDepth,(targetIdx<ioNameCount)?ioNames[targetIdx]:"?"); return; }
     bool wasActive=World.targetIOActive,succeeded=false; u8 entryLevel=World.curLev; if(!wasActive){World.targetIOActive=true; mset(tioTargetInFlight,0,sizeof(tioTargetInFlight)); World.targetIOQuestTestMode=World.instances[activator].questTestMode; World.targetIOActivatorIoflagsHi=World.instances[activator].ioflagsHi; World.targetIOActivatorIoflags=World.instances[activator].ioflags;} const char* targetname=(targetIdx<ioNameCount) ? ioNames[targetIdx] : "";
     tioNestDepth++; if (targetIdx < (u16)MAX_IO_NAMES) tioTargetInFlight[targetIdx] = true;
     for (u8 lev=0;lev<MAX_LEVELS;++lev) { if (World.curLev != lev) SetLevelPointers(lev); for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (World.instances[i].targetnameIdx != targetIdx) {continue;} Targetted(activator,i); succeeded=true; } if (World.lightTargetnames) { for (u16 l = 0; l < World.loadedLights; ++l) { if (World.lightTargetnames[l] != targetIdx) {continue;} TargetLight(activator,l); succeeded=true; } } }
-    if (World.curLev != entryLevel) {SetLevelPointers(entryLevel);} if (!succeeded) {DualLogWarn("No target found: %s\n",targetname);} if (targetIdx < (u16)MAX_IO_NAMES) tioTargetInFlight[targetIdx]=false;/*Cleared unconditionally: deferred trigger paths (TriggerTrippedUpdate etc.) mark targetIOActive true before calling in, so wasActive alone cannot be trusted to know when a bit was set.*/ tioNestDepth--; if (!wasActive) {World.targetIOActive=false;}
+    if (World.curLev != entryLevel) {SetLevelPointers(entryLevel);} if (!succeeded) {DualLogWarn("No target found: %s\n",targetname);} if (targetIdx < (u16)MAX_IO_NAMES) tioTargetInFlight[targetIdx]=false; tioNestDepth--; if (!wasActive) {World.targetIOActive=false;}
 }
 // Frob/Use
 static const float FROB_DISTANCE = 4.9f;
 void MFD_OpenSearch(bool),MFD_CloseSearch(),MFD_OpenData(bool,u8),MFD_OpenPaperLog(int,V3),UI_KeycodeClose(bool),UI_ElevClose(bool),UI_WireClose();
-static void PaperLogUse(u16 self) { ForceInventoryMode();/*Unity PaperLog.Use forces inventory mode, as do the sibling panel uses here; without it the reader's [MORE]/[CLOSE] clicks cannot work (UI interaction is inventory-mode-only)*/ MFD_OpenPaperLog((int)World.instances[self].logIndex, World.position[self]); }
+static void PaperLogUse(u16 self) { ForceInventoryMode(); MFD_OpenPaperLog((int)World.instances[self].logIndex, World.position[self]); }
 static bool IsPuzzleGridPanel(u16 index) { return index>=609&&index<=613; }
 static bool IsPuzzleWirePanel(u16 index) { return index>=741&&index<=745; }
 static bool IsElevatorPanel(u16 index) { return index>=604&&index<=607; }
@@ -616,7 +613,7 @@ static const WirePuzzleDef* WirePuzzleDefFor(u16 constIndex) { for (u32 i=0;i<si
 static void WireLoadInstance(u16 self, const WirePuzzleDef* def) {
     Entity* e=&World.instances[self];
     for (u8 c=0;c<7;++c) { World.Sys_UI.pw_curL[c]=-1; World.Sys_UI.pw_curR[c]=-1; }
-    for (u8 w=0;w<7;++w) { int l=(int)e->wireCurL[w], r=(int)e->wireCurR[w]; if (w<7 && l>=0 && l<7) World.Sys_UI.pw_curL[l]=(i8)w; if (w<7 && r>=0 && r<7) World.Sys_UI.pw_curR[r]=(i8)w; }/*All seven slots, not just the first three: 745 teal runs four wires and level5's teal instance saves currentPositionsRight[3..5], so a w<3 guard dropped its fourth wire and left that panel unsolvable.*/
+    for (u8 w=0;w<7;++w) { int l=(int)e->wireCurL[w], r=(int)e->wireCurR[w]; if (w<7 && l>=0 && l<7) World.Sys_UI.pw_curL[l]=(i8)w; if (w<7 && r>=0 && r<7) World.Sys_UI.pw_curR[r]=(i8)w; }
     for (u8 w=0;w<7;++w) { World.Sys_UI.pw_tgtL[w]=def->tgtL[w]; World.Sys_UI.pw_tgtR[w]=def->tgtR[w]; World.Sys_UI.pw_wireOn[w]=def->wireOn[w]; World.Sys_UI.pw_rowActive[w]=def->rowsActive[w]!=0; World.Sys_UI.pw_wireColor[w]=def->wireColor[w];/*raw HUDColor, as PuzzleWire.wireColors holds it*/ }
 }
 typedef struct { V3 pos; u8 gridType, theme, security; const char* target; u8 cellType[35]; } GridPuzzleDef;

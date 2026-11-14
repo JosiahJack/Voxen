@@ -384,7 +384,7 @@ static char* MmapGetLine(char* buf, int sz){if(mm_ptr>=mm_end){return NULL;} con
 static u16 fwParentSnap[MAX_LEVELS][INSTANCE_COUNT]; static bool fwSnapValid[MAX_LEVELS];/*per-level fwParentOf snapshot: fwParentOf is rewritten by every level load; SetLevelPointers restores the current level's*/
 void SetLevelPointers(u8 lev) {
     if (lev >= MAX_LEVELS) return;
-    if (lev != World.curLev && World.curLev < MAX_LEVELS) { World.levelInstCount[World.curLev] = World.instCount; World.levelLAnimCount[World.curLev] = World.lanimCount; }/*preserve dynamically summoned instances across temporary pointer switches (UseTargets/TargetIO level iteration)*/
+    if (lev != World.curLev && World.curLev < MAX_LEVELS) { World.levelInstCount[World.curLev] = World.instCount; World.levelLAnimCount[World.curLev] = World.lanimCount; World.levelLoadedLights[World.curLev] = World.loadedLights; }/*preserve dynamically summoned instances across temporary pointer switches (UseTargets/TargetIO level iteration)*/
     if (teleportDestinationsInitialized) mcpy(World.TeleportTouch_allTeleportTouches, teleportDestinations[lev], sizeof(World.TeleportTouch_allTeleportTouches));
     World.curLev=lev;                                World.instances=World.levelInstances[lev];   World.position=World.levelPosition[lev]; World.scale=World.levelScale[lev];            World.velocity=World.levelVelocity[lev]; World.angularVelocity=World.levelAngularVelocity[lev];     World.colliderCenter=World.levelColliderCenter[lev];
     World.colliderSize=World.levelColliderSize[lev]; World.col=World.levelCollider[lev];          World.rotation=World.levelRotation[lev]; World.layer=World.levelLayer[lev];            World.radius=World.levelRadius[lev];     World.invInertiaTensor = World.levelInvInertiaTensor[lev]; World.invTnsrValid     = World.levelInvTnsrValid[lev];
@@ -801,7 +801,7 @@ void UpdateSensaroundCamViews() {
 }
 // Save Game System
 #pragma pack(push, 1)
-typedef struct { u32 magicNumber,version,uncompressedSize,compressedSize; char savename[48]; } SaveHeader;
+typedef struct { u32 magicNumber,version,uncompSz,compressedSize; char savename[48]; } SaveHeader;
 #pragma pack(pop)
 size_t GetMaxCompressedSize(size_t srcSize) { return srcSize + (srcSize / 128) + 16; } // Worst-case buffer size for allocation
 size_t VoidSquasher(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) { // Find and pop the zeroes bubbles.  Turned an otherwise 232mb save file into ~23mb.
@@ -819,25 +819,28 @@ size_t BlowBubblesOfVoid(const u8* src, size_t sz, u8* dst, size_t cap) { // Put
 }
 void SaveGame(u8 slot, const char* savename) {
     if(slot > 7 && !savename){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenWriteonly(path); if(fd == (FHandle)-1){return;} size_t sz = sizeof(GlobalContext); size_t maxCompSize=GetMaxCompressedSize(sz); u8* b = OS_Alloc(maxCompSize); size_t finalCompSize = VoidSquasher((const u8*)&World,sz,b,maxCompSize);
-    if (finalCompSize > 0) { SaveHeader header = {.magicNumber=0x56415343/*'CSAV'*/, .version=SAVE_VERSION, .uncompressedSize=(u32)sz, .compressedSize=(u32)finalCompSize}; int i=0; while(savename[i] != '\0' && i < 47){header.savename[i]=savename[i]; i++;} header.savename[i]='\0'; World.justSavedTimeStamp = get_time(); OS_Write(fd,&header,sizeof(SaveHeader),path); OS_Write(fd,b,finalCompSize,path); CenterStatusPrint("Saved to Slot %d",slot); }
+    if (finalCompSize > 0) { SaveHeader header = {.magicNumber=0x56415343/*'CSAV'*/, .version=SAVE_VERSION, .uncompSz=(u32)sz, .compressedSize=(u32)finalCompSize}; int i=0; while(savename[i] != '\0' && i < 47){header.savename[i]=savename[i]; i++;} header.savename[i]='\0'; World.justSavedTimeStamp = get_time(); OS_Write(fd,&header,sizeof(SaveHeader),path); OS_Write(fd,b,finalCompSize,path); CenterStatusPrint("Saved to Slot %d",slot); }
     else { DualLogError("Compression failed during SaveGame!\n"); }    OS_Free(b,maxCompSize); OS_Close(fd);
 }
 void WarmPairsClear(void); extern WeaponFireCtx wfx;
 void LoadGame(u8 slot) {
     if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenReadonly(path); if(fd == (FHandle)-1){return;} SaveHeader header; if (OS_Read(fd,&header,sizeof(SaveHeader)) != sizeof(SaveHeader) || header.magicNumber != 0x56415343) { DualLogError("Corrupted save file header!\n"); OS_Close(fd); return; }
-    if (header.version != SAVE_VERSION || header.uncompressedSize != sizeof(GlobalContext)) { DualLogError("Save is from an incompatible build (v%u, %u bytes; this build wants v%u, %zu bytes) -- start a new game.\n", header.version, header.uncompressedSize, (u32)SAVE_VERSION, sizeof(GlobalContext)); OS_Close(fd); return; }
-    if (header.compressedSize == 0 || header.compressedSize > GetMaxCompressedSize(header.uncompressedSize)) { DualLogError("Save has an implausible compressed size (%u bytes) -- treating as corrupt.\n", header.compressedSize); OS_Close(fd); return; }
+    if (header.version != SAVE_VERSION || header.uncompSz != sizeof(GlobalContext)) { DualLogError("Save is from an incompatible build (v%u, %u bytes; this build wants v%u, %zu bytes) -- start a new game.\n", header.version, header.uncompSz, (u32)SAVE_VERSION, sizeof(GlobalContext)); OS_Close(fd); return; }
+    if (header.compressedSize == 0 || header.compressedSize > GetMaxCompressedSize(header.uncompSz)) { DualLogError("Save has an implausible compressed size (%u bytes) -- treating as corrupt.\n", header.compressedSize); OS_Close(fd); return; }
     u8* b=OS_Alloc(header.compressedSize);
     if (OS_Read(fd,b,header.compressedSize) == (long)header.compressedSize) {
         for (u8 l=0;l<MAX_LEVELS;++l) PSysClearLevel(l);
-        size_t result = BlowBubblesOfVoid(b,header.compressedSize,(u8*)&World,header.uncompressedSize);/*Decompress straight into the World str uct*/
-        if (result == header.uncompressedSize) {
+        size_t result = BlowBubblesOfVoid(b,header.compressedSize,(u8*)&World,header.uncompSz);/*Decompress straight into the World str uct*/
+        if (result == header.uncompSz) {
+            if (World.instCount >= INSTANCE_COUNT) World.instCount = INSTANCE_COUNT - 1; if (World.loadedLights >= LIGHT_COUNT) World.loadedLights = LIGHT_COUNT - 1;
+            if (World.lanimCount >= LANIM_MAX) World.lanimCount = LANIM_MAX - 1;         if (camViewCount >= 64) camViewCount = 63;
+            for (u8 l=0;l<MAX_LEVELS;++l) { if (World.levelInstCount[l] > INSTANCE_COUNT) World.levelInstCount[l] = INSTANCE_COUNT;    if (World.levelLoadedLights[l] > LIGHT_COUNT) World.levelLoadedLights[l] = LIGHT_COUNT;    if (World.levelLAnimCount[l] > LANIM_MAX) World.levelLAnimCount[l] = LANIM_MAX;    if (levelCamViewCount[l] > 64) levelCamViewCount[l] = 64;    if (World.levelWepVModel[l] >= INSTANCE_COUNT) World.levelWepVModel[l] = 0; }
             SetLevelPointers(World.curLev); WarmPairsClear(); for (u8 l=0;l<MAX_LEVELS;++l) World.levelParticles[l].count=0; LoadPerLevelModels(World.curLev); LoadLevelSetup(World.curLev); LoadLogTextForLanguage(Sys_Settings.Language); ResetLevelAudio(); mset(targetIDText,0,sizeof(targetIDText)); mset(targetIDTextFinished,0,sizeof(targetIDTextFinished)); mset(targetIDAttachedFinished,0,sizeof(targetIDAttachedFinished));
             mset(targetIDAttached,0,sizeof(targetIDAttached)); wfx.pendingMeleeFinished=0.0; if (World.curLev == LEVEL_CYBERSPACE) { cyberGolBuilt = 0; } cullVisibilityValid=false; AutomapOnLoad(); CenterStatusPrint("Loaded Game: %s", header.savename);
-        } else { DualLogError("Decompression failed! Expected %u bytes, got %u\n", header.uncompressedSize, (u32)result); }
+        } else { DualLogError("Decompression failed! Expected %u bytes, got %u\n",header.uncompSz,(u32)result); OS_Exit(1); }
     } OS_Free(b,header.compressedSize); OS_Close(fd); for (int i=0;i<World.loadedLights;++i) { flag_set(&World.lights[i].lflags,LDIRTY,true); }
 }
 bool ReadSaveSlotName(u8 slot, char* out, size_t cap) {
     if (slot > 7 || !out || cap == 0) { return false; } char path[]="./Data/sav0.bin"; path[10]=(char)('0'+slot); FHandle fd=OS_OpenReadonly(path); if (fd == (FHandle)-1) { return false; }
-    SaveHeader header; bool ok = OS_Read(fd,&header,sizeof(SaveHeader))==sizeof(SaveHeader) && header.magicNumber==0x56415343u && header.version==SAVE_VERSION && header.uncompressedSize==(u32)sizeof(GlobalContext); OS_Close(fd); if (!ok) { return false; } size_t i=0; while (i + 1 < cap && i < sizeof(header.savename) && header.savename[i]!='\0') { out[i]=header.savename[i]; ++i; } out[i]='\0'; return out[0] != '\0';
+    SaveHeader header; bool ok = OS_Read(fd,&header,sizeof(SaveHeader))==sizeof(SaveHeader) && header.magicNumber==0x56415343u && header.version==SAVE_VERSION && header.uncompSz==(u32)sizeof(GlobalContext); OS_Close(fd); if (!ok) { return false; } size_t i=0; while (i + 1 < cap && i < sizeof(header.savename) && header.savename[i]!='\0') { out[i]=header.savename[i]; ++i; } out[i]='\0'; return out[0] != '\0';
 }

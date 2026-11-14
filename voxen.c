@@ -693,7 +693,7 @@ static void cmd_summon(int itemConstIndex) {
         u16 spawned = SpawnDynamicObject(itemConstIndex);
         if (EntIdxIsValid(spawned)) { lastSpawned = spawned; V3 sdir = ScreenPointToRay(World.instances[PLAYER1].forward, World.instances[PLAYER1].right); World.position[spawned] = V3Add(World.position[PLAYER1], V3_ScaleByF(sdir, 2.0f)); World.velocity[spawned] = (V3){0.0f, 0.0f, 0.0f}; if (IdxIsHardware(itemConstIndex)) { int v = (int)World.invP1.hwVers[itemConstIndex - 328] + 1; World.instances[spawned].customIndex = (i16)(v > 4 ? 4 : v); } }
         CenterStatusPrint("Summoned object ID %d", itemConstIndex);
-    } else { CenterStatusPrint("Invalid object ID: %s", itemConstIndex); }
+    } else { CenterStatusPrint("Invalid object ID: %d", itemConstIndex); }
 }
 static void cmd_notarget() { Cheats.notarget = !Cheats.notarget; CenterStatusPrint("notarget: %s", Cheats.notarget ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
 static u16 showfpsSavedBioBit = 0;
@@ -1250,7 +1250,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
             }
         }
         if (nearbyMeshCount == 0) { shadowmapIndirectionList[lightIdx] = LIGHT_COUNT; if (slotNew) { shadowSlot[lightIdx] = U16_MAX; shadowNextSlot--; } continue; }
-        bool contentDirty = true;//(anyMoved || posSum != shadowPosSum[lightIdx] || idSum != shadowIdSum[lightIdx] || slot == U16_MAX);
+        bool contentDirty = (anyMoved || posSum != shadowPosSum[lightIdx] || idSum != shadowIdSum[lightIdx] || slot == U16_MAX);
         u8 needFaces = (u8)(faceMask & ~shadowFaces[lightIdx]);
         if (contentDirty || needFaces) {
             for (u16 j=1;j<nearbyMeshCount;++j) { SortedMesh key = localMeshes[j]; int sk = (int)j - 1; while (sk >= 0 && localMeshes[sk].sortKey > key.sortKey) { localMeshes[sk + 1] = localMeshes[sk]; --sk; } localMeshes[sk + 1] = key; }
@@ -1715,7 +1715,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
         if (World.curLev != entryLevel) SetLevelPointers(entryLevel);
     }
     LoadModels();
-    LoadLevel(World.startLevel,(V3){10.52f, -43.792f + 0.84f, 20.2908f});
+    LoadLevel(1/*medical*/,(V3){10.52f, -43.792f + 0.84f, 20.2908f});
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { if (IdxIsPortalBlockingDoor(World.instances[i].index)) { AddDoorPortal(World.instances[i].index,i); } }
     double newGameCvxStart = get_time();
     World.invP1.currentCrouchRatio = 1.0f;
@@ -1843,7 +1843,7 @@ void InitalizeEnvironment() {
         #undef GA
         if (sa) { WinSys.x11.xlib.Free(sa); } XcursorImage* native = ImageCreate(16,16); mset(native->pixels,0,256*sizeof(XcursorUInt)); native->xhot=native->yhot = 0; WinSys.x11.hiddenCursorHandle = ImageLoadCursor(WinSys.x11.display,native); ImageDestroy(native); PollMonitors();
     #endif
-    threadCnt = vclampi(OS_GetNumThreads(),1,32); World.diffCbt = World.diffCyb = World.diffPuz = World.diffMis = 2; /*Default difficulties of normal*/ World.cursorPos_x = 680; World.cursorPos_y = 384; /*Internal mouse cursor representation (separate from OS cursor) starts at center*/ World.startLevel = 1 /*medical*/;
+    threadCnt = vclampi(OS_GetNumThreads(),1,32); World.diffCbt = World.diffCyb = World.diffPuz = World.diffMis = 2; /*Default difficulties of normal*/ World.cursorPos_x = 680; World.cursorPos_y = 384; /*Internal mouse cursor representation (separate from OS cursor) starts at center*/;
     FHandle f = OS_OpenReadonly("./Data/Config.ini"); char line[512]; // Load Config.ini
     while (sUpToEndLine(line,sizeof(line),f)) {
         char* s = data_parser_trim(line); if (*s == 0 || (s[0] == '/' && s[1] == '/')) { continue; } char* eq = StringFindFirstCharWithin(s, '='); if (!eq) { continue; } *eq = 0; char *key = data_parser_trim(s), *val = data_parser_trim(eq + 1);

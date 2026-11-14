@@ -1,25 +1,17 @@
 // weapons.c - Weapon System
 #include "common.h"
 void ApplyImpactForce(u16,float,V3,V3),ApplyImpactForceWithSound(u16,float,V3,V3),BiomonitorEnergyPulse(float),WeaponFireStartWeaponDip(float); float TakeDamage(u16,DamageData),GetDamageTakeAmount(DamageData*); FootStepType GetFootstepTypeForPrefab(int pid); bool ChangeAmmoType();
-extern V3 vWepOfs[16]; extern bool editFieldEditing; extern bool EditPanelPointerHover(); double lerpStartTime = 0.0;
-float delayBetweenShotsForWeapon[16]={1.0f,0.6f,0.5f,0.1f,0.8f,1.6f,0.65f,0.8f,0.6f,0.5f,1.2f,0.9f,0.5f,0.08f,1.1f,0.75f}; float delayBetweenShotsForWeapon2[16]={1.0f,4.5f,0.5f,0.15f,4.0f,1.6f,0.75f,0.8f,0.6f,0.5f,1.2f,0.9f,0.5f,0.08f,5.0f,0.75f};
-static float dmgForWep[16]={75.0f,12.0f,15.0f,10.0f,18.0f,150.0f,15.0f,60.0f,45.0f,22.0f,50.0f,185.0f,6.0f,35.0f,6.0f,2.0f};
+extern V3 vWepOfs[16]; extern bool editFieldEditing,EditPanelPointerHover(); double lerpStartTime = 0.0;
+float delayBetweenShotsForWeapon[16]={1.0f,0.6f,0.5f,0.1f,0.8f,1.6f,0.65f,0.8f,0.6f,0.5f,1.2f,0.9f,0.5f,0.08f,1.1f,0.75f},delayBetweenShotsForWeapon2[16]={1.0f,4.5f,0.5f,0.15f,4.0f,1.6f,0.75f,0.8f,0.6f,0.5f,1.2f,0.9f,0.5f,0.08f,5.0f,0.75f};
 float dmgForWep2[16]={160.0f,70.0f,5.0f,22.0f,108.0f,0.0f,0.0f,85.0f,80.0f,33.0f,350.0f,0.0f,0.0f,35.0f,36.0f,15.0f},damageOverloadForWeapon[16]={0.0f,115.0f,0.0f,0.0f,180.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,60.0f,0.0f},energyDrainLowForWeapon[16]={0.0f,3.0f,0.0f,0.0f,5.0f,0.0f,0.0f,0.0f,0.0f,0.0f,13.0f,0.0f,0.0f,0.0f,2.0f,3.0f},energyDrainHiForWeapon[16]={0.0f,15.0f,0.0f,0.0f,30.0f,0.0f,0.0f,0.0f,0.0f,0.0f,130.0f,0.0f,0.0f,0.0f,8.0f,30.0f};
-float energyDrainOverloadForWeapon[16]={0.0f,50.0f,0.0f,0.0f,100.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,24.0f,0.0f}, penetrationWep[16]={50.0f,25.0f,6.0f,35.0f,35.0f,80.0f,40.0f,30.0f,100.0f,20.0f,0.0f,35.0f,0.0f,40.0f,25.0f,0.0f}, penetrationWep2[16]={70.0f,0.0f,0.0f,32.0f,0.0f,0.0f,0.0f,25.0f,120.0f,30.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};
-static float offenseWep[16]={4.0f,4.0f,2.0f,2.0f,6.0f,5.0f,3.0f,4.0f,4.0f,2.0f,3.0f,6.0f,2.0f,2.0f,3.0f,3.0f}, offenseWep2[16]={5.0f,0.0f,3.0f,3.0f,0.0f,0.0f,0.0f,5.0f,5.0f,3.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};
-u8 magazinePitchCountForWeapon[16]={10,0,15,60,0,0,0,12,25,20,0,12,20,50,0,0}; u8 magazinePitchCountForWeapon2[16]={8,0,15,60,0,0,0,12,10,20,0,0,0,100,0,0};
-float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0f,1.5f,2.0f,0.8f,0.8f};
-float recoilForWeapon[16]={1.3f,0.0f,0.1f,0.2f,0.0f,0.0f,0.0f,1.2f,0.8f,0.5f,1.5f,1.0f,0.9f,0.7f,0.0f,0.1f};
-float driftForWeapon[16]={5.0f,0.0f,15.0f,50.0f,0.0f,0.0f,0.0f,8.0f,3.0f,3.0f,3.0f,12.0f,10.0f,30.0f,0.0f,3.0f};
+float energyDrainOverloadForWeapon[16]={0.0f,50.0f,0.0f,0.0f,100.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,24.0f,0.0f},penetrationWep[16]={50.0f,25.0f,6.0f,35.0f,35.0f,80.0f,40.0f,30.0f,100.0f,20.0f,0.0f,35.0f,0.0f,40.0f,25.0f,0.0f}, penetrationWep2[16]={70.0f,0.0f,0.0f,32.0f,0.0f,0.0f,0.0f,25.0f,120.0f,30.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};
+static float offenseWep[16]={4.0f,4.0f,2.0f,2.0f,6.0f,5.0f,3.0f,4.0f,4.0f,2.0f,3.0f,6.0f,2.0f,2.0f,3.0f,3.0f},offenseWep2[16]={5.0f,0.0f,3.0f,3.0f,0.0f,0.0f,0.0f,5.0f,5.0f,3.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f},dmgForWep[16]={75.0f,12.0f,15.0f,10.0f,18.0f,150.0f,15.0f,60.0f,45.0f,22.0f,50.0f,185.0f,6.0f,35.0f,6.0f,2.0f};
+u8 magazinePitchCountForWeapon[16]={10,0,15,60,0,0,0,12,25,20,0,12,20,50,0,0},magazinePitchCountForWeapon2[16]={8,0,15,60,0,0,0,12,10,20,0,0,0,100,0,0}; i8  wepFogInc[16]={2,0,0,1,0,0,0,3,0,1,0,2,4,2,0,0};
+float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0f,1.5f,2.0f,0.8f,0.8f},recoilForWeapon[16]={1.3f,0.0f,0.1f,0.2f,0.0f,0.0f,0.0f,1.2f,0.8f,0.5f,1.5f,1.0f,0.9f,0.7f,0.0f,0.1f},driftForWeapon[16]={5.0f,0.0f,15.0f,50.0f,0.0f,0.0f,0.0f,8.0f,3.0f,3.0f,3.0f,12.0f,10.0f,30.0f,0.0f,3.0f};
 AttType attTypeWep[16]={Att_HitS,Att_Beam,Att_PjNd,Att_HitS,Att_Beam,Att_MlEg,Att_HitS,Att_HitS,Att_Magn,Att_HitS,Att_PjBm,Att_Ball,Att_HitS,Att_HitS,Att_Beam,Att_Trnq};
-u16 wepFireSound[16]={251,239,240,243,245,246,254,249,250,255,257,259,262,263,264,265}; //(0)Assault (1)Blaster (2)Dartgun (3)Flechette (4)IonBeam (5)Rapier (6)Pipe (7)Magnum (8)Magpulse (9)Pistol (10)Plasma (11)Railgun (12)Riotgun (13)Skorpion (14)SparqBeam (15)Stungun
-u16 wepBulletHolePrefab[16]={518,520,522,521,519,520,522,518,519,521,519,519,523,518,520,520};
-i8  wepFogInc[16]={2,0,0,1,0,0,0,3,0,1,0,2,4,2,0,0};
-u16 wepSmokePrefab[16]={506,0,0,509,0,0,0,507,0,510,0,511,512,513,0,0}; // 0 = no smoke for this weapon
-u16 wepModelIndices[16]={646,638,640,642,643,5748,5728,644,645,650,651,652,654,655,656,657}; // [wep16] mk3,blaster,dart,flechette,ion,rapier,pipe,magnum,magpulse,pistol,plasma,rail,riot,skorp,sparq,stun
-u16 wepAnimNums[16]={MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,50,49,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM}; // [wep16] only rapier(50)/pipe(49)
-typedef enum { WC_STD = 0, WC_MELEE = 1, WC_ENERGY = 2 } WepClass;
-static WepClass wepClass[16] = {WC_STD, WC_ENERGY, WC_STD, WC_STD, WC_ENERGY, WC_MELEE, WC_MELEE,WC_STD, WC_STD, WC_STD, WC_ENERGY, WC_STD, WC_STD, WC_STD, WC_ENERGY, WC_ENERGY};
+// mk3,blaster,dart,flechette,ion,rapier,pipe,magnum,magpulse,pistol,plasma,rail,riot,skorp,sparq,stun
+u16 wepFireSound[16]={251,239,240,243,245,246,254,249,250,255,257,259,262,263,264,265},wepBHole[16]={518,520,522,521,519,520,522,518,519,521,519,519,523,518,520,520},wepSmoke[16]={506,0,0,509,0,0,0,507,0,510,0,511,512,513,0,0},wepModelIndices[16]={646,638,640,642,643,5748,5728,644,645,650,651,652,654,655,656,657},wepAnimNums[16]={MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,50,49,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM};
+static u8 wepClass[16] = {WC_STD,WC_ENERGY,WC_STD,WC_STD,WC_ENERGY,WC_MELEE,WC_MELEE,WC_STD,WC_STD,WC_STD,WC_ENERGY,WC_STD,WC_STD,WC_STD,WC_ENERGY,WC_ENERGY};
 float magpulseShotForce = 2.2f, stungunShotForce = 2.2f, railgunShotForce = 5.0f, plasmaShotForce = 1.5f;
 WeaponFireCtx wfx = { .hitOffset = 0.16f, .fireDistance = 200.0f, .overheatedPercent = 80.0f, .reloadContainerHome = {0}, .pendingMeleeFinished = 0.0 };
 INLINE Quaternion QuatEulerZ(float degZ) { float r = deg2rad(degZ) * 0.5f; return (Quaternion){0.0f,0.0f,vsinf(r),vcosf(r)}; }
@@ -65,10 +57,8 @@ void UpdateWeaponReloadDip() {
     } else { wfx.reloadContainerPos = (V3){wfx.reloadContainerPos.x, wfx.reloadContainerHome.y + 0.20f, wfx.reloadContainerPos.z}; }
 }
 static u16 ImpactParticleType(u16 prefab) {
-    switch (prefab) {
-        case 721: return 13;/*ef_particle_bloodspurtsmall*/ case 722: return 15; /*ef_particle_bloodspurtsmallgreen*/ case 723: return 16;/*ef_particle_bloodspurtsmallyellow*/ case 724: return 14; /*ef_particle_bloodspurttiny*/ case 725: return 21;/*ef_particle_camerahit*/ case 726: return 23; /*ef_particle_darthit*/ case 729: return 35;/*ef_particle_sparksmall*/ case 730: return 37; /*ef_particle_sparkssmallblue*/ case 731: return 39;/*ef_particle_sparqhit*/
-        case 739: return 12; /*ef_particle_blasterhit*/     case 740: return 26;/*ef_particle_ionhit*/                case 756: return 184; /*ef_particle_leafburst*/           case 757: return 185;/*ef_particle_mutationburst*/  case 758: return 186; /*ef_particle_graytationburst*/ default: return U16_MAX;
-    }
+    static const u16 kTable[] = {13/*bloodsmall*/,15/*bloodsmallgreen*/,16/*bloodsmallyellow*/,14/*bloodtiny*/,21/*camhit*/,23/*drthit*/,U16_MAX,U16_MAX,35/*sparks*/,37/*sparksblue*/,39/*sprqhit*/,U16_MAX,U16_MAX,U16_MAX,U16_MAX,U16_MAX,U16_MAX,U16_MAX,12/*blstrhit*/,26/*ionhit*/,U16_MAX,U16_MAX,U16_MAX,U16_MAX,U16_MAX,U16_MAX,U16_MAX,U16_MAX,U16_MAX,U16_MAX,U16_MAX,U16_MAX,U16_MAX,U16_MAX,U16_MAX,184/*leafburst*/,185/*mutburst*/,186/*graytationburst*/};
+    return (prefab - 721 >= 38) ? U16_MAX : kTable[prefab - 721];
 }
 static const struct { u16 prefab; u8 type; } impactEffectTypes[] = { { 721, 13 },/*ef_particle_bloodspurtsmall*/ { 722, 14 }, { 722, 15 },/*bloodspurtsmallgreen:tiny,green*/ { 723, 16 },/*bloodspurtsmallyellow*/ { 724, 17 },/*bloodspurttiny*/ { 725, 18 }, { 725, 19 }, { 725, 20 }, { 725, 21 }, { 725, 22 },/*camerahit: Bits,CenterSpatter,DarkBurst,root,CenterSpatter2 */ { 726, 23 },/*darthit*/ { 729, 35 }, { 729, 36 },/*sparkssmall: root,centerburst*/
                                                                      { 730, 37 },/*sparkssmallblue*/ { 731, 39 }, { 731, 40 }, { 731, 41 }, { 731, 42 }, { 731, 43 },/*sparqhit: root,CenterSpatter2,BlueSparksSmall,CenterSpatter,Shockwave*/ { 739, 8 }, { 739, 9 }, { 739, 10 }, { 739, 11 }, { 739, 12 },  /*blasterhit: Shockwave,CenterSpatter,CenterSpatter2,BlueSparksSmall,root*/
@@ -119,7 +109,7 @@ void CreateStandardImpactMarks(int wep16) {
     Entity* e = &World.instances[wfx.tempHit.hitInstanceIndex];
     if ((e->entflags & EF_RIGIDBODY) || IdxIsDoor(e->index) || IdxIsNPC(e->index) || e->index==279/*chunk_screen*/ || e->index==477/*sec_camera*/) { return; }
     V3 pos = V3Add(wfx.tempHit.point, V3_ScaleByF(wfx.tempHit.normal, 0.16f));
-    u16 hole = wepBulletHolePrefab[wep16]; u16 markInst = SpawnDynamicObject(hole); if (!EntIdxIsValid(markInst)) { return; }
+    u16 hole = wepBHole[wep16]; u16 markInst = SpawnDynamicObject(hole); if (!EntIdxIsValid(markInst)) { return; }
     World.position[markInst] = pos;
     World.rotation[markInst] = quat_multiply(QuatFromToRotation((V3){0,1,0},V3_ScaleByF(wfx.tempHit.normal,-1.0f)),QuatEulerZ((float)(int)random_range(0.0f,3.99f) * 90.0f));
     if (hole >= 518 && hole <= 523) World.scale[markInst] = V3_ScaleByF((V3){1,1,1}, bulletHoleSize[hole - 518] / 1.28f);
@@ -130,7 +120,7 @@ static void CreateBeamEffects(int wep16) { Color c = (wep16 == 1) ? (Color){1.f,
 static float DamageForPower(int w) { if (World.invP1.overloadEnabled) { return damageOverloadForWeapon[w]; } float d = dmgForWep[w],D = dmgForWep2[w],e = energyDrainLowForWeapon[w],E = energyDrainHiForWeapon[w]; float pct = World.invP1.weaponEnergySetting[w]*0.01f; return (pct*(D/E - d/e) + 3.0f)*(pct*(E - e) + e); } // Slope-of-slopes curve: interpolates damage/energy ratio across energy setting, then scales by interpolated energy drain itself.
 void HitScanFire(int wep16) {
     u16 ent = wfx.tempHitEnt;
-    bool b = ent != 0xFFFF, isBeam=(wep16 == 1 || wep16 == 4 || wep16 == 14), npc = b && IdxIsNPC(World.instances[ent].index), alt = World.invP1.wepLoadedWithAlternate[World.invP1.wepCur];
+    bool b = ent != 0xFFFF,isBeam=(wep16 == 1 || wep16 == 4 || wep16 == 14),npc = b && IdxIsNPC(World.instances[ent].index),alt = World.invP1.wepLoadedWithAlternate[World.invP1.wepCur];
     DamageData dd = {.isOtherNPC = npc, .hitpoint = wfx.tempHit.point, .attacknormal = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right), .owner = PLAYER1,.impactVelocity = wep16 == 12 ? 120.0f/*riotgun kicks harder*/ : 80.0f,.attackType=(wep16 == 2 && alt) ? Att_Trnq/*dartgun tranqs*/ : attTypeWep[wep16], .berserkActive = (World.invP1.patchActive & PATCH_BERSERK) != 0 };
     if (isBeam) CreateBeamImpactEffects(wep16);
     else { CreateStandardImpactEffects(); if (!npc && b && IdxIsGeometry(World.instances[ent].index)) CreateStandardImpactMarks(wep16); }
@@ -212,7 +202,7 @@ void FireWeapon(int wep16,bool isSilent){
     if(wep16<0||wep16>15)return;
     if (wep16 != 5 && wep16 != 6){World.invP1.makingNoise=true; World.invP1.noiseFinished=World.pauseRelativeTime+0.5;} if (!isSilent&&wepClass[wep16] != WC_MELEE) play_wav(sounds[wepFireSound[wep16]], AppliedFXVol(1.0f), World.position[PLAYER1], false);
     if (wepClass[wep16]!=WC_MELEE) { const PSysDef* mfp = PSysTypeGet(53/*centerFlash*/); if (mfp) { PSysDef mfd=*mfp;mfd.pos=V3Add(wfx.reloadContainerPos,V3_ScaleByF(World.instances[PLAYER1].forward,0.5f));mfd.lifetimeMin=mfd.lifetimeMax=0.05f; PSysAddInternal(&mfd,U16_MAX,U16_MAX); } }
-    bool didHit=false;if(wepSpecialFire[wep16])wepSpecialFire[wep16](wep16);else{didHit=DidRayHit(wep16);if(didHit)HitScanFire(wep16);}if(wepSmokePrefab[wep16]){u16 smk=SpawnDynamicObject(wepSmokePrefab[wep16]);if(EntIdxIsValid(smk)){World.position[smk]=wfx.reloadContainerPos;World.rotation[smk]=World.rotation[PLAYER1];flag_set(&World.instances[smk].entflags,EF_ACTIVE,true);World.instances[smk].tickFinished=World.pauseRelativeTime+1.0;}}
+    bool didHit=false;if(wepSpecialFire[wep16])wepSpecialFire[wep16](wep16);else{didHit=DidRayHit(wep16);if(didHit)HitScanFire(wep16);}if(wepSmoke[wep16]){u16 smk=SpawnDynamicObject(wepSmoke[wep16]);if(EntIdxIsValid(smk)){World.position[smk]=wfx.reloadContainerPos;World.rotation[smk]=World.rotation[PLAYER1];flag_set(&World.instances[smk].entflags,EF_ACTIVE,true);World.instances[smk].tickFinished=World.pauseRelativeTime+1.0;}}
     World.fogFac += wepFogInc[wep16]; u16 wc = World.invP1.wepCur;
     if (wepClass[wep16] == WC_ENERGY) { float setting = World.invP1.weaponEnergySetting[wep16]; if (World.invP1.overloadEnabled) World.invP1.curWepHeat[wc] = 100.0f; else { World.invP1.curWepHeat[wc] += setting; if (World.invP1.curWepHeat[wc] > 100.0f) {World.invP1.curWepHeat[wc] = 100.0f;} } }
     bool wasOverload = World.invP1.overloadEnabled;

@@ -1,68 +1,48 @@
 // textures.c - 2D Texture Loading System and Texture Animations
 #include "common.h"
 static u8* LoadPng(const u8*,int,int*,int*,PngArena*,u32*,u32*);
-typedef struct { u16 index; bool transparent, doublesided; u8 blend; char path[128]; } TextureData;
-typedef struct { TextureData* entries; u32 count, capacity; } TextureDataParser;
-typedef struct { u8 r, g, b; } PngPalEntry;
-typedef struct { char path[96]; u32 texIdx; } VidFrameRec;
-static VidFrameRec* g_vidFrames = NULL;
-static u32 g_vidFrameCnt = 0, g_vidPalOffs[VIDEO_RING], g_vidIdxOffs[VIDEO_RING], g_vidTexBase, g_vidReqGen = 0, g_vidReqFrame = 0xFFFFFFFFu, g_vidPreFrame = 0xFFFFFFFFu;
-static u16* g_vidFrameMap = NULL;
-typedef struct { u32 state; u32 frameTexIdx, palSize, w, h; u8* idx; u32* pal; } VidSlot;
-static VidSlot g_vidSlot[VIDEO_RING];
-static void* g_vidRingBuf = NULL;
-static i32* g_vidSizesCPU = NULL;
-static u16 g_vidSlotTex[VIDEO_RING];
-static bool g_vidUp = false;
-static PngArena g_vidArena;
-static OS_Thread g_vidThr;
-static bool is_vid_path(const char* p);
+typedef struct { u16 index; bool transparent, doublesided; u8 blend; char path[128]; } TextureData;    typedef struct { TextureData* entries; u32 count, capacity; } TextureDataParser;    typedef struct { u8 r, g, b; } PngPalEntry;    typedef struct { char path[96]; u32 texIdx; } VidFrameRec;    typedef struct { u32 state; u32 frameTexIdx, palSize, w, h; u8* idx; u32* pal; } VidSlot;
+static u32 g_vidFrameCnt,g_vidPalOffs[VIDEO_RING],g_vidIdxOffs[VIDEO_RING],g_vidTexBase,g_vidReqGen,g_vidReqFrame = 0xFFFFFFFFu,g_vidPreFrame = 0xFFFFFFFFu; static u16 *g_vidFrameMap,g_vidSlotTex[VIDEO_RING]; static VidFrameRec* g_vidFrames; static VidSlot g_vidSlot[VIDEO_RING]; static void* g_vidRingBuf; static i32* g_vidSizesCPU; static bool g_vidUp; static PngArena g_vidArena; static OS_Thread g_vidThr;
 static VidFrameRec* vid_find(u32 texIdx) { return texIdx<texCnt && g_vidFrameMap[texIdx] ? &g_vidFrames[g_vidFrameMap[texIdx]-1] : NULL; }
 static const u8 bayer8[64] = { 0,32, 8,40, 2,34,10,42, 48,16,56,24,50,18,58,26, 12,44, 4,36,14,46, 6,38, 60,28,52,20,62,30,54,22, 3,35,11,43, 1,33, 9,41, 51,19,59,27,49,17,57,25, 15,47, 7,39,13,45, 5,37, 63,31,55,23,61,29,53,21};
-static void vid_decode(VidFrameRec* r, VidSlot* s) { /*Same palette extraction as the load worker, but straight into a ring slot.*/
+static void vid_decode(VidFrameRec* r, VidSlot* s) {
     FHandle fd; int sz = 0; const char* d = (const char*)OS_OpenAndAllocateFileBufferReadonly(r->path, &fd, &sz); if (unlikely(!d || sz <= 0)) return;
     int w=0,h=0; u32 pngPal[256],pngPalSize; u8* pix=LoadPng((const u8*)d,sz,&w,&h,&g_vidArena,pngPal,&pngPalSize);
     if (likely(pix && w > 0 && h > 0 && (u32)w*h <= VIDEO_MAXFRAME)) {
         u32 bs=pngPalSize;
-        if (bs) { mcpy(s->idx,pix,(u32)w*h); mcpy(s->pal,pngPal,bs*sizeof(u32)); } else {
-        u32 nP = (u32)w*h, x = 0, y = 0; u32 eh[TEXHASH_SZ]; mset(eh, 0xFF, sizeof(eh)); u8 ei[TEXHASH_SZ];
-        u8* nearcache = (u8*)OS_Alloc(32768); mset(nearcache, 0xFF, 32768);
-        for (u32 p=0;p<nP;++p, ++x) {
-            if (x == (u32)w) { x = 0; y++; }
-            u32 c = ((u32*)pix)[p]; u32 hv = (c*0x9E3779B9u); hv ^= hv>>16; u32 sl = hv & (TEXHASH_SZ-1);
-            for (u32 pr=0;pr<TEXHASH_SZ;++pr) { if (eh[sl]==U32_MAX) break; if (eh[sl]==c) { s->idx[p]=ei[sl]; goto vidfound; } sl = (sl+1)&(TEXHASH_SZ-1); }
-            if (bs < 256) { s->pal[bs]=c; s->idx[p]=(u8)bs; eh[sl]=c; ei[sl]=(u8)bs; bs++; goto vidfound; }
-            /*Palette full: snap to nearest. Ordered-dithered*/
-            { i32 dz = (i32)bayer8[(y & 7u)*8u + (x & 7u)] - 32; i32 rr = (i32)(c & 255) + (dz>>2), gg = (i32)((c>>8)&255) + (dz>>2), bb = (i32)((c>>16)&255) + (dz>>2);
-              if (rr<0) rr=0; if (rr>255) rr=255; if (gg<0) gg=0; if (gg>255) gg=255; if (bb<0) bb=0; if (bb>255) bb=255;
-              u32 dc = ((u32)rr) | ((u32)gg<<8) | ((u32)bb<<16) | (c & 0xFF000000u);
-              u32 ck = ((dc & 0xF8) >> 3) | ((dc & 0xF800) >> 6) | ((dc & 0xF80000) >> 9);
-              u8 hit = nearcache[ck];
-              if (hit == 0xFF) { u32 bestI = 0, bestD = ~0u;
-                  for (u32 k=0;k<256;++k) { u32 pc = s->pal[k]; i32 dr=(i32)(pc&255)-rr, dg=(i32)((pc>>8)&255)-gg, db=(i32)((pc>>16)&255)-bb;
-                      u32 dist = (u32)(dr*dr+dg*dg+db*db); if (dist<bestD) { bestD=dist; bestI=k; } }
-                  hit = (u8)bestI; nearcache[ck] = hit; }
-              s->idx[p] = hit; }
-            vidfound:;
-        }
-        OS_Free(nearcache, 32768);
+        if (bs) { mcpy(s->idx,pix,(u32)w*h); mcpy(s->pal,pngPal,bs*sizeof(u32));}
+        else {
+            u32 nP = (u32)w*h, x = 0, y = 0; u32 eh[TEXHASH_SZ]; mset(eh, 0xFF, sizeof(eh)); u8 ei[TEXHASH_SZ];
+            u8* nearcache = (u8*)OS_Alloc(32768); mset(nearcache, 0xFF, 32768);
+            for (u32 p=0;p<nP;++p, ++x) {
+                if (x == (u32)w) { x = 0; y++; }
+                u32 c = ((u32*)pix)[p]; u32 hv = (c*0x9E3779B9u); hv ^= hv>>16; u32 sl = hv & (TEXHASH_SZ-1);
+                for (u32 pr=0;pr<TEXHASH_SZ;++pr) { if (eh[sl]==U32_MAX) break; if (eh[sl]==c) { s->idx[p]=ei[sl]; goto vidfound; } sl = (sl+1)&(TEXHASH_SZ-1); }
+                if (bs < 256) { s->pal[bs]=c; s->idx[p]=(u8)bs; eh[sl]=c; ei[sl]=(u8)bs; bs++; goto vidfound; }
+                i32 dz = (i32)bayer8[(y & 7u)*8u + (x & 7u)] - 32; i32 rr = (i32)(c & 255) + (dz>>2), gg = (i32)((c>>8)&255) + (dz>>2), bb = (i32)((c>>16)&255) + (dz>>2);
+                if (rr<0) rr=0; if (rr>255) rr=255; if (gg<0) gg=0; if (gg>255) gg=255; if (bb<0) bb=0; if (bb>255) bb=255;
+                u32 dc = ((u32)rr) | ((u32)gg<<8) | ((u32)bb<<16) | (c & 0xFF000000u);
+                u32 ck = ((dc & 0xF8) >> 3) | ((dc & 0xF800) >> 6) | ((dc & 0xF80000) >> 9);
+                u8 hit = nearcache[ck];
+                if (hit == 0xFF) { u32 bestI = 0, bestD = ~0u; for (u32 k=0;k<256;++k) { u32 pc = s->pal[k]; i32 dr=(i32)(pc&255)-rr, dg=(i32)((pc>>8)&255)-gg, db=(i32)((pc>>16)&255)-bb; u32 dist = (u32)(dr*dr+dg*dg+db*db); if (dist<bestD) { bestD=dist; bestI=k; } } hit = (u8)bestI; nearcache[ck] = hit; }
+                s->idx[p] = hit;
+                vidfound:;
+            }
+            OS_Free(nearcache, 32768);
         }
         s->palSize = bs; s->w = (u32)w; s->h = (u32)h; s->frameTexIdx = r->texIdx;
     }
     OS_Free((void*)d,(size_t)sz);
 }
-static void* vid_worker(void* arg) { /*Decode-ahead: never touches GL. Slot state carries the upload handshake: 0 claimed, 1 decoded-awaiting-upload, 2 uploaded*/
+static void* vid_worker(void* arg) {
     (void)arg; u32 last = 0, lastPri = 0xFFFFFFFFu, lastPre = 0xFFFFFFFFu, slot = 0;
-    for (;;) { u32 g = __atomic_load_n(&g_vidReqGen, __ATOMIC_ACQUIRE);
-        if (g != last) { last = g;
-            for (u32 pass=0;pass<2;++pass) { u32* lp = pass?&lastPre:&lastPri; u32 want = __atomic_load_n(pass?&g_vidPreFrame:&g_vidReqFrame, __ATOMIC_RELAXED);
-                if (want == 0xFFFFFFFFu || want == *lp) continue; /*the 60fps caller bumps the generation ~120x/s; without this the worker re-decodes the same 720p frame over and over and falls behind*/
-                *lp = want; VidFrameRec* r = vid_find(want); if (!r) continue;
-                VidSlot* s = &g_vidSlot[slot]; slot = (slot + 1u) % VIDEO_RING;
-                __atomic_store_n(&s->state, 0u, __ATOMIC_RELAXED); /*claim before decode, so the main thread cannot upload a half-written slot*/
-                vid_decode(r, s);
-                __atomic_store_n(&s->state, 1u, __ATOMIC_RELEASE); } }
-        else { OS_FutexWait(&g_vidReqGen, g); } }
+    for (;;) {
+        u32 g = __atomic_load_n(&g_vidReqGen, __ATOMIC_ACQUIRE);
+        if (g != last) {
+            last = g;
+            for (u32 p=0;p<2;++p) { u32* lp = p ? &lastPre : &lastPri; u32 want = __atomic_load_n(p ? &g_vidPreFrame : &g_vidReqFrame,__ATOMIC_RELAXED); if (want == 0xFFFFFFFFu || want == *lp) continue; *lp = want; VidFrameRec* r = vid_find(want); if (!r) continue; VidSlot* s = &g_vidSlot[slot]; slot = (slot + 1u) % VIDEO_RING; __atomic_store_n(&s->state,0u,__ATOMIC_RELAXED); vid_decode(r,s); __atomic_store_n(&s->state,1u,__ATOMIC_RELEASE); }
+        } else { OS_FutexWait(&g_vidReqGen, g); }
+    }
 }
 u32 VideoPeekFrame(u32 texIdx) { VidFrameRec* r=g_vidUp ? vid_find(texIdx) : NULL; return r && r+1<g_vidFrames+g_vidFrameCnt ? r[1].texIdx : U32_MAX; }
 void VideoInit(void) { if (g_vidUp) return; PngArenaInit(&g_vidArena); g_vidUp = true; OS_ThreadCreate(&g_vidThr, vid_worker, NULL); }
@@ -156,6 +136,7 @@ INLINE u32 PngHuffman_decode(pngzbuf* a, PngHuffman* z) {
     
     int k = BitReverse(a->code_buffer,16);
     for (s=10;s<16 && k >= z->maxcode[s];++s) { };
+    if (s >= 16) { return 0; }
     b = (k >> (16 - s)) - z->firstcode[s] + z->firstsymbol[s];
     if (b < 0 || ((u32)b) >= 288) return 0;
     
@@ -300,44 +281,37 @@ static void* TextureParsingWorker(void* arg) {
                 
                 found:;
             }
-            OS_Free(exact_hash, TEXHASH_SZ*sizeof(u32));
-            OS_Free(exact_idx, TEXHASH_SZ);
-            OS_Free(nearest_cache, 32768);
+            OS_Free(exact_hash,TEXHASH_SZ*sizeof(u32));
+            OS_Free(exact_idx,TEXHASH_SZ);
+            OS_Free(nearest_cache,32768);
         }
         t->results[i] = (TexResult){.indices = idx, .palette = pal, .palSize = pSz, .w = w, .h = h};
         OS_Free((void*)d,(size_t)sz);
-    }
-    
-    return NULL;
+    } return NULL;
 }
- 
 static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
     FHandle fd; int sz; char *data = OS_OpenAndAllocateFileBufferReadonly(fn, &fd, &sz), *cur = data, *end = data + sz; u32 line = 0, m_idx = 0;
     while (cur < end) {
         char *s = cur; while (cur < end && *cur != '\n' && *cur != '\r') { cur++; } size_t len = cur - s; line++; if (len <= 0) { cur++; continue; }
-        
-        while (cEmpty(*s)) { s++; }
+        while (s < cur && cEmpty(*s)) { s++; }
         char *le = s + (cur - s) - 1;
         while (le > s && cEmpty(*le)) { le--; }
-        if (*s == '\0' || (s[0] == '/' && s[1] == '/') || s[0] == '#') { if (cur < end && (*cur == '\r' || *cur == '\n')) { cur++; } continue; }
-        
+        if (s >= cur || *s == '\0' || (s[0] == '/' && s + 1 < cur && s[1] == '/') || s[0] == '#') { if (cur < end && (*cur == '\r' || *cur == '\n')) { cur++; } continue; }
         char *col = StringFindFirstCharWithin(s, ':');
         if (col && sCompUpToLen(s, "index", col - s) == 0) { char *v = col + 1; while (cEmpty(*v)) { v++; } u32 idx = parse_numberu32(v, s, line); if (idx > m_idx) { m_idx = idx; } }
         if (cur < end && (*cur == '\r' || *cur == '\n')) { cur++; }
     }
     if (!m_idx || m_idx >= maxS) { if (!m_idx) { DualLogWarn("No entries in %s\n", fn); } else { DualLogWarn("Index %u too large in %s\n",m_idx,fn); OS_Free(data,sz); return false; } }
-
     p->entries = OS_AllocScratch((p->count = p->capacity = m_idx + 1) * sizeof(TextureData));
     for (u32 i = 0; i < p->count; ++i) { p->entries[i] = (TextureData){.index = U16_MAX}; }
     TextureData e = {.index = U16_MAX}; line = 0; cur = data;
     while (cur < end) {
         char *s = cur; while (cur < end && *cur != '\n' && *cur != '\r') { cur++; } line++; if ((cur - s) < 3) { cur++; continue; }
-        
-        while (cEmpty(*s)) { s++; }
+        while (s < cur && cEmpty(*s)) { s++; }
         char *le = s + (cur - s) - 1;
         while (le > s && cEmpty(*le)) { le--; }
-        if (s[0] == '/' && s[1] == '/') { cur++; continue; }
-        
+        if (s >= cur) { if (cur < end && (*cur == '\r' || *cur == '\n')) { cur++; } continue; }
+        if (s[0] == '/' && s + 1 < cur && s[1] == '/') { cur++; continue; }
         if (*s == '#') {
             if (e.path[0] && e.index < p->capacity) { p->entries[e.index] = e; }
             e = (TextureData){.index = U16_MAX};

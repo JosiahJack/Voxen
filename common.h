@@ -170,7 +170,8 @@ enum {/*Initialization*/ SCRATCH_ARENA_SIZE = 96468992 /*92mb*/,
       /*UI*/ UI_W = 1366, UI_H = 768, MFD_READER_CONTENTS = 0, MFD_READER_FOLDER = 1, MFD_READER_TEXT = 2, MAX_UI_ELEMENTS = 4096, TXT_PAD = 4, TXT_H = 24, TAB_THICK = 16, MFD_SPACING = 8, MFD_SPACINGCTR = 19, SIDE_MFD_W = 320, CTR_MFD_W = 640, MFD_H = 240, UI_AUTOMAP_ZOOM_IN = 0, UI_AUTOMAP_ZOOM_OUT = 1, UI_AUTOMAP_FULL = 2, UI_AUTOMAP_SIDE = 3,
       /*Automap*/ AM_W = 320, AM_H = 200, AM_FULL_W = 700, AM_FULL_H = 700, AM_MAXHULL = 10,
       /*Multimedia Tabs(UI)*/ MM_EMAIL_TABLE = 0, MM_LOG_TABLE = 1, MM_DATA_TABLE = 2, MM_NOTES = 3, BIOM_ERG = 0, BIOM_CHI = 1, BIOM_ECG = 2, BIOM_GRAPH_W = 620, BIOM_GRAPH_H = 36,
-      /*Rendering*/ PARTICLE_FLAG_ADDITIVE = (1u<<0), PARTICLE_FLAG_SOFT = (1u<<1), PARTICLE_FLAG_LIT = (1u<<2), PARTICLE_FLAG_MULTIPLY = (1u<<3),PARTICLE_FLAG_SOFT_OCCLUDE = (1u<<4), PARTICLE_FLAG_PHYSICS = (1u<<5), PARTICLE_FLAG_TRAIL = (1u<<6), MAX_PARTICLES = 32768, MAX_EMITTERS = 1024, MAX_TRAIL_SEGS = 4096, MAX_TRAIL_OWNERS = 512, MAX_WIRELINE_QUADS = 8192};
+      /*Rendering*/ PARTICLE_FLAG_ADDITIVE = (1u<<0), PARTICLE_FLAG_SOFT = (1u<<1), PARTICLE_FLAG_LIT = (1u<<2), PARTICLE_FLAG_MULTIPLY = (1u<<3),PARTICLE_FLAG_SOFT_OCCLUDE = (1u<<4), PARTICLE_FLAG_PHYSICS = (1u<<5), PARTICLE_FLAG_TRAIL = (1u<<6), MAX_PARTICLES = 32768, MAX_EMITTERS = 1024, MAX_TRAIL_SEGS = 4096, MAX_TRAIL_OWNERS = 512, MAX_WIRELINE_QUADS = 8192,
+      /*Game Logic*/ WC_STD = 0, WC_MELEE = 1, WC_ENERGY = 2};
 typedef enum {AIState_Idle=0,AIState_Walk=1,AIState_Run=2,AIState_Attack1=3,AIState_Attack2=4,AIState_Attack3=5,AIState_Pain=6,AIState_Dying=7,AIState_Inspect=8,AIState_Interacting=9,AIState_Dead=10} AIState;
 u32 parse_numberu32(const char*, const char*,u32); u16 parse_numberu16(const char*, const char*,u32); u8 parse_numberu8(const char*, const char*,u32); bool parse_bool(const char*, const char*,u32);
 static const float PLYR_CAM_OFS_Y = 0.84f, CELLSZ = 2.56f, CELLXHALF = (CELLSZ * 0.5f), VOXEL_SIZE = (CELLSZ / (float)VOXELS_PER_CELL), AI_STOP_DIST = 1.28f, AI_STOP_DIST_SQ = (AI_STOP_DIST * AI_STOP_DIST), AI_POS_CHECK_DELAY = 2.0f, AI_WANDER_RANGE = 79.0f, AI_TARGET_OFFSET_Y = 0.24f;
@@ -259,10 +260,9 @@ typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width, height; fl
 extern CamView camViews[64],levelCamViews[14][64]; extern u8 camViewCount,levelCamViewCount[14]; extern u32 camViewTextures[64],levelCamViewTextures[14][64];
 extern u8 sensaroundCamViewCenter,sensaroundCamViewLeft,sensaroundCamViewRight; void UpdateSensaroundCamViews();
 typedef struct { AttType type; float damage,range,speed,timeToActual,timeBetween,waitMin,waitMax,waitChance,projectileSpeed; bool hasLaser; int projectilePrefab; } NPCAttack;
-typedef struct { // Keep initializer order in npcTable.
-    const char* name; NPCAttack attack[3]; float health,healthForCyberNPC,defense; AIMoveType moveType; float yawSpeed,fov,fovStartMovement,distToSeeBehind,sightRange,walkSpeed,runSpeed,attack3Force,attack3Radius,timeToPain,timeBetweenPain,timeTillDead,timeToChangeEnemy,timeIdleSFXMin,timeIdleSFXMax; bool explodeOnAttack3; double huntTime; float flightHeight; bool flightHeightIsPercentage,switchMaterialOnDeath;
-    float hearingRange,timeForTranquilization; bool hopsOnMove; NPCType type;
-} NPCTable;
+typedef struct {
+    const char* name; NPCAttack attack[3]; float health,healthCyb,def; AIMoveType moveType; float yawSpeed,fov,fovStartMovement,distToSeeBehind,sightRange,walkSpeed,runSpeed,attack3Force,attack3Radius,timeToPain,timeBetweenPain,timeTillDead,timeToChangeEnemy,timeIdleSFXMin,timeIdleSFXMax; bool explodeOnAttack3; double huntTime; float flightHt; bool flightHtIsPerc,switchMaterialOnDeath; float hearingRange,timeForTranq; bool hops; NPCType type;
+} NPCTable; // Keep initializer order in npcTable!
 extern const NPCTable npcTable[NUM_AI_TYPES];
 bool TargetIDShouldRender(u16); bool TargetIDInPlayerPVS(u16); i16 TargetIDGetText(u16);
 typedef struct Particle { V3 pos,vel; float age,invLifetime,baseSize,rotation,angularVelocity; u32 color,emitterIndex,trailOwner; u16 flags,textureIndex,animFrame; u8 blendMode; V3 trailSample; u16 trailHead; } Particle; typedef struct { u32 sortKey; u16 index; } PartSortEntry;
@@ -328,7 +328,7 @@ typedef struct {
     u8 inventoryMode:1, levelCurrentlyLoading:1,         paused:1,   menuActive:1,   gameFinished:1,   creditsActive:1, decoyActive:1;
     u8  uiIsBlocking:1,          geniusActive:1, targetIOActive:1, misTimerLast:1, misTimerCurIdx:1, misTimerTimesUP:1 /*unused bit:1*/;
     bool *invTnsrValid,*colliding,questNotesActive[18],questNotesChecked[18];
-    u8 lanimCount,automapExplored[MAX_LEVELS][ARRSIZE],automapZoom,physSleep[INSTANCE_COUNT],physQuiet[INSTANCE_COUNT],substeps,levelSecurity[MAX_LEVELS],startLevel,curLev,creditsPageIndex,diffCbt,diffPuz,diffMis,diffCyb,levelCameraCount[MAX_LEVELS],levelSmallNodeCount[MAX_LEVELS],levelLargeNodeCount[MAX_LEVELS],levCamDestroyedCnt[MAX_LEVELS],levSmNodeDestroyedCnt[MAX_LEVELS],levNodeDestroyedCnt[MAX_LEVELS];
+    u8 lanimCount,automapExplored[MAX_LEVELS][ARRSIZE],automapZoom,physSleep[INSTANCE_COUNT],physQuiet[INSTANCE_COUNT],substeps,levelSecurity[MAX_LEVELS],curLev,creditsPageIndex,diffCbt,diffPuz,diffMis,diffCyb,levelCameraCount[MAX_LEVELS],levelSmallNodeCount[MAX_LEVELS],levelLargeNodeCount[MAX_LEVELS],levCamDestroyedCnt[MAX_LEVELS],levSmNodeDestroyedCnt[MAX_LEVELS],levNodeDestroyedCnt[MAX_LEVELS];
     i8 lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode,cyberReturnLevel;
     InventorySystem invP1; SystemUI Sys_UI; MusicSystem Sys_Music; Entity levelInstances[MAX_LEVELS][INSTANCE_COUNT];
     UIComponent uiComponents[MAX_UI_ELEMENTS];
@@ -413,6 +413,8 @@ INLINE float vcot(float x) { float x2 = x * x; float t = x + (x2 * x) * 0.333333
 INLINE float deg2rad(float degrees) { return degrees * (PI / 180.0f); }
 INLINE float vexp2f(float x){float ip=vfloor(x); float fp=x - ip; float p=1.0f + fp*(0.69314718f + fp*(0.24022651f + fp*0.05550411f)); /*poly approx 2^fp on [0,1]*/ int ei=(int)ip + 127; u32 bits=(u32)(ei << 23); union{u32 i; float f;}u={bits}; return u.f*p;}
 INLINE float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
+INLINE float vlog2f(float x) { /* assume x > 0 */ union { float f; u32 i; } u = {x}; int e = (int)(u.i >> 23) - 128; u.i = (u.i & 0x007FFFFFu) | 0x3F800000u;/* mantissa in [1,2) */ float m = u.f; float y = ((-1.0f/3.0f)*m + 2.0f)*m - (2.0f/3.0f); return (float)e + y; }
+INLINE float vpow(float x, float y) { return x <= 0.01f || y <= 0.01f ? 0.0f : vexp2f(y * vlog2f(x)); }
 INLINE i32 vclampi(i32 val, i32 min, i32 max) { return (val > max) ? max : ((val < min) ? min : val); }
 INLINE float vround(float val) { return (val >= 0.0f) ? (float)(int)(val + 0.5f) : (float)(int)(val - 0.5f); }
 INLINE void hudColorToRGB(u8 hud, float* r, float* g, float* b) { float inv=1.0f/(222.0f/255.0f); switch (hud) {

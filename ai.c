@@ -1,9 +1,7 @@
 // ai.c - NPC logic
 #include "common.h"
-u16 npcCountInWorldPerType[NUM_AI_TYPES];
-void TextureSequenceStart(u16,u8);    bool PositionVisibleFromPlayerCell(float,float), XZPairInBounds(i32,i32);    u16 AddLightSimple(V3,Color3,float,float,u16);    Quaternion quat_normalize(Quaternion);
-// Name, attacks[3] (type,damage,range,speed,timeToActual,timeBetween,waitMin,waitMax,waitChance,projectileSpeed,hasLaser,projectilePrefab), remaining NPCTable fields.
-const NPCTable npcTable[NUM_AI_TYPES] = {
+u16 npcCountInWorldPerType[NUM_AI_TYPES],AddLightSimple(V3,Color3,float,float,u16); void TextureSequenceStart(u16,u8);    bool PositionVisibleFromPlayerCell(float,float), XZPairInBounds(i32,i32);    Quaternion quat_normalize(Quaternion);    float GetDamageTakeAmount(DamageData*);
+const NPCTable npcTable[NUM_AI_TYPES] = { // Name, attacks[3] (type,damage,range,speed,timeToActual,timeBetween,waitMin,waitMax,waitChance,projectileSpeed,hasLaser,projectilePrefab), remaining NPCTable fields.
     /* 0*/{"AUTOBOMB",{{0,0,0,0,0,0,0.5,1,0.1,0,0,0},{0,0,0,0,0,0,1,3,0.5,0,0,0},{1,200,2.4,0,0,0,0,0,0,0,0,0}},50,0,1,1,300,180,55,3.84,50,2.5,2.5,100,6,0,0,0.1,3,5,12,1,20,0,0,0,10,3,0,2},
     /* 1*/{"CYBORG ASSASSIN",{{0,30,3.3,0,0,0.91,0.5,1,0.1,0,0,0},{5,50,10,0,0.25,0.91,1,2,0.5,0,0,0},{8,35,20,0,0.2,1.58,1,2,0.5,3,0,489}},65,0,4,1,180,180,15,3.2,50,2,2,0,0,0.45,5,2.083,3,5,12,0,60,0,0,0,10,3,0,3},
     /* 2*/{"AVIAN MUTANT",{{1,40,3.3,3.5,0.1,1,0.5,1,0.1,0,0,0},{0,40,10,0,0,0,0,0,0,0,0,0},{0,0,20,0,0,0,0,0,0,0,0,0}},125,0,2,2,180,180,15,5.12,50,2,2,0,0,2,5,1,3,5,12,0,60,0.65,1,0,10,3,0,1},
@@ -33,19 +31,14 @@ const NPCTable npcTable[NUM_AI_TYPES] = {
     /*26*/{"CYBER RAM",{{0,0,0,0,0,0,0,0,0,0,0,0},{8,35,20,0,0,0.2,0,0,0,1.2,0,494},{0,0,0,0,0,0,0,0,0,0,0,0}},0,40,1,4,80,240,15,20.48,25.6,4,4,0,0,0.1,0,0.5,2,998,999,0,500,0.75,0,0,10,0,0,6},
     /*27*/{"CYBER CORTEX REAVER",{{0,0,0,0,0,0,0,0,0,0,0,0},{8,45,20,0,0,0.2,0,0,0,2,0,494},{0,0,0,0,0,0,0,0,0,0,0,0}},0,80,1,4,80,240,15,20.48,25.6,4,4,0,0,0.1,0,0.5,2,998,999,0,500,0.75,0,0,10,0,0,6},
     /*28*/{"SHODAN",{{0,0,0,0,0,0,0,0,0,0,0,0},{8,55,20,0,0,0.05,0,0,0,2,0,494},{0,0,0,0,0,0,0,0,0,0,0,0}},0,500,1,4,360,280,15,20.48,25.6,0,0,0,0,0.1,0,0.5,2,998,999,0,500,0.75,0,0,10,0,0,6},};
-
-/* sfx rows: [0] idle chatter, [1] first-sighting, [2] attack1, [3] attack2, [4] attack3, [5] death */
 static const i16 aiSFX[6][NUM_AI_TYPES] = { /*idle   */{-1,-1, -1,-1,58, -1, 59, -1, 59, 52,-1, -1,-1,-1,-1, -1,121, -1, -1, -1,121,118,-1, -1, -1, -1, -1, -1, -1},       /*sight  */{-1, -1,111,150,58,150,59,152,152, -1,150,150,151,152,150, -1,121, -1,151,150,121,119,151, -1, -1, -1, -1, -1, -1}, /*attack1*/{-1,-1,108,-1,-1,146, -1,146,252,247,-1, -1,-1,-1,-1,122, -1,108,146, -1, -1,118,-1,125,258,258,258,258,258},
                                             /*attack2*/{-1,256, -1,148,50, 50,50, 50, 50,250, 50, 50,146,259,148, -1,121, -1, -1,147, -1, -1,146, -1,258,258,258,258,258}, /*attack3*/{-1,-1, -1,-1,-1,244,244,244,245, -1,-1,149,-1,-1,-1, -1, -1, -1, -1,244, -1, -1,-1, -1,258,258,258,258,258},       /*death  */{-1, 48,110,143,48,145,48, 51, 47, 47,142,143,144, 47,162,123,120,134,144,144,120,117,144,124, -1, -1, -1, -1, -1}};
-typedef struct { u8 p[6], n; } AIPresetSet;
-typedef struct { V3 offset; Color3 color; float range, intensity, duration; } AIDeathBurstLight;
-typedef struct { u16 first, last, primary; } NPCGibRange;
+typedef struct { u8 p[6], n; } AIPresetSet;        typedef struct { V3 offset; Color3 color; float range, intensity, duration; } AIDeathBurstLight;        typedef struct { u16 first, last, primary; } NPCGibRange;
 static const NPCGibRange npcGibRanges[NUM_AI_TYPES] = { [3]={779,787,779},/* EXEC-BOT*/ [5]={768,778,768},/* CORTEX REAVER*/ [10]={814,820,814},/* SECURITY-1*/ [11]={821,830,826},/* SECURITY-2*/ [12]={794,803,795},/* MAINTENANCE*/ [18]={831,839,839},/* SERV-BOT (search collider is gib9)*/ [19]={788,793,792},/* FLIER BOT*/ [22]={804,813,810},/* REPAIR BOT*/ };
 static void AISetHuntFinished(u16 idx) { int npcID = World.instances[idx].index - 419, diff = npcTable[npcID].type == NPCType_Cyber ? World.diffCyb : World.diffCbt; World.instances[idx].huntFinished = World.pauseRelativeTime + vmax(npcTable[npcID].huntTime * (diff <= 1 ? 0.75 : diff >= 3 ? 2 : 1),60); }
 void InitNPC(u16 i) {
     World.layer[i] = L_NPC;
     u16 npcID = World.instances[i].index - 419; if (npcID >= NUM_AI_TYPES) { DualLogError("Invalid NPC index %u\n", npcID); OS_Exit(1); }
-    
     const u8 npcBloodTypes[NUM_AI_TYPES]={4,1,2,4,1,4,1,1,1,1,4,4,4,2,4,1,2,2,4,4,1,1,4,3,0,0,0,0,0};
     World.instances[i].bloodType = (BloodType)npcBloodTypes[npcID];
     const u8 npcDeathBurstPreset[NUM_AI_TYPES] = { [0]=5,/*ef_fragexplosion CentralFireball*/ [3]=100,[5]=54/*deathSubBurst*/,[7]=80/*deathBurst*/,[9]=76/*centerflare*/,[10]=138/*deathSubBurst*/, [11]=54/*deathSubBurst*/,[12]=123/*deathSubBurst(1)*/,[15]=115/*deathBurstTempFX*/,[17]=16/*yellow spurt*/, [18]=145/*deathBurst*/,[19]=80/*deathBurst*/,[22]=100,[23]=127};
@@ -65,170 +58,92 @@ void InitNPC(u16 i) {
     World.instances[i].clip = World.instances[i].currentState; World.instances[i].frame = mdlAnimClips[World.instances[i].animationNum][World.instances[i].currentState].frameStart; /*Only A_DYING index that doesn't match the AIState_Dying, only dead, idle, walk are the 3 at init.*/
     if (npcCountInWorldPerType[npcID] < U16_MAX) npcCountInWorldPerType[npcID]++;
     World.instances[i].npcNumber = npcCountInWorldPerType[npcID];
-    if (npcTable[npcID].type == NPCType_Cyber) { if (World.instances[i].cyberHealth <= 0.0f) { World.instances[i].cyberHealth = npcTable[npcID].healthForCyberNPC; } } else if (World.instances[i].health <= 0.0f) { World.instances[i].health = npcTable[npcID].health; }
+    if (npcTable[npcID].type == NPCType_Cyber) { if (World.instances[i].cyberHealth <= 0.0f) { World.instances[i].cyberHealth = npcTable[npcID].healthCyb; } } else if (World.instances[i].health <= 0.0f) { World.instances[i].health = npcTable[npcID].health; }
 }
-
-float Tranquilize(u16 i, float amount, bool energy) {
-    const NPCTable* npc = &npcTable[World.instances[i].index - 419]; if(npc->type == NPCType_Robot && !energy){return 0.0f;}
-    
-    float tranqSecs = (amount < 3.0f) ? npc->timeForTranquilization : amount;
-    World.instances[i].tranquilizeFinished = vmax(World.pauseRelativeTime + tranqSecs, World.instances[i].tranquilizeFinished + tranqSecs);
-    return tranqSecs;
-}
-
+float Tranquilize(u16 i, float amount, bool energy) { const NPCTable* npc = &npcTable[World.instances[i].index - 419]; if(npc->type == NPCType_Robot && !energy){return 0.0f;} float tranqSecs = (amount < 3.0f) ? npc->timeForTranq : amount; World.instances[i].tranquilizeFinished = vmax(World.pauseRelativeTime + tranqSecs, World.instances[i].tranquilizeFinished + tranqSecs); return tranqSecs; }
 bool HasHealth(u16 i) { return npcTable[World.instances[i].index - 419].type == NPCType_Cyber ? (World.instances[i].cyberHealth > 0.0f) : (World.instances[i].health > 0.0f); }
 static void AISetEnemy(u16, u16);
 void CyberDecoySetTarget(u16 decoy) {
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
-        if (!IdxIsNPC(World.instances[i].index) || npcTable[World.instances[i].index - 419].type != NPCType_Cyber) continue;
-        if (World.instances[i].currentState == AIState_Dead || World.instances[i].currentState == AIState_Dying) continue;
-        u16 en = World.instances[i].enemy; if (!en) continue;
-        
-             if (decoy != U16_MAX) { if (en == PLAYER1)                 { AISetEnemy(i, decoy); flag_set(&World.instances[i].entflags, EF_ENEM_IN_LOS, true); } }
-        else if (!IdxIsNPC(World.instances[en].index) && en != PLAYER1) { World.instances[i].enemy = 0; World.instances[i].posCheckFinished = World.pauseRelativeTime; flag_set(&World.instances[i].entflags, EF_ENEM_IN_LOS, false); }
+        if (!IdxIsNPC(World.instances[i].index) || npcTable[World.instances[i].index - 419].type != NPCType_Cyber) { continue; } if (World.instances[i].currentState == AIState_Dead || World.instances[i].currentState == AIState_Dying) { continue; } u16 en = World.instances[i].enemy; if (!en) { continue; }
+        if (decoy != U16_MAX) { if (en == PLAYER1) { AISetEnemy(i, decoy); flag_set(&World.instances[i].entflags, EF_ENEM_IN_LOS, true); } } else if (!IdxIsNPC(World.instances[en].index) && en != PLAYER1) { World.instances[i].enemy = 0; World.instances[i].posCheckFinished = World.pauseRelativeTime; flag_set(&World.instances[i].entflags, EF_ENEM_IN_LOS, false); }
     }
 }
-
-const V3 sightPointOffsets[NUM_AI_TYPES]={{0.0f,1.066f,0.654f}/* 0 AUTOBOMB*/,{0.0f,1.824f,0.0f}/* 1 CYBORG ASSASSIN*/,{0.0f,1.041f,0.0f}/* 2 AVIAN MUTANT*/,{0.0f,1.89f,0.0f}/* 3 EXEC-BOT*/,{0.0f,0.86f,0.0f}/* 4 CYBORG DRONE*/,{0.0f,1.875f,0.0f}/* 5 CORTEX REAVER*/,{0.0f,1.736f,0.0f}/* 6 CYBORG WARRIOR*/,{0.0f,1.913f,0.144f}/* 7 CYBORG ENFORCER*/,{0.0f,2.082f,0.174f}/* 8 CYBORG ELITE GUARD*/,{0.0f,2.014f,0.105f}/* 9 CYBORG OF ED DIEGO*/,{0.0f,1.338f,0.0f}/*10 SECURITY-1 ROBOT*/,{0.0f,1.797f,0.0f}/*11 SECURITY-2 ROBOT*/,{0.447f,0.965f,0.477f}/*12 MAINTENANCE ROBOT*/,{0.011f,2.185f,0.117f}/*13 MUTANT CYBORG*/,{0.0f,1.759f,0.215f}/*14 HOPPER*/,{0.0f,1.843f,0.0f}/*15 HUMANOID MUTANT*/,{0.0f,0.605f,0.0f}/*16 INVISIBLE MUTANT*/,{0.161f,1.651f,0.223f}/*17 VIRUS MUTANT*/,{0.0f,0.323f,0.0f}/*18 SERV-BOT*/,{0.0f,0.0f,0.0f}/*19 FLIER BOT*/,{0.0f,0.0f,0.0f}/*20 ZERO-G MUTANT*/,{0.0f,1.45f,1.222f}/*21 GORILLA TIGER MUTANT*/,{0.0f,0.618f,0.0f}/*22 REPAIR BOT*/,{0.0f,1.0f,0.0f}/*23 PLANT MUTANT*/,{0.0f,-0.14f,0.0f}/*24 CYBER DOG*/,{-0.465f,0.0f,0.212f}/*25 CYBER GUARD*/,{0.0f,-0.343f,0.151f}/*26 CYBER RAM*/,{0.0f,0.0f,0.0f}/*27 CYBER CORTEX REAVER*/,{0.0f,0.0f,-0.017f}/*28 SHODAN*/};
+const V3 sightPointOffsets[NUM_AI_TYPES]={{0.0f,1.066f,0.654f}/*0 AUTOBOMB*/,{0.0f,1.824f,0.0f}/*1 CYBORG ASSASSIN*/,{0.0f,1.041f,0.0f}/*2 AVIAN MUTANT*/,{0.0f,1.89f,0.0f}/*3 EXEC-BOT*/,{0.0f,0.86f,0.0f}/*4 CYBORG DRONE*/,{0.0f,1.875f,0.0f}/*5 CORTEX REAVER*/,{0.0f,1.736f,0.0f}/*6 CYBORG WARRIOR*/,{0.0f,1.913f,0.144f}/*7 CYBORG ENFORCER*/,{0.0f,2.082f,0.174f}/*8 CYBORG ELITE GUARD*/,{0.0f,2.014f,0.105f}/*9 CYBORG OF ED DIEGO*/,{0.0f,1.338f,0.0f}/*10 SECURITY-1 ROBOT*/,{0.0f,1.797f,0.0f}/*11 SECURITY-2 ROBOT*/,{0.447f,0.965f,0.477f}/*12 MAINTENANCE ROBOT*/,{0.011f,2.185f,0.117f}/*13 MUTANT CYBORG*/,{0.0f,1.759f,0.215f}/*14 HOPPER*/,{0.0f,1.843f,0.0f}/*15 HUMANOID MUTANT*/,{0.0f,0.605f,0.0f}/*16 INVISIBLE MUTANT*/,{0.161f,1.651f,0.223f}/*17 VIRUS MUTANT*/,{0.0f,0.323f,0.0f}/*18 SERV-BOT*/,{0.0f,0.0f,0.0f}/*19 FLIER BOT*/,{0.0f,0.0f,0.0f}/*20 ZERO-G MUTANT*/,{0.0f,1.45f,1.222f}/*21 GORILLA TIGER MUTANT*/,{0.0f,0.618f,0.0f}/*22 REPAIR BOT*/,{0.0f,1.0f,0.0f}/*23 PLANT MUTANT*/,{0.0f,-0.14f,0.0f}/*24 CYBER DOG*/,{-0.465f,0.0f,0.212f}/*25 CYBER GUARD*/,{0.0f,-0.343f,0.151f}/*26 CYBER RAM*/,{0.0f,0.0f,0.0f}/*27 CYBER CORTEX REAVER*/,{0.0f,0.0f,-0.017f}/*28 SHODAN*/};
 INLINE V3 ai_sight_pos(Entity* e);
 typedef struct { V3 gunPoint, gunPoint2; } AIMuzzleOffsets;
 static const AIMuzzleOffsets aiMuzzleOffsets[NUM_AI_TYPES] = { [1]={{0.2034f,1.5728f,1.4950f},{-0.3500f,1.5500f,1.0000f}}, [3]={{0.0000f,1.3350f,0.6800f},{0}}, [4]={{0.0640f,0.4411f,1.2100f},{0}}, [5]={{0.0000f,2.3170f,0.2050f},{0}}, [6]={{0.2450f,1.6190f,0.9770f},{-0.6700f,1.9500f,0.0000f}}, [7]={{0.1221f,1.6599f,1.2048f},{-0.1770f,1.6013f,0.6103f}}, [8]={{0.2969f,1.4550f,0.8212f},{0.0015f,2.0694f,0.3210f}}, [9]={{0.0000f,1.5048f,0.7103f},{0}},
                                                               [10]={{0.0000f,0.5860f,0.2980f},{0}}, [11]={{0.0000f,2.0250f,1.3230f},{0.0000f,2.2490f,0.6870f}}, [12]={{-0.0017f,0.3427f,3.3266f},{0}}, [13]={{0.0000f,2.2630f,0.4200f},{0}}, [14]={{0.0000f,1.7590f,0.2150f},{0}}, [16]={{0.0000f,0.7160f,0.2560f},{0}}, [17]={{0.0896f,1.4884f,0.7545f},{0}}, [18]={{-1.0198f,0.1295f,1.1798f},{0}}, [19]={{0.0000f,-0.4604f,0.0803f},{0}},
                                                               [20]={{0.0000f,0.0000f,0.4700f},{0}}, [21]={{0.0000f,1.4500f,1.2220f},{0}}, [22]={{0.0000f,0.8700f,0.8460f},{0}}, [23]={{0.0000f,1.0000f,0.3950f},{0}}, [24]={{0.0000f,-0.4380f,-0.6690f},{0}}, [25]={{-0.4650f,0.0000f,-0.3930f},{0}}, [26]={{0.0000f,-0.5590f,-0.3840f},{0}}, [27]={{0.0000f,0.0000f,-0.2980f},{0}}, [28]={{0.0000f,0.0000f,0.5170f},{0}}};
-typedef struct { u16 lights[24], count; double expires[24]; } AIEffectLightPool;
-static AIEffectLightPool aiEffectPools[MAX_LEVELS];
-static float ai_effect_marker(u16 slot) { return -100.0f-(float)slot; }
-static void ai_ensure_effect_pool() {    
-    AIEffectLightPool* p = &aiEffectPools[World.curLev];
-    if (p->count) { for (u16 i=0;i<p->count;i++) if (p->lights[i] >= World.loadedLights || World.lights[p->lights[i]].spotAng != ai_effect_marker(i)) { p->count = 0; break; } }
-    if (p->count) return;
-    
-    while (p->count < 24u && World.loadedLights< LIGHT_COUNT-1) { u16 i=p->count; u16 li=AddLightSimple((V3){0},(Color3){1,1,1},1.0f,0.0f,0); p->lights[i]=li; p->expires[i]=0.0; World.lights[li].spotAng=ai_effect_marker(i); p->count++; }
+typedef struct { u16 lights[24],count; double expires[24]; } AIEfLightPool; static AIEfLightPool aiEffectPools[MAX_LEVELS];
+static void ai_ensure_effect_pool() {
+    AIEfLightPool* p = &aiEffectPools[World.curLev]; if (p->count) { for (u16 i=0;i<p->count;i++) if (p->lights[i] >= World.loadedLights || World.lights[p->lights[i]].spotAng != -100.0f - (float)i) { p->count = 0; break; } } if (p->count) { return; }
+    while (p->count < 24u && World.loadedLights< LIGHT_COUNT-1) { u16 i=p->count; u16 li=AddLightSimple((V3){0},(Color3){1,1,1},1.0f,0.0f,0); p->lights[i]=li; p->expires[i]=0.0; World.lights[li].spotAng = -100.0f - (float)i; p->count++; }
 }
-
 static void ai_update_effect_lights() {
-    static double aiEffectLightsUpdatedAt=-1.0;
-    if (aiEffectLightsUpdatedAt==World.pauseRelativeTime) return; aiEffectLightsUpdatedAt=World.pauseRelativeTime; u16 lev=World.curLev; if (lev>=MAX_LEVELS) return; AIEffectLightPool* p=&aiEffectPools[lev];
-    if (!p->count) return; for (u16 i=0;i<p->count;i++) if (p->lights[i]>=World.loadedLights || World.lights[p->lights[i]].spotAng!=ai_effect_marker(i)) { p->count=0; return; }
-    for (u16 i=0;i<p->count;i++) if (p->expires[i]>0.0 && p->expires[i]<=World.pauseRelativeTime) { u16 li=p->lights[i]; UpdateLight(li,World.lights[li].pos,World.lights[li].col,World.lights[li].range,0.0f,0.0f,0.0f,ai_effect_marker(i),QUAT_IDENTITY,false,false); p->expires[i]=0.0; }
+    static double aiEffectLightsUpdatedAt=-1.0; if (aiEffectLightsUpdatedAt==World.pauseRelativeTime) return; aiEffectLightsUpdatedAt=World.pauseRelativeTime; u16 lev=World.curLev; if (lev>=MAX_LEVELS) return; AIEfLightPool* p=&aiEffectPools[lev];
+    if (!p->count) return; for (u16 i=0;i<p->count;i++) if (p->lights[i]>=World.loadedLights || World.lights[p->lights[i]].spotAng != -100.0f - (float)i) { p->count=0; return; } for (u16 i=0;i<p->count;i++) if (p->expires[i]>0.0 && p->expires[i]<=World.pauseRelativeTime) { u16 li=p->lights[i]; UpdateLight(li,World.lights[li].pos,World.lights[li].col,World.lights[li].range,0.0f,0.0f,0.0f,-100.0f - (float)i,QUAT_IDENTITY,false,false); p->expires[i]=0.0; }
 }
-
 void ai_effect_flash(V3 pos, Color3 col, float range, float intensity, double duration) {
-    if (intensity <= 0.0f || range <= 0.0f || duration <= 0.0) return;
-    
-    ai_ensure_effect_pool();
-    AIEffectLightPool* p = &aiEffectPools[World.curLev]; if (!p->count) return;
-    
-    u16 chosen = 0; double oldest = 1000000000000000000000000000000.0;
-    for (u16 i=0;i<p->count;i++) { if (p->expires[i]<=World.pauseRelativeTime) { chosen = i; oldest = -1.0; break; } if (p->expires[i]<oldest) { oldest = p->expires[i]; chosen = i; } }
-    u16 idx = p->lights[chosen];
-    float scaledIntensity = intensity * 0.35f;
-    UpdateLight(idx,pos,col,vclamp(range,0.32f,15.36f),scaledIntensity,scaledIntensity,0.0f,ai_effect_marker(chosen),QUAT_IDENTITY,true,false);
-    p->expires[chosen] = World.pauseRelativeTime + duration;
+    if (intensity <= 0.0f || range <= 0.0f || duration <= 0.0) { return; } ai_ensure_effect_pool(); AIEfLightPool* p = &aiEffectPools[World.curLev]; if (!p->count) { return; } u16 chosen = 0; double oldest = 1000000000000000000000000000000.0; for (u16 i=0;i<p->count;i++) { if (p->expires[i]<=World.pauseRelativeTime) { chosen = i; oldest = -1.0; break; } if (p->expires[i]<oldest) { oldest = p->expires[i]; chosen = i; } }
+    u16 idx = p->lights[chosen]; float scaledIntensity = intensity * 0.35f; UpdateLight(idx,pos,col,vclamp(range,0.32f,15.36f),scaledIntensity,scaledIntensity,0.0f,-100.0f - (float)chosen,QUAT_IDENTITY,true,false); p->expires[chosen] = World.pauseRelativeTime + duration;
 }
-
 static void ai_muzzle_flash(Entity* self, int attackNum) {
-    u16 npc=(u16)(self->index-419); if (npc==18) attackNum=1; else if (attackNum==1) return;
-    
-    typedef struct { Color3 color; float intensity, range; } AIMuzzleLightData;
+    u16 npc=(u16)(self->index-419); if (npc==18) attackNum=1; else if (attackNum==1) return; typedef struct { Color3 color; float intensity, range; } AIMuzzleLightData;
     static const AIMuzzleLightData aiMuzzleLights[NUM_AI_TYPES] = { [1]={{0.9044f,0.8595f,0.6717f},10.09f,2.0f}, [3]={{0.6706f,0.8487f,0.9059f},3.46f,2.0f}, [4]={{0.9044f,0.8595f,0.6717f},10.09f,2.0f}, [5]={{0.0803f,0.0000f,1.0000f},4.21f,5.0f}, [6]={{0.8679f,0.1226f,0.0000f},10.09f,2.0f}, [7]={{0.9608f,0.9195f,0.8039f},10.09f,2.0f}, [8]={{0.8731f,1.0000f,0.6368f},7.0f,2.0f}, [9]={{0.8774f,0.0000f,0.0000f},2.56f,2.0f},
-                                                                   [10]={{0.80f,0.0f,0.0f},0.64f,2.0f},         [11]={{1.0000f,0.9794f,0.7500f},1.0f,2.0f}, [12]={{0.8160f,0.8844f,1.0000f},8.69f,2.0f}, [13]={{0.8412f,1.0000f,0.3821f},3.0f,2.0f}, [14]={{1.0000f,0.5035f,0.2784f},2.0f,7.0f}, [16]={{0.9061f,0.5943f,1.0000f},2.5f,2.0f},   [17]={{0.6500f,1.0000f,0.2500f},2.5f,2.0f}, [18]={{0.9849f,0.5425f,1.0000f},2.0f,3.0f},
-                                                                   [19]={{0.9245f,0.8921f,0.5190f},5.0f,2.0f},  [20]={{1.0000f,0.9807f,0.7358f},2.5f,2.0f}, [22]={{0.6706f,0.9059f,0.8552f},10.09f,2.0f},[23]={{0.5000f,1.0000f,0.3000f},3.0f,2.0f}, [24]={{1.0000f,0.8500f,0.6500f},3.0f,2.0f}, [25]={{1.0000f,0.8500f,0.6500f},3.0f,2.0f},   [26]={{1.0000f,0.8500f,0.6500f},3.0f,2.0f}, [27]={{1.0000f,0.8500f,0.6500f},3.0f,2.0f},
-                                                                   [28]={{1.0000f,0.8500f,0.6500f},3.0f,2.0f}};
-    static const AIMuzzleLightData aiMuzzleLight3[NUM_AI_TYPES] = { [8]={{0.8679f,0.1696f,0.1187f},10.0f,2.5f}, [11]={{1.0000f,0.9794f,0.7500f},2.5f,2.0f} };
-    AIMuzzleLightData d = attackNum==3 ? aiMuzzleLight3[npc] : aiMuzzleLights[npc]; if (attackNum==3 && !d.intensity) d = aiMuzzleLights[npc]; if (d.intensity<=0.0f || d.range<=0.0f) return;
-    
-    u16 selfIdx=(u16)(self-World.instances); V3 pos;
-    if (attackNum==1) pos=ai_sight_pos(self); else { V3 off=aiMuzzleOffsets[npc].gunPoint;
-    if (attackNum==3 && (aiMuzzleOffsets[npc].gunPoint2.x!=0.0f || aiMuzzleOffsets[npc].gunPoint2.y!=0.0f || aiMuzzleOffsets[npc].gunPoint2.z!=0.0f)) off=aiMuzzleOffsets[npc].gunPoint2;
-    if (off.x==0.0f && off.y==0.0f && off.z==0.0f) pos=ai_sight_pos(self); else pos=V3Add(World.position[selfIdx],quat_rot_v3(World.rotation[selfIdx],off)); }
-    ai_effect_flash(pos,d.color,d.range,d.intensity,0.085);
+        [10]={{0.80f,0.0f,0.0f},0.64f,2.0f},         [11]={{1.0000f,0.9794f,0.7500f},1.0f,2.0f}, [12]={{0.8160f,0.8844f,1.0000f},8.69f,2.0f}, [13]={{0.8412f,1.0000f,0.3821f},3.0f,2.0f}, [14]={{1.0000f,0.5035f,0.2784f},2.0f,7.0f}, [16]={{0.9061f,0.5943f,1.0000f},2.5f,2.0f},   [17]={{0.6500f,1.0000f,0.2500f},2.5f,2.0f}, [18]={{0.9849f,0.5425f,1.0000f},2.0f,3.0f},
+        [19]={{0.9245f,0.8921f,0.5190f},5.0f,2.0f},  [20]={{1.0000f,0.9807f,0.7358f},2.5f,2.0f}, [22]={{0.6706f,0.9059f,0.8552f},10.09f,2.0f},[23]={{0.5000f,1.0000f,0.3000f},3.0f,2.0f}, [24]={{1.0000f,0.8500f,0.6500f},3.0f,2.0f}, [25]={{1.0000f,0.8500f,0.6500f},3.0f,2.0f},   [26]={{1.0000f,0.8500f,0.6500f},3.0f,2.0f}, [27]={{1.0000f,0.8500f,0.6500f},3.0f,2.0f}, [28]={{1.0000f,0.8500f,0.6500f},3.0f,2.0f}};
+    static const AIMuzzleLightData aiMuzzleLight3[NUM_AI_TYPES] = { [8]={{0.8679f,0.1696f,0.1187f},10.0f,2.5f}, [11]={{1.0000f,0.9794f,0.7500f},2.5f,2.0f} }; AIMuzzleLightData d = attackNum==3 ? aiMuzzleLight3[npc] : aiMuzzleLights[npc]; if (attackNum==3 && !d.intensity) d = aiMuzzleLights[npc]; if (d.intensity<=0.0f || d.range<=0.0f) return;
+    u16 selfIdx=(u16)(self-World.instances); V3 pos; if (attackNum==1) pos=ai_sight_pos(self); else { V3 off=aiMuzzleOffsets[npc].gunPoint; if (attackNum==3 && (aiMuzzleOffsets[npc].gunPoint2.x!=0.0f || aiMuzzleOffsets[npc].gunPoint2.y!=0.0f || aiMuzzleOffsets[npc].gunPoint2.z!=0.0f)) off=aiMuzzleOffsets[npc].gunPoint2;
+    if (off.x==0.0f && off.y==0.0f && off.z==0.0f) pos=ai_sight_pos(self); else pos=V3Add(World.position[selfIdx],quat_rot_v3(World.rotation[selfIdx],off)); } ai_effect_flash(pos,d.color,d.range,d.intensity,0.085);
 }
 INLINE V3 ai_sight_pos(Entity* e) { u16 idx=(u16)(e - World.instances); return V3Add(World.position[idx],quat_rot_v3(World.rotation[idx],sightPointOffsets[World.instances[idx].index - 419])); }
 INLINE V3 ai_gun_pos(Entity* e, int n) { u16 idx=(u16)(e - World.instances); u16 npc=World.instances[idx].index-419; V3 off=(n==3 && (aiMuzzleOffsets[npc].gunPoint2.x!=0.0f || aiMuzzleOffsets[npc].gunPoint2.y!=0.0f || aiMuzzleOffsets[npc].gunPoint2.z!=0.0f))?aiMuzzleOffsets[npc].gunPoint2:aiMuzzleOffsets[npc].gunPoint; if(off.x==0.0f && off.y==0.0f && off.z==0.0f) off=(V3){0.0f,sightPointOffsets[npc].y+0.3f,0.0f}; return V3Add(World.position[idx],quat_rot_v3(World.rotation[idx],off)); }
 static void ai_spawn_presets(const AIPresetSet* set, V3 pos) { for (u8 i=0;i<set->n;i++){const PSysDef* preset=PSysTypeGet(set->p[i]); if(!preset)continue; PSysDef def=*preset; def.pos=pos; PSysAddInternal(&def,U16_MAX,U16_MAX);} }
 static void ai_muzzle_particles(Entity* self, int attackNum) {
-    u16 npc=(u16)(self->index-419);
-    static const AIPresetSet aiMuzzleBursts[NUM_AI_TYPES][2] = {[1]={{{72},1}}, [3]={{{96,97,129},3}}, [4]={{{81},1}}, [5]={{{56,58},2}}, [8]={{{81,82},2},{{84,85},2}}, [9]={{{78},1}}, [10]={{{96,97,129},3}}, [11]={{{30,31,29,32},4},{{141,34},2}}, [12]={{{118,121,124},3}}, [13]={{{125},1},{{125},1}}, [14]={{{112,113,114},3}}, [19]={{{106,103,104,105},4}} };
-    if (npc==18) { ai_spawn_presets(&aiMuzzleBursts[npc][1],ai_gun_pos(self,1)); ai_muzzle_flash(self,1); }
-    if (attackNum==1) return;/*No muzzle burst for attack 1 melee.*/ ai_spawn_presets(&aiMuzzleBursts[npc][attackNum==3?1:0],ai_gun_pos(self,attackNum)); ai_muzzle_flash(self,attackNum);
+    u16 npc=(u16)(self->index-419); static const AIPresetSet aiMuzzleBursts[NUM_AI_TYPES][2] = {[1]={{{72},1}}, [3]={{{96,97,129},3}}, [4]={{{81},1}}, [5]={{{56,58},2}}, [8]={{{81,82},2},{{84,85},2}}, [9]={{{78},1}}, [10]={{{96,97,129},3}}, [11]={{{30,31,29,32},4},{{141,34},2}}, [12]={{{118,121,124},3}}, [13]={{{125},1},{{125},1}}, [14]={{{112,113,114},3}}, [19]={{{106,103,104,105},4}} };
+    if (npc==18) { ai_spawn_presets(&aiMuzzleBursts[npc][1],ai_gun_pos(self,1)); ai_muzzle_flash(self,1); } if (attackNum == 1) return; ai_spawn_presets(&aiMuzzleBursts[npc][attackNum==3?1:0],ai_gun_pos(self,attackNum)); ai_muzzle_flash(self,attackNum);
 }
-
 Quaternion quat_look_rotation(V3 fwd, V3 up) {
     fwd=V3_Normalize(fwd); V3 r = V3_Normalize(V3_Cross(up,fwd)); up=V3_Cross(fwd,r); float m00=r.x, m01=r.y, m02=r.z, m10=up.x, m11=up.y, m12=up.z, m20=fwd.x, m21=fwd.y, m22=fwd.z; float tr = m00 + m11 + m22; Quaternion q;
     if (tr > 0.0f){float s=0.5f/vsqrtf(tr+1.0f); q.w=(0.25f/s); q.x=(m12-m21)*s; q.y=(m20-m02)*s; q.z=(m01-m10)*s;}else if(m00 > m11 && m00 > m22){float s=2.0f*vsqrtf(1.0f+m00-m11-m22); q.w=(m12-m21)/s; q.x=0.25f*s; q.y=(m01+m10)/s; q.z=(m20+m02)/s;}else if(m11 > m22){float s=2.0f*vsqrtf(1.0f+m11-m00-m22); q.w=(m20-m02)/s; q.x=(m01+m10)/s; q.y=0.25f*s; q.z=(m12+m21)/s; } else { float s = 2.0f * vsqrtf(1.0f + m22 - m00 - m11); q.w=(m01-m10)/s; q.x=(m20+m02)/s; q.y=(m12+m21)/s; q.z=0.25f*s;} return q;
 }
-
 void aiac_idle(Entity* self) { if ((self->entflags & EF_ASLEEP) || self->tranquilizeFinished >= World.pauseRelativeTime) {self->currentFrameFinished=World.pauseRelativeTime + 1000000000.0; return;/*freeze*/} ChangeAnim(self,A_IDLE); }
 void aiac_walk(Entity* self){if(self->entflags & EF_ACT_AS_TURRET){aiac_idle(self); return;} u16 idx=(u16)(self-World.instances); V3 v=World.velocity[idx]; if((v.x*v.x+v.y*v.y+v.z*v.z)>(0.32f*0.32f)){ChangeAnim(self,A_WALK); return;} if (self->animSwapFinished<World.pauseRelativeTime){self->animSwapFinished=World.pauseRelativeTime+.5f; ChangeAnim(self,A_IDLE);}}
 void AIAnimationControllerUpdate(u16 idx) {
-    Entity* self = &World.instances[idx]; if ((!(self->entflags & EF_ACTIVE)) || (self->animationNum >= MAXANIM)) { return; } 
-    if (self->currentState == AIState_Dying){ flag_set(&self->entflags, EF_ASLEEP, false); ChangeAnim(self, A_DYING); return; }
-    
+    Entity* self = &World.instances[idx]; if ((!(self->entflags & EF_ACTIVE)) || (self->animationNum >= MAXANIM)) { return; } if (self->currentState == AIState_Dying){ flag_set(&self->entflags, EF_ASLEEP, false); ChangeAnim(self, A_DYING); return; }
     if (self->currentState == AIState_Dead) { AnimationClip cl=mdlAnimClips[self->animationNum][A_DYING]; self->clip=A_DYING; self->frame=cl.frameEnd; self->modelIndex=cl.frameStartModelIndex + (cl.frameEnd - cl.frameStart); self->currentFrameFinished=World.pauseRelativeTime + 1000000000.0; return;/*freeze*/ }
-    if (self->entflags & EF_ASLEEP) { aiac_idle(self); return; }
-    if (self->currentState == AIState_Run && self->tranquilizeFinished >= World.pauseRelativeTime) { aiac_idle(self); return; }
-    
-    switch (self->currentState) {
-        case AIState_Walk:    aiac_walk(self);            break;
-        case AIState_Run:     if(self->entflags & EF_ACT_AS_TURRET){aiac_idle(self);}else{ChangeAnim(self,A_RUN);} break;
-        case AIState_Attack1: ChangeAnim(self,A_ATTACK1); break;
-        case AIState_Attack2: ChangeAnim(self,A_ATTACK2); break;
-        case AIState_Attack3: ChangeAnim(self,A_ATTACK3); break;
-        case AIState_Pain:    ChangeAnim(self,A_PAIN);    break;
-        default:              aiac_idle(self);            break;
-    }
+    if (self->entflags & EF_ASLEEP || (self->currentState == AIState_Run && self->tranquilizeFinished >= World.pauseRelativeTime)) { aiac_idle(self); return; }
+    switch (self->currentState) { case AIState_Walk: aiac_walk(self); break; case AIState_Run: if(self->entflags & EF_ACT_AS_TURRET){aiac_idle(self);}else{ChangeAnim(self,A_RUN);} break; case AIState_Attack1: ChangeAnim(self,A_ATTACK1); break; case AIState_Attack2: ChangeAnim(self,A_ATTACK2); break; case AIState_Attack3: ChangeAnim(self,A_ATTACK3); break; case AIState_Pain: ChangeAnim(self,A_PAIN); break; default: aiac_idle(self); break; }
 }
-
-INLINE bool NPCInPlayerPVS(u16 idx) { if (unlikely(World.curLev >= LEVEL_CYBERSPACE)) return true;/*Culling is disabled in cyberspace (CullCore early-outs), so never gate there.*/ return PositionVisibleFromPlayerCell(World.position[idx].x,World.position[idx].z); }
+INLINE bool NPCInPlayerPVS(u16 idx) { if (unlikely(World.curLev >= LEVEL_CYBERSPACE)) return true; return PositionVisibleFromPlayerCell(World.position[idx].x,World.position[idx].z); }
 void DoorActuate(u16);
 bool AICheckIfEnemyInSight(u16 idx) {
     u16 eidx=World.instances[idx].enemy; if (!eidx || !HasHealth(idx)) return false; u16 n = (u16)(World.instances[idx].index - 419); const NPCTable* npc=&npcTable[n]; bool cyber = npc->type == NPCType_Cyber; bool enIsNPC = (World.layer[eidx] & L_NPC) != 0; int diff = cyber ? World.diffCyb : World.diffCbt; if (!NPCInPlayerPVS(idx)) return false;/*Cell PVS gate, same as the player path below. Was skipped for NPC targets, so NPCs tracked enemies through the whole level.*/
     if (diff == 0 && n != 28) return false; if (Cheats.notarget && !enIsNPC) { World.instances[idx].enemy = 0; World.instances[idx].posCheckFinished = World.pauseRelativeTime + AI_POS_CHECK_DELAY; World.instances[idx].lastPosition = World.position[idx]; flag_set(&World.instances[idx].entflags, EF_ENEM_IN_LOS, false); return false; }
     if (cyber && World.decoyActive && eidx == World.decoyInstance) { flag_set(&World.instances[idx].entflags, EF_ENEM_IN_LOS, true); return true; }
-    
-    V3 spos = ai_sight_pos(&World.instances[idx]);
-    float dist = V3_Dist(World.position[eidx], spos);
-    if (dist > npc->sightRange) return false;
-    if (cyber) return true; /*Cyborgs see through geometry by design; every other target, NPC included, falls through to the raycast.*/
-        
-    V3 lineN = V3_Normalize(V3_AsubB(World.position[eidx], spos));
-    RaycastHit hit=Raycast(spos, lineN, npc->sightRange, enIsNPC ? (LMASK_NPC_SIGHT | L_NPC) : LMASK_NPC_SIGHT); /*L_NPC only when the target is an NPC: LMASK_NPC_SIGHT omits it, so the ray would otherwise pass straight through the target (on purpose though! player is important and this improves infighting chances).*/
+    V3 spos = ai_sight_pos(&World.instances[idx]); float dist = V3_Dist(World.position[eidx], spos); if (dist > npc->sightRange) return false;
+    if (cyber) { return true;/*Cyborgs see through geometry by design; every other target, NPC included, falls through to the raycast.*/ }
+    V3 lineN = V3_Normalize(V3_AsubB(World.position[eidx], spos)); RaycastHit hit=Raycast(spos, lineN, npc->sightRange, enIsNPC ? (LMASK_NPC_SIGHT | L_NPC) : LMASK_NPC_SIGHT); /*L_NPC only when the target is an NPC: LMASK_NPC_SIGHT omits it, so the ray would otherwise pass straight through the target (on purpose though! player is important and this improves infighting chances).*/
     if (hit.hit) {
         if (hit.hitInstanceIndex == eidx) { flag_set(&World.instances[idx].entflags, EF_ENEM_IN_LOS, true); return true; }
-        
         NPCType t = npc->type;
-        if (t != NPCType_Mutant && t != NPCType_Supermutant && t != NPCType_Cyber) { /*Smart npcs attempt to open doors between them and player.*/
-            u16 hi=hit.hitInstanceIndex;
-            if (hi&&V3_SqDist(hit.point,spos)<4.0f&&IdxIsDoor(World.instances[hi].index)){
-                Entity* dr=&World.instances[hi];
-                if ((dr->doorOpen == DoorState_Closed || (dr->doorOpen == DoorState_Closing && World.diffCbt > 2)) && !(dr->entflags & EF_LOCKED) && GetCurrentLevelSecurity() <= UsableOrDef((float)dr->securityThreshold,100.0f) && (dr->requiredAccessCard == ACC_None)) DoorActuate(hi);
-            }
+        if (t != NPCType_Mutant && t != NPCType_Supermutant && t != NPCType_Cyber) { /*Smart npcs open doors btw them and player.*/ 
+            u16 hi = hit.hitInstanceIndex;
+            if (hi && V3_SqDist(hit.point,spos) < 4.0f && IdxIsDoor(World.instances[hi].index)) { Entity* dr = &World.instances[hi]; if ((dr->doorOpen == DoorState_Closed || (dr->doorOpen == DoorState_Closing && World.diffCbt > 2)) && !(dr->entflags & EF_LOCKED) && GetCurrentLevelSecurity() <= UsableOrDef((float)dr->securityThreshold,100.0f) && (dr->requiredAccessCard == ACC_None)) DoorActuate(hi); }
         }
     } flag_set(&World.instances[idx].entflags, EF_ENEM_IN_LOS, false); return false;
 }
-
 static void AISetEnemy(u16 idx, u16 eidx) {
     if (!eidx) {return;}
-    
     if (eidx == PLAYER1) {
         u16 d = U16_MAX;
-        if (!World.decoyActive) { World.decoyInstance = U16_MAX; }
-        else {
-            u16 check_d = World.decoyInstance;
-            if (check_d >= INSTS_1ST_IDX && check_d < World.instCount && World.instances[check_d].index == 553u) { d = check_d; }
-            else {
-                for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if(World.instances[i].index == 553u){World.decoyInstance = i; d = i; break;} }
-                if (d == U16_MAX) { World.decoyInstance = U16_MAX; }
-            }
-        }
+        if (!World.decoyActive) { World.decoyInstance = U16_MAX; } else { u16 check_d = World.decoyInstance; if (check_d >= INSTS_1ST_IDX && check_d < World.instCount && World.instances[check_d].index == 553u) { d = check_d; } else { for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if(World.instances[i].index == 553u){World.decoyInstance = i; d = i; break;} } if (d == U16_MAX) { World.decoyInstance = U16_MAX; } } }
         if (d != U16_MAX && (npcTable[World.instances[idx].index - 419].type == NPCType_Cyber)) eidx = d;
     }
-    World.instances[idx].enemy=eidx; World.instances[idx].posCheckFinished=World.pauseRelativeTime + AI_POS_CHECK_DELAY; flag_set(&World.instances[idx].entflags,EF_WANDERING,false); World.instances[idx].wanderFinished=World.pauseRelativeTime;
+    World.instances[idx].enemy=eidx; World.instances[idx].posCheckFinished=World.pauseRelativeTime + AI_POS_CHECK_DELAY; flag_set(&World.instances[idx].entflags,EF_WANDERING,false); World.instances[idx].wanderFinished=World.pauseRelativeTime; 
     World.instances[idx].lastPosition = World.position[idx]; World.instances[idx].targettingPosition = V3Add(V3Add(World.position[eidx],World.colliderCenter[eidx]),(V3){0.0f,AI_TARGET_OFFSET_Y,0.0f}); AISetHuntFinished(idx);
 }
-
-
 static void AIPlaySightSound(u16 idx) { if ((!(World.instances[idx].entflags&EF_FIRST_SIGHTING)) || (!HasHealth(idx)) || (World.instances[idx].entflags&EF_ACT_AS_CORPSE_ONLY)){return;} flag_set(&World.instances[idx].entflags,EF_FIRST_SIGHTING,false); i16 sfx = aiSFX[1][World.instances[idx].index - 419]; if (sfx >= 39 && sfx < SOUNDS_COUNT){play_wav(sounds[sfx],AppliedFXVol(1.0f),World.position[idx],true);} }
 bool AICheckIfPlayerInSight(u16 idx) {
     u16 n = (u16)(World.instances[idx].index - 419); const NPCTable* npc=&npcTable[n]; bool cyber = npc->type == NPCType_Cyber; int diff = cyber ? World.diffCyb : World.diffCbt; if (!NPCInPlayerPVS(idx) || (diff == 0 && n != 28)) return false; if (World.instances[idx].enemy) return AICheckIfEnemyInSight(idx);
@@ -305,7 +220,7 @@ static void AIWalk(u16 self) {
         }
     }
     if (dist > AI_STOP_DIST && AIWithinAngleToTarget(&World.instances[self])) {
-        if (npc->hopsOnMove) { AIHopMove(self); }
+        if (npc->hops) { AIHopMove(self); }
         else {
             float ws  = npc->walkSpeed; V3 mv = { World.instances[self].forward.x*ws,World.instances[self].forward.y*ws,World.instances[self].forward.z*ws };
             if (npc->moveType != AIMoveType_Fly) {
@@ -342,7 +257,7 @@ static void AIHunt(Entity* self) {
 static float DistToEnemy(u16 self, u16 enem) { if(self >= World.instCount){return 100000.0f;} if(enem >= World.instCount){return 100000.0f;} V3 d = V3_AsubB(ai_sight_pos(&World.instances[self]),World.position[enem]); return V3_dot(d,d); }
 static bool AICanAttack(u16 selfIdx, float dsq, u8 type, float dsqToEnemy) {
     Entity* self = &World.instances[selfIdx]; const NPCTable* npc = &npcTable[self->index - 419]; bool cyber = npc->type == NPCType_Cyber; if (dsqToEnemy >= dsq) return false; AttType att = type == 3 ? npc->attack[2].type : (type == 2 ? npc->attack[1].type : npc->attack[0].type); if (att == Att_None) return false;
-    if (type == 3) { if (dsqToEnemy < 49.0f && att == Att_Ball)/*DistToEnemy returns SQUARED distance; Unity linear <7f == squared <49*/ { int p = npc->attack[2].projectilePrefab; if(p == 370 || p == 372 || p == 387 || p == 404){return false;} } } if (cyber/*Cyber enemies are dumb but aggressive.*/) return true;
+    if (type == 3) { if (dsqToEnemy < 49.0f && att == Att_Ball) { int p = npc->attack[2].projectilePrefab; if(p == 370 || p == 372 || p == 387 || p == 404){return false;} } } if (cyber/*Cyber enemies are dumb but aggressive.*/) return true;
     if ((!(self->entflags & EF_ENEM_IN_FRONT)) || (type >= 2 && !(self->entflags & EF_ENEM_IN_FOV))){return false;} float wait = type == 3 ? self->randWaitAtt3Finished : (type == 2 ? self->randWaitAtt2Finished : self->randWaitAtt1Finished); return wait < World.pauseRelativeTime;
 }
 
@@ -372,7 +287,7 @@ static void AIRun(u16 selfIdx) {
     if (self->enemy && !(self->entflags & EF_WANDERING)) { self->targettingPosition=V3Add(V3Add(World.position[self->enemy],World.colliderCenter[self->enemy]),(V3){0.0f,AI_TARGET_OFFSET_Y,0.0f}); self->currentDestination=self->targettingPosition; }
     flag_set(&self->entflags,EF_SHOT_FIRED,false); AISetHuntFinished(selfIdx); float nr = npc->attack[0].range, near = nr * nr, mr = npc->attack[1].range, mid  = mr * mr, fr = npc->attack[2].range, far  = fr * fr, rangeToEnemy = DistToEnemy(selfIdx,self->enemy);/*computed once for all three checks: the target can't move within the same think tick*/
     if (AICanAttack(selfIdx,near,1,rangeToEnemy)) { AIStartAttack(self,1); return; } if (AICanAttack(selfIdx, mid,2,rangeToEnemy)) { AIStartAttack(self,2); return; } if (AICanAttack(selfIdx, far,3,rangeToEnemy)) { AIStartAttack(self,3); return; }
-    if (npc->moveType != AIMoveType_None && rangeToEnemy > AI_STOP_DIST_SQ) { if (AIWithinAngleToTarget(self)) { if (npc->hopsOnMove && !(World.instances[selfIdx].entflags & EF_ACT_AS_TURRET)){ AIHopMove(selfIdx); } else { AIRunMove(selfIdx); } } else if (World.diffCbt >= 2 && random_range(0.0f,1.0f) < 0.5f) { AIFace(self,self->currentDestination); } }
+    if (npc->moveType != AIMoveType_None && rangeToEnemy > AI_STOP_DIST_SQ) { if (AIWithinAngleToTarget(self)) { if (npc->hops && !(World.instances[selfIdx].entflags & EF_ACT_AS_TURRET)){ AIHopMove(selfIdx); } else { AIRunMove(selfIdx); } } else if (World.diffCbt >= 2 && random_range(0.0f,1.0f) < 0.5f) { AIFace(self,self->currentDestination); } }
 }
 
 static void AIPain(Entity* self) { if (self->timeTillPainFinished < World.pauseRelativeTime) { self->currentState = AIState_Run; flag_set(&self->entflags, EF_GO_INTO_PAIN, false); self->timeTillPainFinished = World.pauseRelativeTime + npcTable[self->index - 419].timeBetweenPain; } }
@@ -480,30 +395,16 @@ static void AIDead(u16 idx) {
     }
     flag_set(&World.instances[idx].entflags, EF_DEAD_CHECKS_DONE, true);
 }
-
 static DamageData SetNPCData(Entity* self, int n) { const NPCAttack* a=&npcTable[self->index-419].attack[n==1 ? 0 : n==2 ? 1 : 2]; return (DamageData){.owner=(u16)(self-World.instances),.damage=a->damage,.attackType=a->type}; }
-float GetDamageTakeAmount(DamageData*);
 static void ai_apply_damage(DamageData dd, u16 hitIdx) {
-    if(!hitIdx || hitIdx >= INSTANCE_COUNT || hitIdx >= World.instCount){return;}
-    if(hitIdx == dd.owner){return;} // Never hurt self (melee/projectile origin sits inside own capsule).
-    if(!(World.instances[hitIdx].entflags & EF_ACTIVE)){return;}
-    
-    bool hitPlayer = (hitIdx == PLAYER1);
-    dd.isOtherNPC=!hitPlayer && IdxIsNPC(World.instances[hitIdx].index);
-    if (dd.isOtherNPC) { const NPCTable* nt = &npcTable[World.instances[hitIdx].index - 419]; dd.defense = nt->defense; }
-    dd.damage = GetDamageTakeAmount(&dd);
-    TakeDamage(hitIdx, dd);
+    if(!hitIdx || hitIdx >= INSTANCE_COUNT || hitIdx >= World.instCount){return;} if(hitIdx == dd.owner){return;} if(!(World.instances[hitIdx].entflags & EF_ACTIVE)){return;} bool hitPlayer = (hitIdx == PLAYER1); dd.isOtherNPC=!hitPlayer && IdxIsNPC(World.instances[hitIdx].index); if (dd.isOtherNPC) { const NPCTable* nt = &npcTable[World.instances[hitIdx].index - 419]; dd.defense = nt->def; } dd.damage = GetDamageTakeAmount(&dd); TakeDamage(hitIdx, dd);
 }
 static void AIApplyAttackMovement(Entity* self, float speed) { u16 eidx=self->enemy; if(!eidx)return; if(self->entflags & EF_ACT_AS_TURRET){self->currentDestination=ai_sight_pos(self); return;} if(speed<=0||self->tranquilizeFinished>=World.pauseRelativeTime)return; self->currentDestination=World.position[eidx]; if(V3_SqDist(ai_sight_pos(self),self->currentDestination)<=AI_STOP_DIST_SQ)return; if(!AIWithinAngleToTarget(self))return; AddForce((u16)(self-World.instances),V3_ScaleByF(self->forward,speed),false); }
 static void AITransitionAttackToRun(Entity* self, int n) {
-    flag_set(&self->entflags,EF_GO_INTO_PAIN,false); self->currentState=AIState_Run; const NPCTable* npc=&npcTable[self->index - 419]; const NPCAttack* a=&npc->attack[n==1 ? 0 : n==2 ? 1 : 2];
-    float* wait=n==1 ? &self->randWaitAtt1Finished : n==2 ? &self->randWaitAtt2Finished : &self->randWaitAtt3Finished;
-    *wait=random_range(0.0f,1.0f)<a->waitChance ? World.pauseRelativeTime+random_range(a->waitMin,a->waitMax) : World.pauseRelativeTime;
+    flag_set(&self->entflags,EF_GO_INTO_PAIN,false); self->currentState = AIState_Run; const NPCTable* npc = &npcTable[self->index - 419]; const NPCAttack* a = &npc->attack[n == 1 ? 0 : n == 2 ? 1 : 2]; float* w = n == 1 ? &self->randWaitAtt1Finished : n == 2 ? &self->randWaitAtt2Finished : &self->randWaitAtt3Finished; *w = random_range(0.0f,1.0f) < a->waitChance ? World.pauseRelativeTime+random_range(a->waitMin,a->waitMax) : World.pauseRelativeTime;
 }
-
 static void ProjectileRaycast(Entity* self, int n) {
     if (n < 1 || n > 3){n = 1;} V3 spos = (n == 1) ? ai_sight_pos(self) : ai_gun_pos(self, n); u16 selfIdx=(u16)(self - World.instances); u16 eidx = self->enemy; V3 targ = eidx ? self->targettingPosition : (V3){spos.x + self->forward.x*10.0f,spos.y,spos.z + self->forward.z*10.0f}; V3 dir=(n == 1) ? self->forward : V3_Normalize(V3_AsubB(targ,spos)); float range=npcTable[self->index-419].attack[n-1].range;
-    // Origin sits inside own capsule; push start forward so we don't hit ourselves.
     V3 opos = {spos.x + dir.x*0.55f, spos.y + dir.y*0.55f, spos.z + dir.z*0.55f};
     ai_muzzle_particles(self,n);
     RaycastHit hit = Raycast(opos, dir, range, LMASK_NPC_ATTACK); if(!hit.hit){return;} u16 hi = hit.hitInstanceIndex;
@@ -514,7 +415,6 @@ static void ProjectileRaycast(Entity* self, int n) {
     dd.hitpoint=hit.point; dd.attacknormal=dir; dd.impactVelocity=dd.damage; bool hitPlayer=(hi == PLAYER1); if(hitPlayer){dd.impactVelocity *= 0.5f;} dd.isOtherNPC=!hitPlayer && IdxIsNPC(World.instances[hi].index);
     if (hi){ai_apply_damage(dd,hi);} u16 impactCI = GetImpactType(hi); if(impactCI){SpawnImpactEffectParticle(impactCI,hit.point,hit.normal);}
 }
-
 static void ProjectileLaunched(Entity* self, int n) {
     if (n < 1 || n > 3){n = 3;} ai_muzzle_particles(self,n);
     u16 sidx=(u16)(self - World.instances); const NPCTable* npc = &npcTable[self->index - 419]; int masterIdx=npc->attack[n-1].projectilePrefab; float launchSpd=npc->attack[n-1].projectileSpeed;
@@ -524,15 +424,7 @@ static void ProjectileLaunched(Entity* self, int n) {
     proj->damage=dd.damage; proj->strength=dd.penetration; proj->speed=dd.offense; proj->attackType=dd.attackType; proj->recentMostActivator=sidx; ProjectileEffectImpactInitAfterLoad(bb);
     V3 shove = V3_ScaleByF(dir, launchSpd); if (World.instances[sidx].hasGrav) { shove.x += World.velocity[sidx].x; shove.z += World.velocity[sidx].z; } World.velocity[bb] = (V3){0}; AddForce(bb,shove,true); flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);
 }
-
-static void AIExplodeAttack(Entity* self) {
-    u16 selfIdx=(u16)(self - World.instances);
-    float radius = npcTable[self->index - 419].attack3Radius; float force=npcTable[self->index - 419].attack3Force; V3 epos = ai_sight_pos(self); DamageData dd = SetNPCData(self, 3);
-    dd.damage = GetDamageTakeAmount(&dd);
-    ApplyImpactForceSphere(&dd, epos, radius, force);
-    DamageData selfdd = SetNPCData(self, 3); TakeDamage(selfIdx, selfdd);
-}
-
+static void AIExplodeAttack(Entity* self) { u16 selfIdx=(u16)(self - World.instances); float radius = npcTable[self->index - 419].attack3Radius; float force=npcTable[self->index - 419].attack3Force; V3 epos = ai_sight_pos(self); DamageData dd = SetNPCData(self, 3); dd.damage = GetDamageTakeAmount(&dd); ApplyImpactForceSphere(&dd, epos, radius, force); DamageData selfdd = SetNPCData(self, 3); TakeDamage(selfIdx, selfdd); }
 static void AIMakeAttack(Entity* self, AttType att, int ind) { if (ind < 1 || ind > 3){ind=1;/*Melee hitscan by default.*/} switch (att) { case Att_Melee:ProjectileRaycast(self,ind); break; case Att_HitS: case Att_PjBm:ProjectileRaycast(self,ind); World.fogFac += 1; break; case Att_Ball:ProjectileLaunched(self,ind); World.fogFac += 1; break; default: break; } }
 static void AIAttack(Entity* self, int slot) {
     if (self->entflags & EF_ASLEEP) { return; }
@@ -540,41 +432,22 @@ static void AIAttack(Entity* self, int slot) {
     if (self->gracePeriodFinished < World.pauseRelativeTime && !(self->entflags & EF_SHOT_FIRED)) { flag_set(&self->entflags,EF_SHOT_FIRED,true); int sat = aiSFX[slot + 1][self->index - 419]; float* s_time = slot == 1 ? &self->attack1SoundTime : (slot == 2 ? &self->attack2SoundTime : &self->attack3SoundTime); float tb = npc->attack[slot-1].timeBetween; AttType attack = npc->attack[slot-1].type; if (*s_time < World.pauseRelativeTime && sat >= 0 && sat < (i16)SOUNDS_COUNT) { play_wav(sounds[sat],AppliedFXVol(1.0f),World.position[sidx],true); *s_time=World.pauseRelativeTime + tb; } AIMakeAttack(self,attack,slot); }
     if (Cheats.showNPC) { (slot == 3 && self->enemy) ? (self->index == 427 ? DrawLine(ai_sight_pos(self),World.position[self->enemy],(Color){1.0f, 0.15f, 0.18f, 0.85f}) : self->index == 433 ? DrawLine(ai_sight_pos(self),World.position[self->enemy],(Color){0.96f,1.0f,0.0f,0.88f}) : (void)0) : (void)0; } if (self->attackFinished < World.pauseRelativeTime) AITransitionAttackToRun(self,slot);
 }
-
 static void AIFlierMoveToHoverHeight(Entity* self) {
-    u16 sidx = (u16)(self - World.instances);
-    const NPCTable* npc = &npcTable[self->index - 419]; if (npc->runSpeed <= 0.0f) return;
-    
-    u16 eidx = self->enemy;
+    u16 sidx = (u16)(self - World.instances); const NPCTable* npc = &npcTable[self->index - 419]; if (npc->runSpeed <= 0.0f) return; u16 eidx = self->enemy;
     if (eidx) { self->idealPos = World.position[sidx]; self->idealPos.y += AI_TARGET_OFFSET_Y; }
-    else {
-        V3 sp = ai_sight_pos(self);
-        RaycastHit dn=Raycast(sp,(V3){0,-1,0},npc->sightRange,LMASK_NPC_SIGHT);
-        if (dn.hit) {
-            float dUp=0.0f;
-            if (npc->flightHeightIsPercentage) {
-                RaycastHit up=Raycast(sp,(V3){0,1,0},npc->sightRange,LMASK_NPC_SIGHT);
-                if (up.hit) dUp=up.distance;
-            }
-            float yH=npc->flightHeight * (npc->flightHeightIsPercentage ? dn.distance + dUp : 1.0f);
-            self->idealPos = dn.point; self->idealPos.y += yH;
-        } else self->idealPos=World.position[sidx];
-    }
+    else { V3 sp = ai_sight_pos(self); RaycastHit dn=Raycast(sp,(V3){0,-1,0},npc->sightRange,LMASK_NPC_SIGHT); if (dn.hit) { float dUp=0.0f; if (npc->flightHtIsPerc) { RaycastHit up=Raycast(sp,(V3){0,1,0},npc->sightRange,LMASK_NPC_SIGHT); if (up.hit) dUp=up.distance; } float yH=npc->flightHt * (npc->flightHtIsPerc ? dn.distance + dUp : 1.0f); self->idealPos = dn.point; self->idealPos.y += yH; } else self->idealPos=World.position[sidx]; }
     float dy = self->idealPos.y - World.position[sidx].y, maxV = npc->runSpeed * World.timeScale, vDesired = vclamp(dy * 8.0f, -maxV, maxV);
     AddForce(sidx, (V3){0.0f, (vDesired - World.velocity[sidx].y) * EntMass(sidx), 0.0f}, true);
 }
-
 void AIAlert(u16 idx) { if (!World.diffCbt){return;} Entity* self = &World.instances[idx]; AISetEnemy(idx,PLAYER1); self->currentDestination = World.position[PLAYER1]; flag_set(&self->entflags, EF_ENEM_IN_SIGHT, false); }
 static void AIThink(u16 idx) {
     Entity* self = &World.instances[idx]; if ((self->entflags & EF_DYING_SETUP) && self->deathBurstFinished < World.pauseRelativeTime && !(self->entflags & EF_DEATH_BURST_DONE)) { SpawnNPCDeathBurst(self); flag_set(&self->entflags,EF_DEATH_BURST_DONE,true); }
     if (!HasHealth(idx)) { if (!(self->entflags & EF_DYING) && !(self->entflags & EF_DEAD)){flag_set(&self->entflags,EF_DYING,true); self->currentState=AIState_Dying;}else if((self->entflags & EF_DEAD) && self->currentState != AIState_Dead){self->currentState=AIState_Dead;}else if((self->entflags & EF_DYING) && self->currentState != AIState_Dying){self->currentState=AIState_Dying;} }
     switch (self->currentState) { case AIState_Idle:AIIdle(idx); break; case AIState_Walk:AIWalk(idx); break; case AIState_Run:AIRun(idx); break; case AIState_Attack1:AIAttack(self,1); break; case AIState_Attack2:AIAttack(self,2); break; case AIState_Attack3:AIAttack(self,3); break; case AIState_Pain:AIPain(self); break; case AIState_Dying:AIDying(idx); break; case AIState_Dead:AIDead(idx); break; default:AIIdle(idx); break; }
 }
-
 void AIControllerUpdate(u16 idx) {
     ai_update_effect_lights(); Entity* self=&World.instances[idx]; if(!(self->entflags & EF_ACTIVE)){return;}
     u16 edx=self->index; if(!IdxIsNPC(edx)){return;}
-    
     u16 ndx = edx - 419, eidx = self->enemy;
     const NPCTable* npc = &npcTable[ndx]; bool cyber = npc->type == NPCType_Cyber;
     if (self->currentState != AIState_Dead && self->currentState != AIState_Dying) { World.instances[idx].hasGrav = !(cyber || npc->moveType == AIMoveType_Fly); }
