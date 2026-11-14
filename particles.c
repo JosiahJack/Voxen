@@ -224,14 +224,12 @@ void PSysClearLevel(u8 level) {
         World.levParticles[level].count = 0;
     }
 }
-
 u16 PSysAddInternal(const PSysDef* pd, u16 meshInstance, u16 parentIdx) {
     PSysDef def=*pd; if(def.trail && def.trailTexture>=MAXTEX){def.trailTexture=881u;}
     LevelParticles* list = World.particles;
     if (list->count >= MAX_LEVEL_PARTICLES) return U16_MAX;
     for (u16 i = 0; i < MAX_EMITTERS; i++) {
         if (psys.emitters[i].active || psys.emitters[i].aliveCount){continue;}
-        
         Emitter* em=&psys.emitters[i]; u16 fc=def.textureCount; u32 baseTex=fc ? def.textures[0] : 0; if(fc == 0){fc=1;} em->active=true; em->looping=def.looping; em->position = def.pos; float rotationLength = def.rotation.x*def.rotation.x + def.rotation.y*def.rotation.y + def.rotation.z*def.rotation.z + def.rotation.w*def.rotation.w;
         if (rotationLength < 0.000001f) { em->orientation = QUAT_IDENTITY; } else { float invRotationLength = 1.0f/vsqrtf(rotationLength); em->orientation = (Quaternion){def.rotation.x*invRotationLength,def.rotation.y*invRotationLength,def.rotation.z*invRotationLength,def.rotation.w*invRotationLength}; } em->emitAccumulator=em->age=0; em->emitRate = def.emitRate; em->duration = def.duration; em->aliveCount = 0;
         em->physicsMode=(def.gravity != 0) ? 1 : 0; em->trail=def.trail; em->shapeType=def.shapeType; em->useMesh=def.useMesh; em->parentIdx=parentIdx;
@@ -249,7 +247,6 @@ u16 PSysAddInternal(const PSysDef* pd, u16 meshInstance, u16 parentIdx) {
         if(def.velCount >= 2){build_curve(em->velocityCurve,def.velKeys,def.velTimes,def.velCount);} if(def.rotCount >= 2){build_curve(em->rotationCurve,def.rotKeys,def.rotTimes,def.rotCount);} if(def.emissCount >= 2){build_curve(em->emissionCurve,def.emissKeys,def.emissTimes,def.emissCount);} list->emitters[list->count++] = i; return i;
     } return U16_MAX;
 }
-
 void PSysAddLevelLoops() { for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { u16 type; switch (World.instances[i].index) { case 720: type = 7; break; case 733: type = 45; break; case 734: type = 47; break; default: continue; } const PSysDef *preset = PSysTypeGet(type); if (!preset) continue; PSysDef def = *preset; def.pos = World.position[i]; def.rotation = World.rotation[i]; PSysAddInternal(&def,U16_MAX,U16_MAX); } }
 INLINE int trail_cmp(const void* a, const void* b){TrlSegInst* ta=(TrlSegInst*)a; TrlSegInst* tb=(TrlSegInst*)b; float ax=(ta->p0x+ta->p1x)*0.5f-trailSortCam.x,ay=(ta->p0y+ta->p1y)*0.5f-trailSortCam.y,az=(ta->p0z+ta->p1z)*0.5f-trailSortCam.z,bx=(tb->p0x+tb->p1x)*0.5f-trailSortCam.x,by=(tb->p0y+tb->p1y)*0.5f-trailSortCam.y,bz=(tb->p0z+tb->p1z)*0.5f-trailSortCam.z; float da=ax*ax+ay*ay+az*az,db=bx*bx+by*by+bz*bz; return da>db?-1:(da<db?1:0);}
 void PSys_Render(float* viewProj, V3 camPos, V3 camRight, V3 camUp, V3 camForward, u32 depthTex, float near, float far, float viewW, float viewH) {
@@ -287,7 +284,6 @@ void PSys_Render(float* viewProj, V3 camPos, V3 camRight, V3 camUp, V3 camForwar
                 TrlSegInst* b=&psys.trailSegments[j]; if (a->trailOwner != b->trailOwner){continue;}
                 if (((a->uvData>>16)&0xFFFFu) != ((b->uvData>>16)&0xFFFFu)){continue;}
                 if (b->chainIndex != a->chainIndex + 1){continue;}
-                
                 a->c10x = b->c00x = (a->c10x + b->c00x) * 0.5f; a->c10y = b->c00y = (a->c10y + b->c00y) * 0.5f; a->c10z = b->c00z = (a->c10z + b->c00z) * 0.5f; a->c11x = b->c01x = (a->c11x + b->c01x) * 0.5f; a->c11y = b->c01y = (a->c11y + b->c01y) * 0.5f; a->c11z = b->c01z = (a->c11z + b->c01z) * 0.5f;
             }
         }
@@ -296,27 +292,22 @@ void PSys_Render(float* viewProj, V3 camPos, V3 camRight, V3 camUp, V3 camForwar
         glDrawArraysInstanced(GL_TRIANGLE_STRIP,0,4,psys.trailCount); drawCalls++; vertsRendered += psys.trailCount * 4; glEnable(GL_CULL_FACE); glDepthMask(GL_TRUE); glDisable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); glDepthFunc(GL_LESS);
     }
 }
-
 INLINE int sort_cmp(const void* a, const void* b) { u32 ka = ((const PartSortEntry*)a)->sortKey; u32 kb = ((const PartSortEntry*)b)->sortKey; return (ka > kb) - (ka < kb); }
 void PSys_Update(float dt) {
     if (!World.particles) { psys.aliveCount = 0; psys.trailCount = 0; return; }
-    
     if (World.particles->count > MAX_LEVEL_PARTICLES) World.particles->count = MAX_LEVEL_PARTICLES;
     PSysCompactLevelList();
     float now=(float)World.pauseRelativeTime; u32 out=0; for(u32 i=0;i<psys.trailCount;++i){TrlSegInst* s=&psys.trailSegments[i]; if(s->deathTime > now && PSysLevelOwnsEmitter((u16)(s->uvData >> 16))){if(out!=i){psys.trailSegments[out]=*s;} out++;}} psys.trailCount=out;/*Prune trails*/
     for (u16 i = 0; i < MAX_EMITTERS; i++) {/*Update emitters*/
         if (!PSysLevelOwnsEmitter(i)) continue;
         Emitter* em = &psys.emitters[i]; if(!em->active){continue;}
-        
         if (em->parentIdx != U16_MAX) {
             if (em->parentIdx >= World.instCount || !(World.instances[em->parentIdx].entflags & EF_ACTIVE)) { em->active = false; u32 keep = 0; for (u32 r = 0; r < psys.aliveCount; ++r) { if (psys.particles[r].emitterIndex != i) { psys.particles[keep++] = psys.particles[r]; } } em->aliveCount = 0; psys.aliveCount = keep; continue; }
-            
             V3 moved = V3_AsubB(World.position[em->parentIdx], em->position);
             if (moved.x || moved.y || moved.z) { for (u32 p = 0; p < psys.aliveCount; ++p) { Particle* pp = &psys.particles[p]; if (pp->emitterIndex == i) { pp->pos = V3Add(pp->pos, moved); } } }
             em->position = World.position[em->parentIdx];
         }
         em->age+=dt; if(em->duration > 0.0f&& em->age>=em->duration){em->active=false; continue;}
-        
         int count=0; if(em->burstRemaining){count=em->burstRemaining; em->burstRemaining=0; em->emitAccumulator=0.0f;} else { float rate = em->emitRate; if (em->duration > 0.0f && em->duration < 1000000.0f){rate*=sample_curve(em->emissionCurve,em->age/em->duration);} em->emitAccumulator+=rate*dt; count=(int)em->emitAccumulator; em->emitAccumulator-=(float)count; }
         for (int p = 0; p < count; p++) {
             if ((psys.aliveCount >= MAX_PARTICLES) || (em->aliveCount >= 2000)){break;} Particle* part = &psys.particles[psys.aliveCount]; float angle = random_range(0.0f,6.2831853f), speed = random_range(em->speedMin,em->speedMax); V3 dir; u16 mdl = U16_MAX; if (em->useMesh && em->meshInstance < INSTANCE_CNT) { u16 cur = World.instances[em->meshInstance].modelIndex; mdl = (cur < MAX_MDLS && physPos[cur] && physVertCounts[cur]) ? cur : em->meshModelIdx; if (mdl >= MAX_MDLS || !physPos[mdl] || !physVertCounts[mdl]) mdl = U16_MAX; } const float* Mp = (mdl != U16_MAX) ? &modelMatrices[em->meshInstance*16] : NULL;

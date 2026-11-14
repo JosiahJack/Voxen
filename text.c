@@ -1,13 +1,13 @@
 // text.c - Text and Font Rendering/Loading System
 #include "common.h"
-typedef struct {i16 x,y,cx,cy,cx1,cy1;u8 type,padding;} font_vertex;
-typedef struct {void*userdata;u8*data;int fontstart,numGlyphs,loca,head,glyf,hhea,hmtx,index_map,indexToLocFormat;} font_fontinfo;
+typedef struct {i16 x,y,cx,cy,cx1,cy1;u8 type,padding;} font_vertex;    typedef struct {void*userdata;u8*data;int fontstart,numGlyphs,loca,head,glyf,hhea,hmtx,index_map,indexToLocFormat;} font_fontinfo;    typedef struct tt_heapchk{ struct tt_heapchk* next; }tt_heapchk;    typedef struct{ tt_heapchk* head; void* first_free; int remaining; }font__hheap;    typedef struct{ float x0,y0,x1,y1; int invert; }font__edge;
+typedef struct font__active_edge{ struct font__active_edge*next; float fx,fdx,fdy,direction,sy,ey; }font__active_edge;
 INLINE i16 ttSHORT (u8*p) { return p[0]*256 + p[1]; }
 INLINE u16 ttUSHORT(u8*p) { return p[0]*256 + p[1]; }
 INLINE u32 ttULONG (u8*p) {return((u32)p[0]<<24)|((u32)p[1]<<16)|((u32)p[2]<<8)|p[3];}
 INLINE size_t GetLineLength(const u8* data, size_t total_size, size_t start_dp, int utf16) {
     size_t dp = start_dp;
-    if (utf16) { while (dp + 1 < total_size) { u16 ch = data[dp] | (data[dp + 1] << 8); dp += 2; if (ch == '\r' || ch == '\n') { if (ch == '\r' && dp + 1 < total_size && (data[dp] | (data[dp + 1] << 8)) == '\n') dp += 2; break; } } }
+    if (utf16) { while (dp + 1 < total_size) { u16 ch = data[dp] | (data[dp + 1] << 8); dp += 2; if (ch == '\r' || ch == '\n') { if (ch == '\r' && dp + 1 < total_size && (data[dp] | (data[dp + 1] << 8)) == '\n') dp += 2; break; } } } 
     else       { while (dp     < total_size) { u8  c  = data[dp]; if (c == '\r' || c == '\n') {  if ( c == '\r' && dp + 1 < total_size && data[dp + 1] == '\n') dp++; dp++; break; } dp++; } }
     return dp - start_dp;
 }
@@ -77,32 +77,22 @@ static int font_GetGlyphShape(const font_fontinfo *info, int gi, font_vertex **p
     *pv = verts;
     return nv;
 }
-typedef struct tt_heapchk{ struct tt_heapchk* next; }tt_heapchk;
-typedef struct{ tt_heapchk* head; void* first_free; int remaining; }font__hheap;
+
 static void* _hha(font__hheap* hh,size_t sz) { if(hh->first_free){void*p=hh->first_free;hh->first_free=*(void**)p;return p;} if(!hh->remaining) {int c=sz<32?2000:sz<128?800:100;tt_heapchk*ck=(tt_heapchk*)OS_AllocScratch(sizeof(*ck)+sz*c); if(!ck){return NULL;} ck->next=hh->head; hh->head=ck; hh->remaining=c;} --hh->remaining; return(char*)hh->head+sizeof(tt_heapchk)+sz*hh->remaining; }
 static void _hhf(font__hheap* hh,void*p) { *(void**)p=hh->first_free;hh->first_free=p; }
-typedef struct{ float x0,y0,x1,y1; int invert; }font__edge; typedef struct font__active_edge{ struct font__active_edge*next; float fx,fdx,fdy,direction,sy,ey; }font__active_edge;
 static void _hce(float*sl,int x,font__active_edge*e,float x0,float y0,float x1,float y1){ if(y0==y1||y0>e->ey||y1<e->sy)return;if(y0<e->sy){x0+=(x1-x0)*(e->sy-y0)/(y1-y0);y0=e->sy;}if(y1>e->ey){x1+=(x1-x0)*(e->ey-y1)/(y1-y0);y1=e->ey;} if(x0<=x&&x1<=x)sl[x]+=e->direction*(y1-y0);else if(x0>=x+1&&x1>=x+1);else sl[x]+=e->direction*(y1-y0)*(1.0f-((x0-(float)x)+(x1-(float)x))/2.0f); }
 INLINE float _ptz(float h,float t0,float t1,float b0,float b1){ return ((t1-t0)+(b1-b0))/2.0f*h; }
 static void _add_pt(V2*p,int n,float x,float y){if(p){p[n].x=x;p[n].y=y;}}
 static void _tess_c(V2*pts,int*np,float x0,float y0,float x1,float y1,float x2,float y2,float fsq,int n) { float mx = (x0 + 2*x1 + x2) / 4, my = (y0 + 2*y1 + y2) / 4, dx = (x0 + x2) / 2 - mx, dy = (y0 + y2) / 2 - my; if (n > 16 || dx*dx + dy*dy <= fsq) { _add_pt(pts,(*np)++,x2,y2); return; } _tess_c(pts,np,x0,y0,(x0 + x1) / 2,(y0 + y1) / 2,mx,my,fsq,n + 1); _tess_c(pts,np,mx,my,(x1 + x2) / 2,(y1 + y2) / 2,x2,y2,fsq,n + 1); }
 static int edge_compare(const void* a, const void* b) { float ya = ((const font__edge*)a)->y0, yb = ((const font__edge*)b)->y0; return (ya > yb) - (ya < yb); }
 static void font_MakeGlyphBitmapSubpixel(const font_fontinfo* font, u8* dst, int ow, int oh, int ostr, float sx, float sy, int g, int precomputed_ix0, int precomputed_iy0) {
-    font_vertex *v; int ix0 = precomputed_ix0, iy0 = precomputed_iy0, nv = font_GetGlyphShape(font, g, &v);
-    float scale = sx > sy ? sy : sx;
-    int wc = 0; int *wl = NULL; V2 *win = NULL;
-    float flat = 0.35f / scale; float fsq = flat * flat; int n = 0;
+    font_vertex *v; int ix0 = precomputed_ix0, iy0 = precomputed_iy0, nv = font_GetGlyphShape(font, g, &v); float scale = sx > sy ? sy : sx; int wc = 0; int *wl = NULL; V2 *win = NULL; float flat = 0.35f / scale; float fsq = flat * flat; int n = 0;
     for (int i = 0; i < nv; ++i) { if (v[i].type == FONT_vmove) { ++n; } }
     wc = n;
     if (n != 0) {
-        wl = (int*)OS_AllocScratch(sizeof(int) * (size_t)n);
-        int np = 0;
+        wl = (int*)OS_AllocScratch(sizeof(int) * (size_t)n); int np = 0;
         for (int pass = 0; pass < 2; ++pass) {
-            float x = 0, y = 0;
-            int start = 0;
-            n = -1;
-            if (pass == 1) { win = (V2*)OS_AllocScratch((size_t)np * sizeof(V2)); }
-            np = 0;
+            float x = 0, y = 0; int start = 0; n = -1; if (pass == 1) { win = (V2*)OS_AllocScratch((size_t)np * sizeof(V2)); } np = 0;
             for (int i = 0; i < nv; ++i) {
                 switch (v[i].type) {
                     case FONT_vmove: if (n >= 0) wl[n] = np - start; start = np; ++n; x = v[i].x; y = v[i].y; _add_pt(win, np++, x, y);               break;
@@ -123,18 +113,12 @@ static void font_MakeGlyphBitmapSubpixel(const font_fontinfo* font, u8* dst, int
                 V2* p = win + m; m += wl[i]; int j = wl[i] - 1;
                 for (int k = 0; k < wl[i]; j = k++) {
                     int a = k, b = j; if (p[j].y == p[k].y) continue;
-                    e[n_edges].invert = 0;
-                    if (inv ? p[j].y > p[k].y : p[j].y < p[k].y) { e[n_edges].invert = 1; a = j; b = k; }
-                    e[n_edges].x0 = p[a].x * sx;
-                    e[n_edges].y0 = p[a].y * ysi;
-                    e[n_edges].x1 = p[b].x * sx;
-                    e[n_edges].y1 = p[b].y * ysi;
-                    ++n_edges;
+                    e[n_edges].invert = 0; if (inv ? p[j].y > p[k].y : p[j].y < p[k].y) { e[n_edges].invert = 1; a = j; b = k; }
+                    e[n_edges].x0 = p[a].x * sx; e[n_edges].y0 = p[a].y * ysi;
+                    e[n_edges].x1 = p[b].x * sx; e[n_edges].y1 = p[b].y * ysi; ++n_edges;
                 }
             }
-            qsort_new(e, n_edges, sizeof(font__edge), edge_compare);
-            e[n_edges].y0=(float)(iy0+oh)+1;
-            font__hheap hh={0}; font__active_edge*active=NULL; font__edge*ep=e; float sd[129],*sl=sd,*sl2; int y=iy0,j=0,i;
+            qsort_new(e, n_edges, sizeof(font__edge), edge_compare); e[n_edges].y0=(float)(iy0+oh)+1; font__hheap hh={0}; font__active_edge*active=NULL; font__edge*ep=e; float sd[129],*sl=sd,*sl2; int y=iy0,j=0,i;
             if(ow>64)sl=(float*)OS_AllocScratch((size_t)(ow*2+1)*sizeof(float));
             if(sl){
                 sl2=sl+ow;
@@ -150,12 +134,8 @@ static void font_MakeGlyphBitmapSubpixel(const font_fontinfo* font, u8* dst, int
                             if (xt>=0&&xbt>=0&&xt<ow&&xbt<ow) {
                                 if((int)xt==(int)xbt){int x=(int)xt;float h=(sy1-sy0)*ae->direction;sl[x]+=_ptz(h,xt,(float)x+1.0f,xbt,(float)x+1.0f);sl2[x+1]+=h;}
                                 else{float yc,yf,stp,sign,area;
-                                    if(xt>xbt){float t;sy0=syb-(sy0-syt);sy1=syb-(sy1-syt);t=sy0;sy0=sy1;sy1=t;t=xbt;xbt=xt;xt=t;dx=-dx;dy=-dy;t=x0;x0=xb;xb=t;}
-                                    int x1=(int)xt,x2=(int)xbt;yc=syt+dy*((float)(x1+1)-x0);yf=syt+dy*((float)x2-x0);if(yc>syb)yc=syb;sign=ae->direction;area=sign*(yc-sy0);
-                                    sl[x1]+=area*((float)(x1+1)-xt)/2;
-                                    if(yf>syb){yf=syb;dy=(yf-yc)/((float)x2-(float)(x1+1));}
-                                    stp=sign*dy;for(int x=x1+1;x<x2;++x){sl[x]+=area+stp/2;area+=stp;}
-                                    sl[x2]+=area+sign*_ptz(sy1-yf,(float)x2,(float)x2+1.0f,xbt,(float)x2+1.0f);sl2[x2+1]+=sign*(sy1-sy0);}
+                                    if(xt>xbt){float t;sy0=syb-(sy0-syt);sy1=syb-(sy1-syt);t=sy0;sy0=sy1;sy1=t;t=xbt;xbt=xt;xt=t;dx=-dx;dy=-dy;t=x0;x0=xb;xb=t;} int x1=(int)xt,x2=(int)xbt;yc=syt+dy*((float)(x1+1)-x0);yf=syt+dy*((float)x2-x0);if(yc>syb)yc=syb;sign=ae->direction;area=sign*(yc-sy0); sl[x1]+=area*((float)(x1+1)-xt)/2;
+                                    if(yf>syb){yf=syb;dy=(yf-yc)/((float)x2-(float)(x1+1));} stp=sign*dy;for(int x=x1+1;x<x2;++x){sl[x]+=area+stp/2;area+=stp;} sl[x2]+=area+sign*_ptz(sy1-yf,(float)x2,(float)x2+1.0f,xbt,(float)x2+1.0f);sl2[x2+1]+=sign*(sy1-sy0);}
                             } else {
                                 for(int x=0;x<ow;++x){float y0=syt,x1f=(float)x,x2f=(float)(x+1),x3=xb,y3=syb;float y1=((float)x-x0)/dx+syt,y2=((float)(x+1)-x0)/dx+syt;
                                 if(x0<x1f&&x3>x2f){_hce(sl,x,ae,x0,y0,x1f,y1);_hce(sl,x,ae,x1f,y1,x2f,y2);_hce(sl,x,ae,x2f,y2,x3,y3);}
@@ -165,8 +145,7 @@ static void font_MakeGlyphBitmapSubpixel(const font_fontinfo* font, u8* dst, int
                                 else _hce(sl,x,ae,x0,y0,x3,y3);}}
                         }
                     }
-                    {float sum=0;for(i=0;i<ow;++i){sum+=sl2[i];float cov=(float)vabs(sl[i]+sum)*255.0f+0.5f;int px=(int)cov;if(px>255)px=255; dst[j*ostr+i]=(u8)px;}}
-                    step=&active;while(*step){font__active_edge*z=*step;z->fx+=z->fdx;step=&(*step)->next;}++y;++j;
+                    {float sum=0;for(i=0;i<ow;++i){sum+=sl2[i];float cov=(float)vabs(sl[i]+sum)*255.0f+0.5f;int px=(int)cov;if(px>255)px=255; dst[j*ostr+i]=(u8)px;}} step=&active;while(*step){font__active_edge*z=*step;z->fx+=z->fdx;step=&(*step)->next;}++y;++j;
                 } for(tt_heapchk*c=hh.head,*hp;c;c=hp){hp=c->next;}
             }
         }
