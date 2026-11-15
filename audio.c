@@ -641,7 +641,7 @@ void UpdateAudio() {
     if ((World.paused && !World.menuActive) || (!Sys_Settings.VolumeMusic && !videoPageClip)) { mp3_paused = true; return; }
     
     mp3_paused = false;
-    u32 zone = World.Sys_Music.inZone ? (((u32)World.Sys_Music.zoneTrack&0xFFu) | ((u32)World.Sys_Music.zoneMusic << 8)) : 0u;
+    u32 zone = World.Sys_Music.inZone ? (((u32)World.Sys_Music.zoneTrack & 0xFFu) | ((u32)World.Sys_Music.zoneMusic << 8)) : 0u;
     if (!zone && (World.Sys_Music.elevator || World.Sys_Music.distortion)) zone = (u32)(World.Sys_Music.distortion ? TT_Distortion : TT_Elev) | ((u32)MT_Override << 8);
     static u32 musicZoneLast = 0U;
     bool zoneChanged=(zone!=musicZoneLast); musicZoneLast=zone;

@@ -1,6 +1,6 @@
 // text.c - Text and Font Rendering/Loading System
 #include "common.h"
-typedef struct {i16 x,y,cx,cy,cx1,cy1;u8 type,padding;} font_vertex;    typedef struct {void*userdata;u8*data;int fontstart,numGlyphs,loca,head,glyf,hhea,hmtx,index_map,indexToLocFormat;} font_fontinfo;    typedef struct tt_heapchk{ struct tt_heapchk* next; }tt_heapchk;    typedef struct{ tt_heapchk* head; void* first_free; int remaining; }font__hheap;    typedef struct{ float x0,y0,x1,y1; int invert; }font__edge;
+typedef struct { i16 x,y,cx,cy; u8 type,padding; } font_vertex;    typedef struct {u8 *data; int fontstart,numGlyphs,loca,head,glyf,hhea,hmtx,index_map,indexToLocFormat; } font_fontinfo;    typedef struct tt_heapchk{ struct tt_heapchk* next; }tt_heapchk;    typedef struct{ tt_heapchk* head; void* first_free; int remaining; }font__hheap;    typedef struct{ float x0,y0,x1,y1; int invert; }font__edge;
 typedef struct font__active_edge{ struct font__active_edge*next; float fx,fdx,fdy,direction,sy,ey; }font__active_edge;
 INLINE i16 ttSHORT (u8*p) { return p[0]*256 + p[1]; }
 INLINE u16 ttUSHORT(u8*p) { return p[0]*256 + p[1]; }

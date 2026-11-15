@@ -1,9 +1,10 @@
 // physics.c - The Jack Physics Engine, By W. Josiah Jack MIT-0 -- full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
 #include "common.h"
-u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX]; static u16 triggerVolumes[128]; static u16 numTriggers; extern double game_actual_start_time; static bool ladderWalkOff = false; static float ladderTopY = 0.0f; static double ladderSFXFinished = 0.0; void DrawBoxColliderColored(u16 i, Color col); void DrawCapsuleCollider(u16 i);
+u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX]; static u16 triggerVolumes[128]; static u16 numTriggers; extern double game_actual_start_time; static bool ladderWalkOff = false; static float ladderTopY = 0.0f; static double ladderSFXFinished = 0.0;
 static const float PHY_EPSILON=0.0001f,PHY_NEARNUFF=0.001f,MAX_SPEED=17.0f/*m/s fastest is railgun given 5.0 impulse w/ 0.3 mass=5.0/0.3 */,MAX_STEP_SIZE=(0.12f / MAX_SPEED),MAX_ANGULAR_SPEED=8.0f/*arbitrary*/,MANIFOLD_TIE_MARGIN=0.008f,MANIFOLD_ALIGN_THRESHOLD=0.8f,MAX_BIAS_SPEED=2.0f,WALK_SPEED=5.7f,PLAYER_MAX_CYBER_SPEED=10.0f,CROUCH_SPEED=2.5f,PLAYER_MAX_PRONE_SPEED=1.6f,PLAYER_BOOSTER_SPEED_BOOST=1.2f,PLAYER_CROUCH_RATIO=0.63f,
                    PLAYER_PRONE_RATIO=0.32f,WALK_SPEED_ACCEL=3.0f,BOOST_ACCEL=1.0f,SKATE_SLIDE=5.0f,SKATE_SPEED=1.1f;
-void DrawSphereContact(V3 pos, float rad);
+void DrawSphereContact(V3,float),BiomonitorEnergyPulse(float),DrawBoxColliderColored(u16,Color),DrawCapsuleCollider(u16);
+float TakeDamage(u16,DamageData);
 typedef struct { V3 v[4]; V3 wA[4]; i32 n; } Simplex3D;
 typedef struct { V3 point; float pen; } ManifoldPt;
 typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
@@ -35,7 +36,6 @@ void AddAccessCardToInventory(int index); void UseTargets(u16 activator, u16 tar
 static bool IsImpactGrenade(u16 idx) { return idx == 370 || idx == 372 || idx == 387 || idx == 404; }
 static bool IsImpactProjectile(u16 idx) { return idx >= 481 && idx <= 495; }
 static void QueueProjectileImpact(u16 prj, u16 o, V3 p, V3 n) { if (prj < World.instCount && o < World.instCount && o != World.instances[prj].recentMostActivator) { projectileContactThisFrame[prj] = 1; if (World.instances[prj].currentTargetIdx != (u16)(o + 1)) { if (!projImpQueued[prj]) { projImpQueued[prj] = 1; projImpTarg[prj] = o; projImpPt[prj] = p; projImpNor[prj] = n; } } } }
-void CyberDataFragmentOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (other != PLAYER1) {return;} CenterStatusPrint("%s",Sys_Text.stringTable[(u16)e->textIndex]); }
 void CyberItemOnTriggerEnter(u16 self, u16 other) {
     if (other!=PLAYER1) { return; }
     bool success = false;
@@ -54,11 +54,7 @@ void CyberItemOnTriggerEnter(u16 self, u16 other) {
     }
     if(success){ const PSysDef* d0=PSysTypeGet(190); if(d0){PSysDef d=*d0; d.pos=World.position[self]; PSysAddInternal(&d,U16_MAX,U16_MAX);} const PSysDef* d1=PSysTypeGet(191); if(d1){PSysDef d=*d1; d.pos=World.position[self]; PSysAddInternal(&d,U16_MAX,U16_MAX);} DeleteInstance(self); }
 }
-void CyberIceOnTriggerEnter(u16 self, u16 other) { (void)self; Entity* e = &World.instances[other]; if (!(e->entflags & EF_RIGIDBODY)) return; World.layer[other] = L_NPCBullet;/*L_NPCBullet, not a bare 24: the enums are bit flags, so only L_NPCBullet happens to equal 1<<24.  An adjacent enum insertion would have silently turned this into a different collision layer.*/ World.velocity[other] = V3_ScaleByF(World.velocity[other],-1.0f); }
 void CyberMineInitBeforeLoad(u16 self) { Entity* e=&World.instances[self]; e->damage=55.0f; if(World.diffCyb<3){if(random_range(0.0f,1.0f)<0.2f)flag_set(&e->entflags,EF_ACTIVE,false); e->damage=33.0f;} if(World.diffCyb<2){if(random_range(0.0f,1.0f)<0.33f)flag_set(&e->entflags,EF_ACTIVE,false); e->damage=22.0f;} if(World.diffCyb<1){if(random_range(0.0f,1.0f)<0.50f)flag_set(&e->entflags,EF_ACTIVE,false); e->damage=11.0f;} }
-float TakeDamage(u16 self,DamageData dd);
-void BiomonitorEnergyPulse(float);
-void CyberSwitchOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (e->active || other != PLAYER1) {return;} CenterStatusPrint("%s",Sys_Text.stringTable[(u16)e->textIndex]); e->active = true; UseTargets(self,e->targetIdx); }
 extern u16 teleportDestinations[MAX_LEVELS][8];
 void TeleportTouchOnTriggerEnter(u16 self, u16 o) {
     Entity *e = &World.instances[self], *player = &World.instances[PLAYER1]; if (!e->touchEnabled || o!=PLAYER1 || player->health <= 0.0f || e->justUsed >= World.pauseRelativeTime) return; u16 dest = World.curLev < MAX_LEVELS && e->targetDestinationID < 8 ? teleportDestinations[World.curLev][e->targetDestinationID] : U16_MAX; if (dest >= World.instCount || World.instances[dest].index != 703) return;
@@ -66,8 +62,6 @@ void TeleportTouchOnTriggerEnter(u16 self, u16 o) {
 }
 void TriggerDelayedTarget(u16 self) { Entity* e=&World.instances[self]; u16 act=e->recentMostActivator; e->delayFinished = World.pauseRelativeTime + e->delay; e->deferredIoflags = World.targetIOActive ? World.targetIOActivatorIoflags : (act<World.instCount?World.instances[act].ioflags:0u); e->deferredIoflagsHi = World.targetIOActive ? World.targetIOActivatorIoflagsHi : (act<World.instCount?World.instances[act].ioflagsHi:0u); }
 void TriggerTriggerTripped(u16 self, u16 other) { Entity* e=&World.instances[self]; if(other != PLAYER1 || (World.instances[self].allDone && World.instances[self].onlyOnce)) return; e->recentMostActivator=other; if(e->onlyOnce){e->allDone=true;} if(e->delay <= 0.0f){UseTargets(self,World.instances[self].targetIdx);}else{TriggerDelayedTarget(self);} }
-void TriggerOnTriggerEnter(u16 self, u16 other) { if (World.instances[self].allDone && World.instances[self].onlyOnce){return;} TriggerTriggerTripped(self,other); }
-void TriggerOnTriggerStay(u16 self, u16 other) { if (World.instances[self].allDone && World.instances[self].onlyOnce){return;} TriggerTriggerTripped(self,other); }
 static float GravityLiftTopY(u16 liftIdx) { ShapeBox box=Entity_GetBox(liftIdx); V3 up=quat_rot_v3(box.rot,(V3){0,1,0}); float extent=vabs(up.x)*box.hExt.x+vabs(up.y)*box.hExt.y+vabs(up.z)*box.hExt.z; return box.ctr.y+extent; }
 static float GravityLiftBodyBottomY(u16 body) { if(World.col[body]==CT_CAP){ShapeCapsule cap=Entity_GetCap(body);return cap.base.y-cap.rad;} return World.position[body].y-(World.colliderSize[body].y*0.5f*vabs(World.scale[body].y)); }
 static float GravityLiftGravityAccel(u16 body) { if(body==PLAYER1&&(Cheats.noclip||World.invP1.ladderState>0||World.curLev==LEVEL_CYBERSPACE))return 0.0f; return World.instances[body].hasGrav ? 9.81f : 0.0f; }
@@ -104,7 +98,6 @@ void trigger_gravitylift_touch(u16 self, u16 other, bool entering) {
     } else { if (other == PLAYER1) gravityLiftTopSupport[other] = 0; if (World.velocity[other].y < lift->offStrengthFactor) { forceY = lift->offStrengthFactor - World.velocity[other].y; if (initialBurst) forceY *= 2.0f; } }
     AddForce(other,(V3){0.0f,forceY,0.0f},false);
 }
-void CyberDoorOnCollisionEnter(u16 self, u16 other) { if(other != PLAYER1){return;} CenterStatusPrint("%s  %s",Sys_Text.stringTable[World.instances[self].messageIndex],Sys_Text.stringTable[601]); }
 // Physics System
 INLINE void SetPosition(u16 i, V3 newpos) { float d=V3_Dist(World.position[i],newpos); if(d < PHY_NEARNUFF){return;} float allowed=vmin(d,posBudget[i]); if(allowed < PHY_NEARNUFF){return;} World.position[i]=V3Add(World.position[i],V3_ScaleByF(V3_AsubB(newpos,World.position[i]),allowed/d)); flag_set(&World.instances[i].entflags,EF_MOVING,true); posBudget[i] -= allowed; }
 INLINE Manifold OverlapToManifold(Overlap r) { Manifold m={0}; if (r.hit && r.pen > PHY_EPSILON) { m.normal = r.normal; m.n = 1; m.p[0] = (ManifoldPt){r.point, r.pen}; m.maxPen = r.pen; } return m; }
@@ -565,7 +558,7 @@ void Physics(float dt) {
                 else {float sphereRadius=vmax(vmax(vabs(World.colliderSize[other].x*World.scale[other].x),vabs(World.colliderSize[other].y*World.scale[other].y)),vabs(World.colliderSize[other].z*World.scale[other].z)); if(sphereRadius<=0.0f)sphereRadius=0.32f; touches=CapsuleTouchesOBB(World.position[other],sphereRadius,trigBox);}
                 if (!touches) continue; if(trigdx==596){ if(other==PLAYER1 && Cheats.noclip) continue; u16 mark=(u16)(self+1);bool entering=gravityLiftWasInside[other]!=mark&&gravityLiftTouched[other]!=mark;gravityLiftTouched[other]=mark;trigger_gravitylift_touch(self,other,entering);continue;} if(trigdx==703){u16 mark=(u16)(self+1);if(teleportWasTouching!=mark&&teleportTouched!=mark)TeleportTouchOnTriggerEnter(self,other);teleportTouched=mark;continue;}
                 switch(trigdx) {
-                    case 595/*trigger_cyberpush*/:if(other == PLAYER1 && World.diffCyb >= 1){AddForce(other,V3_ScaleByF(World.instances[self].dir,World.instances[self].force*0.02f*EntMass(other)),false); World.Sys_Music.cyberTube=true; World.Sys_Music.inZone=true; World.Sys_Music.zoneTrack=TT_Cybertube; World.Sys_Music.zoneMusic=MT_Override;} break;
+                    case 595/*trigger_cyberpush*/:if(other == PLAYER1 && World.diffCyb >= 1){AddForce(other,V3_ScaleByF(World.instances[self].dir,World.instances[self].force*0.02f*EntMass(other)),false); World.Sys_Music.cyberTube=true; World.Sys_Music.inZone=true; World.Sys_Music.zoneTrack = TT_Cybertube; World.Sys_Music.zoneMusic=MT_Override;} break;
                     case 597/*trigger_ladder*/:if(other == PLAYER1 && !Cheats.noclip){ World.invP1.ladderState=1; ladderTouched=true; ladderTopY=trigBox.ctr.y + trigBox.hExt.y;} break;
                     case 598/*trigger_multiple*/: case 600/*trigger_once*/: TriggerTriggerTripped(self,other); break;  case 599/*trigger_music*/:if(other == PLAYER1){TrackType tt=World.instances[self].trackType; MusicType mt=World.instances[self].musicType; World.Sys_Music.inZone=true; World.Sys_Music.elevator=(tt == TT_Elev); World.Sys_Music.distortion=(tt == TT_Distortion); World.Sys_Music.zoneTrack=tt; World.Sys_Music.zoneMusic=mt;} break;
                     case 601/*trigger_radiation*/:if(other == PLAYER1){World.invP1.radiationArea=true;World.instances[PLAYER1].radiation=World.instances[self].radiation;} break; /* radiation bleedoff / amelioration handled in physics update */

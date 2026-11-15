@@ -363,25 +363,24 @@ static void AIFlierMoveToHoverHeight(Entity* self) {
     AddForce(sidx, (V3){0.0f, (vDesired - World.velocity[sidx].y) * EntMass(sidx), 0.0f}, true);
 }
 void AIAlert(u16 idx) { if (!World.diffCbt){return;} Entity* self = &World.instances[idx]; AISetEnemy(idx,PLAYER1); self->currentDestination = World.position[PLAYER1]; flag_set(&self->entflags, EF_ENEM_IN_SIGHT, false); }
-static void AIThink(u16 idx) {
-    Entity* self = &World.instances[idx]; if ((self->entflags & EF_DYING_SETUP) && self->deathBurstFinished < World.pauseRelativeTime && !(self->entflags & EF_DEATH_BURST_DONE)) { SpawnNPCDeathBurst(self); flag_set(&self->entflags,EF_DEATH_BURST_DONE,true); }
-    if (!HasHealth(idx)) { if (!(self->entflags & EF_DYING) && !(self->entflags & EF_DEAD)){flag_set(&self->entflags,EF_DYING,true); self->currentState=AIState_Dying;}else if((self->entflags & EF_DEAD) && self->currentState != AIState_Dead){self->currentState=AIState_Dead;}else if((self->entflags & EF_DYING) && self->currentState != AIState_Dying){self->currentState=AIState_Dying;} }
-    switch (self->currentState) { case AIState_Idle:AIIdle(idx); break; case AIState_Walk:AIWalk(idx); break; case AIState_Run:AIRun(idx); break; case AIState_Attack1:AIAttack(self,1); break; case AIState_Attack2:AIAttack(self,2); break; case AIState_Attack3:AIAttack(self,3); break; case AIState_Pain:AIPain(self); break; case AIState_Dying:AIDying(idx); break; case AIState_Dead:AIDead(idx); break; default:AIIdle(idx); break; }
-}
 void AIControllerUpdate(u16 idx) {
     ai_update_effect_lights(); Entity* self=&World.instances[idx]; if(!(self->entflags & EF_ACTIVE)){return;}
     u16 edx=self->index; if(!IdxIsNPC(edx)){return;}
     u16 ndx = edx - 419, eidx = self->enemy;
     const NPCTable* npc = &npcTable[ndx]; bool cyber = npc->type == NPCType_Cyber;
     if (self->currentState != AIState_Dead && self->currentState != AIState_Dying) { World.instances[idx].hasGrav = !(cyber || npc->moveType == AIMoveType_Fly); }
-    if (self->aiThinkFinished < World.pauseRelativeTime) { self->aiThinkFinished = World.pauseRelativeTime + 0.1f; /*Sight/front checks refresh at think rate: every runtime consumer of EF_ENEM_IN_SIGHT/LOS/FOV/FRONT runs inside AIThink (the only other reader is the showai debug color in citadel.c), so running the sight raycast per frame bought nothing.*/
+    if (self->aiThinkFinished < World.pauseRelativeTime) {
+        self->aiThinkFinished = World.pauseRelativeTime + 0.1f;
         flag_set(&self->entflags,EF_ENEM_IN_SIGHT,AICheckIfPlayerInSight(idx));
         if (eidx && HasHealth(idx)) {
-            bool enAlive = (cyber && eidx == World.decoyInstance) || (cyber ? World.instances[eidx].cyberHealth > 0.0f : World.instances[eidx].health > 0.0f);/*the decoy projection has no health by design, so it would otherwise read as a corpse on the very next tick and be dropped*/
+            bool enAlive = (cyber && eidx == World.decoyInstance) || (cyber ? World.instances[eidx].cyberHealth > 0.0f : World.instances[eidx].health > 0.0f);
             if (!enAlive || (eidx == PLAYER1 && World.invP1.ressurectingFinished > World.pauseRelativeTime)) { if (cyber) self->currentState = AIState_Idle; else { flag_set(&self->entflags, EF_WANDERING, true); self->wanderFinished = World.pauseRelativeTime + random_range(3.0f, 8.0f); self->currentState = AIState_Walk; } self->enemy = 0; self->posCheckFinished = World.pauseRelativeTime; self->lastPosition = World.position[idx]; }
             else AIEnemyInFrontChecks(self,eidx,cyber);
         }
-        AIThink(idx); }
+        if ((self->entflags & EF_DYING_SETUP) && self->deathBurstFinished < World.pauseRelativeTime && !(self->entflags & EF_DEATH_BURST_DONE)) { SpawnNPCDeathBurst(self); flag_set(&self->entflags,EF_DEATH_BURST_DONE,true); }
+        if (!HasHealth(idx)) { if (!(self->entflags & EF_DYING) && !(self->entflags & EF_DEAD)){flag_set(&self->entflags,EF_DYING,true); self->currentState=AIState_Dying;}else if((self->entflags & EF_DEAD) && self->currentState != AIState_Dead){self->currentState=AIState_Dead;}else if((self->entflags & EF_DYING) && self->currentState != AIState_Dying){self->currentState=AIState_Dying;} }
+        switch (self->currentState) { case AIState_Idle:AIIdle(idx); break; case AIState_Walk:AIWalk(idx); break; case AIState_Run:AIRun(idx); break; case AIState_Attack1:AIAttack(self,1); break; case AIState_Attack2:AIAttack(self,2); break; case AIState_Attack3:AIAttack(self,3); break; case AIState_Pain:AIPain(self); break; case AIState_Dying:AIDying(idx); break; case AIState_Dead:AIDead(idx); break; default:AIIdle(idx); break; }
+    }
     if (self->currentState == AIState_Dead || self->currentState == AIState_Idle) return;
     if ((self->entflags & EF_ACT_AS_TURRET) && eidx) self->currentDestination = (V3){World.position[eidx].x,World.position[eidx].y + AI_TARGET_OFFSET_Y,World.position[eidx].z}; if (cyber && eidx) self->currentDestination = World.position[eidx];
     V3 toTarget = V3_AsubB(self->currentDestination,ai_sight_pos(self)); if (!cyber) toTarget.y = 0.0f; self->idealTransformForward = V3_Normalize(toTarget); float sqmag = V3_dot(toTarget, toTarget); if (sqmag > 0.000001f || cyber) AIFace(self,self->currentDestination);    if (npc->moveType == AIMoveType_Fly && self->tranquilizeFinished < World.pauseRelativeTime) AIFlierMoveToHoverHeight(self);

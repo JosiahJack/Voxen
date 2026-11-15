@@ -47,9 +47,7 @@ int sFormatV(char* buf, size_t bufsz, const char* f, va_list args) {
         if (*f != '%') { buf[pos++] = *f++; continue; } f++; // skip '%'
         int width = 0; char padChar = ' '; if (*f == '0') { padChar = '0'; f++; } while (*f >= '0' && *f <= '9') { width = width * 10 + (*f - '0'); f++; } int decimals = 9; if (*f == '.') { f++; if (*f >= '0' && *f <= '9') { decimals = *f - '0'; } f++; }/*0 is a valid precision: %.0f prints just the integer part*/
         switch (*f) {
-            case 'x': case 'u': case 'd': case 'i': {
-                u32 val; int base=*f=='x' ? 16 : 10; char num[32]; int i=0; if (*f=='d' || *f=='i') { int v=__builtin_va_arg(args,int); val=(u32)v; if (v<0) { buf[pos++]='-'; val=-val; } } else val=__builtin_va_arg(args,u32);
-                do { num[i++]="0123456789abcdef"[val%base]; val/=base; } while (val);    while (i<width && pos<bufsz-1) { buf[pos++]=padChar; width--; } while (i-- && pos<bufsz-1) buf[pos++]=num[i];   } break;
+            case 'x': case 'u': case 'd': case 'i': { u32 val; int base=*f=='x' ? 16 : 10; char num[32]; int i=0; if (*f=='d' || *f=='i') { int v=__builtin_va_arg(args,int); val=(u32)v; if (v<0) { buf[pos++]='-'; val=-val; } } else val=__builtin_va_arg(args,u32); do { num[i++]="0123456789abcdef"[val%base]; val/=base; } while (val);    while (i<width && pos<bufsz-1) { buf[pos++]=padChar; width--; } while (i-- && pos<bufsz-1) buf[pos++]=num[i]; } break;
             case 'c': buf[pos++]=(char)__builtin_va_arg(args,int); break;
             case 's': case 'f': { char num[64]; const char* v; if (*f=='s') v=__builtin_va_arg(args,const char*); else { double2str(num,__builtin_va_arg(args,double),decimals,sizeof(num)); v=num; } for (size_t i=0;v && v[i] && pos<bufsz-1;++i) buf[pos++]=v[i]; } break;
             case '%': if (pos < bufsz - 1) buf[pos++] = '%'; break;
@@ -92,40 +90,30 @@ void BmpWrite(char const *filename, int x, int y, const void *data) {
     FHandle f = OS_OpenWriteonly(filename); if (f == INVALID_FHANDLE) { DualLogError("Failed to open %s for writing\n", filename); return; }
     u32 fileSize = 14 + 108 + (u32)x * y * 4;/*BMP file header (14 bytes)*/ u8 fileHeader[14] = {'B','M',fileSize & 255,(fileSize >> 8) & 255,(fileSize >> 16) & 255,(fileSize >> 24) & 255,0,0,0,0,14 + 108,0,0,0}; u8 infoHeader[108]={0}; *(u32*)(infoHeader+0)=108;/*size*/
     *(u32*)(infoHeader+4)=(u32)x;/*w*/ *(u32*)(infoHeader+8)=(u32)-y;/*h*/ *(u16*)(infoHeader+12)=1;/*planes*/ *(u16*)(infoHeader+14)=32;/*bit count*/ *(u32*)(infoHeader+16)=3;/*bit fields*/ *(u32*)(infoHeader+40)=0xFF;/*Red*/ *(u32*)(infoHeader + 44) = 0xFF00;/*Green*/ *(u32*)(infoHeader + 48) = 0xFF0000;/*Blue*/ *(u32*)(infoHeader + 52) = 0;/*Alpha*/
-    OS_Write(f,fileHeader,14,filename); OS_Write(f,infoHeader,108,filename);
-    const u8 *pixels = (const u8 *)data; for (int j=y-1;j>=0;--j) OS_Write(f,(void*)(pixels + j*x*4),(size_t)x*4,filename); OS_Close(f);
+    OS_Write(f,fileHeader,14,filename); OS_Write(f,infoHeader,108,filename); const u8 *pixels = (const u8 *)data; for (int j=y-1;j>=0;--j) OS_Write(f,(void*)(pixels + j*x*4),(size_t)x*4,filename); OS_Close(f);
 }
 void Screenshot() {
-    World.screenshotTimeout = World.current_time + 1.0;/*Prevent saving more than 1 per second for sanity purposes.*/ OS_MakeFolder("Screenshots"); u16 w=Sys_Settings.ScreenWidth, h=Sys_Settings.ScreenHeight;
-    u8* pixels = OS_Alloc(w * h * 4 * sizeof(char)); glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,pixels); 
-    char filename[96]; sFormat(filename,sizeof(filename),"Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp",get_time(),World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z);
-    BmpWrite(filename,w,h,pixels); CenterStatusPrint("Saved screenshot %s\n",filename); OS_Free(pixels,w * h * 4 * sizeof(char));
+    World.screenshotTimeout = World.current_time + 1.0;/*Prevent saving more than 1 per second for sanity purposes.*/ OS_MakeFolder("Screenshots"); u16 w=Sys_Settings.ScreenWidth, h=Sys_Settings.ScreenHeight; u8* pixels = OS_Alloc(w * h * 4 * sizeof(char)); glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,pixels);  
+    char filename[96]; sFormat(filename,sizeof(filename),"Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp",get_time(),World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z); BmpWrite(filename,w,h,pixels); CenterStatusPrint("Saved screenshot %s\n",filename); OS_Free(pixels,w * h * 4 * sizeof(char));
 }
 size_t g_mmap_live = 0;
 void DebugRAMPeak() { // Kernel high-water mark of RSS over process lifetime
     #if defined(_WIN32)
-        (void)0;/*no /proc on Windows*/
+        (void)0;/*no /proc on Windows and I don't do RAM reduction efforts on Windows so who cares.*/
     #else
-        FHandle fd = OS_OpenReadonly("/proc/self/status"); if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/status\n"); return; }
-        char buf[2048]; long n = OS_Read(fd,buf,sizeof(buf)-1); OS_Close(fd); if (n <= 0) return; buf[n]='\0';
-        u32 kb=0; for (char* p=buf;*p;++p) { if (mcmp(p,"VmHWM:",6)==0) { p+=6; while(*p==' '||*p=='\t') ++p; while(*p>='0'&&*p<='9') kb=kb*10+(u32)(*p++-'0'); break; } }
-        DualLog("Peak: %uKB|%.2fMB",kb,kb/1024.0);
+        FHandle fd = OS_OpenReadonly("/proc/self/status"); if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/status\n"); return; } char buf[2048]; long n = OS_Read(fd,buf,sizeof(buf)-1); OS_Close(fd); if (n <= 0) return; buf[n]='\0'; u32 kb=0; for (char* p=buf;*p;++p) { if (mcmp(p,"VmHWM:",6)==0) { p+=6; while(*p==' '||*p=='\t') ++p; while(*p>='0'&&*p<='9') kb=kb*10+(u32)(*p++-'0'); break; } } DualLog("Peak: %uKB|%.2fMB",kb,kb/1024.0);
     #endif
 }
 void DebugRAMActual(const char *context) { // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
     #if defined(_WIN32)
-        (void)context;/*no /proc and no brk(2) on Windows - the raw `syscall` below is a privileged instruction in ring 3 there and would crash the process*/
+        (void)context;/*no /proc and no brk(2) on Windows and I don't do RAM reduction efforts on Windows so who cares.*/
     #else
     static void* heap_start = (void*)-1; if(heap_start == (void*)-1){ long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); heap_start = (void*)r; }
     long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); void* current_brk = (void*)r;
     size_t heap_bytes = (size_t)((char*)current_brk - (char*)heap_start); size_t uss_bytes = 0; FHandle fd = OS_OpenReadonly("/proc/self/smaps_rollup"); if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); return; }
     char buf[4096]; long bytes_read = OS_Read(fd,buf,sizeof(buf)-1); if (bytes_read > 0) { buf[bytes_read] = '\0'; } else buf[0] = '\0'; OS_Close(fd); char* p = buf;
-    while (*p) {
-        if (mcmp(p,"Private_",8) == 0) {
-            p += 8; size_t val = 0; if (mcmp(p,"Clean",5) !=0 && mcmp(p,"Dirty",5) != 0) { p++; continue; }    while (*p && *p != ':') p++; if (*p != ':') { p++; continue; }
-            p++; while(*p == ' ' || *p == '\t'){p++;} while(*p >= '0' && *p <= '9'){val=val * 10 + (*p - '0'); p++;} uss_bytes += val * 1024;
-        } p++;
-    } u32 mmapped=(u32)__atomic_load_n(&g_mmap_live,__ATOMIC_RELAXED); DualLog("Mem at %s: Heap %ub(%uKB|%.2fMB), USS %ub(%uKB|%.2fMB), MMAP %uKB|%.2fMB\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0,mmapped / 1024,mmapped / 1024.0 / 1024.0);
+    while (*p) { if (mcmp(p,"Private_",8) == 0) { p += 8; size_t val = 0; if (mcmp(p,"Clean",5) !=0 && mcmp(p,"Dirty",5) != 0) { p++; continue; }    while (*p && *p != ':') p++; if (*p != ':') { p++; continue; } p++; while(*p == ' ' || *p == '\t'){p++;} while(*p >= '0' && *p <= '9'){val=val * 10 + (*p - '0'); p++;} uss_bytes += val * 1024; } p++; }
+    u32 mmapped=(u32)__atomic_load_n(&g_mmap_live,__ATOMIC_RELAXED); DualLog("Mem at %s: Heap %ub(%uKB|%.2fMB), USS %ub(%uKB|%.2fMB), MMAP %uKB|%.2fMB\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0,mmapped / 1024,mmapped / 1024.0 / 1024.0);
     #endif
 }
 u32 random_range_rng = 0x12345678u;

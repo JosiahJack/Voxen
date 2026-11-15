@@ -1,8 +1,9 @@
 // citadel.c - Game logic
 #include "common.h"
 __attribute__((used, visibility("default"))) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; /*Must be always visible for AutoSplitter tools to find it.*/
-void PatchDisableAll(),BiomonitorEnergyPulse(float),BioMonitorClearGraphs(),TextureSequenceInit(u16,char*),MFD_OpenAudioLog(int); extern double lerpStartTime; extern V3 queuedLevelPos; extern u8 queuedLevelToLoad; extern u16 editModeSelection; extern const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS]; extern const u16 vmailStartFrames[6];
+void PatchDisableAll(),BiomonitorEnergyPulse(float),BioMonitorClearGraphs(),TextureSequenceInit(u16,char*),MFD_OpenAudioLog(int),WeaponsUpdate(),TextureSequenceUpdate(u16),AIAnimationControllerUpdate(u16),AIControllerUpdate(u16);
 float lerp(float min, float max, float val) { return min + (max - min) * vclamp(val,0.0f,1.0f); }
+extern double lerpStartTime; extern V3 queuedLevelPos; extern u8 queuedLevelToLoad,magazinePitchCountForWeapon[16],magazinePitchCountForWeapon2[16]; extern u16 editModeSelection,editModeLightSelection; extern const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS]; extern const u16 vmailStartFrames[6]; extern bool editFieldEditing; extern const V3 sightPointOffsets[NUM_AI_TYPES];
 V3 ScreenPointToRay(V3 fwd, V3 rt) {
     float px=World.inventoryMode?(float)World.cursorPos_x:(float)UI_W*0.5f, py=World.inventoryMode?(float)World.cursorPos_y:(float)UI_H*0.5f;
     float tanFov=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),aspect=(float)Sys_Settings.ScreenWidth/(float)Sys_Settings.ScreenHeight;
@@ -108,13 +109,12 @@ void RemoveWeapon(i32 slot) {
     CompleteWeaponChange(); ForceInventoryMode();
 }
 static float DefaultEnergySettingForWeapon(int wep16Index) { return (wep16Index == 4) ? 5.0f : (wep16Index == 10) ? 13.0f : (wep16Index == 14) ? 2.0f : 3.0f; }
-__attribute__((noinline)) void AddAmmoToInventory(int index,int constIndex,int amount,bool isSecondary) { if(index < 0){return;} if(isSecondary){World.invP1.wepAmmoSecondary[index]+=(u16)amount;} else {World.invP1.wepAmmo[index]+=(u16)amount;} CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(constIndex)],Sys_Text.stringTable[630]); }
-bool AddWeaponToInventory(int index,int ammo1,int ammo2,bool loadedAlt) {
-    if (index < 0) return false; if (!World.Sys_UI.firstMain){World.Sys_UI.firstMain=true; World.Sys_UI.mfdTab[0]=1;} if(!World.Sys_UI.firstWeapon){World.Sys_UI.firstWeapon=true; World.Sys_UI.mfdTab[1]=1;}
+bool AddWeaponToInventory(int ci) {
+    if (ci < 0) return false; if (!World.Sys_UI.firstMain){World.Sys_UI.firstMain=true; World.Sys_UI.mfdTab[0]=1;} if(!World.Sys_UI.firstWeapon){World.Sys_UI.firstWeapon=true; World.Sys_UI.mfdTab[1]=1;}
     for (i32 i = 0; i < 7; i++) {
-        if(World.invP1.wepInvIndices[i] >= 0){continue;} World.invP1.wepInvIndices[i] = index; i32 index16 = Get16WeaponIndexFromConstIndex(index); World.invP1.weaponEnergySetting[index16] = DefaultEnergySettingForWeapon(index16); if (i == 0) { World.invP1.wepCurPending=i; World.invP1.weaponIndexPending=(u16)index; WeaponFireStartWeaponDip(0.5f); World.invP1.recoiling = false; }
-        if (loadedAlt && ammo2 > 0){World.invP1.currentMagazineAmount2[i]=(u8)ammo2; if (ammo1 > 0) World.invP1.wepAmmo[index16]+=(u16)ammo1; World.invP1.wepLoadedWithAlternate[i]=true;}else{World.invP1.currentMagazineAmount[i]=(u8)ammo1; if (ammo2 > 0) World.invP1.wepAmmoSecondary[index16]+=(u16)ammo2; World.invP1.wepLoadedWithAlternate[i]=false;}
-        CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[33]); World.invP1.numweapons=0; for (i32 j=0;j<7;j++) { if(World.invP1.wepInvIndices[j] >= 0){World.invP1.numweapons++;} } return true;
+        if(World.invP1.wepInvIndices[i] >= 0){continue;} World.invP1.wepInvIndices[i] = ci; i32 index16 = Get16WeaponIndexFromConstIndex(ci); World.invP1.weaponEnergySetting[index16] = DefaultEnergySettingForWeapon(index16); if (i == 0) { World.invP1.wepCurPending=i; World.invP1.weaponIndexPending=(u16)ci; WeaponFireStartWeaponDip(0.5f); World.invP1.recoiling = false; }
+        if (World.invP1.heldObjectLoadedAlternate && World.invP1.heldAmmo2 > 0){World.invP1.currentMagazineAmount2[i]=(u8)World.invP1.heldAmmo2; if (World.invP1.heldAmmo > 0) World.invP1.wepAmmo[index16]+=(u16)World.invP1.heldAmmo; World.invP1.wepLoadedWithAlternate[i]=true;}else{World.invP1.currentMagazineAmount[i]=(u8)World.invP1.heldAmmo; if (World.invP1.heldAmmo2 > 0) World.invP1.wepAmmoSecondary[index16]+=(u16)World.invP1.heldAmmo2; World.invP1.wepLoadedWithAlternate[i]=false;}
+        CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(ci)],Sys_Text.stringTable[33]); World.invP1.numweapons=0; for (i32 j=0;j<7;j++) { if(World.invP1.wepInvIndices[j] >= 0){World.invP1.numweapons++;} } return true;
     } return false;
 }
 static const u8 grenadeSlots[7]={0,3,1,6,4,5,2};
@@ -137,10 +137,9 @@ void InventoryUpdate() {
     if (GetKeyPressed(35)/*Patch cycle+*/){PatchCycle(Sys_Settings.InvertInventoryCycling ? -1 : 1);} else if (GetKeyPressed(36)/*Patch cycle-*/){PatchCycle(Sys_Settings.InvertInventoryCycling ? 1 : -1);}
 }
 void AddItemFail(int index) { DropHeldItem(); CenterStatusPrint("%s%s%s", Sys_Text.stringTable[32],Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[318]);/*Inventory full.*/ }
-extern u8 magazinePitchCountForWeapon[16],magazinePitchCountForWeapon2[16];
 void AddItemToInventory(int index, int custIdx) {
     if (IdxIsGenericItem(index)) { if(!AddGeneralObjectToInventory(index,custIdx)){AddItemFail(index);} } else if (IdxIsAudioLog(index)) { AddAudioLogToInventory(World.invP1.heldObjectCustIdx); } 
-    else if (IdxIsWeapon(index)) { int constIndex = index + 307; if (constIndex < 343 || constIndex > 358) constIndex = index; if (!AddWeaponToInventory(constIndex,World.invP1.heldAmmo,World.invP1.heldAmmo2,World.invP1.heldObjectLoadedAlternate)) { AddItemFail(index); } } else if (IdxIsAccessCard(index)) AddAccessCardToInventory(UseableFromConst(index));
+    else if (IdxIsWeapon(index)) { int ci = index + 307; if (ci < 343 || ci > 358) ci = index; if (!AddWeaponToInventory(ci)) { AddItemFail(index); } } else if (IdxIsAccessCard(index)) AddAccessCardToInventory(UseableFromConst(index));
     else if (IdxIsHardware(index)) AddHardwareToInventory(index-328,custIdx);
     else {
         switch (index) {
@@ -148,12 +147,11 @@ void AddItemToInventory(int index, int custIdx) {
             case 321 ... 327: AddPatchToInventory(index-321,index); break;
             case 367 ... 386: {
                 static const struct { u8 weapon; bool alt; } ammo[]={[0]={13,false},[6]={3,false},[7]={3,true},[8]={10,false},[9]={10,true},[10]={8,false},[11]={8,true},[12]={1,false},[13]={1,true},[14]={4,false},[15]={4,true},[16]={12,false},[17]={14,false},[18]={14,true},[19]={9,false}};
-                u8 w = ammo[index-367].weapon; if (!w) return; --w; bool alt = ammo[index-367].alt; AddAmmoToInventory(w,index,alt ? magazinePitchCountForWeapon2[w] : magazinePitchCountForWeapon[w],alt); break;
+                u8 w = ammo[index-367].weapon; if (!w) return; --w; bool alt = ammo[index-367].alt; if (w >= 0) { int amount = alt ? magazinePitchCountForWeapon2[w] : magazinePitchCountForWeapon[w]; if (alt) { World.invP1.wepAmmoSecondary[w] += (u16)amount; } else { World.invP1.wepAmmo[w] += (u16)amount; } CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[630]); } break;
             } default: return;
         }
     } play_wav(sounds[87], AppliedFXVol(1.0f), (V3){0}, false);
 }
-void CyberTimerInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; e->cyberTimer = 600.0f; e->timerFinished = World.pauseRelativeTime + 1.0; }
 void CyberTimerReset(u16 self, int diff) { Entity* e = &World.instances[self]; switch (diff) { case 0: e->cyberTimer = 600.0f; break; case 1: e->cyberTimer = 300.0f; break; case 2: e->cyberTimer = 240.0f; break; case 3: e->cyberTimer = 180.0f; break; } }
 void ExitCyberspace() { if (World.curLev != LEVEL_CYBERSPACE) return; Entity* p = &World.instances[PLAYER1]; if (p->cyberHealth <= 0.0f) { p->cyberHealth = 1.0f; } play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false); LoadLevel((World.cyberReturnLevel >= 0 && (u8)World.cyberReturnLevel < MAX_LEVELS) ? (u8)World.cyberReturnLevel : 1, World.cybRetPos); }
 void CyberTimerUpdate(u16 self) { if(World.curLev != LEVEL_CYBERSPACE){return;} Entity* e = &World.instances[self]; if (e->timerFinished >= World.pauseRelativeTime) { return; } e->cyberTimer-=1.0f; e->timerFinished = World.pauseRelativeTime + 1.0; if (e->cyberTimer <= 0.0f) { ExitCyberspace(); return; } }
@@ -186,7 +184,6 @@ void CyberSwitchUpdate(u16 self)   { Entity* e = &World.instances[self]; if (!(e
 void CyberDataFragUpdate(u16 self) { Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE)) return; if (e->allDone) return; if (V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f) { e->allDone = true; if (e->textIndex > 0) CenterStatusPrint("%s",Sys_Text.stringTable[e->textIndex]); } }
 void SearchFXEnable(int side) { side = side == 1; World.Sys_UI.searchFXActive[side] = true; World.Sys_UI.searchFXStartTime[side] = World.pauseRelativeTime; World.Sys_UI.searchFXCursorX[side] = (float)World.cursorPos_x; World.Sys_UI.searchFXCursorY[side] = (float)World.cursorPos_y; }
 void SearchFXResetUpdate(u16 self) { Entity* e = &World.instances[self]; if (e->delayFinished >= World.pauseRelativeTime) { return; } flag_set(&e->entflags,EF_ACTIVE,false); }
-void DelayedSpawnEnable(u16 self)  { Entity* e = &World.instances[self]; e->timerFinished = World.pauseRelativeTime + e->delay; e->active = true; }
 void DelayedSpawnUpdate(u16 s)     { Entity* e = &World.instances[s]; if (!e->active || e->timerFinished <= 0.0 || e->timerFinished>World.pauseRelativeTime) { return; } e->active=false; if (!e->doSelfAfterList){ return; } if (e->despawnInstead) { DeleteInstance(s);/*despawn means gone, not deactivated*/ } else flag_set(&e->entflags,EF_ACTIVE,true); }
 void FuncWallShiftChildren(u16 self, V3 delta) { if (vabs(delta.x)+vabs(delta.y)+vabs(delta.z) < 0.00001f) {return;} for (u16 i=PLAYER1;i<World.instCount;++i) { if (fwParentOf[i]==self) { World.position[i]=V3Add(World.position[i],delta); } } }
 void FuncWallTargetted(u16 self) { Entity* e = &World.instances[self]; u8 st = (u8)e->funcState; if (st == FStat_Start || st == FStat_MovingStart || st == FStat_AjarMovingTarget || (st > FStat_AjarMovingTarget && e->ajarPercentage > 0.0f)) { World.instances[self].funcState = FStat_MovingTarget; World.instances[self].tickFinished = World.pauseRelativeTime + 10.0f; } else { World.instances[self].funcState = FStat_MovingStart; World.instances[self].tickFinished = World.pauseRelativeTime + 10.0f; } play_wav(sounds[76], AppliedFXVol(1.0f), World.position[self], true); }
@@ -279,7 +276,6 @@ bool FindElevatorKeypadPos(u8 level,V3* outPos) { for (u32 m=0;m<sizeof(elevPane
 bool GetElevatorDestinationPos(u8 lev,u8 nth,V3* outPos) { if (lev>=MAX_LEVELS || nth>=elevatorDestCounts[lev]) { return false; } u16 idx = elevatorDestinations[lev][nth]; if (idx<INSTS_1ST_IDX || idx>=World.levelInstCount[lev]) return false; if (World.levInstances[lev][idx].index != 706) { return false; } *outPos = World.levelPosition[lev][idx]; return true; }
 bool ElevatorDefaultDestinationPos(u8 lev, V3* outPos) { V3 panel; if (FindElevatorKeypadPos(lev,&panel)) { V3 best; float bd = 0.0f; bool found = false; for (u8 n=0;n<MAX_LEVELS;++n) { V3 p; if (!GetElevatorDestinationPos(lev,n,&p)) { break; } V3 d = V3_AsubB(p,panel); float sq = V3_dot(d,d); if (!found || sq < bd) { best = p; bd = sq;found = true; } } if (found) { *outPos = best; return true; } } return GetElevatorDestinationPos(lev,0,outPos); }
 void EmailTargetted(u16 self) { Entity* e=&World.instances[self]; u16 idx=e->emailIndex; if(idx>=LOGCNT){return;} if(World.invP1.hasLog[idx]){return;} World.invP1.hasLog[idx]=World.invP1.hasNewEmail=true; World.invP1.lastAddedIndex=idx; if(Sys_Text.audioLogType[idx] == AudioLogType_Email){World.invP1.beepDone=true;/*TODO actually play beep sound 3 times when new unread email received*/} if (e->autoPlayEmail) { PlayLog(idx); World.invP1.lastAddedIndex = -1; } }
-u8 OverloadButtonVisualState() { if (World.invP1.curWepHeat[World.invP1.wepCur] > 25.0f) {return 2;} if (World.invP1.overloadEnabled) {return 1;} return 0; }
 void OverloadButtonAction() {
     static double overloadClickFinished = 0.0; if (overloadClickFinished >= World.pauseRelativeTime){return;} overloadClickFinished = World.pauseRelativeTime + 0.4; if (World.invP1.curWepHeat[World.invP1.wepCur] > 25.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[12]);/*Weapon too hot*/ return; }
     if (World.invP1.overloadEnabled) { CenterStatusPrint("%s",Sys_Text.stringTable[13]);/*Overload disabled*/ World.invP1.overloadEnabled = false; } else { CenterStatusPrint("%s",Sys_Text.stringTable[17]);/*Overload enabled*/ World.invP1.overloadEnabled = true; }
@@ -607,7 +603,6 @@ void UseTargets(u16 activator, u16 targetIdx) {
     if (World.curLev != entryLevel) {SetLevelPointers(entryLevel);} if (!succeeded) {DualLogWarn("No target found: %s\n",targetname);} if (targetIdx < (u16)MAX_IO_NAMES) tioTargetInFlight[targetIdx]=false; tioNestDepth--; if (!wasActive) {World.targetIOActive=false;}
 }
 // Frob/Use
-static const float FROB_DISTANCE = 4.9f;
 void MFD_OpenSearch(bool),MFD_CloseSearch(),MFD_OpenData(bool,u8),MFD_OpenPaperLog(int,V3),UI_KeycodeClose(bool),UI_ElevClose(bool),UI_WireClose();
 static void PaperLogUse(u16 self) { ForceInventoryMode(); MFD_OpenPaperLog((int)World.instances[self].logIndex, World.position[self]); }
 static bool IsPuzzleGridPanel(u16 index) { return index>=609&&index<=613; }
@@ -625,35 +620,23 @@ static void WireLoadInstance(u16 self, const WirePuzzleDef* def) {
     for (u8 w=0;w<7;++w) { World.Sys_UI.pw_tgtL[w]=def->tgtL[w]; World.Sys_UI.pw_tgtR[w]=def->tgtR[w]; World.Sys_UI.pw_wireOn[w]=def->wireOn[w]; World.Sys_UI.pw_rowActive[w]=def->rowsActive[w]!=0; World.Sys_UI.pw_wireColor[w]=def->wireColor[w];/*raw HUDColor, as PuzzleWire.wireColors holds it*/ }
 }
 typedef struct { V3 pos; u8 gridType, theme, security; const char* target; u8 cellType[35]; } GridPuzzleDef;
-static const GridPuzzleDef gridPuzzleDefs[] = {
-    /*0 R.ReactorLevel       teal   levRmedbeddoor*/{{-4.4910f,-54.6630f,30.3431f},4,2,100,"levRmedbeddoor",{0,0,0,0,1,1,1,1,1,1,0,1,0,1,1,0,3,1,1,0,3,1,1,1,0,1,0,1,0,0,0,0,1,1,1}},
-    /*1 1.MedicalLevel       blue   lev1wall1relay*/{{39.7100f,-44.4490f,32.5760f},5,0,100,"lev1wall1relay",{1,1,1,0,1,1,1,1,0,1,0,1,0,1,1,0,1,1,1,0,1,1,0,1,0,1,0,1,1,1,1,0,1,1,1}},
-    /*1 1.MedicalLevel       teal   lev1xdoor1*/{{6.0450f,-42.7601f,1.1690f},0,1,90,"lev1xdoor1",{0,0,0,0,0,0,0,3,2,1,1,1,3,1,3,1,1,1,1,0,2,3,1,1,1,1,3,1,0,0,0,0,0,0,0}},
-    /*2 2.ScienceLevel       red    levRrobotspawncontrol*/{{-24.3560f,-28.0130f,34.6520f},4,2,100,"levRrobotspawncontrol",{0,0,0,0,1,1,1,1,1,1,0,1,0,1,1,0,2,1,1,0,2,1,1,1,0,1,0,1,0,0,0,0,1,1,1}},
-    /*2 2.ScienceLevel       red    lev2doorarmory*/{{39.6969f,-27.4656f,-7.7154f},0,1,100,"lev2doorarmory",{0,0,0,0,0,0,0,0,1,2,1,1,0,0,3,1,1,1,1,3,3,0,1,1,1,1,0,0,0,0,0,0,0,0,0}},
-    /*4 4.StorageLevel       brown  lev4hiddenclosetforcedoor*/{{-10.1910f,-9.5700f,24.9638f},3,3,100,"lev4hiddenclosetforcedoor",{0,1,0,1,0,0,0,1,1,1,1,1,1,0,1,1,1,2,1,1,1,1,1,1,1,1,1,0,0,1,0,1,0,0,0}},
-    /*5 5.FlightDeck         brown  lev5flightbay3iris*/{{-15.4832f,9.6899f,23.7354f},0,1,100,"lev5flightbay3iris",{0,0,0,0,0,0,0,3,2,1,1,1,3,1,3,1,1,1,1,0,2,3,1,1,1,1,3,1,0,0,0,0,0,0,0}},
-    /*5 5.FlightDeck         brown  lev5flightbay3iris*/{{-14.0602f,12.2240f,22.9740f},0,1,100,"lev5flightbay3iris",{0,0,0,0,0,0,0,1,2,1,1,3,1,0,1,1,1,1,0,2,3,1,1,1,1,3,1,0,0,0,0,0,0,0,0}},
-    /*5 5.FlightDeck         brown  lev5flightbay23bulkhead*/{{-14.0472f,13.9730f,2.4340f},0,1,100,"lev5flightbay23bulkhead",{0,0,0,0,0,0,0,1,2,1,1,1,3,1,3,1,1,1,1,0,2,1,1,1,1,1,3,1,0,0,0,0,0,0,0}},
-    /*7 7.EngineeringLevel   brown  lev7antennafield1*/{{4.6211f,50.6000f,54.9166f},5,0,100,"lev7antennafield1",{0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,1,1,1,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
-    /*7 7.EngineeringLevel   gray   lev7antennafield1*/{{3.3831f,50.8220f,56.1656f},5,0,100,"lev7antennafield1",{1,1,1,0,3,1,2,0,0,1,0,3,0,1,1,1,1,0,1,3,3,1,0,0,0,1,1,1,1,1,1,1,1,1,1}},
-};
+static const GridPuzzleDef gridPuzzleDefs[] = {/*0 R.ReactorLevel     teal  levRmedbeddoor*/{{-4.4910f,-54.6630f,30.3431f},4,2,100,"levRmedbeddoor",{0,0,0,0,1,1,1,1,1,1,0,1,0,1,1,0,3,1,1,0,3,1,1,1,0,1,0,1,0,0,0,0,1,1,1}},                  /*1 1.MedicalLevel     blue  lev1wall1relay*/{{39.7100f,-44.4490f,32.5760f},5,0,100,"lev1wall1relay",{1,1,1,0,1,1,1,1,0,1,0,1,0,1,1,0,1,1,1,0,1,1,0,1,0,1,0,1,1,1,1,0,1,1,1}},
+                                               /*1 1.MedicalLevel     teal  lev1xdoor1*/{{6.0450f,-42.7601f,1.1690f},0,1,90,"lev1xdoor1",{0,0,0,0,0,0,0,3,2,1,1,1,3,1,3,1,1,1,1,0,2,3,1,1,1,1,3,1,0,0,0,0,0,0,0}},                             /*2 2.ScienceLevel     red   levRrobotspawncontrol*/{{-24.3560f,-28.0130f,34.6520f},4,2,100,"levRrobotspawncontrol",{0,0,0,0,1,1,1,1,1,1,0,1,0,1,1,0,2,1,1,0,2,1,1,1,0,1,0,1,0,0,0,0,1,1,1}},
+                                               /*2 2.ScienceLevel     red   lev2doorarmory*/{{39.6969f,-27.4656f,-7.7154f},0,1,100,"lev2doorarmory",{0,0,0,0,0,0,0,0,1,2,1,1,0,0,3,1,1,1,1,3,3,0,1,1,1,1,0,0,0,0,0,0,0,0,0}},                  /*4 4.StorageLevel     brown lev4hiddenclosetforcedoor*/{{-10.1910f,-9.5700f,24.9638f},3,3,100,"lev4hiddenclosetforcedoor",{0,1,0,1,0,0,0,1,1,1,1,1,1,0,1,1,1,2,1,1,1,1,1,1,1,1,1,0,0,1,0,1,0,0,0}},
+                                               /*5 5.FlightDeck       brown lev5flightbay3iris*/{{-15.4832f,9.6899f,23.7354f},0,1,100,"lev5flightbay3iris",{0,0,0,0,0,0,0,3,2,1,1,1,3,1,3,1,1,1,1,0,2,3,1,1,1,1,3,1,0,0,0,0,0,0,0}},           /*5 5.FlightDeck       brown lev5flightbay3iris*/{{-14.0602f,12.2240f,22.9740f},0,1,100,"lev5flightbay3iris",{0,0,0,0,0,0,0,1,2,1,1,3,1,0,1,1,1,1,0,2,3,1,1,1,1,3,1,0,0,0,0,0,0,0,0}},
+                                               /*5 5.FlightDeck       brown lev5flightbay23bulkhead*/{{-14.0472f,13.9730f,2.4340f},0,1,100,"lev5flightbay23bulkhead",{0,0,0,0,0,0,0,1,2,1,1,1,3,1,3,1,1,1,1,0,2,1,1,1,1,1,3,1,0,0,0,0,0,0,0}}, /*7 7.EngineeringLevel brown lev7antennafield1*/{{4.6211f,50.6000f,54.9166f},5,0,100,"lev7antennafield1",{0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,1,1,1,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                               /*7 7.EngineeringLevel gray  lev7antennafield1*/{{3.3831f,50.8220f,56.1656f},5,0,100,"lev7antennafield1",{1,1,1,0,3,1,2,0,0,1,0,3,0,1,1,1,1,0,1,3,3,1,0,0,0,1,1,1,1,1,1,1,1,1,1}}};
 static const GridPuzzleDef* GridPuzzleDefFor(V3 pos) { for (u32 i=0;i<sizeof(gridPuzzleDefs)/sizeof(gridPuzzleDefs[0]);++i) { const GridPuzzleDef* d=&gridPuzzleDefs[i]; if (vabs(pos.x-d->pos.x)<0.05f && vabs(pos.y-d->pos.y)<0.05f && vabs(pos.z-d->pos.z)<0.05f) return d; } return NULL; }
 static void GridLoadInstance(u16 self) {
-    Entity* e=&World.instances[self];
-    const GridPuzzleDef* def=GridPuzzleDefFor(World.position[self]);
-    World.Sys_UI.pg_width=7; World.Sys_UI.pg_height=5; World.Sys_UI.pg_source=14; World.Sys_UI.pg_output=20;
+    Entity* e=&World.instances[self]; const GridPuzzleDef* def=GridPuzzleDefFor(World.position[self]); World.Sys_UI.pg_width=7; World.Sys_UI.pg_height=5; World.Sys_UI.pg_source=14; World.Sys_UI.pg_output=20;
     if (def) { if (def->target) e->targetIdx=IOInternName(def->target); e->securityThreshold=def->security; }
     if (def) { World.Sys_UI.pg_gridType=(PuzzleGridType)def->gridType; World.Sys_UI.pg_theme=def->theme; mcpy(World.Sys_UI.pg_type,def->cellType,sizeof(def->cellType)); }
     else     { World.Sys_UI.pg_gridType=PuzzleGridType_King; World.Sys_UI.pg_theme=HUDColor_Gray; mset(World.Sys_UI.pg_type,PuzzleCellType_Standard,sizeof(World.Sys_UI.pg_type)); }
     for (int k=0;k<35;++k) World.Sys_UI.pg_cell[k]=Entity_GetGridCell(e,k);
-    World.Sys_UI.pg_solved=e->puzzleSolved; World.Sys_UI.pg_fired=e->puzzleFired;
-    PGEvalPuzzle();
+    World.Sys_UI.pg_solved=e->puzzleSolved; World.Sys_UI.pg_fired=e->puzzleFired; PGEvalPuzzle();
 }
 static void PuzzlePanelUse(u16 i) {
-    Entity* e=&World.instances[i];
-    if(GetCurrentLevelSecurity()>UsableOrDef((float)e->securityThreshold,100.0f)){UIBlockedBySecurity(World.position[i]);return;}
-    if(e->entflags&EF_LOCKED){CenterStatusPrint("%s",Sys_Text.stringTable[302]);return;}
+    Entity* e = &World.instances[i]; if (GetCurrentLevelSecurity() > UsableOrDef((float)e->securityThreshold,100.0f)) { UIBlockedBySecurity(World.position[i]); return; } if (e->entflags & EF_LOCKED) { CenterStatusPrint("%s",Sys_Text.stringTable[302]); return; }
     World.Sys_UI.objectInUsePos=World.position[i]; ForceInventoryMode();
     if (IsPuzzleGridPanel(e->index)) { if (!e->panelOpen) { e->panelOpen = true; ChangeAnim(e,A_OPENING); play_wav(sounds[91],AppliedFXVol(1.0f),World.position[i],true); } bool initialize = World.Sys_UI.tetheredPGP != i || World.Sys_UI.pg_width == 0 || World.Sys_UI.pg_height == 0; World.Sys_UI.tetheredPGP = i; if (initialize) { GridLoadInstance(i); } MFD_OpenData(World.Sys_UI.lastDataSideRH,3); }
     else {
@@ -662,7 +645,7 @@ static void PuzzlePanelUse(u16 i) {
     } CenterStatusPrint("%s",Sys_Text.stringTable[190]);
 }
 static bool PanelUseAllowed(u16 i) {
-    Entity* e = &World.instances[i]; if (GetCurrentLevelSecurity() > UsableOrDef((float)e->securityThreshold,100.0f)) { UIBlockedBySecurity(World.position[i]); return false; }
+    Entity* e = &World.instances[i]; if (GetCurrentLevelSecurity() > UsableOrDef((float)e->securityThreshold,100.0f)) { UIBlockedBySecurity(World.position[i]); return false; } 
     if(e->entflags & EF_LOCKED) { u16 msg = (u16)e->lockedMessageLingdex; if (msg < T_LOGSTR_CNT&&msg!=0)CenterStatusPrint("%s",Sys_Text.stringTable[msg]);else CenterStatusPrint("%s",Sys_Text.stringTable[302]); if(e->lockedTargetIdx!=IO_NONE)UseTargets(i,e->lockedTargetIdx); return false; }
     return true;
 }
@@ -831,14 +814,17 @@ void UseEntity(u16 i) {
 INLINE V3 ScreenPointToRayOffset(V3 f,V3 r,float dx,float dy){float px=(World.inventoryMode?(float)World.cursorPos_x:(float)UI_W*0.5f)+dx,py=(World.inventoryMode?(float)World.cursorPos_y:(float)UI_H*0.5f)+dy,t=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),aspect=(float)Sys_Settings.ScreenWidth/(float)Sys_Settings.ScreenHeight,nx=(px-(float)UI_W*0.5f)/((float)UI_W*0.5f),ny=((float)UI_H*0.5f-py)/((float)UI_H*0.5f);V3 v=V3_Normalize((V3){nx*aspect*t,ny*t,-1.0f}),ff=(V3){-f.x,-f.y,-f.z},up=V3_Normalize(V3_Cross(r,ff));return(V3){v.x*r.x+v.y*up.x+v.z*ff.x,v.x*r.y+v.y*up.y+v.z*ff.y,v.x*r.z+v.y*up.z+v.z*ff.z};}
 V3 ScreenPointToRayPixels(V3 f,V3 r,float dx,float dy){return ScreenPointToRayOffset(f,r,dx,dy);}
 INLINE bool FrobRayIsFrobable(RaycastHit h){if(!h.hit)return false;u16 i=h.hitInstanceIndex;if(i>=World.instCount)return false;u16 e=World.instances[i].index;if((World.layer[i]&L_CorpseSearchable))return true;if((World.layer[i]&L_Corpse)&&!IdxIsGib(e))return true;return IsFrobUsableSpecial(e)||IdxIsUsableObject(e)||IdxIsSearchable(e)||IdxIsDoor(e)||IdxIsButtonSwitch(e)||IdxIsNPC(e);};
-extern bool editFieldEditing; extern u16 editModeLightSelection;
-static bool TargetIDFrob(V3 p,V3 f,V3 r){V3 dir=ScreenPointToRayOffset(f,r,0,0);RaycastHit h=Raycast(p,dir,TargetIDGetSensingRange(true),LMASK_PLAYER_TARGET_ID_FROB);if(!h.hit||h.hitInstanceIndex>=World.instCount||!IdxIsNPC(World.instances[h.hitInstanceIndex].index))return false;u16 i=h.hitInstanceIndex;Entity* e=&World.instances[i];if((e->entflags&(EF_DYING|EF_DEAD))||!HasHealth(i)){if(World.layer[i]&(L_Corpse|L_CorpseSearchable)){UseEntity(i);return true;}return false;}/*Death flags, not health: AIDead restores health to NPC_CORPSE_HEALTH on the 15 searchCollider types (mask bit 4 = cyborg drone) so corpses stay shootable, which made a fully dead drone test as alive here.*/if((World.invP1.hasHardware&HW_TID)&&World.invP1.hwVers[HW_TID_IDX]>1){if(targetIDAttached[i]&&targetIDAttachedFinished[i]<=World.pauseRelativeTime)targetIDAttached[i]=false;if(!targetIDAttached[i]){CreateTargetIDInstance(-1.0f,i,-1.0f);return true;}}CenterStatusPrint("%s%s",Sys_Text.stringTable[29],npcTable[e->index-419].name);return true;}
+static bool TargetIDFrob(V3 p,V3 f,V3 r){
+    V3 dir = ScreenPointToRayOffset(f,r,0,0); RaycastHit h=Raycast(p,dir,TargetIDGetSensingRange(true),LMASK_PLAYER_TARGET_ID_FROB); if (!h.hit || h.hitInstanceIndex >= World.instCount || !IdxIsNPC(World.instances[h.hitInstanceIndex].index)) return false; u16 i = h.hitInstanceIndex; Entity* e = &World.instances[i];
+    if ((e->entflags & (EF_DYING | EF_DEAD)) || !HasHealth(i)) { if (World.layer[i] & (L_Corpse | L_CorpseSearchable)) { UseEntity(i); return true; } return false; }
+    if ((World.invP1.hasHardware & HW_TID) && World.invP1.hwVers[HW_TID_IDX] > 1) { if (targetIDAttached[i] && targetIDAttachedFinished[i] <= World.pauseRelativeTime) targetIDAttached[i] = false; if (!targetIDAttached[i]) { CreateTargetIDInstance(-1.0f,i,-1.0f); return true; } }
+    CenterStatusPrint("%s%s",Sys_Text.stringTable[29],npcTable[e->index-419].name); return true;
+}
 static void Frob(V3 p,V3 f,V3 r){
     if(World.uiIsBlocking||World.curLev==LEVEL_CYBERSPACE)return;
     if(Cheats.editMode){
         V3 d0=ScreenPointToRayOffset(f,r,0,0);RaycastHit fh=RaycastEditPick(p,d0,World.farPlane[World.curLev],LMASK_PLAYER_FROB);u16 newEnt=(fh.hit&&fh.hitInstanceIndex>=INSTS_1ST_IDX&&fh.hitInstanceIndex<World.instCount)?fh.hitInstanceIndex:U16_MAX;float lightDist=0.0f;u16 newLight=EditModePickLight(p,d0,World.farPlane[World.curLev],&lightDist);bool lightWins=(newLight<U16_MAX&&(!fh.hit||lightDist<fh.distance));
-        if(lightWins){editModeLightSelection=newLight;editModeSelection=U16_MAX;editFieldEditing=false;CenterStatusPrint("Selected light %u",newLight);}
-        else {editModeSelection=newEnt;editModeLightSelection=U16_MAX;editFieldEditing=false;if(newEnt<U16_MAX)CenterStatusPrint("Selected object %u (const index %u)",newEnt,World.instances[newEnt].index);else CenterStatusPrint("Object deselected");}
+        if(lightWins){editModeLightSelection=newLight;editModeSelection=U16_MAX;editFieldEditing=false;CenterStatusPrint("Selected light %u",newLight);} else {editModeSelection=newEnt;editModeLightSelection=U16_MAX;editFieldEditing=false;if(newEnt<U16_MAX)CenterStatusPrint("Selected object %u (const index %u)",newEnt,World.instances[newEnt].index);else CenterStatusPrint("Object deselected");}
         return;/*No pickup/search/use while in edit mode; selection only.*/
     }
     if (World.Sys_UI.vmailActive) { World.Sys_UI.vmailActive = 0; return; } if (World.invP1.holdingObject) { if (FrobHeldItemIntoPanel(p,f,r)) { return; } DropHeldItem(); return; }
@@ -846,14 +832,10 @@ static void Frob(V3 p,V3 f,V3 r){
     for (int i=0;i<8&&!ok;++i) { V3 d = ScreenPointToRayOffset(f,r,ox[i],oy[i]); RaycastHit th = Raycast(p,d,FROB_DISTANCE,LMASK_PLAYER_FROB); if(FrobRayIsFrobable(th)) { bh = th; ok = true; } } 
     if (!ok) { bh = fh; }
     if (Cheats.showPhys) { World.debugLine_start = p; World.debugLineFinished = World.pauseRelativeTime + 3.0; V3 dbg = ok ? ScreenPointToRayOffset(f,r,0,0) : d0; RaycastHit dh = ok ? bh : fh; World.debugLine_end = dh.hit ? dh.point : (V3){dbg.x*FROB_DISTANCE+p.x,dbg.y*FROB_DISTANCE+p.y,dbg.z*FROB_DISTANCE+p.z}; }
-    if (!ok) {
-        if (fh.hit) { u16 idx = fh.hitInstanceIndex; if (idx < World.instCount) { u16 ei = World.instances[idx].index; if (IdxIsGeometry(ei) || IdxIsDoor(ei) || World.instances[idx].index >= 595) { int t = UseNameTableIndex(ei); const char* sec = UseSecretText(ei,idx); CenterStatusPrint("%s%s",Sys_Text.stringTable[29],sec?sec:(t >= 0 ? Sys_Text.stringTable[t] : "")); return; } } }
-        CenterStatusPrint("%s",Sys_Text.stringTable[30]);
-    } else UseEntity(bh.hitInstanceIndex);
+    if (!ok) { if (fh.hit) { u16 idx = fh.hitInstanceIndex; if (idx < World.instCount) { u16 ei = World.instances[idx].index; if (IdxIsGeometry(ei) || IdxIsDoor(ei) || World.instances[idx].index >= 595) { int t = UseNameTableIndex(ei); const char* sec = UseSecretText(ei,idx); CenterStatusPrint("%s%s",Sys_Text.stringTable[29],sec?sec:(t >= 0 ? Sys_Text.stringTable[t] : "")); return; } } } CenterStatusPrint("%s",Sys_Text.stringTable[30]); }
+    else UseEntity(bh.hitInstanceIndex);
 }
 // Update
-void WeaponsUpdate(); void TextureSequenceUpdate(u16 self); void AIAnimationControllerUpdate(u16 selfIdx); void AIControllerUpdate(u16 selfIdx);
-extern const V3 sightPointOffsets[NUM_AI_TYPES];
 void DrawAIDebug(u16 i) {
     if ((!IdxIsNPC(World.instances[i].index)) || !Cheats.showNPC) return; World.layer[i] = L_NPC; World.layer[PLAYER1] = L_Player; Quaternion r = World.rotation[i]; float x=r.x,y=r.y,z=r.z,w=r.w; V3 fwd = V3_Normalize((V3){2.0f*(x*z + w*y), 0.0f, 1.0f - 2.0f*(x*x + y*y)}); u16 npcIdx = World.instances[i].index - 419;
     V3 sightPt = V3Add(World.position[i],quat_rot_v3(World.rotation[i],sightPointOffsets[npcIdx])); DrawLine(sightPt,V3Add(sightPt,V3_ScaleByF(fwd,0.6f)),(Color){1.0f,1.0f,0.0f,1.0f}); V3 enemPt = World.position[PLAYER1]; enemPt.y -= 0.24f;
@@ -863,57 +845,44 @@ void DrawAIDebug(u16 i) {
     DrawSphereWireframe(dbgCol, (ShapeSphere){sightPt, 0.32f});
 }
 INLINE float CamYawFromQuat(Quaternion q) { float d = __builtin_atan2f(2.0f * (q.x*q.z + q.y*q.w), 1.0f - 2.0f * (q.x*q.x + q.y*q.y)) * (180.0f / 3.14159265f); if (d < 0.0f) d += 360.0f; return d; }
-void SecurityCameraRotateUpdate(u16 self) { /*Sweeps the camera back and forth between startYAngle and endYAngle about the Y axis (yaw) only*/
-    if (!World.instances[self].camRotateEnabled) return;
-    if (!(World.instances[self].entflags & EF_ACTIVE)) return;
-    if (!SphereInFrustum(playerFrustumPlanes, World.position[self], 1.28f)) return;
-    if (!World.instances[self].camSweepInit) { World.instances[self].camSweepInit = true; World.instances[self].camBaseRot = World.rotation[self]; World.instances[self].camYaw0 = CamYawFromQuat(World.instances[self].camBaseRot); World.instances[self].camYaw = World.instances[self].camYaw0; }
-    if (World.instances[self].camWaitingFinished >= World.pauseRelativeTime) return;
-        
+void SecurityCameraRotateUpdate(u16 self) {
+    Entity* e = &World.instances[self];
+    if (!e->camRotateEnabled) return; if (!(e->entflags & EF_ACTIVE)) return; if (!SphereInFrustum(playerFrustumPlanes,World.position[self],1.28f)) return; if (!e->camSweepInit) { e->camSweepInit = true; e->camBaseRot = World.rotation[self]; e->camYaw0 = CamYawFromQuat(e->camBaseRot); e->camYaw = e->camYaw0; } if (e->camWaitingFinished >= World.pauseRelativeTime) return;
     float dt = World.dt;
-    if (World.instances[self].camRotatePositive) { if (vabs(World.instances[self].camYaw - World.instances[self].camEndYAngle)   <= 1.0f) { World.instances[self].camRotatePositive = false; World.instances[self].camWaitingFinished = World.pauseRelativeTime + World.instances[self].camWaitTime; } else World.instances[self].camYaw += 24.0f * dt; }
-    else                                         { if (vabs(World.instances[self].camYaw - World.instances[self].camStartYAngle) <= 1.0f) { World.instances[self].camRotatePositive =  true; World.instances[self].camWaitingFinished = World.pauseRelativeTime + World.instances[self].camWaitTime; } else World.instances[self].camYaw -= 24.0f * dt; }
-    if (World.instances[self].camYaw < 0.0f) { World.instances[self].camYaw += 360.0f; } else if (World.instances[self].camYaw >= 360.0f) { World.instances[self].camYaw -= 360.0f; }
-    float half = deg2rad(World.instances[self].camYaw - World.instances[self].camYaw0) * 0.5f;
-    Quaternion yaw = {0.0f,vsinf(half),0.0f,vcosf(half)};
-    World.rotation[self] = quat_multiply(yaw,World.instances[self].camBaseRot);
+    if (e->camRotatePositive) { if (vabs(e->camYaw - e->camEndYAngle)   <= 1.0f) { e->camRotatePositive = false; e->camWaitingFinished = World.pauseRelativeTime + e->camWaitTime; } else e->camYaw += 24.0f * dt; }
+    else                      { if (vabs(e->camYaw - e->camStartYAngle) <= 1.0f) { e->camRotatePositive =  true; e->camWaitingFinished = World.pauseRelativeTime + e->camWaitTime; } else e->camYaw -= 24.0f * dt; }
+    if (e->camYaw < 0.0f) { e->camYaw += 360.0f; } else if (e->camYaw >= 360.0f) { e->camYaw -= 360.0f; } float half = deg2rad(e->camYaw - e->camYaw0) * 0.5f; Quaternion yaw = {0.0f,vsinf(half),0.0f,vcosf(half)}; World.rotation[self] = quat_multiply(yaw,e->camBaseRot);
 }
 static bool PanelTetherBroken(u16 i) { return i<World.instCount && (World.instances[i].entflags&EF_ACTIVE) && V3_SqDist(World.position[PLAYER1],World.position[i]) > 64.0f; }
-void TriggerTrippedUpdate(u16 self) {
-    Entity* e = &World.instances[self]; if (e->delayFinished <= 0.0 || e->delayFinished >= World.pauseRelativeTime) { return; } e->delayFinished = 0.0; u32 sf = World.targetIOActivatorIoflags, sfh = World.targetIOActivatorIoflagsHi; bool wa = World.targetIOActive; World.targetIOActive = true; World.targetIOActivatorIoflags = e->deferredIoflags; World.targetIOActivatorIoflagsHi = e->deferredIoflagsHi; UseTargets(self,e->targetIdx);
+void TriggerTrippedUpdate(u16 s) {
+    Entity* e = &World.instances[s]; if (e->delayFinished <= 0.0 || e->delayFinished >= World.pauseRelativeTime) { return; } e->delayFinished = 0.0; u32 sf = World.targetIOActivatorIoflags, sfh = World.targetIOActivatorIoflagsHi; bool wa = World.targetIOActive; World.targetIOActive = true; World.targetIOActivatorIoflags = e->deferredIoflags; World.targetIOActivatorIoflagsHi = e->deferredIoflagsHi; UseTargets(s,e->targetIdx);
     World.targetIOActivatorIoflags = sf; World.targetIOActivatorIoflagsHi = sfh; World.targetIOActive = wa;
 }
 void ModUpdate() {
     if (World.paused || World.menuActive) return;
     bool resurrecting = World.invP1.ressurectingFinished > World.pauseRelativeTime;
     UpdateSearchTether(); if (!resurrecting) WeaponsUpdate(); if (!resurrecting) InventoryUpdate(); PlayerEnergyUpdate(); PatchUpdate(); HardwareUpdate(); MissionTimerUpdate();
-    if (World.curLev == LEVEL_CYBERSPACE) CyberTimerUpdate(PLAYER1); /*the loop below starts at INSTS_1ST_IDX, so the player's own countdown would never tick*/
+    if (World.curLev == LEVEL_CYBERSPACE) CyberTimerUpdate(PLAYER1);
     if (!resurrecting && GetKeyPressed(24)/*Use/Frob*/) { Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right); }
     if (World.pauseRelativeTime < World.debugLineFinished && (World.lineVertCnt + 6) < MAX_LINEVRTS) { DrawLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f}); }
     if (World.curLev == LEVEL_CYBERSPACE) { CyberWallTouchersBuild(); CyberGolUpdate(); }
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
-        u16 constdex = World.instances[i].index;
-        if(IsLiveGrenade(constdex) && (World.instances[i].entflags & EF_ACTIVE)) { GrenadeUpdate(i); }
+        Entity* e = &World.instances[i]; u16 constdex = e->index;
+        if(IsLiveGrenade(constdex) && (e->entflags & EF_ACTIVE)) { GrenadeUpdate(i); }
         DelayedSpawnUpdate(i);
         if (constdex == 553u) { if (World.decoyActive && World.instances[World.decoyInstance].timerFinished < World.pauseRelativeTime) { World.decoyActive = false; World.decoyInstance = U16_MAX; CyberDecoySetTarget(U16_MAX); } } // Decoy expired.
         if (constdex == 614) { RelayPanelUpdate(i); }
         if (IsPuzzleGridPanel(constdex)) { PuzzlePanelUpdate(i); }
-        if (World.instances[i].textureAnimating && World.instances[i].tickFinished < World.pauseRelativeTime) { TextureSequenceUpdate(i); }
+        if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) { TextureSequenceUpdate(i); }
         if (IdxIsButtonSwitch(constdex)){ ButtonSwitchUpdate(i); }
-        if (IdxIsDoor(constdex)) { DoorUpdate(i); }
-        switch (constdex) { case 701: LogicTimerUpdate(i); break; case 594: TriggerCounterUpdate(i); break; case 699: LogicRelayUpdate(i); break; case 598: case 600: TriggerTrippedUpdate(i); break; case 702: SpawnManagerUpdate(i); break; case 477: SecurityCameraRotateUpdate(i); break; }
-        if (World.instances[i].itemLifeTime > 0.0f) { SearchFXResetUpdate(i); }
-        if (World.instances[i].cyberTimer > 0.0f) { CyberTimerUpdate(i); }
-        switch (constdex) { case 515: ForceBridgeUpdate(i); break; case 517: FuncWallUpdate(i); break; case 21: case 22: CyberWallUpdate(i); break; }
-        if (IdxIsNPC(constdex)) { DrawAIDebug(i); AIControllerUpdate(i); AIAnimationControllerUpdate(i); }
-        switch (constdex) { case 552: CyberDataFragUpdate(i); break; case 554: CyberExitUpdate(i); break; case 555: CyberSwitchUpdate(i); break; case 448 ... 457: CyberItemUpdate(i); break; case 480: CyberMineUpdate(i); break; }
+        if (IdxIsDoor(constdex)) { DoorUpdate(i); }                                                           switch (constdex) { case 701: LogicTimerUpdate(i); break; case 594: TriggerCounterUpdate(i); break; case 699: LogicRelayUpdate(i); break; case 598: case 600: TriggerTrippedUpdate(i); break; case 702: SpawnManagerUpdate(i); break; case 477: SecurityCameraRotateUpdate(i); break; }
+        if (e->itemLifeTime > 0.0f) { SearchFXResetUpdate(i); }
+        if (e->cyberTimer > 0.0f) { CyberTimerUpdate(i); }                                                    switch (constdex) { case 515: ForceBridgeUpdate(i); break; case 517: FuncWallUpdate(i); break; case 21: case 22: CyberWallUpdate(i); break; }
+        if (IdxIsNPC(constdex)) { DrawAIDebug(i); AIControllerUpdate(i); AIAnimationControllerUpdate(i); }    switch (constdex) { case 552: CyberDataFragUpdate(i); break; case 554: CyberExitUpdate(i); break; case 555: CyberSwitchUpdate(i); break; case 448 ... 457: CyberItemUpdate(i); break; case 480: CyberMineUpdate(i); break; }
     }
     if (World.invP1.painSoundFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f && !(World.invP1.radSoundFinished < World.pauseRelativeTime)) { World.invP1.painSoundFinished = World.pauseRelativeTime + (double)random_range(2.5f,4.0f); play_wav(sounds[140]/*player/playerpain1*/,AppliedFXVol(0.2f),(V3){0},false); }
     if (!Cheats.god && World.invP1.radBleedFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f) { /*Radiation damage pulse*/ World.invP1.radBleedFinished = World.pauseRelativeTime + 1.8; float take = World.instances[PLAYER1].radiation * 0.2f; World.instances[PLAYER1].health -= take; World.painStaticAlpha = take > 15.0f ? 1.0f : take > 10.0f ? 0.8f : 0.3f; }
     if (World.invP1.radSoundFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f) { double minT = World.instances[PLAYER1].radiation > 50.0f ? 0.5 : 1.0; World.invP1.radSoundFinished = World.pauseRelativeTime + minT + (double)random_range(0.0f, 2.0f); play_wav(sounds[90]/*hud/radiation*/, AppliedFXVol(0.18f), (V3){0.0f, 0.0f, 0.0f}, false); }
-    if (PanelTetherBroken(World.Sys_UI.tetheredPGP)) UI_PuzzleGridClose();
-    if (PanelTetherBroken(World.Sys_UI.tetheredKeypadKeycode)) UI_KeycodeClose(false);
-    if (PanelTetherBroken(World.Sys_UI.tetheredKeypadElevator)) UI_ElevClose(false);
-    if (PanelTetherBroken(World.Sys_UI.tetheredPWP)) UI_WireClose();
+    if (PanelTetherBroken(World.Sys_UI.tetheredPGP)) UI_PuzzleGridClose();    if (PanelTetherBroken(World.Sys_UI.tetheredKeypadKeycode)) UI_KeycodeClose(false);        if (PanelTetherBroken(World.Sys_UI.tetheredKeypadElevator)) UI_ElevClose(false);    if (PanelTetherBroken(World.Sys_UI.tetheredPWP)) UI_WireClose();
     if (World.Sys_UI.MFD_Data == 8 && V3_SqDist(World.position[PLAYER1],World.Sys_UI.objectInUsePos) > 64.0f) UI_BlockedClose();
 }

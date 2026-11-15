@@ -1,9 +1,5 @@
 // ui.c - User Interface(UI) aka HUD
-static bool reflDropdownOpen = false,saveSlotUsed[8]; static i8 reflHoverIdx = -1, rebindRow = -1, saveSlotEditing = -1; static u32 rebindArmedFrame = 0; static char saveSlotNames[8][48],saveNameEntry[48]; static u8 saveNameEntryLen = 0;
-bool enteringSaveName = false;
-extern V3 queuedLevelPos; extern u8 queuedLevelToLoad; extern float reloadTime[16];
-void BiomonitorBlitToUI(),LoadTextForLanguage(u8),LoadLogTextForLanguage(u8),SaveGame(u8,const char*),LoadGame(u8),WeaponFireStartWeaponDip(float),RemoveWeapon(i32),ActualChangeAmmoType(),OverloadButtonAction(),ReloadSecret(bool),Unload(bool),PlayLog(int),CheckForUnreadLogs(),UseTargets(u16,u16),UseCyberspaceItemByIndex(int);;
-bool PlayerInElevatorCell(),FindElevatorKeypadPos(u8,V3*),ReadSaveSlotName(u8,char*,size_t);
+bool enteringSaveName = false; static bool reflDropdownOpen = false,saveSlotUsed[8],uiClickLock = false, uiClickBlocked = false; static i8 reflHoverIdx = -1, rebindRow = -1, saveSlotEditing = -1; static u32 rebindArmedFrame = 0; static char saveSlotNames[8][48],saveNameEntry[48]; static u8 saveNameEntryLen = 0; extern V3 queuedLevelPos; extern u8 queuedLevelToLoad; extern float reloadTime[16];
 #define UI_MFD_IDS(P) UI_ID_##P##_TAB_WEAPON, UI_ID_##P##_TAB_ITEM, UI_ID_##P##_TAB_AUTOMAP, UI_ID_##P##_TAB_DATA,      UI_ID_##P##_PANEL,      UI_ID_##P##_WEAPON_NAME, UI_ID_##P##_WEAPON_ICON,      UI_ID_##P##_WEAPON_AMMO,       UI_ID_##P##_WEAPON_RELOAD,     UI_ID_##P##_WEAPON_UNLOAD, UI_ID_##P##_WEAPON_OVERLOAD, UI_ID_##P##_WEAPON_ENERGY_SLIDER, UI_ID_##P##_MEDIA_HEADER, UI_ID_##P##_MEDIA_TAB_0, UI_ID_##P##_MEDIA_TAB_3 = UI_ID_##P##_MEDIA_TAB_0 + 3, \
                       UI_ID_##P##_ITEM_NAME, UI_ID_##P##_ITEM_ICON, UI_ID_##P##_ITEM_USE,    UI_ID_##P##_ITEM_VAPORIZE, UI_ID_##P##_ITEM_SKATE, UI_ID_##P##_ITEM_BOOST,  UI_ID_##P##_ITEM_TIMER_VALUE, UI_ID_##P##_ITEM_TIMER_SLIDER, UI_ID_##P##_ITEM_ACCESS_CARDS, UI_ID_##P##_BLOCKED_SECURITY_TEXT, UI_ID_##P##_ELEV_FLOOR_INDICATOR, UI_ID_##P##_ELEV_BUTTON_0,    UI_ID_##P##_ELEV_BUTTON_7 = UI_ID_##P##_ELEV_BUTTON_0 + 7, UI_ID_##P##_ELEV_CLOSE, \
                       UI_ID_##P##_KEYCODE_0, UI_ID_##P##_KEYCODE_11 = UI_ID_##P##_KEYCODE_0 + 11, UI_ID_##P##_KEYCODE_DIGIT_0, UI_ID_##P##_KEYCODE_DIGIT_2 = UI_ID_##P##_KEYCODE_DIGIT_0 + 2,          UI_ID_##P##_KEYCODE_CLOSE,     UI_ID_##P##_AUDIOLOG_IMAGE,    UI_ID_##P##_AUDIOLOG_NAME, UI_ID_##P##_AUDIOLOG_SENDER, UI_ID_##P##_AUDIOLOG_SUBJECT, UI_ID_##P##_PUZZLE_NODE_SOURCE, UI_ID_##P##_PUZZLE_NODE, UI_ID_##P##_PUZZLE_CELL_0, \
@@ -11,9 +7,9 @@ bool PlayerInElevatorCell(),FindElevatorKeypadPos(u8,V3*),ReadSaveSlotName(u8,ch
                       UI_ID_##P##_SYS_VAL_0, UI_ID_##P##_SYS_VAL_10 = UI_ID_##P##_SYS_VAL_0 + 10, UI_ID_##P##_SYS_CLOSE, UI_ID_##P##_MINIGAMES_HEADER, UI_ID_##P##_MINIGAME_0, UI_ID_##P##_MINIGAME_8 = UI_ID_##P##_MINIGAME_0 + 8,   UI_ID_##P##_MINIGAMES_FOOTER,  UI_ID_##P##_MINIGAME_VIEW, UI_ID_##P##_MINIGAME_BACK,   UI_ID_##P##_MINIGAME_CLOSE,   UI_ID_##P##_SEARCH_NAME,        UI_ID_##P##_SEARCH_ICON_0, \
                       UI_ID_##P##_SEARCH_ICON_3 = UI_ID_##P##_SEARCH_ICON_0 + 3,             UI_ID_##P##_SEARCH_EMPTY,  UI_ID_##P##_SEARCH_CLOSE, UI_ID_##P##_AUTOMAP_ZOOM_IN, UI_ID_##P##_AUTOMAP_ZOOM_OUT, UI_ID_##P##_AUTOMAP_FULL,UI_ID_##P##_AUTOMAP_SIDE
 enum{UI_ID_NONE, /*Menu*/ UI_ID_MENU_SINGLEPLAYER, UI_ID_MENU_MULTIPLAYER, UI_ID_MENU_OPTIONS, UI_ID_MENU_QUIT, UI_ID_MENU_CONTINUE, UI_ID_MENU_NEW_GAME, UI_ID_MENU_PLAY_INTRO, UI_ID_MENU_PLAY_CREDITS, UI_ID_MENU_BACK, UI_ID_MENU_TAB_GRAPHICS, UI_ID_MENU_TAB_INPUT, UI_ID_MENU_TAB_AUDIO_LANG, UI_ID_MENU_MODEL_DETAIL, UI_ID_MENU_FXAA, UI_ID_MENU_SHADOWS, UI_ID_MENU_SSR, UI_ID_MENU_VSYNC, UI_ID_MENU_FOV_SLIDER, UI_ID_MENU_GAMMA_SLIDER, UI_ID_MENU_RESOLUTION,
-                          UI_ID_MENU_GI, UI_ID_MENU_SSR_RES_SLIDER, UI_ID_MENU_INVERT_LOOK, UI_ID_MENU_INVERT_CYB_LOOK, UI_ID_MENU_INVERT_INV_CYC, UI_ID_MENU_QUICK_PICKUP, UI_ID_MENU_QUICK_RELOAD, UI_ID_MENU_NO_SHOOT, UI_ID_MENU_HEAD_BOB, UI_ID_MENU_MOUSE_SENS_SLIDER, UI_ID_MENU_SPEAKER_MODE, UI_ID_MENU_REVERB, UI_ID_MENU_DYNAMIC_MUSIC, UI_ID_MENU_FOOTSTEPS, UI_ID_MENU_FULLSCREEN, UI_ID_MENU_TOGGLE_MONITOR, UI_ID_MENU_RES_APPLY,
-                          UI_ID_MENU_MASTER_VOLUME_SLIDER, UI_ID_MENU_MUSIC_VOLUME_SLIDER, UI_ID_MENU_SFX_VOLUME_SLIDER, UI_ID_MENU_LOG_VOLUME_SLIDER, UI_ID_MENU_LANGUAGE, UI_ID_MENU_INPUT_0, UI_ID_MENU_INPUT_41 = UI_ID_MENU_INPUT_0 + 41, UI_ID_MENU_NAME_INPUT, UI_ID_MENU_DIFF_COMBAT, UI_ID_MENU_DIFF_PUZZLE, UI_ID_MENU_DIFF_MISSION, UI_ID_MENU_DIFF_CYBER, UI_ID_MENU_DIFF_CELL_0, UI_ID_MENU_DIFF_CELL_15 = UI_ID_MENU_DIFF_CELL_0 + 15, UI_ID_MENU_START,
-                          UI_ID_MENU_SAVE_SLOT_0, UI_ID_MENU_SAVE_SLOT_7 = UI_ID_MENU_SAVE_SLOT_0 + 7,
+                          UI_ID_MENU_GI, UI_ID_MENU_INVERT_LOOK, UI_ID_MENU_INVERT_CYB_LOOK, UI_ID_MENU_INVERT_INV_CYC, UI_ID_MENU_QUICK_PICKUP, UI_ID_MENU_QUICK_RELOAD, UI_ID_MENU_NO_SHOOT, UI_ID_MENU_HEAD_BOB, UI_ID_MENU_MOUSE_SENS_SLIDER, UI_ID_MENU_SPEAKER_MODE, UI_ID_MENU_REVERB, UI_ID_MENU_DYNAMIC_MUSIC, UI_ID_MENU_FOOTSTEPS, UI_ID_MENU_FULLSCREEN, UI_ID_MENU_TOGGLE_MONITOR, UI_ID_MENU_RES_APPLY, UI_ID_MENU_MASTER_VOLUME_SLIDER,
+                          UI_ID_MENU_MUSIC_VOLUME_SLIDER, UI_ID_MENU_SFX_VOLUME_SLIDER, UI_ID_MENU_LOG_VOLUME_SLIDER, UI_ID_MENU_LANGUAGE, UI_ID_MENU_INPUT_0, UI_ID_MENU_INPUT_41 = UI_ID_MENU_INPUT_0 + 41, UI_ID_MENU_NAME_INPUT, UI_ID_MENU_DIFF_COMBAT, UI_ID_MENU_DIFF_PUZZLE, UI_ID_MENU_DIFF_MISSION, UI_ID_MENU_DIFF_CYBER, UI_ID_MENU_DIFF_CELL_0, UI_ID_MENU_DIFF_CELL_15 = UI_ID_MENU_DIFF_CELL_0 + 15, UI_ID_MENU_START, UI_ID_MENU_SAVE_SLOT_0,
+                          UI_ID_MENU_SAVE_SLOT_7 = UI_ID_MENU_SAVE_SLOT_0 + 7,
     /*Pause*/ UI_ID_PAUSE_RESUME, UI_ID_PAUSE_LOAD, UI_ID_PAUSE_SAVE, UI_ID_PAUSE_OPTIONS, UI_ID_PAUSE_QUIT_TO_MENU, UI_ID_PAUSE_QUIT_GAME,
     /*HUD*/ UI_ID_HUD_SHOOTMODE, UI_ID_HUD_HW_0, UI_ID_HUD_HW_7 = UI_ID_HUD_HW_0 + 7, UI_ID_CMFD_MISSION_TIMER, UI_ID_CMFD_CYBER_TIMER, UI_ID_CMFD_BIOMONITOR, UI_ID_VMAIL_VIEWER, UI_ID_FULLMAP_CLOSE, UI_ID_SENSA_CTR, UI_ID_SENSA_LH, UI_ID_SENSA_RH,
     /*Center MFD*/ UI_ID_CMFD_ADD_TO_INVENTORY, UI_ID_CMFD_TAB_MAIN, UI_ID_CMFD_TAB_HARDWARE, UI_ID_CMFD_TAB_GENERAL, UI_ID_CMFD_TAB_SOFTWARE, UI_ID_CMFD_WEAPON_HEADER, UI_ID_CMFD_SHOTS_HEADER, UI_ID_CMFD_WEAPON_ROW_0, UI_ID_CMFD_WEAPON_ROW_6 = UI_ID_CMFD_WEAPON_ROW_0 + 6, UI_ID_CMFD_GREN_HEADER, UI_ID_CMFD_PATCH_HEADER, UI_ID_CMFD_GREN_USE_0, UI_ID_CMFD_GREN_USE_6 = UI_ID_CMFD_GREN_USE_0 + 6, UI_ID_CMFD_GREN_ROW_0,
@@ -22,7 +18,6 @@ enum{UI_ID_NONE, /*Menu*/ UI_ID_MENU_SINGLEPLAYER, UI_ID_MENU_MULTIPLAYER, UI_ID
                    UI_ID_CMFD_LOG_BACK, UI_ID_CMFD_EMAIL_ENTRY_0, UI_ID_CMFD_EMAIL_ENTRY_14 = UI_ID_CMFD_EMAIL_ENTRY_0 + 14, UI_ID_CMFD_DATA_ENTRY_0, UI_ID_CMFD_DATA_ENTRY_12 = UI_ID_CMFD_DATA_ENTRY_0 + 12, UI_ID_CMFD_NOTE_TOGGLE_0, UI_ID_CMFD_NOTE_TOGGLE_17 = UI_ID_CMFD_NOTE_TOGGLE_0 + 17,
     /*Left/Right MFD*/ UI_MFD_IDS(LMFD), UI_ID_SIDEMFD_PAD, UI_MFD_IDS(RMFD),
     /*In-Game Editor*/ UI_ID_CMFD_EDIT_PANEL, UI_ID_CMFD_EDIT_ROW_0, UI_ID_CMFD_EDIT_ROW_14 = UI_ID_CMFD_EDIT_ROW_0 + 14, UI_ID_CMFD_EDIT_LIGHT_TYPE, UI_ID_CMFD_EDIT_LIGHT_DIR_N, UI_ID_CMFD_EDIT_LIGHT_DIR_E, UI_ID_CMFD_EDIT_LIGHT_DIR_S, UI_ID_CMFD_EDIT_LIGHT_DIR_W, UI_ID_CMFD_EDIT_LIGHT_DIR_UP, UI_ID_CMFD_EDIT_LIGHT_DIR_DN, UI_ID_COUNT};
-#define UI_MFD_STRIDE (UI_ID_RMFD_TAB_WEAPON-UI_ID_LMFD_TAB_WEAPON)
 #define MID(rh, n) ((u32)UI_ID_LMFD_##n + ((rh) ? (u32)(UI_ID_RMFD_TAB_WEAPON-UI_ID_LMFD_TAB_WEAPON) : 0u))/*Mirror an LMFD id onto whichever side we are drawing*/
 #define UIC(i) World.uiComponents[i]
 INLINE bool CursorIsOverBounds(float x0, float x1, float y0, float y1) { return World.cursorPos_x >= x0 && World.cursorPos_x <= x1 && World.cursorPos_y >= y0 && World.cursorPos_y <= y1;/*0,0=top left*/ }
@@ -35,7 +30,6 @@ INLINE void UIRImg(u32 id, i16 x, i16 y, i16 w, i16 h, u16 tex) { UIR(id,x,y,w,h
 INLINE i16 UITextW(const char* t, float sc, i16 maxW) { float w=MeasureLineAdvance(t,FONT_NORMAL)*sc; if (w<1.0f) w=1.0f; return (maxW>0 && w>(float)maxW) ? maxW : (i16)w; }
 INLINE void UIRText(u32 id, i16 x, i16 y, u32 col, u8 font, float sc, i16 maxW, const char* t) { UIR(id,x,y,UITextW(t,sc,maxW),(i16)(22.0f*sc)); RenderTextL(x,y,col,font,sc,"%s",t); }
 INLINE bool UIOver(u32 id) { return UIC(id).active && CursorIsOverBounds(UIC(id).min.x,UIC(id).max.x,UIC(id).min.y,UIC(id).max.y); }
-void CreateUIElement(V2 min, V2 max, u32 idx) { if (!idx) return; UIC(idx).min=min; UIC(idx).max=max; UIC(idx).initialized=UIC(idx).active=true; }
 static void UI_BeginFrame() { for (u32 i=1;i<UI_ID_COUNT;++i) UIC(i).active=false; }
 static u8 UIClicked(u32 id) {
     if (id >= UI_ID_COUNT || id == 0) return 0; if (!UIOver(id)) return 0; bool l=Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed, r=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed; if (!l && !r) return 0;
@@ -45,11 +39,8 @@ static void RefreshSaveSlots(void) { for (u8 i=0;i<8;++i) { saveSlotUsed[i] = Re
 static void SaveSlotCancelTyping(void) { saveSlotEditing=-1; enteringSaveName=false; saveNameEntryLen=0; saveNameEntry[0]='\0'; }
 static void SaveSlotConfirmTyping(void) { i8 slot = saveSlotEditing; char name[48]; u8 n=saveNameEntryLen; if (n > 47) { n = 47; } for (u8 i=0;i<n;++i) name[i] = saveNameEntry[i]; name[n] = '\0'; SaveSlotCancelTyping(); if (slot < 0 || slot > 7 || n == 0) return; for (u8 i=0;i<=n;++i) saveSlotNames[slot][i] = name[i]; World.menuActive = false; World.paused = false; returnToPause = false; SaveGame((u8)slot,name); }
 void SaveNameEntry(i32 k) {
-    if (k==KEY_ESCAPE) { Sys_Input.keyStates[KEY_ESCAPE].pressed=false; SaveSlotCancelTyping(); return; }
-    if (k==KEY_ENTER||k==KEY_KP_ENTER) { Sys_Input.keyStates[KEY_ENTER].pressed = Sys_Input.keyStates[KEY_KP_ENTER].pressed = false; SaveSlotConfirmTyping(); return; }
-    if (k==KEY_BACKSPACE && saveNameEntryLen>0) { saveNameEntry[--saveNameEntryLen] = '\0'; return; }
-    if (k==KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { saveNameEntry[0] = '\0'; saveNameEntryLen = 0; return; }
-    if (saveNameEntryLen>=47) { return; }
+    if (k==KEY_ESCAPE) { Sys_Input.keyStates[KEY_ESCAPE].pressed=false; SaveSlotCancelTyping(); return; } if (k==KEY_ENTER||k==KEY_KP_ENTER) { Sys_Input.keyStates[KEY_ENTER].pressed = Sys_Input.keyStates[KEY_KP_ENTER].pressed = false; SaveSlotConfirmTyping(); return; } if (k==KEY_BACKSPACE && saveNameEntryLen>0) { saveNameEntry[--saveNameEntryLen] = '\0'; return; }
+    if (k==KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { saveNameEntry[0] = '\0'; saveNameEntryLen = 0; return; } if (saveNameEntryLen>=47) { return; } 
     char c = (k >= KEY_A && k <= KEY_Z) ? (char)('a' + (k - KEY_A)):((k >= KEY_1 && k <= KEY_9) ? (char)('1' + (k - KEY_1)) : ((k == KEY_0) ? '0' : ((k == KEY_SPACE) ? ' ' : 0))); if (c) { saveNameEntry[saveNameEntryLen] = c; saveNameEntry[++saveNameEntryLen] = '\0'; }
 }
 void MFD_ResetGeneral() { World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.consumableClickRow=-1; World.Sys_UI.genClickSlot = -1; }
@@ -70,11 +61,9 @@ INLINE void MFD_SelectTab(u8 panel, u8 tab, bool toggle) {
     play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0},false);
 }
 void WeaponSelectSlot(int slot) {
-    int wi = (int)World.invP1.wepInvIndices[slot]; if (wi < 0 || wi >= MAX_ENTITIES || (int)World.invP1.wepCur == slot || World.invP1.reloadFinished > World.pauseRelativeTime) { return; }
-    play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); World.invP1.wepCurPending = (i16)slot; World.invP1.weaponIndexPending = (i16)wi; int w = Get16WeaponIndexFromConstIndex(wi); WeaponFireStartWeaponDip((w >= 0 && w < 16) ? reloadTime[w] : 0.5f);
+    int wi = (int)World.invP1.wepInvIndices[slot]; if (wi < 0 || wi >= MAX_ENTITIES || (int)World.invP1.wepCur == slot || World.invP1.reloadFinished > World.pauseRelativeTime) { return; } play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); World.invP1.wepCurPending = (i16)slot; World.invP1.weaponIndexPending = (i16)wi; int w = Get16WeaponIndexFromConstIndex(wi); WeaponFireStartWeaponDip((w >= 0 && w < 16) ? reloadTime[w] : 0.5f);
 }
 __attribute__((noinline)) bool MenuEnter() { return !Cheats.consoleActive && (Sys_Input.keyStates[KEY_KP_ENTER].pressed || Sys_Input.keyStates[KEY_ENTER].pressed); }
-static bool uiClickLock = false, uiClickBlocked = false;
 static void UiClickGate() { bool anyDown = false; for (u8 b = 0; b < MAX_MOUSE_BUTTONS; ++b) anyDown |= Sys_Input.mouseButtons[b].down; uiClickBlocked = false; if (uiClickLock) { if (!anyDown) uiClickLock = false; else uiClickBlocked = true; } }
 __attribute__((noinline)) u8 UI_MenuInteractable(u32 id, i16 x, i16 y, float w, float h, bool* cursorOver, i8 this, bool sustained) {
     UIR(id,x,(i16)((float)y-h),(i16)w,(i16)h); bool cursorIsOver = CursorIsOverBounds(x, x + w, (float)y - h, (float)y); if (cursorIsOver && mouseMovementThisFrame && !resDropdownOpen) { currentMenuItem = this; if (cursorOver != NULL) {*cursorOver = cursorIsOver;} } if (uiClickBlocked) return 0u; if ((sustained ? Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].down : Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].pressed) && cursorIsOver) { uiClickBlocked = true; uiClickLock = true; return 1u; }
@@ -636,13 +625,6 @@ void EditFieldKey(i32 keycode){
     if(changed)EditFieldCommitLive();
 }
 bool UIInteractions() { if (!World.inventoryMode) return false; if (World.menuActive || World.paused || World.creditsActive || Cheats.consoleActive) return true; if (Cheats.noHUD || World.Sys_UI.vmailActive) return false; for (u32 i=UI_ID_NONE+1;i<UI_ID_COUNT;++i) if (UIOver(i)) return true; return false; }
-bool InventoryPointerHover() { return UIInteractions(); }
-int GeneralInvItem(int);
-bool GeneralInvCanUse(int),GeneralInvCanVaporize(int),GenInvTake(int slot);
-void GenInvClick(int),GenInvApply(int),VaporizeClick();
-bool InventoryHasAccessCard(AccCardType card);
-const char* AccessCardCodeForType(AccCardType card);
-u16 GetItemFrobTexture(u16 index);
 static const i16 generalStartRowY=586,generalColX[2]={372,684},generalRowY[7]={generalStartRowY,generalStartRowY+1*TXT_H,generalStartRowY+2*TXT_H,generalStartRowY+3*TXT_H,generalStartRowY+4*TXT_H,generalStartRowY+5*TXT_H,generalStartRowY+6*TXT_H};
 static const char* GeneralInvLabel(int slot) { int item=GeneralInvItem(slot); return item<0?"":Sys_Text.stringTable[slot?item+326:597]; }
 static const u8 grenadeItems[7]={7,9,13,8,11,12,10},patchSlots[7]={6,5,0,3,4,2,1};

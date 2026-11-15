@@ -82,7 +82,7 @@ typedef struct { glb_accessor*input,*output;glb_interpolation_type interpolation
 typedef struct { glbanim_samp*sampler;glb_node*target_node;glb_animt_path_type target_path;}glb_anim_chan;
 typedef struct { glbanim_samp*samplers;size_t samplers_count;glb_anim_chan*channels;size_t channels_count;}glb_animt;
 typedef struct { glb_mesh *meshes; size_t meshes_count; glb_accessor *accessors; size_t accessors_count; glb_buffer_view *buffer_views; size_t buffer_views_count; glb_buffer *buffers; size_t buffers_count; glb_skin *skins; size_t skins_count; glb_node *nodes; size_t nodes_count; glb_animt *animations; size_t animations_count; const void *bin; size_t bin_size; } glb_data;
-typedef enum { JSMN_UND = 0, JSMN_OBJECT = 1, JSMN_ARRAY = 2, JSMN_STRING = 3, JSMN_PRIMITIVE = 4 } jsmntype_t;
+typedef enum {JSMN_OBJECT = 1, JSMN_ARRAY = 2, JSMN_STRING = 3, JSMN_PRIMITIVE = 4 } jsmntype_t;
 enum { JSMN_ERROR_NOMEM = -1,JSMN_ERROR_INVAL = -2, JSMN_ERROR_PART = -3 };
 typedef struct { jsmntype_t type; i64 start,end; i32 size,parent; } jsmntok_t;
 typedef struct { size_t pos; u32 toknext; i32 toksuper; } jsmn_parser;
