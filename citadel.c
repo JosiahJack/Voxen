@@ -1,7 +1,8 @@
 // citadel.c - Game logic
 #include "common.h"
 __attribute__((used, visibility("default"))) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; /*Must be always visible for AutoSplitter tools to find it.*/
-void PatchDisableAll(),BiomonitorEnergyPulse(float),BioMonitorClearGraphs(),TextureSequenceInit(u16,char*); bool RecentLog(); extern double lerpStartTime; extern V3 queuedLevelPos; extern u8 queuedLevelToLoad; extern u16 editModeSelection; extern const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS];
+void PatchDisableAll(),BiomonitorEnergyPulse(float),BioMonitorClearGraphs(),TextureSequenceInit(u16,char*),MFD_OpenAudioLog(int); extern double lerpStartTime; extern V3 queuedLevelPos; extern u8 queuedLevelToLoad; extern u16 editModeSelection; extern const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS]; extern const u16 vmailStartFrames[6];
+float lerp(float min, float max, float val) { return min + (max - min) * vclamp(val,0.0f,1.0f); }
 V3 ScreenPointToRay(V3 fwd, V3 rt) {
     float px=World.inventoryMode?(float)World.cursorPos_x:(float)UI_W*0.5f, py=World.inventoryMode?(float)World.cursorPos_y:(float)UI_H*0.5f;
     float tanFov=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),aspect=(float)Sys_Settings.ScreenWidth/(float)Sys_Settings.ScreenHeight;
@@ -61,7 +62,7 @@ bool AddGeneralObjectToInventory(int index, int custIdx){
 void CheckForUnreadLogs() { int e=0,l=0; for (int i=0;i<LOGCNT;++i) if (World.invP1.hasLog[i] && !World.invP1.readLog[i]) *(Sys_Text.audioLogType[i] == AudioLogType_Email ? &e : &l)=1; World.invP1.hasNewEmail=e; World.invP1.hasNewLogs=l; }
 static int FindNextUnreadLog() { for (int i = LOGCNT-1; i >= 0; i--) { if(World.invP1.hasLog[i] && !World.invP1.readLog[i]){return i;} } return -1; }
 static u8 VmailClipForLog(int logIndex) { switch(logIndex){case 119: return 0; case 116: return 1; case 117: return 2; case 110: return 3; case 114: return 4; case 120: return 5;} return 0xFF;} /*0 BetaJettison, 1 BridgeSeparation, 2 CitadelSelfDestruct, 3 GeneralStatus, 4 LaserDestroyed, 5 ShieldsUp*/
-void MFD_OpenAudioLog(int);
+void PlayVmail(u8 i) { if(i>=sizeof(vmailStartFrames)/sizeof(*vmailStartFrames)){DualLogError("PlayVmail: clip %u out of range\n",i);return;} World.Sys_UI.vmailActive=(u8)(i+1); World.Sys_UI.vmailFrame=vmailStartFrames[i]; World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; ForceInventoryMode(); }
 void PlayLog(int logIndex) {if(logIndex<0||logIndex>=LOGCNT||!(World.invP1.hasHardware&HW_ERD)){return;} const char* lp=AudioLogPath(logIndex); if (lp && lp[0]) play_message(lp);/*text-only logs have no mp3: skip playback instead of erroring on ./Audio/.mp3*/ World.invP1.readLog[logIndex]=true; u8 vmailClip=VmailClipForLog(logIndex); if(vmailClip!=0xFF) PlayVmail(vmailClip); CenterStatusPrint("%s%s",Sys_Text.stringTable[1020],World.audiologNames[logIndex]); MFD_OpenAudioLog(logIndex); }
 void AddAudioLogToInventory(int index) {
     if (index < 0 || index >= LOGCNT) { DualLogError("BUG: Audio log index %d out of range (%d)\n",index,LOGCNT); return; } if (index == 128) { CenterStatusPrint("%s",Sys_Text.stringTable[309]); return; }/*Trioptimum Funpack*/
@@ -126,11 +127,14 @@ void UseGrenade(int index) {
     World.invP1.heldObjectCustIdx = U16_MAX; World.invP1.heldAmmo = 0; World.invP1.heldAmmo2 = 0; World.invP1.heldObjectLoadedAlternate = false; World.invP1.holdingObject = true;
 }
 void InventoryUpdate() {
-    if (Grenade()) { if (World.curLev == LEVEL_CYBERSPACE){UseCyberspaceItem();} else if (World.invP1.grenCur >= 0 && World.invP1.grenCur < 7 && World.invP1.grenAmmo[World.invP1.grenCur] > 0){UseGrenade(World.invP1.grenConstIndex[World.invP1.grenCur]);} else {CenterStatusPrint("%s",Sys_Text.stringTable[322]);/*Out of grenades.*/} }
-    if (GrenCycUp())  { if (World.curLev == LEVEL_CYBERSPACE) CycleCyberSpaceItem(1); else GrenadeCycle(Sys_Settings.InvertInventoryCycling ? -1 : 1); } if (GrenCycDn()){ if (World.curLev == LEVEL_CYBERSPACE) CycleCyberSpaceItem(-1); else GrenadeCycle(Sys_Settings.InvertInventoryCycling ? 1 : -1); }
-    if (RecentLog() && (World.invP1.hasHardware & HW_ERD)) {
-        if(World.invP1.lastAddedIndex>=0){int temp=World.invP1.lastAddedIndex; PlayLog(temp); World.invP1.lastAddedIndex=FindNextUnreadLog(); if(World.invP1.lastAddedIndex==temp)World.invP1.lastAddedIndex=-1; CheckForUnreadLogs(); }else{int temp=World.invP1.lastAddedIndex; World.invP1.lastAddedIndex=FindNextUnreadLog(); if(World.invP1.lastAddedIndex==temp){World.invP1.lastAddedIndex=-1;} CheckForUnreadLogs(); CenterStatusPrint("%s",Sys_Text.stringTable[1019]);/*Log playback stopped.*/}
-    } if (Patch()) { if (World.invP1.patchCur >= 0 && World.invP1.patchCur < 7 && World.invP1.patchCounts[World.invP1.patchCur] > 0){PatchUse(World.invP1.patchCur);} else {CenterStatusPrint("%s",Sys_Text.stringTable[324]); /*Out of patches.*/} } if (PatchCycUp()){PatchCycle(Sys_Settings.InvertInventoryCycling ? -1 : 1);} else if (PatchCycDown()){PatchCycle(Sys_Settings.InvertInventoryCycling ? 1 : -1);}
+    if (GetKeyPressed(30)/*Grenade use*/) { if (World.curLev == LEVEL_CYBERSPACE){UseCyberspaceItem();} else if (World.invP1.grenCur >= 0 && World.invP1.grenCur < 7 && World.invP1.grenAmmo[World.invP1.grenCur] > 0){UseGrenade(World.invP1.grenConstIndex[World.invP1.grenCur]);} else {CenterStatusPrint("%s",Sys_Text.stringTable[322]);/*Out of grenades.*/} }
+    if (GetKeyPressed(31)/*Grenade cycle+*/)  { if (World.curLev == LEVEL_CYBERSPACE) CycleCyberSpaceItem(1); else GrenadeCycle(Sys_Settings.InvertInventoryCycling ? -1 : 1); } if (GetKeyPressed(32)/*Grenade cycle-*/){ if (World.curLev == LEVEL_CYBERSPACE) CycleCyberSpaceItem(-1); else GrenadeCycle(Sys_Settings.InvertInventoryCycling ? 1 : -1); }
+    if (GetKeyPressed(14)/*Play recent log*/ && (World.invP1.hasHardware & HW_ERD)) {
+        if (World.invP1.lastAddedIndex>=0) { int temp=World.invP1.lastAddedIndex; PlayLog(temp); World.invP1.lastAddedIndex=FindNextUnreadLog(); if(World.invP1.lastAddedIndex==temp)World.invP1.lastAddedIndex=-1; CheckForUnreadLogs(); }
+        else { int temp=World.invP1.lastAddedIndex; World.invP1.lastAddedIndex=FindNextUnreadLog(); if(World.invP1.lastAddedIndex==temp){World.invP1.lastAddedIndex=-1;} CheckForUnreadLogs(); CenterStatusPrint("%s",Sys_Text.stringTable[1019]);/*Log playback stopped.*/ }
+    }
+    if (GetKeyPressed(34)/*Patch use*/) { if (World.invP1.patchCur >= 0 && World.invP1.patchCur < 7 && World.invP1.patchCounts[World.invP1.patchCur] > 0){PatchUse(World.invP1.patchCur);} else {CenterStatusPrint("%s",Sys_Text.stringTable[324]);/*Out of patches.*/} }
+    if (GetKeyPressed(35)/*Patch cycle+*/){PatchCycle(Sys_Settings.InvertInventoryCycling ? -1 : 1);} else if (GetKeyPressed(36)/*Patch cycle-*/){PatchCycle(Sys_Settings.InvertInventoryCycling ? 1 : -1);}
 }
 void AddItemFail(int index) { DropHeldItem(); CenterStatusPrint("%s%s%s", Sys_Text.stringTable[32],Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[318]);/*Inventory full.*/ }
 extern u8 magazinePitchCountForWeapon[16],magazinePitchCountForWeapon2[16];
@@ -163,23 +167,27 @@ static bool CyberGolIsPlanar(u16 self) { V3 wn = quat_rot_v3(World.rotation[self
 static void CyberGolOpenBuild() { mset(cyberGolOpen, 0, sizeof(cyberGolOpen)); for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { Entity* e = &World.instances[i]; u16 ci = e->index; if (ci != 21 && ci != 22) { continue; } cyberGolOpen[PosGetCellCoords(World.position[i].x,World.position[i].z)] = 1; if (CyberGolIsPlanar(i)) cyberWallFade[i] = 1.0f; } mcpy(cyberGolCur, cyberGolOpen, ARRSIZE); cyberGolTimer = 0.0f; cyberGolBuilt = 1; }
 static void CyberGolStep() {
     for (u32 c = 0; c < ARRSIZE; ++c) {
-        if (!cyberGolOpen[c]) { cyberGolNext[c] = 0; continue; }
-        u32 x = c % WORLDX; u32 z = c / WORLDX; u32 n = 0;
-        for (i32 dz = -1; dz <= 1; ++dz) for (i32 dx = -1; dx <= 1; ++dx) { if (!dx && !dz) { continue; } i32 nx = (i32)x + dx; i32 nz = (i32)z + dz; if (nx < 0 || nx >= WORLDX || nz < 0 || nz >= WORLDX) { continue; } n += cyberGolCur[(u32)nz * WORLDX + (u32)nx]; }
+        if (!cyberGolOpen[c]) { cyberGolNext[c] = 0; continue; } u32 x = c % WORLDX; u32 z = c / WORLDX; u32 n = 0; for (i32 dz = -1; dz <= 1; ++dz) for (i32 dx = -1; dx <= 1; ++dx) { if (!dx && !dz) { continue; } i32 nx = (i32)x + dx; i32 nz = (i32)z + dz; if (nx < 0 || nx >= WORLDX || nz < 0 || nz >= WORLDX) { continue; } n += cyberGolCur[(u32)nz * WORLDX + (u32)nx]; }
         if (cyberGolCur[c]) { cyberGolNext[c] = (n == 2 || n == 3) ? 1 : 0; } else { cyberGolNext[c] = (n == 3) ? 1 : 0; }
     } mcpy(cyberGolCur, cyberGolNext, ARRSIZE);
 }
 static void CyberGolUpdate() { if (!cyberGolBuilt) CyberGolOpenBuild(); cyberGolTimer += vclamp((float)World.dt, 0.0f, 0.1f); if (cyberGolTimer >= 1.0f) { cyberGolTimer -= 1.0f; CyberGolStep(); } }
-void CyberWallUpdate(u16 self) { Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE)) return; bool gol = false; u32 cell = 0; if (cyberGolBuilt) { if (CyberGolIsPlanar(self)) { cell = PosGetCellCoords(World.position[self].x, World.position[self].z); gol = cyberGolOpen[cell] != 0; } } if (gol) { float target = cyberGolCur[cell] ? 1.0f : 0.02f; float step = 0.49f * vclamp((float)World.dt, 0.0f, 0.1f); if (cyberWallFade[self] < target) { cyberWallFade[self] += step; if (cyberWallFade[self] > target) cyberWallFade[self] = target; } else if (cyberWallFade[self] > target) { cyberWallFade[self] -= step; if (cyberWallFade[self] < target) cyberWallFade[self] = target; } } else if (cyberWallFade[self] > 0.02f) { cyberWallFade[self] -= 0.49f * vclamp((float)World.dt, 0.0f, 0.1f); if (cyberWallFade[self] < 0.02f) cyberWallFade[self] = 0.02f; } ShapeBox panelBox = Entity_GetBox(self); ShapeSphere sph = Entity_GetSph(PLAYER1); float reach = World.radius[self] + 1.86f; bool touching = false; if (V3_SqDist(World.position[self], sph.ctr) < reach * reach) touching = CapsuleTouchesOBB(sph.ctr, sph.rad + 0.06f, panelBox); for (u16 k = 0; k < cyberWallToucherCount && !touching; ++k) touching = CyberWallToucherTouches(&cyberWallTouchers[k], panelBox, World.position[self], World.radius[self]); if (touching && !cyberWallWasTouching[self]) { cyberWallFade[self] = 1.0f; if (gol) cyberGolCur[cell] = 1; } cyberWallWasTouching[self] = touching; }
-void CyberItemUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f){ CyberItemOnTriggerEnter(self,PLAYER1); } }
-void CyberMineUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f){ CyberMineOnTriggerEnter(self,PLAYER1); } }
-void CyberExitUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(World.curLev != LEVEL_CYBERSPACE)return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 2.0f){ ExitCyberspace(); } }
-void CyberSwitchUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(e->active)return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f){ e->active=true; ChangeAnim(e,A_ACTIVATED); if(e->textIndex>0) CenterStatusPrint("%s",Sys_Text.stringTable[e->textIndex]); UseTargets(self,e->targetIdx); } }
-void CyberDataFragUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(e->allDone)return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f){ e->allDone=true; if(e->textIndex>0) CenterStatusPrint("%s",Sys_Text.stringTable[e->textIndex]); } }
+void CyberWallUpdate(u16 s) {
+    Entity* e = &World.instances[s]; if (!(e->entflags & EF_ACTIVE)) return; bool gol = false; u32 cell = 0; if (cyberGolBuilt) { if (CyberGolIsPlanar(s)) { cell = PosGetCellCoords(World.position[s].x, World.position[s].z); gol = cyberGolOpen[cell] != 0; } }
+    if (gol) { float target = cyberGolCur[cell] ? 1.0f : 0.02f; float step = 0.49f * vclamp((float)World.dt,0.0f,0.1f); if (cyberWallFade[s] < target) { cyberWallFade[s] += step; if (cyberWallFade[s] > target) cyberWallFade[s] = target; } else if (cyberWallFade[s] > target) { cyberWallFade[s] -= step; if (cyberWallFade[s] < target) cyberWallFade[s] = target; } }
+    else if (cyberWallFade[s] > 0.02f) { cyberWallFade[s] -= 0.49f * vclamp((float)World.dt, 0.0f, 0.1f); if (cyberWallFade[s] < 0.02f) cyberWallFade[s] = 0.02f; }
+    ShapeBox panelBox = Entity_GetBox(s); ShapeSphere sph = Entity_GetSph(PLAYER1); float reach = World.radius[s] + 1.86f; bool touching = false; if (V3_SqDist(World.position[s], sph.ctr) < reach * reach) touching = CapsuleTouchesOBB(sph.ctr, sph.rad + 0.06f, panelBox); for (u16 k = 0; k < cyberWallToucherCount && !touching; ++k) touching = CyberWallToucherTouches(&cyberWallTouchers[k], panelBox, World.position[s], World.radius[s]);
+    if (touching && !cyberWallWasTouching[s]) { cyberWallFade[s] = 1.0f; if (gol) cyberGolCur[cell] = 1; } cyberWallWasTouching[s] = touching;
+}
+void CyberItemUpdate(u16 self)     { Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE)) return; if (V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f) { CyberItemOnTriggerEnter(self,PLAYER1); } }
+void CyberMineUpdate(u16 self)     { Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE)) return; if (V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f) { DamageData dd = {0}; dd.damage = e->damage; dd.owner = self; TakeDamage(PLAYER1,dd); play_wav(sounds[67],AppliedFXVol(1.0f),World.position[self],false); flag_set(&e->entflags,EF_ACTIVE,false); } }
+void CyberExitUpdate(u16 self)     { Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE)) return; if (World.curLev != LEVEL_CYBERSPACE) return; if (V3_Dist(World.position[self],World.position[PLAYER1]) < 2.0f) { ExitCyberspace(); } }
+void CyberSwitchUpdate(u16 self)   { Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE)) return; if (e->active)  return; if (V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f) { e->active  = true; ChangeAnim(e,A_ACTIVATED); if (e->textIndex > 0) CenterStatusPrint("%s",Sys_Text.stringTable[e->textIndex]); UseTargets(self,e->targetIdx); } }
+void CyberDataFragUpdate(u16 self) { Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE)) return; if (e->allDone) return; if (V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f) { e->allDone = true; if (e->textIndex > 0) CenterStatusPrint("%s",Sys_Text.stringTable[e->textIndex]); } }
 void SearchFXEnable(int side) { side = side == 1; World.Sys_UI.searchFXActive[side] = true; World.Sys_UI.searchFXStartTime[side] = World.pauseRelativeTime; World.Sys_UI.searchFXCursorX[side] = (float)World.cursorPos_x; World.Sys_UI.searchFXCursorY[side] = (float)World.cursorPos_y; }
-void SearchFXResetUpdate(u16 self) { Entity* e = &World.instances[self]; if (e->delayFinished >= World.pauseRelativeTime) {return;} flag_set(&e->entflags,EF_ACTIVE,false); }
-void DelayedSpawnEnable(u16 self) { Entity* e = &World.instances[self]; e->timerFinished = World.pauseRelativeTime + e->delay; e->active = true; }
-void DelayedSpawnUpdate(u16 s) { Entity* e=&World.instances[s]; if(!e->active||e->timerFinished<=0.0||e->timerFinished>World.pauseRelativeTime){return;} e->active=false; if(!e->doSelfAfterList){return;} if(e->despawnInstead){DeleteInstance(s);/*despawn means gone, not deactivated*/}else flag_set(&e->entflags,EF_ACTIVE,true);}
+void SearchFXResetUpdate(u16 self) { Entity* e = &World.instances[self]; if (e->delayFinished >= World.pauseRelativeTime) { return; } flag_set(&e->entflags,EF_ACTIVE,false); }
+void DelayedSpawnEnable(u16 self)  { Entity* e = &World.instances[self]; e->timerFinished = World.pauseRelativeTime + e->delay; e->active = true; }
+void DelayedSpawnUpdate(u16 s)     { Entity* e = &World.instances[s]; if (!e->active || e->timerFinished <= 0.0 || e->timerFinished>World.pauseRelativeTime) { return; } e->active=false; if (!e->doSelfAfterList){ return; } if (e->despawnInstead) { DeleteInstance(s);/*despawn means gone, not deactivated*/ } else flag_set(&e->entflags,EF_ACTIVE,true); }
 void FuncWallShiftChildren(u16 self, V3 delta) { if (vabs(delta.x)+vabs(delta.y)+vabs(delta.z) < 0.00001f) {return;} for (u16 i=PLAYER1;i<World.instCount;++i) { if (fwParentOf[i]==self) { World.position[i]=V3Add(World.position[i],delta); } } }
 void FuncWallTargetted(u16 self) { Entity* e = &World.instances[self]; u8 st = (u8)e->funcState; if (st == FStat_Start || st == FStat_MovingStart || st == FStat_AjarMovingTarget || (st > FStat_AjarMovingTarget && e->ajarPercentage > 0.0f)) { World.instances[self].funcState = FStat_MovingTarget; World.instances[self].tickFinished = World.pauseRelativeTime + 10.0f; } else { World.instances[self].funcState = FStat_MovingStart; World.instances[self].tickFinished = World.pauseRelativeTime + 10.0f; } play_wav(sounds[76], AppliedFXVol(1.0f), World.position[self], true); }
 void FuncWallUpdateInner(u16 self) {
@@ -461,7 +469,7 @@ float TakeDamage(u16 self,DamageData dd) {
     if (isCyber) { if (World.instances[self].cyberHealth <= 0.0f) { if (!World.instances[self].iceActive && isNPC && !(World.instances[self].entflags & EF_DEAD_CHECKS_DONE)) {World.cyberkills++;} Death(self,false); } } else { if (World.instances[self].health <= 0.0f) { if (isNPC && !(World.instances[self].entflags & EF_DEAD_CHECKS_DONE)) {World.kills++;} Death(self,dd.attackType == Att_Beam || dd.attackType == Att_PjBm); } }    return take;
 }
 // Hardware
-static Color3 lantCol = (Color3){1.0f,1.0f,1.0f}; static float lanternVersionBrightness[3] = {0.875f,1.4f,1.75f}; static const float SIGHT_LIGHT_INTENSITY=0.36f,SIGHT_LIGHT_RANGE=75.8f;/*Citadel sightLight: white spotlight, intensity 0.36, range 75.7961*/
+static Color3 lantCol = (Color3){1.0f,1.0f,1.0f}; static float lanternVersionBrightness[3] = {0.875f,1.4f,1.75f}; static const float SIGHT_LIGHT_INTENSITY=0.36f,SIGHT_LIGHT_RANGE=75.8f;/*Citadel sightLight: white spotlight, intensity 0.36, range 75.7961*/ V3 lanternPos;
 void HardwareUpdate() {
     bool infraredOn = (World.invP1.hasHardware & HW_INF) && (World.invP1.hardwareIsActive & HW_INF) > 0, lanternOn = (World.invP1.hasHardware & HW_LAN) && (World.invP1.hardwareIsActive & HW_LAN) > 0;
     bool sightOn = (World.invP1.patchActive & PATCH_SIGHT) && World.invP1.sightFinishedTime != -1.0;
@@ -871,12 +879,16 @@ void SecurityCameraRotateUpdate(u16 self) { /*Sweeps the camera back and forth b
     World.rotation[self] = quat_multiply(yaw,World.instances[self].camBaseRot);
 }
 static bool PanelTetherBroken(u16 i) { return i<World.instCount && (World.instances[i].entflags&EF_ACTIVE) && V3_SqDist(World.position[PLAYER1],World.position[i]) > 64.0f; }
+void TriggerTrippedUpdate(u16 self) {
+    Entity* e = &World.instances[self]; if (e->delayFinished <= 0.0 || e->delayFinished >= World.pauseRelativeTime) { return; } e->delayFinished = 0.0; u32 sf = World.targetIOActivatorIoflags, sfh = World.targetIOActivatorIoflagsHi; bool wa = World.targetIOActive; World.targetIOActive = true; World.targetIOActivatorIoflags = e->deferredIoflags; World.targetIOActivatorIoflagsHi = e->deferredIoflagsHi; UseTargets(self,e->targetIdx);
+    World.targetIOActivatorIoflags = sf; World.targetIOActivatorIoflagsHi = sfh; World.targetIOActive = wa;
+}
 void ModUpdate() {
     if (World.paused || World.menuActive) return;
     bool resurrecting = World.invP1.ressurectingFinished > World.pauseRelativeTime;
     UpdateSearchTether(); if (!resurrecting) WeaponsUpdate(); if (!resurrecting) InventoryUpdate(); PlayerEnergyUpdate(); PatchUpdate(); HardwareUpdate(); MissionTimerUpdate();
     if (World.curLev == LEVEL_CYBERSPACE) CyberTimerUpdate(PLAYER1); /*the loop below starts at INSTS_1ST_IDX, so the player's own countdown would never tick*/
-    if (!resurrecting && Use()) { Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right); }
+    if (!resurrecting && GetKeyPressed(24)/*Use/Frob*/) { Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right); }
     if (World.pauseRelativeTime < World.debugLineFinished && (World.lineVertCnt + 6) < MAX_LINEVRTS) { DrawLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f}); }
     if (World.curLev == LEVEL_CYBERSPACE) { CyberWallTouchersBuild(); CyberGolUpdate(); }
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {

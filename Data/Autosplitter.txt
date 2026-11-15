@@ -41,7 +41,7 @@ The splits are as follows, the value is the resulting ID after the split:
 
 The code as it is in mod.h:
 typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData;
-extern AutoSplitterData autoSplitter;
+AutoSplitterData autoSplitter;
 
 And citadel.c:
 __attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; // Fore use with LiveSplit or other future speedrunner utilities for doing speedruns

@@ -1,6 +1,6 @@
 // weapons.c - Weapon System
 #include "common.h"
-void ApplyImpactForce(u16,float,V3,V3),ApplyImpactForceWithSound(u16,float,V3,V3),BiomonitorEnergyPulse(float),WeaponFireStartWeaponDip(float); float TakeDamage(u16,DamageData),GetDamageTakeAmount(DamageData*); FootStepType GetFootstepTypeForPrefab(int pid); bool ChangeAmmoType();
+void ApplyImpactForce(u16,float,V3,V3),ApplyImpactForceWithSound(u16,float,V3,V3),BiomonitorEnergyPulse(float),WeaponFireStartWeaponDip(float); float TakeDamage(u16,DamageData),GetDamageTakeAmount(DamageData*); FootStepType GetFootstepTypeForPrefab(int pid);
 extern V3 vWepOfs[16]; extern bool editFieldEditing,EditPanelPointerHover(); double lerpStartTime = 0.0;
 float delayBetweenShotsForWeapon[16]={1.0f,0.6f,0.5f,0.1f,0.8f,1.6f,0.65f,0.8f,0.6f,0.5f,1.2f,0.9f,0.5f,0.08f,1.1f,0.75f},delayBetweenShotsForWeapon2[16]={1.0f,4.5f,0.5f,0.15f,4.0f,1.6f,0.75f,0.8f,0.6f,0.5f,1.2f,0.9f,0.5f,0.08f,5.0f,0.75f};
 float dmgForWep2[16]={160.0f,70.0f,5.0f,22.0f,108.0f,0.0f,0.0f,85.0f,80.0f,33.0f,350.0f,0.0f,0.0f,35.0f,36.0f,15.0f},damageOverloadForWeapon[16]={0.0f,115.0f,0.0f,0.0f,180.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,60.0f,0.0f},energyDrainLowForWeapon[16]={0.0f,3.0f,0.0f,0.0f,5.0f,0.0f,0.0f,0.0f,0.0f,0.0f,13.0f,0.0f,0.0f,0.0f,2.0f,3.0f},energyDrainHiForWeapon[16]={0.0f,15.0f,0.0f,0.0f,30.0f,0.0f,0.0f,0.0f,0.0f,0.0f,130.0f,0.0f,0.0f,0.0f,8.0f,30.0f};
@@ -36,17 +36,10 @@ void CompleteWeaponChange() {
     World.invP1.wepCurPending = World.invP1.weaponIndexPending = -1;
 }
 void CycleWeaponSlot(int dir) { // dir: +1 = next, -1 = prev; dead in cyberspace, only 2 weapons so up is down
-    if (World.curLev == LEVEL_CYBERSPACE) { World.invP1.isPulserNotDrill = !World.invP1.isPulserNotDrill; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ return; }
-    if (World.invP1.reloadFinished > World.pauseRelativeTime) return; // Dip in progress
-    int curSlot = (int)World.invP1.wepCur;
-    int nextSlot = curSlot;
-    for (int attempt = 0; attempt < 7; ++attempt) { nextSlot += dir; if (nextSlot < 0) { nextSlot = 6; } if (nextSlot > 6) { nextSlot = 0; } if (nextSlot == curSlot) { break; } int wi = (int)World.invP1.wepInvIndices[nextSlot]; if (wi >= 0 && wi < MAX_ENTITIES && Get16WeaponIndexFromConstIndex(wi) >= 0) { break; /*Valid weapon*/} }
-    if (nextSlot == curSlot) return;
-    int wi = (int)World.invP1.wepInvIndices[nextSlot];
-    play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/
-    World.invP1.wepCurPending = (i16)nextSlot;
-    World.invP1.weaponIndexPending = (i16)wi;
-    int w16=Get16WeaponIndexFromConstIndex(wi); WeaponFireStartWeaponDip(w16>=0?reloadTime[w16]:0.5f);
+    if (World.curLev == LEVEL_CYBERSPACE) { World.invP1.isPulserNotDrill = !World.invP1.isPulserNotDrill; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ return; } if (World.invP1.reloadFinished > World.pauseRelativeTime) return; // Dip in progress
+    int curSlot = (int)World.invP1.wepCur; int nextSlot = curSlot;
+    for (int attempt = 0; attempt < 7; ++attempt) { nextSlot += dir; if (nextSlot < 0) { nextSlot = 6; } if (nextSlot > 6) { nextSlot = 0; } if (nextSlot == curSlot) { break; } int wi = (int)World.invP1.wepInvIndices[nextSlot]; if (wi >= 0 && wi < MAX_ENTITIES && Get16WeaponIndexFromConstIndex(wi) >= 0) { break; /*Valid weapon*/} } if (nextSlot == curSlot) return;
+    int wi = (int)World.invP1.wepInvIndices[nextSlot]; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ World.invP1.wepCurPending = (i16)nextSlot; World.invP1.weaponIndexPending = (i16)wi; int w16=Get16WeaponIndexFromConstIndex(wi); WeaponFireStartWeaponDip(w16>=0?reloadTime[w16]:0.5f);
 }
 void UpdateWeaponReloadDip() {
     if (World.invP1.reloadFinished > World.pauseRelativeTime) {
@@ -70,25 +63,11 @@ bool SpawnImpactParticleForPrefab(u16 prefab, V3 pos, V3 normal) {
     return true;
 }
 void SpawnBeamTrail(u16 presetType, V3 from, V3 to, Color c) {
-    const PSysDef* preset=PSysTypeGet(presetType); if(!preset)return; V3 delta=V3_AsubB(to,from); float dist=V3_Mag(delta); if(dist<0.01f)return;
-    const int BEAM_SEGS=8;
-    const float life=0.04f, trailLife=0.40f;
+    const PSysDef* preset=PSysTypeGet(presetType); if(!preset)return; V3 delta=V3_AsubB(to,from); float dist=V3_Mag(delta); if(dist<0.01f)return; const int BEAM_SEGS=8; const float life=0.04f, trailLife=0.40f;
     for (int seg=0; seg<BEAM_SEGS; ++seg) {
-        PSysDef def=*preset; float f0=(float)seg/(float)BEAM_SEGS;
-        V3 segFrom=V3Add(from,V3_ScaleByF(delta,f0));
-        def.pos=segFrom; def.rotation=QuatFromToRotation((V3){0,1,0},V3_Normalize(delta));
-        def.textures=NULL; def.textureCount=0;
-        def.sizeMin=def.sizeMax=0.0f;
-        def.shapeType=3;
-        def.lifetimeMin=def.lifetimeMax=life;
-        def.trailLifetime=trailLife;
-        def.trailWidthStart=def.trailWidthEnd=0.05f;
-        float segDist=dist/(float)BEAM_SEGS;
-        def.speedMin=def.speedMax=segDist*(2.0f/life);
-        def.velKeys=(const float[]){1,0}; def.velTimes=(const float[]){0,1}; def.velCount=2;
-        def.trailColorStart=c; def.trailColorEnd=c;
-        Color colors[16]; for (int i=0;i<16;++i) colors[i]=c; def.rampColors=colors;
-        def.emitRate=0.0f; def.burstCount=1; def.duration=life+0.05f; PSysAddInternal(&def,U16_MAX,U16_MAX);
+        PSysDef def=*preset; float f0=(float)seg/(float)BEAM_SEGS; V3 segFrom=V3Add(from,V3_ScaleByF(delta,f0));
+        def.pos=segFrom; def.rotation=QuatFromToRotation((V3){0,1,0},V3_Normalize(delta)); def.textures=NULL; def.textureCount=0; def.sizeMin=def.sizeMax=0.0f; def.shapeType=3; def.lifetimeMin=def.lifetimeMax=life; def.trailLifetime=trailLife; def.trailWidthStart=def.trailWidthEnd=0.05f; float segDist=dist/(float)BEAM_SEGS; def.speedMin=def.speedMax=segDist*(2.0f/life); def.velKeys=(const float[]){1,0}; def.velTimes=(const float[]){0,1}; def.velCount=2;
+        def.trailColorStart=c; def.trailColorEnd=c; Color colors[16]; for (int i=0;i<16;++i) colors[i]=c; def.rampColors=colors; def.emitRate=0.0f; def.burstCount=1; def.duration=life+0.05f; PSysAddInternal(&def,U16_MAX,U16_MAX);
     }
 }
 static const struct { u16 proj; u8 type; } projectileImpactTypes[] = { { 481, 177 }/* proj_enemshot2: impact_enemshot2 */, { 482, 169 }, { 482, 170 }/* magpulse: magpulse_center, sparks_spits */, { 483, 171 }, { 483, 182 }/* stungun: stungun_impacts, sparkssmall */, { 484, 172 }, { 484, 173 }, { 484, 174 }, { 484, 175 }/* railgun: root, centerumbra, shockwave, smoke */, { 485, 176 }, { 485, 183 }/* plasma: plasmarifle_hit, sparkssmall */,
@@ -117,20 +96,13 @@ static void CreateBeamImpactEffects(int wep16) { u16 imp = 731u;/*Cyan sparq*/ i
 static void CreateBeamEffects(int wep16) { Color c = (wep16 == 1) ? (Color){1.f,0.18f,0.12f,1.f} : (wep16 == 4) ? (Color){1.f,0.9f,0.15f,1.f} : (Color){0.3f,1.f,1.f,1.f}; V3 p = World.position[PLAYER1]; p.y -= 0.2f; SpawnBeamTrail(166,p,wfx.tempHit.point,c); }
 static float DamageForPower(int w) { if (World.invP1.overloadEnabled) { return damageOverloadForWeapon[w]; } float d = dmgForWep[w],D = dmgForWep2[w],e = energyDrainLowForWeapon[w],E = energyDrainHiForWeapon[w]; float pct = World.invP1.weaponEnergySetting[w]*0.01f; return (pct*(D/E - d/e) + 3.0f)*(pct*(E - e) + e); } // Slope-of-slopes curve: interpolates damage/energy ratio across energy setting, then scales by interpolated energy drain itself.
 void HitScanFire(int wep16) {
-    u16 ent = wfx.tempHitEnt;
-    bool b = ent != 0xFFFF,isBeam=(wep16 == 1 || wep16 == 4 || wep16 == 14),npc = b && IdxIsNPC(World.instances[ent].index),alt = World.invP1.wepLoadedWithAlternate[World.invP1.wepCur];
+    u16 ent = wfx.tempHitEnt; bool b = ent != 0xFFFF,isBeam=(wep16 == 1 || wep16 == 4 || wep16 == 14),npc = b && IdxIsNPC(World.instances[ent].index),alt = World.invP1.wepLoadedWithAlternate[World.invP1.wepCur];
     DamageData dd = {.isOtherNPC = npc, .hitpoint = wfx.tempHit.point, .attacknormal = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right), .owner = PLAYER1,.impactVelocity = wep16 == 12 ? 120.0f/*riotgun kicks harder*/ : 80.0f,.attackType=(wep16 == 2 && alt) ? Att_Trnq/*dartgun tranqs*/ : attTypeWep[wep16], .berserkActive = (World.invP1.patchActive & PATCH_BERSERK) != 0 };
-    if (isBeam) CreateBeamImpactEffects(wep16);
-    else { CreateStandardImpactEffects(); if (!npc && b && IdxIsGeometry(World.instances[ent].index)) CreateStandardImpactMarks(wep16); }
-    float tranq = -1.0f; if (npc && dd.attackType == Att_Trnq){tranq=Tranquilize(ent,3.0f + random_range(0.0f,4.0f),false);}
-    dd.damage=alt ? dmgForWep2[wep16] : (CurrentWeaponUsesEnergy() ? DamageForPower(wep16) : dmgForWep[wep16]); dd.offense=alt ? offenseWep2[wep16] : offenseWep[wep16]; dd.penetration=alt ? penetrationWep2[wep16] : penetrationWep[wep16];
-    dd.damage = GetDamageTakeAmount(&dd);
-    float dmgFinal = 0.0f;
-    if (b && World.instances[ent].health > 0.0f) { dd.damage*=0.8f;/*rebalancing factor*/ dmgFinal=TakeDamage(ent,dd); dd.impactVelocity+=dd.damage; if (npc && !(World.instances[wfx.tempHitEnt].entflags & EF_ASLEEP)) { World.invP1.justFired = World.pauseRelativeTime; } }
-    if (dmgFinal < 0.0f) dmgFinal = 0.0f;
+    if (isBeam) CreateBeamImpactEffects(wep16); else { CreateStandardImpactEffects(); if (!npc && b && IdxIsGeometry(World.instances[ent].index)) CreateStandardImpactMarks(wep16); }
+    float tranq = -1.0f; if (npc && dd.attackType == Att_Trnq){tranq=Tranquilize(ent,3.0f + random_range(0.0f,4.0f),false);} dd.damage=alt ? dmgForWep2[wep16] : (CurrentWeaponUsesEnergy() ? DamageForPower(wep16) : dmgForWep[wep16]); dd.offense=alt ? offenseWep2[wep16] : offenseWep[wep16]; dd.penetration=alt ? penetrationWep2[wep16] : penetrationWep[wep16]; dd.damage = GetDamageTakeAmount(&dd); float dmgFinal = 0.0f;
+    if (b && World.instances[ent].health > 0.0f) { dd.damage*=0.8f;/*rebalancing factor*/ dmgFinal=TakeDamage(ent,dd); dd.impactVelocity+=dd.damage; if (npc && !(World.instances[wfx.tempHitEnt].entflags & EF_ASLEEP)) { World.invP1.justFired = World.pauseRelativeTime; } } if (dmgFinal < 0.0f) dmgFinal = 0.0f;
     CreateTargetIDInstance(dmgFinal,ent,tranq);
-    if (b && (!dd.isOtherNPC || wep16==12)) { float force=(wep16==12 ? 10.0f : 1.0f)*dd.impactVelocity; if (isBeam) ApplyImpactForce(ent,force,dd.attacknormal,dd.hitpoint); else ApplyImpactForceWithSound(ent,force,dd.attacknormal,dd.hitpoint); }
-    if (isBeam){CreateBeamEffects(wep16);}
+    if (b && (!dd.isOtherNPC || wep16==12)) { float force=(wep16==12 ? 10.0f : 1.0f)*dd.impactVelocity; if (isBeam) ApplyImpactForce(ent,force,dd.attacknormal,dd.hitpoint); else ApplyImpactForceWithSound(ent,force,dd.attacknormal,dd.hitpoint); } if (isBeam){CreateBeamEffects(wep16);}
 }
 void MeleeHitUpdate(void) {
     if (wfx.pendingMeleeFinished <= 0.0 || World.pauseRelativeTime < wfx.pendingMeleeFinished) return;
@@ -179,12 +151,8 @@ void FireBeachball(int wep16, float shoveForce, u16 prefabID) { // Acts like a b
     for (u32 i=0;i<sizeof(ribbons)/sizeof(*ribbons);++i) { if (ribbons[i].prefab == prefabID) { const PSysDef* root = &particleTypeDefs[ribbons[i].root]; PSysDef d = *root; d.pos = World.position[ball]; PSysAddInternal(&d,U16_MAX,ball); if (ribbons[i].child != U16_MAX) { const PSysDef* ch = &particleTypeDefs[ribbons[i].child]; PSysDef dc = *ch; dc.pos = World.position[ball]; PSysAddInternal(&dc,U16_MAX,ball); } } }
 }
 void FireCyberBeachball(bool isPulser, float shoveForce, u16 prefabID) { // Same beachball/baseball split, but damage and attack type come from the held cyber software version
-    u16 ball = SpawnDynamicObject(prefabID); if (!EntIdxIsValid(ball)) return;
-    Entity* proj = &World.instances[ball];
-    World.layer[ball] = L_PlayerBullets; proj->forward = V3_Normalize(ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right));
-    proj->damage = isPulser ? (1.0f + 0.25f * (float)World.invP1.softVersions[SW_PULSER]) : 10.0f * (float)World.invP1.softVersions[SW_DRILL];
-    proj->strength = proj->speed = 0.0f;
-    proj->attackType = isPulser ? Att_Ball/*ProjectileLaunched*/ : Att_Drill; proj->recentMostActivator = PLAYER1; ProjectileEffectImpactInitAfterLoad(ball);
+    u16 ball = SpawnDynamicObject(prefabID); if (!EntIdxIsValid(ball)) return; Entity* proj = &World.instances[ball]; World.layer[ball] = L_PlayerBullets; proj->forward = V3_Normalize(ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right));
+    proj->damage = isPulser ? (1.0f + 0.25f * (float)World.invP1.softVersions[SW_PULSER]) : 10.0f * (float)World.invP1.softVersions[SW_DRILL]; proj->strength = proj->speed = 0.0f; proj->attackType = isPulser ? Att_Ball/*ProjectileLaunched*/ : Att_Drill; proj->recentMostActivator = PLAYER1; ProjectileEffectImpactInitAfterLoad(ball);
     World.position[ball] = World.position[PLAYER1]; World.velocity[ball] = (V3){0}; World.rotation[ball] = QuatFromToRotation((V3){0.0f,0.0f,1.0f},proj->forward);
     AddForce(ball, V3_ScaleByF(proj->forward, shoveForce), true); flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);
 }
@@ -218,7 +186,7 @@ void FireWeapon(int wep16,bool isSilent){
 static bool pendingAttackWep16Valid = false; static int  pendingAttackWep16 = -1; void DropHeldItem(); void ResetHeldItem(); void AddItemToInventory(int index, int custIdx);
 extern u16 editModeTestEntityDefinition;
 void CheckAttackInput(void) {
-    if(!Attack()){return;} if(World.Sys_UI.vmailActive) { World.Sys_UI.vmailActive=0; World.invP1.waitTilNextFire=World.pauseRelativeTime+0.8f; return;}
+    if(!GetKey(23)/*Attack*/){return;} if(World.Sys_UI.vmailActive) { World.Sys_UI.vmailActive=0; World.invP1.waitTilNextFire=World.pauseRelativeTime+0.8f; return;}
     if (World.curLev == LEVEL_CYBERSPACE) { FireCyberWeapon(); return; }
     if (editFieldEditing || EditPanelPointerHover()) { return; }
     if (Cheats.editMode && Cheats.editSubMode==1){World.invP1.holdingObject = true; World.invP1.heldObjectIndex = editModeTestEntityDefinition;}
@@ -251,25 +219,21 @@ static void LoadAmmoType(bool alt,bool isSilent) {
     World.invP1.reloadFinished=World.pauseRelativeTime+vmax(reloadTime[wep16],0.0f); lerpStartTime=World.pauseRelativeTime; wfx.reloadContainerPos=wfx.reloadContainerHome;
 }
 void ReloadSecret(bool isSilent) {
-    int w=Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); if (w<0) return;
-    if (wepClass[w]==WC_MELEE || wepClass[w]==WC_ENERGY) { CenterStatusPrint("%s",Sys_Text.stringTable[wepClass[w]==WC_MELEE ? 315 : 538]); return; }
+    int w=Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); if (w<0) return; if (wepClass[w]==WC_MELEE || wepClass[w]==WC_ENERGY) { CenterStatusPrint("%s",Sys_Text.stringTable[wepClass[w]==WC_MELEE ? 315 : 538]); return; }
     u16 wc=World.invP1.wepCur; bool alt=World.invP1.wepLoadedWithAlternate[wc];
     if ((alt ? World.invP1.currentMagazineAmount2[wc] : World.invP1.currentMagazineAmount[wc])==(alt ? magazinePitchCountForWeapon2[w] : magazinePitchCountForWeapon[w])) { CenterStatusPrint("%s",Sys_Text.stringTable[191]); return; }
     if (!(alt ? World.invP1.wepAmmoSecondary[w] : World.invP1.wepAmmo[w])) { if (!(alt ? World.invP1.wepAmmo[w] : World.invP1.wepAmmoSecondary[w])) { CenterStatusPrint("%s",Sys_Text.stringTable[305]); return; } CenterStatusPrint("%s",Sys_Text.stringTable[192]); alt=!alt; }
     LoadAmmoType(alt,isSilent);
 }
 void CheckReloadInput(void) {
-    if (World.invP1.reloadFinished >= World.pauseRelativeTime || !Reload() || (int)World.invP1.wepCur < 0) return;
-    if (Sys_Settings.QuickReloadWeapons) { ReloadSecret(false); return; }
-    int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); if (wep16 < 0) return;
+    if (World.invP1.reloadFinished >= World.pauseRelativeTime || !GetKeyPressed(27)/*Reload*/ || (int)World.invP1.wepCur < 0) return; if (Sys_Settings.QuickReloadWeapons) { ReloadSecret(false); return; } int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); if (wep16 < 0) return;
     u16 wc = World.invP1.wepCur; bool alt = World.invP1.wepLoadedWithAlternate[wc]; if (alt ? (World.invP1.currentMagazineAmount2[wc] <= 0 || World.invP1.wepAmmoSecondary[wep16] <= 0) : (World.invP1.currentMagazineAmount[wc] <= 0 || World.invP1.wepAmmo[wep16] <= 0)) ReloadSecret(false); else Unload(false);
 }
 void ActualChangeAmmoType(void) {
-    int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); if (wep16 < 0) {return;}
-    if (wepClass[wep16] == WC_MELEE) { CenterStatusPrint("%s", Sys_Text.stringTable[315]); return; }
+    int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); if (wep16 < 0) {return;}  if (wepClass[wep16] == WC_MELEE) { CenterStatusPrint("%s", Sys_Text.stringTable[315]); return; }
     if (wepClass[wep16] == WC_ENERGY) { u16 wc = World.invP1.wepCur; if (World.invP1.curWepHeat[wc] > 25.0f) { CenterStatusPrint("%s", Sys_Text.stringTable[12]); return; } if (World.invP1.overloadEnabled) { CenterStatusPrint("%s", Sys_Text.stringTable[13]); World.invP1.overloadEnabled = false; } else { CenterStatusPrint("%s", Sys_Text.stringTable[17]); World.invP1.overloadEnabled = true; } return; }
     u16 wc = World.invP1.wepCur;
     if (World.invP1.wepLoadedWithAlternate[wc]) { if (World.invP1.wepAmmo[wep16] > 0         ) { World.invP1.wepLoadedWithAlternate[wc] = false; World.invP1.wepAmmoSecondary[wep16] += World.invP1.currentMagazineAmount2[wc]; World.invP1.currentMagazineAmount2[wc] = 0; LoadAmmoType(false,false); } else { CenterStatusPrint("%s", Sys_Text.stringTable[535]); } }
     else                                        { if (World.invP1.wepAmmoSecondary[wep16] > 0) { World.invP1.wepLoadedWithAlternate[wc] =  true; World.invP1.wepAmmo[wep16]          += World.invP1.currentMagazineAmount[wc];  World.invP1.currentMagazineAmount[wc]  = 0; LoadAmmoType( true,false); } else { CenterStatusPrint("%s", Sys_Text.stringTable[535]); } }
 }
-void WeaponsUpdate(void) { HeatBleedOff(); if (World.fogFac > 255) {World.fogFac = 255;} UpdateWeaponReloadDip(); Recoiling(); CheckAttackInput(); CheckUIStateAndAttack(); CheckReloadInput(); if (ChangeAmmoType()){ActualChangeAmmoType();} MeleeHitUpdate(); }
+void WeaponsUpdate(void) { HeatBleedOff(); if (World.fogFac > 255) {World.fogFac = 255;} UpdateWeaponReloadDip(); Recoiling(); CheckAttackInput(); CheckUIStateAndAttack(); CheckReloadInput(); if (GetKeyPressed(33)/*Change ammot type*/){ActualChangeAmmoType();} MeleeHitUpdate(); }

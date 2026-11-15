@@ -3,20 +3,27 @@
 #include "credits.h"
 #include "Shaders/shaders.h"
 GlobalContext World = {0}; // Full game state
-double game_start_time, game_actual_start_time, shadowTime, physTime, renderTime, prePhys, gameTime, raycastMs;
+double game_start_time,game_actual_start_time,shadowTime,physTime,renderTime,prePhys,gameTime,raycastMs,last_mouse_x,last_mouse_y;
 float rasterPerspectiveProjection[16],modelMatrices[INSTANCE_CNT*16],*world_from_mdl = modelMatrices,modelBounds[MAX_MDLS],**physPos,lightView[MAX_SHADOWMAPS][6][4][4],lightViewProj[MAX_SHADOWMAPS][6][16],shadowmapsPerspectiveProjection[16],sunShadowMatrix[16],berserkSeedTime;
 static float shakeAmp = 0.15f,amMapScaleX,amMapScaleY,amMapOffsetX;
+size_t scratch_peak,cvxAdjOffsetBytes[MAX_UNIQUE_CVX_MESHES],cvxAdjListBytes[MAX_UNIQUE_CVX_MESHES];
 static u32 globalframesPerLastSecond,inputImageID,inputUIID,inputDepthID,inputSpecID,inputNormalID,outputImageID,gBufferFBO,uiSP,depthPrepassSP,chunkSP,chunkVAO,matricesBufferID,ssrSP,rtSP,rtCopySP,imageBlitSP,quadVAO,quadVBO,rtInstanceInfoID,rtCellCountsID,rtCellListsID,rtGeomID,rtOrderBufID,gpuQ[5][5],wireVertCount,raycastPickMode;
 u32 globalframe,threadCnt = 1,*physVertCounts,*rtSrcVertCounts,uiFBO,textDecalVBO[MAX_LEVELS][INSTANCE_CNT],textSP,textVAO,textVBO,textDecalVertexCount[MAX_LEVELS][INSTANCE_CNT],lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,cellVisibleDataID,shadowmapsSP,shadowMapSSBO,shadowMapsIndirectionID,sunShadowFBO,sunShadowTex,shadowmapIndirectionList[LIGHT_CNT],colorBufferID,texPalID,texPalOfsID,textureOffsetsID,textureSizesID,psysInstancesID,
-    psysTrailsID,psysquadVAO,psysquadVBO,particleSP,trailSP,camViewTextures[64],levelCamViewTextures[14][64],drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal,biomTexId,biomFBO,raycastCalls,debugUnlitSP,debugLinesVAO,debugLinesVBO,wireLinesVAO,wireLinesVBO;
-u16 **modelTriangles, modelTriangleCounts[MAX_MDLS], mdlsCnt, **physTris, texCnt, decalStyleCount, decalInlineTextLevel[DECAL_INLINE_TEXT_MAX], decalInlineTextInst[DECAL_INLINE_TEXT_MAX], decalInlineTextCount;
+    psysTrailsID,psysquadVAO,psysquadVBO,particleSP,trailSP,camViewTextures[64],levelCamViewTextures[14][64],drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal,biomTexId,biomFBO,raycastCalls,debugUnlitSP,debugLinesVAO,debugLinesVBO,wireLinesVAO,wireLinesVBO,uniqueCvxMeshCount = 0;
+u16 **modelTriangles,modelTriangleCounts[MAX_MDLS],mdlsCnt,**physTris,texCnt,decStyleCnt,decTxtLevel[DECAL_INLINE_TEXT_MAX],decTxtInst[DECAL_INLINE_TEXT_MAX],decTxtCount,uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES];
+extern u32 numActivePortals;
 static u8 currentPlayerNameLength,currentMenuPage,resDropdownCount,resSelectedIdx,gpuQFrame,uiMouseCaptured;
 static i8 currentMenuItem,currentMenuTab, menuItemCount = 4, menuTabCount = 1, resHoverIdx = -1;
-u8 particleBlendTexture[MAXTEX],camViewCount,levelCamViewCount[14];
-char decalInlineText[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN];
+u8 particleBlendTexture[MAXTEX],camViewCount,levelCamViewCount[14],*scratch_base,*scratch_cur,*scratch_end;
+char decTxt[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN];
 bool doubleSidedTexture[MAXTEX],transparentTexture[MAXTEX],shadowBuffersCreated,resDropdownOpen,mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause,fovSliderActive,gammaSliderActive,masterVolumeSliderActive,musicVolumeSliderActive,messageVolumeSliderActive,sfxVolumeSliderActive,ssrResSliderActive,mouseSensSliderActive,enteringPlayerName;
+typedef struct WSWin WSWin; static WSWin* window; typedef struct WSCtx WSCtx; typedef struct WSLib WSLib; typedef struct WSMon WSMon; static WSLib WinSys; typedef void (*WSP)(void);
+void ConsoleEmulator(i32),EditFieldKey(i32),SaveNameEntry(i32),KeycodeEntryKey(i32 keycode),CycleWeaponSlot(int),CloseFullmap(),UI_AutomapClick(bool,int),UpdateScreenSize(i32,i32),SaveConfig(),InputWindowFocus(i32),InputKey(char*,int,int),InputMouseClick(char*,int,int),InputCursorPos(double*,double*,double,double),InputMonitor(WSMon*,int,int),ComputeWindowPlacement(int,int*,int*),SaveGame(u8,const char*),LoadGame(u8),ApplyPlayerMovements(float),
+     HwToggle(u8),MFD_ResetGeneral(),PSys_Render(float*,V3,V3,V3,V3,u32,float,float,float,float),MissionTimerInit(),AddHardwareToInventory(int,int),mp3_clear(),AddDoorPortal(u16,u16),MdlSwapWindowDisposeData(u16),LoadModels(),LoadTextures(),InitAudio(),Physics(float),UpdateAnims(),UpdateAudio(),AudioUpdateMix(),PSys_Update(float),BioMonitorUpdate(),NewGame(),MenuGoBack(),DebugRAMActual(const char*),DebugRAMPeak();
+bool MdlIsWinMemberSet(u16,u8),VidMenuKeyArmed();
+i32 s2i32(const char*);
 typedef struct { u32 nodeBase,triBase,vtxBase,uvBase,orderBase; } ModelRTInfo; typedef struct { u32 geom[4]; u32 info[4]; float iscl2[4]; } InstanceRTInfo; static InstanceRTInfo rtInstanceInfo[INSTANCE_CNT]; static InstanceRTInfo rtPrevInfo[INSTANCE_CNT]; static ModelRTInfo rtModelInfo[MAX_MDLS];
-V3 modelMin[MAX_MDLS], modelMax[MAX_MDLS],sunDirection={0.0f,1.0f,0.0f}; FrustumPlane lightFrustumPlanes[MAX_SHADOWMAPS][6][6],playerFrustumPlanes[6],sunShadowFrustum[6]; DecalStyle decalStyles[DECAL_STYLE_MAX]; CamView camViews[64], levelCamViews[14][64];
+V3 modelMin[MAX_MDLS],modelMax[MAX_MDLS],sunDirection={0.0f,1.0f,0.0f},debugWepOffset; FrustumPlane lightFrustumPlanes[MAX_SHADOWMAPS][6][6],playerFrustumPlanes[6],sunShadowFrustum[6]; DecalStyle decalStyles[DECAL_STYLE_MAX]; CamView camViews[64],levelCamViews[14][64];
 typedef struct {int w,h;} ResMode; ResMode resModes[16];
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
     .InputCodeSettings = { 5,/*Fwd=F*/      0,/*Strf L=A*/   18,/*Backpedal=S*/ 3,/*Strf R=D*/ 100,/*Jump=SPACE*/        2,/*Crouch=C*/        23,/*Prone=X*/   16,/*Lean L=Q*/       4,/*Lean Right=E*/ 45,/*Sprint=LSHIFT*/ 38,/*Turn L=LARROW*/ 39,/*Turn Right=RARROW*/ 36,/*Look Up=UARROW*/ 37,/*Look Down=DARROW*/ 20,/*Recent Log=U*/ 26,/*Biomonitor=1*/ 27,/*Sensaround=2*/ 28,/*Lantern=3*/ 29,/*Shield=4*/     30,/*Infrared=5*/      31,/*Email=6*/
@@ -61,32 +68,29 @@ void DrawCapsuleCollider(u16 i) {
 void DrawAngularVelocity(u16 i) {
     if (!(World.instances[i].entflags & EF_RIGIDBODY) || V3_Mag(World.angularVelocity[i]) < 0.0001f) return;/*skip near-zero*/
     Color purple = (Color){0.5f,0.0f,1.0f,1.0f};
-    V3 dir = V3_Normalize(World.angularVelocity[i]);
-    V3 tip = V3Add(World.position[i],V3_ScaleByF(World.angularVelocity[i],0.35f)); DrawLine(World.position[i],tip,purple); // Arrow (line vector)
+    V3 dir = V3_Normalize(World.angularVelocity[i]), tip = V3Add(World.position[i],V3_ScaleByF(World.angularVelocity[i],0.35f)); DrawLine(World.position[i],tip,purple); // Arrow (line vector)
     V3 ref = (vabs(dir.y) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0};
     V3 perp=V3_Normalize(V3_Cross(dir,ref)); V3 perp2 = V3_Cross(dir,perp);
-    DrawLine(V3Add(tip,V3_ScaleByF(perp, 0.05f)),V3Add(tip,V3_ScaleByF(perp, -0.05f)), purple);
-    DrawLine(V3Add(tip,V3_ScaleByF(perp2,0.05f)),V3Add(tip,V3_ScaleByF(perp2,-0.05f)), purple);
+    DrawLine(V3Add(tip,V3_ScaleByF(perp, 0.05f)),V3Add(tip,V3_ScaleByF(perp, -0.05f)), purple); DrawLine(V3Add(tip,V3_ScaleByF(perp2,0.05f)),V3Add(tip,V3_ScaleByF(perp2,-0.05f)), purple);
     float rad = 0.6f/*Quarter circle arc (visualizes rotation plane + sense)*/, step = 1.57079632679f / 8.0f; /*quarter circle divided into 8 segments*/
     V3 axis = dir; V3 p1 = V3_Normalize(V3_Cross(axis,ref)); V3 p2 = V3_Cross(axis,p1), prev = V3Add(World.position[i], V3_ScaleByF(p1,rad)); // Find two vectors perpendicular to angular axis
     for (int j=1;j<=8;++j) { float a = j * step; float c = vcosf(a), s = vsinf(a); V3 cur = V3Add(World.position[i],V3Add(V3_ScaleByF(p1,c * rad),V3_ScaleByF(p2,s * rad))); DrawLine(prev,cur,purple); prev = cur; }
 }
 // WinSys Windowing and Input System interfacing with the OS.
-typedef struct WSWin WSWin; static WSWin* window; typedef struct WSCtx WSCtx; typedef struct WSLib WSLib; typedef struct WSMon WSMon; static WSLib WinSys; typedef void (*WSP)(void);
-void CycleWeaponSlot(int),CloseFullmap(),UI_AutomapClick(bool,int),UpdateScreenSize(i32,i32),SaveConfig(),InputWindowFocus(i32),InputKey(char*,int,int),InputMouseClick(char*,int,int),InputCursorPos(double*,double*,double,double),InputMonitor(WSMon*,int,int),ComputeWindowPlacement(int,int*,int*);
 #if defined(_WIN32)
     int __cdecl wcscmp(const u16*,const u16*); u16* wcscpy(u16*,const u16*);
     typedef struct { i32 x,y; } POINT;
     typedef struct { i32 l,t,r,b; } RECT;
     typedef struct { u32 s,maj,min; u8 _p[264]; u16 sp; u8 _p2[6]; } OSVERSIONINFOEXW;
     typedef struct _devicemodeW { u16 a[34]; u16 dmSize,b; u32 c; POINT dmPosition; u8 d[18]; u16 e[33]; u32 f,dmPelsWidth,dmPelsHeight,g,dmDisplayFrequency; u8 h[32]; } DEVMODEW,*LPDEVMODEW;
-    typedef i64 (__stdcall *WNDPROC)(void*,u32,u64,i64);
+    typedef i64 (__stdcall *WNDPROC)(void*,u32,u64,i64);    typedef i64 (WINAPI *PROC)();    typedef i64 (WINAPI *FARPROC)();
     typedef i32 (__stdcall *MONITORENUMPROC)(void*,void*,RECT*,i64);
     typedef struct _ICONINFO { i32 fIcon; u32 xHotspot,yHotspot; void *hbmMask,*hbmColor; } ICONINFO;
     typedef struct { u8 a[8]; u32 message; u8 b[4]; u64 wParam; i64 lParam; u32 time; u8 c[12]; } MSG;
     typedef struct { u32 cbSize; RECT rcMonitor,rcWork; u8 b[4]; } MONITORINFO,*LPMONITORINFO;
     typedef struct { u32 cbSize; u8 a[36]; u16 szDevice[32]; } MONITORINFOEXW;
     typedef struct { u32 length; u8 a[4]; u32 showCmd; u8 b[16]; RECT rcNormalPosition; } WINDOWPLACEMENT;
+    typedef struct { int unused; } *HINSTANCE;    typedef HINSTANCE HMODULE;
     typedef struct { u32 cbSize,style; WNDPROC lpfnWndProc; i32 a,b; HINSTANCE hInstance; void *c,*d,*e; u16 *f,*n; void *g; } WNDCLASSEXW;
     typedef i32 (WINAPI * PFN_DwmIsCompositionEnabled)(i32*),(WINAPI * PFN_DwmFlush)(),(WINAPI * PFN_RtlVerifyVersionInfo)(OSVERSIONINFOEXW*,u32,u64),(WINAPI * PFN_SWE)(int),(WINAPI * PFN_GPFAIVA)(void*,int,int,u32,const int*,int*),(WINAPI * PFN_wglMakeCurrent)(void*,void*);
     typedef PROC (WINAPI * PFN_wglGetProcAddress)(const char*);
@@ -107,7 +111,7 @@ void CycleWeaponSlot(int),CloseFullmap(),UI_AutomapClick(bool,int),UpdateScreenS
     DLL_IMP i32 WINAPI BringWindowToTop(void*); DLL_IMP i32 WINAPI SetWindowPlacement(void*,const WINDOWPLACEMENT*); DLL_IMP void* WINAPI SetFocus(void*); DLL_IMP i32 WINAPI SetForegroundWindow(void*); DLL_IMP i32 WINAPI GetWindowPlacement(void*,WINDOWPLACEMENT*); DLL_IMP i32 WINAPI SetPropW(void*,u16*,void*); DLL_IMP i32 WINAPI OffsetRect(RECT*,int,int); DLL_IMP void* WINAPI CreateWindowExW(u32,u16*,u16*,u32,int,int,int,int,void*,void*,HINSTANCE,void*);
     DLL_IMP u64 WINAPI VerSetConditionMask(u64,u32,u8); DLL_IMP u16 WINAPI RegisterClassExW(const WNDCLASSEXW *); DLL_IMP i32 WINAPI DeleteObject(void*); DLL_IMP i32 WINAPI DeleteDC(void*); DLL_IMP i32 WINAPI SwapBuffers(void*); DLL_IMP i32 WINAPI EnumDisplayMonitors(void*,const RECT*,MONITORENUMPROC,i64); DLL_IMP i32 WINAPI EnumDisplaySettingsW(u16*,u32,LPDEVMODEW); DLL_IMP i32 WINAPI EnumDisplayDevicesW(u16*,u32,DISPLAY_DEVICEW*,u32);
     DLL_IMP i32 WINAPI EnumDisplaySettingsExW(u16*,u32,LPDEVMODEW,u32); DLL_IMP i32 WINAPI SetPixelFormat(void*,i32,const PIXELFORMATDESCRIPTOR *); DLL_IMP i32 WINAPI ChoosePixelFormat(void* hdc,const PIXELFORMATDESCRIPTOR *ppfd); DLL_IMP i32 WINAPI DescribePixelFormat(void*,i32,u32,PIXELFORMATDESCRIPTOR*); DLL_IMP void* WINAPI CreateBitmap(i32,i32,u32,u32,const void *); DLL_IMP void* WINAPI CreateDIBSection(void*,void*,u32,void**,void*,u32);
-    DLL_IMP i32 WINAPI GetDeviceCaps(void*,i32);
+    DLL_IMP i32 WINAPI GetDeviceCaps(void*,i32); DLL_IMP HINSTANCE WINAPI LoadLibraryA(const char*);
     struct WSLib { WSMon** monitors; int monitorCount; WSLibWin32 win32; HINSTANCE instance; };
     struct WSCtx { void (*makeCurrent)(WSWin*); void (*swapBuffers)(WSWin*); void (*swapInterval)(int); WSP (*getProcAddress)(const char*); WGLContext wgl; }; 
     struct WSWin { i32 decorated; char mouseButtons[MAX_MOUSE_BUTTONS],keys[WS_KEYCOUNT]; double virtualCursorPosX,virtualCursorPosY; WSCtx context; WSWinWin32 win32; };
@@ -249,6 +253,7 @@ void CycleWeaponSlot(int),CloseFullmap(),UI_AutomapClick(bool,int),UpdateScreenS
     }
 // End Windows section
 #else // LINUX
+    void *dlopen(const char*,int); void *dlsym(void*,const char*);
     typedef u8 KeyCode;
     typedef char *XPointer;
     typedef u16 Rotation,Connection;
@@ -433,7 +438,7 @@ void GetFrameExtents(int* l,int* t,int* r,int* b) {
     if(*l||*t||*r||*b){ cl=*l; ct=*t; cr=*r; cb=*b; have=1; } else if(have){ *l=cl; *t=ct; *r=cr; *b=cb; }/*undecorated reads go stale: serve last decorated values*/
 #endif
 }
-void GetDecorationOverhead(int* dw,int* dh) {int l,t,r,b; GetFrameExtents(&l,&t,&r,&b); *dw=l+r; *dh=t+b;}
+void GetDecorationOverhead(int* dw, int* dh) { int l,t,r,b; GetFrameExtents(&l,&t,&r,&b); *dw = l + r; *dh = t + b; }
 void ClampWindowSizeToMonitor() {
     int ci=(int)Sys_Settings.CurrentMonitor; if (ci>=WinSys.monitorCount) { ci = 0; Sys_Settings.CurrentMonitor = 0; } int x,y,w,h; GetMonitorWorkarea(WinSys.monitors[ci],&x,&y,&w,&h); int dw,dh; GetDecorationOverhead(&dw,&dh); bool ch=false; if(w-dw>=320 && (int)Sys_Settings.ScreenWidth>w-dw){Sys_Settings.ScreenWidth=(w-dw); ch=true;} if(h-dh>=200 && (int)Sys_Settings.ScreenHeight>h-dh){Sys_Settings.ScreenHeight=(h-dh); ch=true;} if(ch){SaveConfig();}
 }
@@ -449,7 +454,7 @@ void ApplyStagedWindowedSizeOn(int monIdx) {
     WSMon* m=WinSys.monitors[monIdx]; int wx,wy,ww,wh; GetMonitorWorkarea(m,&wx,&wy,&ww,&wh); int ddw,ddh; GetDecorationOverhead(&ddw,&ddh); int w=vmax(vmin((int)Sys_Settings.ScreenWidth,ww-ddw),320),h=vmax(vmin((int)Sys_Settings.ScreenHeight,wh-ddh),200); Sys_Settings.ScreenWidth=(u16)w; Sys_Settings.ScreenHeight=(u16)h; 
     SetWindowSize(w,h); PlaceWindowOnMonitor(monIdx); UpdateScreenSize(w,h); resDropdownOpen=false; resHoverIdx=-1; SaveConfig();
 }
-void ApplyStagedWindowedSize() {int i=GetCurrentMonitorIndex(); Sys_Settings.CurrentMonitor=(u8)i; ApplyStagedWindowedSizeOn(i);}
+void ApplyStagedWindowedSize() { int i = GetCurrentMonitorIndex(); Sys_Settings.CurrentMonitor = (u8)i; ApplyStagedWindowedSizeOn(i); }
 void GatherResolutionModesFor(int monIdx) {
     int keepW=-1,keepH=-1; if(resSelectedIdx>=0 && resSelectedIdx<resDropdownCount){keepW=resModes[resSelectedIdx].w; keepH=resModes[resSelectedIdx].h;}
     resDropdownCount = 0; if(monIdx>=WinSys.monitorCount){monIdx=0;} WSMon* m = WinSys.monitors[monIdx]; int wx,wy,ww,wh; GetMonitorWorkarea(m,&wx,&wy,&ww,&wh); static const struct {int w,h;} cr[] = {{320,200},{640,400},{640,480},{800,600},{1024,768},{1280,720},{1280,800},{1366,768},{1440,900},{1600,900},{1920,1080},{2560,1440}}; int j; int fddw,fddh;
@@ -480,20 +485,25 @@ void CycleToNextMonitor() {
     if (Sys_Settings.Fullscreen) { WSMon* m = WinSys.monitors[Sys_Settings.CurrentMonitor]; int x,y,w,h; GetMonitorFullarea(m,&x,&y,&w,&h); SetWindowMonitor(x,y,w,h); Sys_Settings.ScreenWidth=w; Sys_Settings.ScreenHeight=h; } else { GatherResolutionModesFor(Sys_Settings.CurrentMonitor); ApplyStagedWindowedSizeOn(Sys_Settings.CurrentMonitor); }
 }
 // Input and Configuration System for Config.ini, keyboard and mouse support.
-double last_mouse_x,last_mouse_y;
 InputElement inputElements[134]={{"A",KEY_A},{"B",KEY_B},{"C",KEY_C},{"D",KEY_D},{"E",KEY_E},{"F",KEY_F},{"G",KEY_G},{"H",KEY_H},{"I",KEY_I},{"J",KEY_J},{"K",KEY_K},{"L",KEY_L},{"M",KEY_M},{"N",KEY_N},{"O",KEY_O},{"P",KEY_P},{"Q",KEY_Q},{"R",KEY_R},{"S",KEY_S},{"T",KEY_T},{"U",KEY_U},{"V",KEY_V},{"W",KEY_W},{"X",KEY_X},{"Y",KEY_Y},{"Z",KEY_Z},{"1",KEY_1},{"2",KEY_2},{"3",KEY_3},{"4",KEY_4},{"5",KEY_5},{"6",KEY_6},{"7",KEY_7},{"8",KEY_8},{"9",KEY_9},
                                  {"0",KEY_0},{"UPARROW",KEY_UP},{"DNARROW",KEY_DOWN},{"LFARROW",KEY_LEFT},{"RTARROW",KEY_RIGHT},{"NUM1",KEY_KP_1},{"NUM2",KEY_KP_2},{"NUM3",KEY_KP_3},{"NUM+",KEY_KP_ADD},{"ENTER",KEY_ENTER},{"RIGHTSHIFT",KEY_RIGHT_SHIFT},{"LEFTSHIFT",KEY_LEFT_SHIFT},{"RIGHTCTRL",KEY_RIGHT_CONTROL},{"LEFTCTRL",KEY_LEFT_CONTROL},{"RIGHTALT",KEY_RIGHT_ALT},{"LEFTALT",KEY_LEFT_ALT},{"RIGHTCMD",KEY_RIGHT_SUPER},{"LEFTCMD",KEY_LEFT_SUPER},
                                  {"LMB",MOUSE_BUTTON_1},{"RMB",MOUSE_BUTTON_2},{"MMB",MOUSE_BUTTON_3},{"MB3",MOUSE_BUTTON_4},{"MB4",MOUSE_BUTTON_5},{"MB5",MOUSE_BUTTON_6},{"MB6",MOUSE_BUTTON_7},{"MB7",MOUSE_BUTTON_8},{"JOY0",JOYSTICK_1},{"JOY1",JOYSTICK_2},{"JOY2",JOYSTICK_3},{"JOY3",JOYSTICK_4},{"JOY4",JOYSTICK_5},{"JOY5",JOYSTICK_6},{"JOY6",JOYSTICK_7},{"JOY7",JOYSTICK_8},{"JOY8",JOYSTICK_9},{"JOY9",JOYSTICK_10},{"JOY10",JOYSTICK_11},
                                  {"JOY11",JOYSTICK_12},{"JOY12",JOYSTICK_13},{"JOY13",JOYSTICK_14},{"JOY14",JOYSTICK_15},{"JOY15",JOYSTICK_16},{"JOY16",JOYHAT_UP},{"JOY17",JOYHAT_RIGHT},{"BACKSPACE",KEY_BACKSPACE},{"TAB",KEY_TAB},{"NUMENTER",KEY_KP_ENTER},{"ESCAPE",KEY_ESCAPE},{"SPACE",KEY_SPACE},{"DELETE",KEY_DELETE},{"INSERT",KEY_INSERT},{"HOME",KEY_HOME},{"END",KEY_END},{"PAGEUP",KEY_PAGE_UP},{"PAGEDN",KEY_PAGE_DOWN},{"F1",KEY_F1},{"F2",KEY_F2},
                                  {"F3",KEY_F3},{"F4",KEY_F4},{"F5",KEY_F5},{"F6",KEY_F6},{"F7",KEY_F7},{"F8",KEY_F8},{"F9",KEY_F9},{"F10",KEY_F10},{"F11",KEY_F11},{"F12",KEY_F12},{"GRAVE",KEY_GRAVE_ACCENT},{"-",KEY_MINUS},{"=",KEY_EQUAL},{"[",KEY_LEFT_BRACKET},{"]",KEY_RIGHT_BRACKET},{"\\",KEY_BACKSLASH},{"/",KEY_SLASH},{".",KEY_PERIOD},{",",KEY_COMMA},{";",KEY_SEMICOLON},{"'",KEY_APOSTROPHE},{"CAPSLOCK",KEY_CAPS_LOCK},{"NUM0",KEY_KP_0},{"NUM4",KEY_KP_4},
                                  {"NUM5",KEY_KP_5},{"NUM6",KEY_KP_6},{"NUM7",KEY_KP_7},{"NUM8",KEY_KP_8},{"NUM9",KEY_KP_9},{"NUM*",KEY_KP_MULTIPLY},{"NUM-",KEY_KP_SUBTRACT},{"NUM.",KEY_KP_DECIMAL},{"MENU",KEY_MENU},{"PAUSE",KEY_PAUSE},{"NUMLOCK",KEY_NUM_LOCK},{"MWHEEL+",127},{"MWHEEL-",128},/*Handled special case for mousewheel +/-respectively*/{"PRINT",KEY_PRINT_SCREEN},{"JOY18",JOYHAT_DOWN},{"JOY19",JOYHAT_LEFT},{"UNUSED",0}};
-static bool uiWheelBlocked; static KeyState unboundInput; bool rebindCaptureActive = false;/*Set by the Input tab when a binding row is capturing a key; suppresses Menu() ESC-back + wheel capture while capturing.*/ bool UIInteractions(void); void UI_ProcessNavigation(void);
+static bool uiWheelBlocked; static KeyState unboundInput; bool rebindCaptureActive = false;/*Set by the Input tab when a binding row is capturing a key; suppresses GetKeyPressed(25) Menu ESC-back + wheel capture while capturing.*/ bool UIInteractions(void); void UI_ProcessNavigation(void);
 KeyState* GetCodeMapping(int settingIndex) { if (settingIndex<0 || settingIndex>=42) return &unboundInput; i32 i=Sys_Settings.InputCodeSettings[settingIndex]; if (i<0 || i>=(i32)(sizeof(inputElements)/sizeof(inputElements[0]))) return &unboundInput; if (i>=53 && i<=60) { int button=inputElements[i].value; return (uiMouseCaptured&(1u<<button)) ? &unboundInput : &Sys_Input.mouseButtons[button]; } return &Sys_Input.keyStates[inputElements[i].value]; }
 void TextEntry(i32 k) {
     if (k == KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { World.playerName[0] = '\0'; currentPlayerNameLength = 0; return; } if (k == KEY_ENTER || k == KEY_KP_ENTER) { currentMenuItem++; return; } if (k == KEY_BACKSPACE && currentPlayerNameLength > 0) { World.playerName[--currentPlayerNameLength] = '\0'; return; } if (currentPlayerNameLength >= 26) return;
     char c = (k >= KEY_A && k <= KEY_Z) ? 'a' + (k - KEY_A) : ((k >= KEY_1 && k <= KEY_9) ? '1' + (k - KEY_1) : ((k == KEY_0) ? '0' : ((k == KEY_SPACE) ? ' ' : 0))); if (c) { World.playerName[currentPlayerNameLength] = c; World.playerName[++currentPlayerNameLength] = '\0'; }
 }
-void ConsoleEmulator(i32 keycode); extern bool editFieldEditing; extern void EditFieldKey(i32 keycode); extern bool enteringSaveName; extern void SaveNameEntry(i32 keycode); extern void KeycodeEntryKey(i32 keycode); extern float cyberWallFade[INSTANCE_CNT];
+extern bool editFieldEditing,enteringSaveName; extern float cyberWallFade[INSTANCE_CNT];
+void GoIntoGame() {
+    NewGame(); mp3_clear(); DualLog("Player named \"%s\" started the game!\n", World.playerName); game_actual_start_time = get_time();
+    DualLog("Entity counts::0:%4u|1:%4u|2:%4u|3:%4u|4:%4u|5:%4u|6:%4u|7:%4u|8:%4u|9:%4u|10:%4u|11:%4u|12:%4u|13:%4u\n Light counts::0:%4u|1:%4u|2:%4u|3:%4u|4:%4u|5:%4u|6:%4u|7:%4u|8:%4u|9:%4u|10:%4u|11:%4u|12:%4u|13:%4u\n",World.levelInstCount[0],World.levelInstCount[1],World.levelInstCount[2],World.levelInstCount[3],World.levelInstCount[4],
+    World.levelInstCount[5],World.levelInstCount[6],World.levelInstCount[7],World.levelInstCount[8],World.levelInstCount[9],World.levelInstCount[10],World.levelInstCount[11],World.levelInstCount[12],World.levelInstCount[13],World.levelLoadedLights[0],World.levelLoadedLights[1],World.levelLoadedLights[2],World.levelLoadedLights[3],
+    World.levelLoadedLights[4],World.levelLoadedLights[5],World.levelLoadedLights[6],World.levelLoadedLights[7],World.levelLoadedLights[8],World.levelLoadedLights[9],World.levelLoadedLights[10],World.levelLoadedLights[11],World.levelLoadedLights[12],World.levelLoadedLights[13]);
+}
 void InputKey(char* keys,int key,int action) {
     if (key >= 0 && key < WS_KEYCOUNT) { if (action == INPUT_RELEASE && keys[key] == INPUT_RELEASE) { return; } if (action == INPUT_PRESS && keys[key] == INPUT_PRESS) { action = INPUT_REPEAT; } else { keys[key] = action; } }
     if (key == KEY_F10 && action) OS_Exit(0); if (!window_has_focus && action != INPUT_RELEASE) return;
@@ -514,34 +524,25 @@ void InputCursorPos(double* x, double* y, double xpos, double ypos) {
 bool GetKeyRiseEdgeOrHeld(int sI, bool onRise) { i32 i = Sys_Settings.InputCodeSettings[sI]; if (i == 127) {return !uiWheelBlocked && Sys_Input.scrollDelta > 0;} if (i == 128) {return !uiWheelBlocked && Sys_Input.scrollDelta < 0;} KeyState* k = GetCodeMapping(sI); return onRise ? k->pressed : k->down; }
 bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
 bool GetKeyPressed(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
-bool Forward() { return GetKey(0); }                bool StrafeLeft() { return GetKey(1); }             bool Backpedal() { return GetKey(2); }            bool StrafeRight() { return GetKey(3); }            bool Jump() { return GetKey(4); }                   bool JumpDown() { return GetKeyPressed(4); }
-bool Crouch() { return GetKeyPressed(5); }          bool Prone() { return GetKeyPressed(6); }           bool LeanLeft() { return GetKey(7); }             bool LeanRight() { return GetKey(8); }              bool Sprint() { return GetKey(9); }                 bool TurnLeft() { return GetKey(10); }
-bool TurnRight() { return GetKey(11); }             bool LookUp() { return GetKey(12); }                bool LookDown() { return GetKey(13); }            bool RecentLog() { return GetKeyPressed(14); }
-bool Attack() { return GetKey(23); }         bool Use() { return GetKeyPressed(24); }            bool Menu() { return GetKeyPressed(25); }         bool Reload() { return GetKeyPressed(27); }
-bool Grenade() { return GetKeyPressed(30); }        bool GrenCycUp() { return GetKeyPressed(31); }      bool GrenCycDn() { return GetKeyPressed(32); }    bool ChangeAmmoType() { return GetKeyPressed(33); } bool Patch() { return GetKeyPressed(34); }
-bool PatchCycUp() { return GetKeyPressed(35); }     bool PatchCycDown() { return GetKeyPressed(36); }
-bool DoubleTapLeanLeft(void)  { if(!GetKeyPressed(7)){ return false; } if (World.pauseRelativeTime < World.invP1.leanLTapFinished) { World.invP1.leanLTapFinished = 0.0; return true; } World.invP1.leanLTapFinished = World.pauseRelativeTime + 0.5; return false; }
-bool DoubleTapLeanRight(void) { if(!GetKeyPressed(8)){ return false; } if (World.pauseRelativeTime < World.invP1.leanRTapFinished) { World.invP1.leanRTapFinished = 0.0; return true; } World.invP1.leanRTapFinished = World.pauseRelativeTime + 0.5; return false; } 
 void ForceShootMode() { if (Sys_Settings.NoShootMode){ return; } if (World.inventoryMode) { World.cursorPos_x = 663; World.cursorPos_y = 364; ignore_next_mouse_delta = true; } World.Sys_UI.mouseClickHeldOverGUI=World.inventoryMode = false; CloseFullmap(); World.Sys_UI.vmailActive = 0; }
 void ForceInventoryMode() { if (!World.inventoryMode) { World.inventoryMode = true; World.cursorPos_x = 683; World.cursorPos_y = 364; ignore_next_mouse_delta = true;} }
 void ToggleInventoryMode() { if (World.inventoryMode) { ForceShootMode();} else {ForceInventoryMode(); } }
 void ToggleConsole() { static bool imWasActPrior = false; editFieldEditing = false; if (!Cheats.consoleActive) {imWasActPrior = World.inventoryMode;} Cheats.consoleActive = !Cheats.consoleActive; World.paused = !World.paused; if (Cheats.consoleActive) { World.inventoryMode = true; } else if (!imWasActPrior && World.inventoryMode) {ForceShootMode();} }
-void SaveGame(u8,const char*),LoadGame(u8),ApplyPlayerMovements(float);
-void HwToggle(u8);
-V3 debugWepOffset;
 void InputProcessing() {
     for (int i=0;i<MAX_MOUSE_BUTTONS;++i) { if(!Sys_Input.mouseButtons[i].down){uiMouseCaptured &= ~(1u<<i);} }
     mouseMovementThisFrame = false; Sys_Input.scrollDelta = 0.0f; PollEvents(); World.Sys_UI.mouseClickHeldOverGUI = false; uiWheelBlocked = window_has_focus && UIInteractions(); World.uiIsBlocking = uiWheelBlocked;
     for (int i=0;i<MAX_MOUSE_BUTTONS;++i) if (uiWheelBlocked && Sys_Input.mouseButtons[i].pressed) uiMouseCaptured|=1u<<i;
     if (window_has_focus) {
         UI_ProcessNavigation();
-        if (Sys_Input.keyStates[KEY_R].pressed && Cheats.editMode && !editFieldEditing) { bool foundValidDynamic = false; i8 dir = Sprint() ? -1 : 1; while (!foundValidDynamic) { editModeTestEntityDefinition += dir; if (Sprint() ? (editModeTestEntityDefinition < 307) : (editModeTestEntityDefinition > 767)) editModeTestEntityDefinition = Sprint() ? 767 : 307; if (IdxIsDynamicObject(editModeTestEntityDefinition)) foundValidDynamic = true; } }
+        if (Sys_Input.keyStates[KEY_R].pressed && Cheats.editMode && !editFieldEditing) {
+            bool foundValidDynamic = false; i8 dir = GetKey(9)/*Sprint is held*/ ? -1 : 1; while (!foundValidDynamic) { editModeTestEntityDefinition += dir; if (GetKey(9)/*Sprint is held*/ ? (editModeTestEntityDefinition < 307) : (editModeTestEntityDefinition > 767)) editModeTestEntityDefinition = GetKey(9)/*Sprint is held*/ ? 767 : 307; if (IdxIsDynamicObject(editModeTestEntityDefinition)) foundValidDynamic = true; }
+        }
         if (Sys_Input.keyStates[KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn;
         if (Sys_Input.keyStates[KEY_F6].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F6].pressed = false; if (!World.menuActive) { bool wasPaused=World.paused; World.paused=false; SaveGame(7,"quicksave"); if (wasPaused) World.paused=true; } return; }
         if (Sys_Input.keyStates[KEY_F9].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F9].pressed = false; LoadGame(7); return; }
         if (GetKeyPressed(41)/*Console`~*/ && !rebindCaptureActive) ToggleConsole();
-        if (Menu() && !World.menuActive && !editFieldEditing) { World.paused = !World.paused; return; }
-        if (Menu() && World.menuActive && !rebindCaptureActive && VidMenuKeyArmed()) { MenuGoBack(); return; }
+        if (GetKeyPressed(25)/*Menu*/ && !World.menuActive && !editFieldEditing) { World.paused = !World.paused; return; }
+        if (GetKeyPressed(25)/*Menu*/ && World.menuActive && !rebindCaptureActive && VidMenuKeyArmed()) { MenuGoBack(); return; }
         if (World.paused || World.menuActive || Cheats.consoleActive || World.invP1.ressurectingFinished > World.pauseRelativeTime) return; // Pause/Menu barrier <<<<<<<
         if (Sys_Input.keyStates[KEY_1].pressed) { debugWepOffset.x += 0.05f; } else if (Sys_Input.keyStates[KEY_2].pressed) { debugWepOffset.x -= 0.05f; } // Debug weapon offset adjustment hooks TEMP TODO DELETE ME ONCE PIPE AND RAPIER OFFSETS ARE FIXED!!
         if (Sys_Input.keyStates[KEY_3].pressed) { debugWepOffset.y += 0.05f; } else if (Sys_Input.keyStates[KEY_4].pressed) { debugWepOffset.y -= 0.05f; }
@@ -567,8 +568,8 @@ void InputProcessing() {
         if (!World.inventoryMode) { // Apply mouselook/keyboardlook/lean
             bool cyber = World.curLev == LEVEL_CYBERSPACE, invLook = cyber ? Sys_Settings.InvCybLook : Sys_Settings.InvertLook;
             float ns = vclamp((float)Sys_Settings.MouseSensitivity / 100.0f,0.01f,1.0f), s = ns * 0.2f, kts = 900.0f * ns;
-            float dyaw = (float)World.currentMouse_dx * s + ((float)TurnRight() - (float)TurnLeft()) * kts * World.dt;
-            float dpitch = ((float)World.currentMouse_dy * s + ((float)LookDown() - (float)LookUp()) * kts * World.dt) * (invLook ? -1.0f : 1.0f);
+            float dyaw = (float)World.currentMouse_dx * s + ((float)GetKey(11)/*TurnR*/ - (float)GetKey(10)/*TurnL*/) * kts * World.dt;
+            float dpitch = ((float)World.currentMouse_dy * s + ((float)GetKey(13)/*Look dn*/ - (float)GetKey(12)/*Look up*/) * kts * World.dt) * (invLook ? -1.0f : 1.0f);
             World.cam_yaw += dyaw; if (World.cam_yaw >= 360.0f) {World.cam_yaw -= 360.0f;} if(World.cam_yaw<0.0f){World.cam_yaw+=360.0f;}
             World.cam_pitch += dpitch;
             if (cyber) {
@@ -576,7 +577,7 @@ void InputProcessing() {
                 Quaternion q = World.rotation[PLAYER1];
                 if (dyaw != 0.0f) { float half = deg2rad(dyaw) * 0.5f; q = quat_multiply(q,(Quaternion){0.0f,vsinf(half),0.0f,vcosf(half)}); }
                 if (dpitch != 0.0f) { float half = deg2rad(dpitch) * 0.5f; q = quat_multiply(q,(Quaternion){vsinf(half),0.0f,0.0f,vcosf(half)}); }
-                float droll = ((float)LeanLeft() - (float)LeanRight()) * 60.0f * World.dt; if (droll != 0.0f) { float half = deg2rad(droll) * 0.5f; q = quat_multiply(q,(Quaternion){0.0f,0.0f,vsinf(half),vcosf(half)}); }
+                float droll = ((float)GetKey(7)/*LeanL*/ - (float)GetKey(8)/*LeanR*/) * 60.0f * World.dt; if (droll != 0.0f) { float half = deg2rad(droll) * 0.5f; q = quat_multiply(q,(Quaternion){0.0f,0.0f,vsinf(half),vcosf(half)}); }
                 float qlen = vsqrtf(q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w); if (qlen > 0.000001f) { float invLen = 1.0f / qlen; q.x *= invLen; q.y *= invLen; q.z *= invLen; q.w *= invLen; }
                 World.rotation[PLAYER1] = q;
             } else { if (World.cam_pitch > 89.0f) {World.cam_pitch = 89.0f;} else if (World.cam_pitch < -89.0f) {World.cam_pitch = -89.0f;} quat_from_yaw_pitch_roll(&World.rotation[PLAYER1],World.cam_yaw,World.cam_pitch,World.cam_roll); }
@@ -613,7 +614,7 @@ void BioMonitorClearGraphs() {
 }
 void BioMonitorAlignCursors() { BioMonitorClearGraphs(); int idx=(int)(BIOM_GRAPH_W * random_range(0.0f,1.0f)); bioMonitor.currentIndex[0]=bioMonitor.currentIndex[1]=bioMonitor.currentIndex[2]=idx; }
 static void IncrementGraph(int graph) { if (++bioMonitor.currentIndex[graph]>=BIOM_GRAPH_W) bioMonitor.currentIndex[graph]=0; }
-static void Push(int index,float val) { if (index<BIOM_ERG || index>BIOM_ECG) return; bioMonitor.rings[index][bioMonitor.currentIndex[index]]=(u8)vclamp((int)(inverse_lerp(bioMonitor.min[index],bioMonitor.max[index],val)*BIOM_GRAPH_H),0,bioMonitor.ymax); }
+static void Push(int index,float val) { if (index<BIOM_ERG || index>BIOM_ECG) return; bioMonitor.rings[index][bioMonitor.currentIndex[index]]=(u8)vclamp((int)((bioMonitor.min[index] == bioMonitor.max[index]) ? 0.0f : vclamp((val - bioMonitor.min[index]) / (bioMonitor.max[index] - bioMonitor.min[index]),0.0f,1.0f)/*Inverse lerp*/ * BIOM_GRAPH_H),0,bioMonitor.ymax); }
 void BiomonitorEnergyPulse(float take) { Push(0,take); IncrementGraph(0); Push(0,take); IncrementGraph(0); }
 INLINE float biomMsToGraph(int graph, double ms, float fullScale) { return bioMonitor.min[graph] + vclamp((float)ms/fullScale,0.0f,1.0f) * (bioMonitor.max[graph] - bioMonitor.min[graph]); }
 void BioMonitorUpdate() {
@@ -652,8 +653,9 @@ static i32 currentEntryLength=0, numHistory=0, historyPos=0; char consoleEntryTe
 V3 ressurectionLocations[10] = {{-27.386f,-54.488f,26.5941f}/*0/R*/, {40.903f,-41.372f,-30.78f}/*1*/, {30.67407f,-24.832f,10.21412f}/*2*/, {38.26813f,-14.498f,20.37825f}/*3*/, {-19.48f,-6.928f,22.954f}/*4*/, {-24.358f,13.5956f,31.8497f}/*5*/,{-22.3568f,34.7845f,-30.728f}/*6*/,  {2.228084f,51.95243f,7.532025f}/*7*/, {10.068f,59.897f,13.973f}/*8*/, {2.303f,107.77f,-38.554f}/*9*/};
 V3 cyberSpaceEntryLocations[8] = {{210.6834f,2.812f,-24.378f}/*0*/, {195.42f,-13.44f, 33.28f}/*1*/, {157.1608f,-15.53f,47.331f}/*2a, if cyberport localPosition.x < -26.0f*/, {256.0416f,-0.716f,62.48789f}/*2b level 2 secondary cyberport position*/,{126.43f,29.56733f,34.24f}/*5*/, {177.612f,3.29494f,108.7725f}/*6*/, {244.735f,41.99257f,-19.695f}/*8*/, {185.161f,84.502f,-46.04246f},/*9*/ };
 void RecallHistory(int d) { if (d==1 && historyPos>0) --historyPos; else if (d==-1 && historyPos<numHistory) ++historyPos; else return; if (historyPos==numHistory) consoleEntryText[0]=currentEntryLength=0; else { scpy_to_a_from_b(consoleEntryText,history[historyPos],T_BUFFER_SIZE); currentEntryLength=slen(consoleEntryText); } }
-typedef void (*ConsoleCmdFuncNoArg)(); typedef void (*ConsoleCmdFuncInt)(int); typedef void (*ConsoleCmdFuncStr)(const char*);
+typedef void (*ConsoleCmdFuncNoArg)();    typedef void (*ConsoleCmdFuncInt)(int);    typedef void (*ConsoleCmdFuncStr)(const char*);
 typedef struct { const char* name; union {ConsoleCmdFuncNoArg noArg; ConsoleCmdFuncInt withInt; ConsoleCmdFuncStr withStr; const char* text; u8 questOp;} func; enum {NOARG,CMD_INT,CMD_STR,CMD_PRINT,CMD_QUEST}type;} ConsoleCommand;
+INLINE char c2Lower(const char c) { return c + ((c >= 'A' && c <= 'Z') ? 32 : 0); }
 INLINE int CommandMatch(const char* in, const char* cmd) { while (*cmd && *in) { char c1 = c2Lower((u8)*in++); char c2 = c2Lower((u8)*cmd++); if (c1 == ' ' || c1 == '_') {c1 = ' ';} if (c2 == ' ' || c2 == '_') {c2 = ' ';} if (c1 != c2) {return 0;} } return *cmd == '\0' && (*in == '\0' || cEmpty((u8)*in) || *in == '_'); }
 void cmd_noclip() { Cheats.noclip = !Cheats.noclip; if (Cheats.noclip) { World.velocity[PLAYER1] = (V3){ 0.0f, 0.0f, 0.0f }; CenterStatusPrint("noclip: %s", Sys_Text.stringTable[1000]); /*"ACTIVATED"*/} else {CenterStatusPrint("noclip: %s", Sys_Text.stringTable[717]); /*"DISABLED"*/} }
 void cmd_showphys() { Cheats.showPhys = !Cheats.showPhys; CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[Cheats.showPhys?1000:717]);/*"ACTIVATED"/"DISABLED"*/ }
@@ -714,7 +716,7 @@ static void cmd_git(const char* arg) {
                                  "reflog","dc51440 HEAD0 -> master: commit: Establish neural connection ... ERROR: invalid ID `2-4601`.","merge", "Failed, could not connect with origin/triop.","push","Could not find Username for 'triopttp://192.168.1.451'.","clone", "Failed, connection blocked by SHODAN. Employee ID invalid." };
     for (int i = 0; i < 16; i += 2) { if (sFindSub(arg,cmds[i])) { CenterStatusPrint(cmds[i+1]); return; } } if(sFindSub(arg,"branch") || sFindSub(arg, "-b")){ const char *last = StringFindLastChar(arg,' '); CenterStatusPrint("Created new branch %s",last ? last + 1 : "unknown");} else {CenterStatusPrint("Branch name not recognized. Contact your TriopBucket representative.");}
 }
-static void cmd_quit()      { OS_Exit(0); }
+static void cmd_quit() { OS_Exit(0); }
 static const ConsoleCommand consoleCmds[] = {{"noclip",{.noArg=cmd_noclip},NOARG},{"idclip",{.noArg=cmd_noclip},NOARG},{"showphys",{.noArg = cmd_showphys},NOARG},{"god",{.noArg=cmd_god},NOARG},{"overwhelming",{.noArg=cmd_god},NOARG},{"whosyourdaddy",{.noArg = cmd_god},NOARG},{"iddqd",{.noArg=cmd_god},NOARG},{"notarget",{.noArg=cmd_notarget},NOARG},{"editmode",{.noArg=cmd_edit},NOARG},{"undo",{.noArg=cmd_undo},NOARG},{"showfps",{.noArg=cmd_showfps},NOARG},
                                              {"showlocation",{.noArg=cmd_showlocation},NOARG},{"editsub",{.withInt=cmd_editsub},CMD_INT},{"nohud",{.noArg=cmd_nohud},NOARG},{"bottomlessclip",{.noArg = cmd_bottomless},NOARG},{"load",{.withStr=cmd_loadlevel},CMD_STR},{"loadarsenal",{.withStr = cmd_loadarsenal},CMD_STR},{"summon_obj",{.withInt=cmd_summon},CMD_INT},{"motherlode",{.text="Nice try, there's no money here."},CMD_PRINT},
                                              {"rosebud",{.text="Nice try, there's no money here."},CMD_PRINT},{"kaching",{.text="Nice try, there's no money here."},CMD_PRINT},{"money",{.text="Nice try, there's no money here."},CMD_PRINT},{"dizzy",{.noArg=cmd_dizzy},NOARG},{"help",{.text="There's no one to save you now Hacker!"},CMD_PRINT},{"ifeelthepower",{.noArg = cmd_energy},NOARG},{"i am shodan", {.noArg=cmd_iamshodan},NOARG},
@@ -792,7 +794,7 @@ float BvhRayAABBHit(V3 o, V3 d, V3 a, V3 b, float m) {
     if (vabs(d.z) < 0.00000001f) { if (o.z < a.z || o.z > b.z) return -1.0f; } else { float inv=1.0f/d.z; float t1=(a.z - o.z) * inv, t2=(b.z - o.z) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > mn){mn=t1;} if(t2 < mx){mx=t2;} if (mn > mx) return -1.0f; } /*Z slab*/ return mn;
 }
 static u16 rayCellHeads[ARRSIZE],rayNext[INSTANCE_CNT]; static u32 rayGridFrame=U32_MAX;
-INLINE void RayGridRebuild(void) { rayGridFrame = globalframe; for (u32 c=0;c<ARRSIZE;++c) { rayCellHeads[c] = INSTANCE_CNT; } for (u16 i=0;i<World.instCount;++i){ u16 c=(u16)World.instances[i].cellIndex; if (c>=ARRSIZE){ c = (u16)PosGetCellCoords(World.position[i].x, World.position[i].z); } rayNext[i] = rayCellHeads[c]; rayCellHeads[c] = i; } }
+INLINE void RayGridRebuild() { rayGridFrame = globalframe; for (u32 c=0;c<ARRSIZE;++c) { rayCellHeads[c] = INSTANCE_CNT; } for (u16 i=0;i<World.instCount;++i){ u16 c=(u16)World.instances[i].cellIndex; if (c>=ARRSIZE){ c = (u16)PosGetCellCoords(World.position[i].x, World.position[i].z); } rayNext[i] = rayCellHeads[c]; rayCellHeads[c] = i; } }
 RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
     double rStart = get_time(); const float maxDistSq = maxDist * maxDist; dir = V3_Normalize(dir); RaycastHit result = {.hit = false,.distance = maxDist,.point = origin,.normal = dir,.hitInstanceIndex = INSTANCE_CNT}; if (unlikely(rayGridFrame != globalframe)) { RayGridRebuild(); }
     float wx = World.worldMin_x[World.curLev], wz = World.worldMin_z[World.curLev], ex = origin.x + dir.x*maxDist, ez = origin.z + dir.z*maxDist;
@@ -807,7 +809,7 @@ RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
                 u16 mindex = World.instances[i].modelIndex;
                 V3 objPos = World.position[i];
                 V3 delta = V3_AsubB(objPos,origin);
-                u16 instCellIdx = PosGetCellCoords(objPos.x,objPos.z); if (!IdxIsPortalBlockingDoor(World.instances[i].index)) { if(((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (World.instances[i].index != 754 || !SkyIsVisible())){continue;} }
+                u16 instCellIdx = PosGetCellCoords(objPos.x,objPos.z); if (!IdxIsPortalBlockingDoor(World.instances[i].index)) { if(((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (World.instances[i].index != 754 || !((gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || World.curLev == LEVEL_CYBERSPACE)/*Sky visible*/)){continue;} }
                 if (mindex >= MAX_MDLS) {
                     if (raycastPickMode == 1) continue; ColliderType ct = World.col[i]; if (ct != CT_CAP && ct != CT_SPH && (ct != CT_BOX || raycastPickMode != 2)) continue; if (V3_dot(delta, delta) >= maxDistSq) continue;
                     RaycastHit ch = {0}; if (ct == CT_CAP) { ch = RayCapsule(origin, dir, Entity_GetCap(i), result.distance); } else if (ct == CT_SPH) { ch = RaySphere(origin, dir, Entity_GetSph(i), result.distance); } else { ch = RayBox(origin, dir, Entity_GetBox(i), result.distance); } if (!ch.hit || ch.distance >= result.distance) { continue; }
@@ -1115,7 +1117,6 @@ void UpdateLights() {
     glUseProgram(voxelUpdateSP); glUniform3f(5, World.position[PLAYER1].x, World.position[PLAYER1].y, World.position[PLAYER1].z); glUniform3f(8, World.instances[PLAYER1].forward.x, World.instances[PLAYER1].forward.y, World.instances[PLAYER1].forward.z); glUniform1ui(9, Sys_Settings.Reflections); glUniform1ui(2, World.loadedLights);
     glDispatchCompute((VOXELS_X + 15) / 16, (VOXELS_Z + 15) / 16, 1); glMemoryBarrier(0x2000/*GL_SHADER_STORAGE_BARRIER_BIT*/);
 }
-
 // Shadowmapping
 typedef struct {float depth; u16 index; } DepthSort;
 INLINE bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &World.instances[i]; return e->texIndex >= texCnt || !(e->entflags & EF_ACTIVE) || e->index >= MAX_ENTITIES || (e->modelIndex >= MAX_MDLS && !Cheats.showPhys) || otherCondition; }
@@ -1162,7 +1163,7 @@ static u16 AddShadMsh(SortedMesh *sm, u16 i, float *ps, u32 *is, bool *moved, u8
     if (vabs(sc.x) + vabs(sc.y) + vabs(sc.z) >= 0.1f) { Entity* e = &World.instances[i]; u16 mi = ((instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && e->lodIndex < mdlsCnt ? e->lodIndex : e->modelIndex); *sm = (SortedMesh){((u32)mi << 16) | e->texIndex,i,fm}; *is += i + sm->sortKey; *ps += World.position[i].x + World.position[i].y + World.position[i].z; if ((e->entflags & EF_MOVING) && !IdxIsNPC(e->index)) { *moved = true; } return 1u; }
     return 0u;
 }
-__attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
+__attribute__((hot, target("avx2,fma"))) void RenderShadowmaps() {
     double shadowStartTime = get_time(); V3 playerPos=World.position[PLAYER1], pf=World.instances[PLAYER1].forward; u16 numCandidates=0; i32 numCasters=0;
     for (u16 i = 0; i < World.loadedLights; ++i) {
         if (unlikely(!(World.lights[i].lflags & SHADON) || !(World.lights[i].lflags & LIGHTON))) { continue; }
@@ -1289,15 +1290,15 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     } glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight); glBindBuffer(GL_SSBO, shadowMapsIndirectionID); glBufferSubData(GL_SSBO, 0, World.loadedLights * sizeof(u32), shadowmapIndirectionList); shadowTime = get_time() - shadowStartTime;
 }
 float sunYawCur = 0.0f;
-V3 SunDirection(void) { double yawRaw = World.pauseRelativeTime * 0.1 * skyRotateSpeeds[Cheats.dizzyLevel]; sunYawCur = (float)(yawRaw - 6.283185307179586 * (double)((long long)(yawRaw * 0.15915494309189535))); /*1/TAU = 0.15915494309189535; trunc floor for the always-positive monotonic phase*/ float c = vcosf(sunYawCur), s = vsinf(sunYawCur); V3 b = {0.0f, 0.1f, 0.99498743f}; return V3_Normalize((V3){b.x*c - b.z*s, b.y, b.x*s + b.z*c}); }
-void InitSunShadowmap(void) {
+V3 SunDirection() { double yawRaw = World.pauseRelativeTime * 0.1 * skyRotateSpeeds[Cheats.dizzyLevel]; sunYawCur = (float)(yawRaw - 6.283185307179586 * (double)((long long)(yawRaw * 0.15915494309189535))); /*1/TAU = 0.15915494309189535; trunc floor for the always-positive monotonic phase*/ float c = vcosf(sunYawCur), s = vsinf(sunYawCur); V3 b = {0.0f, 0.1f, 0.99498743f}; return V3_Normalize((V3){b.x*c - b.z*s, b.y, b.x*s + b.z*c}); }
+void InitSunShadowmap() {
     i32 prevUnit=0; glGetIntegerv(GL_ACTIVE_TEXTURE,&prevUnit); glActiveTexture(GL_TEXTURE10);
     glGenTextures(1,&sunShadowTex); glBindTexture(GL_TEXTURE_2D,sunShadowTex);
     glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT24,SUN_SHADOW_SIZE,SUN_SHADOW_SIZE,0,GL_DEPTH_COMPONENT,GL_UNSIGNED_INT,NULL); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_BORDER); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_BORDER); const float sunBorderCol[4]={1.0f,1.0f,1.0f,1.0f}; glTexParameterfv(GL_TEXTURE_2D,GL_TEXTURE_BORDER_COLOR,sunBorderCol);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_COMPARE_MODE,GL_COMPARE_REF_TO_TEXTURE); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_COMPARE_FUNC,GL_LEQUAL);
     glGenFramebuffers(1,&sunShadowFBO); glBindFramebuffer(GL_FRAMEBUFFER,sunShadowFBO); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_TEXTURE_2D,sunShadowTex,0); glDrawBuffers(0,NULL); glActiveTexture((u32)prevUnit); glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
 }
-void RenderSunShadowmap(void) {    
+void RenderSunShadowmap() {    
     V3 sunDir=SunDirection(); sunDirection=sunDir;
     V3 target=World.position[PLAYER1];
     V3 fwd={-sunDir.x,-sunDir.y,-sunDir.z};
@@ -1372,7 +1373,6 @@ void mat4_inverse(const float* m, float* out) {
     inv[8]  = ( m[4]*c4  - m[5]*c2   + m[7]*c0 ) * id;  inv[9]  = (-m[0]*c4  + m[1]*c2   - m[3]*c0 ) * id; inv[10] = ( m[12]*s4 - m[13]*s2  + m[15]*s0) * id;  inv[11] = (-m[8]*s4  + m[9]*s2   - m[11]*s0) * id; inv[12] = (-m[4]*c3  + m[5]*c1   - m[6]*c0 ) * id;  inv[13] = ( m[0]*c3  - m[1]*c1   + m[2]*c0 ) * id; inv[14] = (-m[12]*s3 + m[13]*s1  - m[14]*s0) * id;  inv[15] = ( m[8]*s3  - m[9]*s1   + m[10]*s0) * id;
     for (int i = 0; i < 16; ++i) out[i] = inv[i];
 }
-void PSys_Render(float*,V3,V3,V3,V3,u32,float,float,float,float);
 static void ClearAll() { glClearColor(0.0f,0.0f,0.0f,0.0f); glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glClear(GL_COLOR_BUFFER_BIT); glBindFramebuffer(GL_FRAMEBUFFER,amFBO); glClear(GL_COLOR_BUFFER_BIT); glBindFramebuffer(GL_FRAMEBUFFER,amFullFBO); glClear(GL_COLOR_BUFFER_BIT); glBindFramebuffer(GL_FRAMEBUFFER,biomFBO); glClear(GL_COLOR_BUFFER_BIT); }
 static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u16 swidth, sheight; float sfov, snear, sfar;
@@ -1386,7 +1386,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     ExtractFrustumPlanes(viewProj, playerFrustumPlanes);
     glBindVertexArray(chunkVAO);/*Common vao for RenderDynamicShadowmaps and Rasterized Geometry*/
     glEnable(GL_DEPTH_TEST);
-    bool sunActive = !camView && likely(Sys_Settings.Shadows > 0u) && SkySunIsVisible();
+    bool sunActive = !camView && likely(Sys_Settings.Shadows > 0u) && ((gridCellStates[playerCellIdx] & CELL_SEES_SUN) && World.curLev != LEVEL_CYBERSPACE)/*Sun visible*/;
     if (sunActive && sunShadowFBO == 0u) { InitSunShadowmap(); }
     glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][0]);
     if (likely(Sys_Settings.Shadows > 0u) && !camView) { glDisable(GL_DEPTH_TEST); RenderShadowmaps(); glEnable(GL_DEPTH_TEST); if (sunActive) { RenderSunShadowmap(); } }
@@ -1426,7 +1426,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         if (selIdx != 592 && selIdx != 593) { /* decals have no mesh: baked 3D text drawn in decal pass; force-draw would hit modelIndex U16_MAX */
             if (transparentTexture[World.instances[editModeSelection].texIndex]) {
                 if (tcnt < INSTANCE_CNT) {          tmpTransparent[tcnt].index = editModeSelection;          tmpTransparent[tcnt].depth = 1.28f;        tcnt++; }
-            } else                         { visibleInstances[opaqueCount].index = editModeSelection; visibleInstances[opaqueCount].depth = 1.28f; opaqueCount++; }
+            } else                       { visibleInstances[opaqueCount].index = editModeSelection; visibleInstances[opaqueCount].depth = 1.28f; opaqueCount++; }
         }
     }
     mcpy(visibleInstances + opaqueCount,tmpTransparent,tcnt * sizeof(DepthSort));
@@ -1478,7 +1478,6 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         u16 i=visibleInstances[visibleIndex].index; Entity* e=&World.instances[i]; u16 tex=e->texIndex,constIndex=e->index;
         if (!alpha && transparentTexture[tex]) continue;
         bool twoSided = doubleSidedTexture[tex] || World.scale[i].x<0.0f || World.scale[i].y<0.0f || World.scale[i].z<0.0f; if (alpha && !twoSided && !transparentTexture[tex]) continue;
-        
         u8 state=twoSided ? 2 : alpha ? 1 : 0;
         if (cullBlendState!=state) { if (twoSided) glDisable(GL_CULL_FACE); else glEnable(GL_CULL_FACE); if (state) glEnable(GL_BLEND); else glDisable(GL_BLEND); cullBlendState=state; }
         if (alpha) glDepthFunc(((constIndex>=561 && constIndex<=565) || (constIndex>=568 && constIndex<=573)) ? 0x202/*GL_EQUAL*/ : 0x203/*GL_LEQUAL*/);
@@ -1502,7 +1501,6 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         u16 cIdx = World.instances[i].index; if (cIdx!=592 && cIdx!=593) { continue; }
         if (!(World.instances[i].entflags & EF_ACTIVE)) { continue; }
         if (!((gridCellStates[World.instances[i].cellIndex] & CELL_VISIBLE) || ((gridCellStates[World.instances[i].cellIndex] & CELL_OPEN) == CELL_OPEN))) { continue; }
-        
         if (cullBlendState != 2) { /*Double-sided*/ glDisable(GL_CULL_FACE); glEnable(GL_BLEND); cullBlendState = 2; }
         glUniform1ui(0, (u32)i);
         glUniform1ui(18, (u32)World.instances[i].texIndex);
@@ -1634,12 +1632,8 @@ static const Color fogLUT[MAX_LEVELS] = { {0.3207547f, 0.29200783f,0.29200783f,0
 static const V2 levMins[MAX_LEVELS]={{-37.3600f,-52.7600f},/*0*/  {-53.8000f,-64.0800f},/*1*/  {-46.12f,-56.34f},/*2*/  {-51.266f,-51.246f},/*3*/  {-29.462f, -53.7872f},/*4*/ {-47.3622f,-55.04f},/*5*/ {-65.94f,-71.6833f},/*6*/ {-66.8989f,-82.0144f},/*7*/ {-43.7456f,-43.9872f},/*8*/ {-51.5039f,-69.0306f},/*9*/ {-24.0994f,-39.7972f},/*10*/ {-27.1772f,-28.3394f},/*11*/ {-18.05f,-30.50f},/*12*/ {99.4200f,-60.120f}/*13*/};
 static const float lFars[MAX_LEVELS] = { 56.32f/*R*/, 56.32f/*1*/, 51.2f/*2*/, 51.2f/*3*/, 40.96f/*4*/, 58.88f/*5*/, 79.36f/*6*/, 56.32f/*7*/, 69.12f/*8*/, 53.76f/*9*/,  51.2f/*10*/,  51.2f/*11*/, 38.4f/*12*/, 1300.00f/*13*/};
 int EdgeCompare(const void* a, const void* b) { u32 ea = *(const u32*)a, eb = *(const u32*)b; return (ea > eb) - (ea < eb); }
-u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount = 0; extern u32 numActivePortals;
-void MissionTimerInit(),AddHardwareToInventory(int,int),mp3_clear(),AddDoorPortal(u16,u16);
 // Init && Main
-bool MdlIsWinMemberSet(u16,u8); void MdlSwapWindowDisposeData(u16);
 void MdlBuildLevelConvexAdjacency(u8 lev) {
-    if (lev >= MAX_LEVELS) return;
     for (u32 i = 0; i < World.levelInstCount[lev]; ++i) {
         World.levInstances[lev][i].adjacencyIdx = U16_MAX;
         if (World.levCol[lev][i] == CT_CVX) {
@@ -1700,7 +1694,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     mset(&Sys_Input,0,sizeof(Sys_Input));
     World.currentMouse_dx = World.currentMouse_dy = 0; last_mouse_x = last_mouse_y = 0; ignore_next_mouse_delta = true; Sys_Input.isCapsLockOn = false; /*As far as we're concerned, don't worry about OS capslock actual state.*/
     for (u8 lev=1;lev<MAX_LEVELS;++lev) { CopyPlayerState(0,lev); }
-    decalInlineTextCount = decalStyleCount = 0;
+    decTxtCount = decStyleCnt = 0;
     mset(World.levelCameraCount,0,sizeof(World.levelCameraCount));     mset(World.levelSmallNodeCount,0,sizeof(World.levelSmallNodeCount));     mset(World.levelLargeNodeCount,0,sizeof(World.levelLargeNodeCount));
     mset(World.levCamDestroyedCnt,0,sizeof(World.levCamDestroyedCnt)); mset(World.levSmNodeDestroyedCnt,0,sizeof(World.levSmNodeDestroyedCnt)); mset(World.levNodeDestroyedCnt,0,sizeof(World.levNodeDestroyedCnt));
     for (u32 u = 0; u < uniqueCvxMeshCount; ++u) { if (cvxAdjOffsets[u]) { OS_Free(cvxAdjOffsets[u], cvxAdjOffsetBytes[u]); cvxAdjOffsets[u] = 0; cvxAdjOffsetBytes[u] = 0; } if (cvxAdjLists[u]) { OS_Free(cvxAdjLists[u], cvxAdjListBytes[u]); cvxAdjLists[u] = 0; cvxAdjListBytes[u] = 0; } }
@@ -1723,13 +1717,6 @@ __attribute__((cold)) void NewGame() { // Reset World States
     firstFrameMouselook = true; // Prevent jumps after cursor is centered once menu turned off.
     DualLog("Convex mesh and automap init........................................................took %.6f secs\n",get_time() - newGameCvxStart);
 }
-void PlayVmail(u8 i) {/*Starts vmail clip i: the ui.c vmailStartFrames/vmailEndFrames slots. Sys_UI.vmailActive also gates the frob/fire "click skips the mail" paths and the UI draws as a bool, so it stores clip+1 (0 stays "no mail playing").*/ if(i>=sizeof(vmailStartFrames)/sizeof(*vmailStartFrames)){DualLogError("PlayVmail: clip %u out of range\n",i);return;} World.Sys_UI.vmailActive=(u8)(i+1); World.Sys_UI.vmailFrame=vmailStartFrames[i]; World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; ForceInventoryMode(); }
-void GoIntoGame() { NewGame(); mp3_clear(); DualLog("Player named \"%s\" started the game!\n", World.playerName); game_actual_start_time = get_time(); DualLog("Entity counts::0:%4u|1:%4u|2:%4u|3:%4u|4:%4u|5:%4u|6:%4u|7:%4u|8:%4u|9:%4u|10:%4u|11:%4u|12:%4u|13:%4u\n Light counts::0:%4u|1:%4u|2:%4u|3:%4u|4:%4u|5:%4u|6:%4u|7:%4u|8:%4u|9:%4u|10:%4u|11:%4u|12:%4u|13:%4u\n",World.levelInstCount[0],World.levelInstCount[1],World.levelInstCount[2],World.levelInstCount[3],World.levelInstCount[4],
-                                              World.levelInstCount[5],World.levelInstCount[6],World.levelInstCount[7],World.levelInstCount[8],World.levelInstCount[9],World.levelInstCount[10],World.levelInstCount[11],World.levelInstCount[12],World.levelInstCount[13],World.levelLoadedLights[0],World.levelLoadedLights[1],World.levelLoadedLights[2],World.levelLoadedLights[3],
-                                              World.levelLoadedLights[4],World.levelLoadedLights[5],World.levelLoadedLights[6],World.levelLoadedLights[7],World.levelLoadedLights[8],World.levelLoadedLights[9],World.levelLoadedLights[10],World.levelLoadedLights[11],World.levelLoadedLights[12],World.levelLoadedLights[13]); }
-void LoadModels(), LoadTextures(), InitAudio();
-extern u32 random_range_rng, biomTexId, biomFBO;
-u8* scratch_base,*scratch_cur,*scratch_end; size_t scratch_peak;
 void* OS_AllocScratch(size_t amount) { size_t aligned = (amount + 15) & ~(size_t)15; u8* p = (u8*)__atomic_fetch_add(&scratch_cur,aligned,__ATOMIC_RELAXED); if (p + aligned > scratch_end) { DualLogError("Scratch ovr!\n"); OS_Exit(1); } size_t used = (size_t)((p + aligned) - scratch_base),peak;  do { peak = scratch_peak; } while (used > peak && !__atomic_compare_exchange_n(&scratch_peak,&peak,used,false,__ATOMIC_RELAXED,__ATOMIC_RELAXED)); return p; }
 void OS_FreeInitPhase() { scratch_cur=scratch_base; mset(scratch_cur,0,scratch_peak); }
 static void* InitFontAtlasses_Thread(void* arg) { (void)arg; InitFontAtlasses(); return NULL; }
@@ -1746,7 +1733,7 @@ static void RtWriteModelNodes(u32* nodes, u32 nodeBase, u32 triBase, u16 m) {
     }
 }
 static void RtDispatchModelCopy(u16 m) { u32 tcnt = modelBVHTriOrderCounts[m]; if (!tcnt) { return; } glBindBufferRange(GL_SSBO, 18, modelIBO, (intptr_t)mdlIboOfs[m], (size_t)((size_t)modelTriangleCounts[m]*6u + 4u)); glUniform1ui(3, tcnt); glUniform1ui(4, rtModelInfo[m].triBase); glUniform1ui(5, rtModelInfo[m].orderBase); glDispatchCompute((tcnt + 255u) / 256u, 1, 1); glMemoryBarrier(0x2000/*GL_SHADER_STORAGE_BARRIER_BIT*/); }
-void EnsureReflectionResources(void) {
+void EnsureReflectionResources() {
     if (Sys_Settings.Reflections >= 1u && outputImageID == 0) { GenerateAndBindTexture(&outputImageID,GL_RGBA8,Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES,Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL); glBindImageTexture(4,outputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); glActiveTexture(GL_TEXTURE4); glBindTexture(GL_TEXTURE_2D,outputImageID); }
     if (Sys_Settings.Reflections == 2u && !rtAccelBuilt) {
         if (!modelVBO || !mdlsCnt) { return; }
@@ -1775,7 +1762,7 @@ void EnsureReflectionResources(void) {
         rtAccelBuilt = true; RtSwapPatchModels(); DualLog("Raytraced reflections upload........................................................took %.6f secs\n",get_time() - startTime);
     }
 }
-extern u8 mdlSwapLev, *fontBmp1, *fontBmp2;
+extern u8 mdlSwapLev,*fontBmp1,*fontBmp2;
 void RtSwapPatchModels() {
     if (!rtAccelBuilt) return;
     u8 lev = mdlSwapLev; static u16 rtPatchList[MAX_MDLS]; static u16 rtPatchStamp[MAX_MDLS]; u32 patchCnt = 0; if (lev < MAX_LEVELS) { u32 cnt = 0; for (u32 m=0; m<mdlsCnt; ++m) { if (!(MdlIsWinMemberSet((u16)m,lev) && m < mdlsCnt && modelVertexCounts[m] && rtSrcVertCounts[m])) continue; if (cnt < MAX_MDLS) rtPatchList[cnt] = (u16)m; ++cnt; } patchCnt = cnt; }
@@ -1803,6 +1790,8 @@ void RtSwapPatchModels() {
     for (u32 k=0;k<patchCnt;++k) { u16 m = rtPatchList[k]; if (rtPatchStamp[m] == 2) RtDispatchModelCopy(m); }
     glFinish();
 }
+char* data_parser_trim(char* s) { while(cEmpty((u8)*s)){s++;} if (*s == 0){return s;} char* e=s + slen(s) - 1; while(e > s && cEmpty((u8)*e)){e--;} e[1]=0; return s; }
+char* sUpToEndLine(char* buf, int sz, FHandle fd){if(sz<=1 || buf == NULL){return NULL;} char* p=buf; int rem=sz-1; static int pos=0,end=0; static char b[4096]; while(rem > 0){if(pos>=end){long n=OS_Read(fd,b,sizeof(b)); if(n <= 0){if(p==buf){return NULL;} goto done;} pos=0; end=(int)n;} while(rem>0 && pos<end){char c=b[pos++]; *p++=c; rem--; if(c=='\n'){goto done;}}} done:*p='\0'; return buf;} // fgets replacement, not thread safe but no multithreading
 void InitalizeEnvironment() {
     game_start_time = get_time();
     random_range_rng = (u32)game_start_time;
@@ -1949,7 +1938,6 @@ void InitalizeEnvironment() {
     DebugRAMPeak(); DualLog(".......Game Initialization TOTAL %.6f secs\n",get_time() - game_start_time); DebugRAMActual("init");
 }
 void RessurectionTextUpdate() { static int lastStage = -1; double fin = World.invP1.ressurectingFinished; if (fin <= World.pauseRelativeTime) { lastStage = -1; return; } double el = World.pauseRelativeTime - (fin - 3.0); int stage = (int)(el * 8.0 / 3.0); if (stage < 0) stage = 0; if (stage > 7) stage = 7; if (stage != lastStage) { lastStage = stage; CenterStatusPrint("%s", Sys_Text.stringTable[860 + stage]); } }
-void Physics(float),UpdateAnims(),UpdateAudio(),AudioUpdateMix(),PSys_Update(float),BioMonitorUpdate();
 i32 main() {
     InitalizeEnvironment();
     while(1) {

@@ -18,7 +18,6 @@ void* mset(void *dst,int c,size_t n){
 }
 size_t slen(const char* s) { if (s == NULL) {return 0;} const char *p=s; while (*(p++)); return (size_t)(p - s - 1); } // strlen replacement
 bool cEmpty(const char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; } // isspace replacement
-char* data_parser_trim(char* s) { while(cEmpty((u8)*s)){s++;} if (*s == 0){return s;} char* e=s + slen(s) - 1; while(e > s && cEmpty((u8)*e)){e--;} e[1]=0; return s; }
 i32 s2i32(const char *str){while (cEmpty(*str)){str++;} int sign=1; if(*str=='-'){sign=-1; str++;}else if(*str == '+') {str++;} if(*str<'0' || *str>'9')return 0; i64 result=0; while(*str>='0' && *str<='9'){int digit=*str-'0'; if(result>(2147483647-digit)/10){return (sign==1) ? 2147483647 : -2147483648;} result=result*10+digit; str++;} return (i32)(sign*result);} // atoi replacement, needed separately from fast_atoi for user console input
 bool sEqual(const char* a, const char* b) { if (!a) a=""; if (!b) b=""; while (*a && *a == *b) { a++; b++; } return *a == *b; } // !strcmp replacement (hated its inverted logic)
 int sCompUpToLen(const char* s1, const char* s2, size_t n) { const u8 *p1 = (const u8*)s1, *p2 = (const u8*)s2; while (n-- > 0) { if (*p1 != *p2) {return (*p1 < *p2) ? -1 : 1;}  if (*p1 == '\0') {break;} p1++; p2++; } return 0; } // !strncmp replacement (yes inverted for sanity)
@@ -31,7 +30,6 @@ __attribute__((noinline)) u16 parse_numberu16(const char* str, const char* line,
 __attribute__((noinline)) u8 parse_numberu8(const char* str, const char* line, u32 lineNum) { u32 retval = parse_numberu32(str, line, lineNum); if (retval > 255) { DualLogError("Value %u out of range for u8 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (u8)retval; }
 __attribute__((noinline)) bool parse_bool(const char* str, const char* line, u32 lineNum) { u32 parseval = parse_numberu32(str, line, lineNum); if (parseval > 1) {DualLogWarn("Loaded %u but expected boolean from line[%u]: %s\n",parseval, lineNum+1, line);} return parseval != 0; }
 void sCpy2aSubFromb(char* a, size_t subsz, const char* b, size_t bufsz) { if (subsz >= bufsz) { DualLogError("sCpy2aSubFromb substring overflow!\n"); OS_Exit(1); } size_t i=0; for (;i<subsz && b[i];++i) a[i]=b[i]; mset(a+i,0,subsz-i+1); } // strncpy replacement (hopefully my mnemonic "a_subfrom_b" will help)
-char c2Lower(const char c) { return c + ((c >= 'A' && c <= 'Z') ? 32 : 0); }
 char* sFindSub(const char* s, const char* sub) { if (sub[0] == '\0') {return (char*)s;} for (size_t i = 0; s[i] != '\0'; ++i) { if (s[i] == sub[0]/*Only look if first matches*/) { size_t si=i, subi=0; while (s[si] != '\0' && sub[subi] != '\0' && s[si] == sub[subi]){si++; subi++;} if(sub[subi] == '\0'){return (char*)&s[i];} } } return NULL;/*No match*/ } // strstr replacement
 const char* StringFindLastChar(const char* str, const char c) { const char* lastSeen = NULL; do { if (*str == c) lastSeen = str; } while (*str++); return lastSeen; } // strrchr replacement
 char* StringFindFirstCharWithin(const char *s, char c) { char* stringwalker = (char*)s; while (*stringwalker != c) { if (!*stringwalker) {return NULL;} stringwalker++; } return stringwalker; } // strchr replacement
@@ -59,12 +57,11 @@ int sFormatV(char* buf, size_t bufsz, const char* f, va_list args) {
     } buf[pos] = '\0'; return (int)pos;
 }
 int sFormat(char* buffer, size_t bufsz, const char* format, ...) { va_list args; __builtin_va_start(args,format); int ret = sFormatV(buffer,bufsz,format,args); __builtin_va_end(args); return ret; } // snprintf replacement
-char* sUpToEndLine(char* buf, int sz, FHandle fd){if(sz<=1 || buf == NULL){return NULL;} char* p=buf; int rem=sz-1; static int pos=0,end=0; static char b[4096]; while(rem > 0){if(pos>=end){long n=OS_Read(fd,b,sizeof(b)); if(n <= 0){if(p==buf){return NULL;} goto done;} pos=0; end=(int)n;} while(rem>0 && pos<end){char c=b[pos++]; *p++=c; rem--; if(c=='\n'){goto done;}}} done:*p='\0'; return buf;} // fgets replacement, not thread safe but no multithreading
 FHandle console_log_file=0;
 static void DualLogMain(bool writeToFileToo, const char *prefix, const char *fmt, va_list args) {
     char buf[4096]; va_list c; __builtin_va_copy(c,args); size_t len=sFormatV(buf,sizeof(buf),fmt,c),prefixLen=slen(prefix); __builtin_va_end(c); bool color=(prefix && prefix[0] == '\033');
     #if defined(_WIN32)
-        FHandle out=GetStdHandle(color ? (u32)-12 : (u32)-11);
+        FHandle out = GetStdHandle(color ? (u32)-12 : (u32)-11);
     #else
         FHandle out=color ? 2/*stderr*/ : 1/*stdout*/;
     #endif
@@ -89,7 +86,6 @@ void qsort_new(void* base, size_t nel, size_t w, cmpfun cmp) {
 i32 PosGetCellCoordX(float x) { return (u16)vclampi((i32)vfloor((x - World.worldMin_x[World.curLev] + CELLXHALF) / CELLSZ),0,(WORLDX - 1)); }
 i32 PosGetCellCoordZ(float z) { return (u16)vclampi((i32)vfloor((z - World.worldMin_z[World.curLev] + CELLXHALF) / CELLSZ),0,(WORLDX - 1)); }
 i32 PosGetCellCoords(float x, float z) { return (PosGetCellCoordZ(z) * WORLDX) + PosGetCellCoordX(x); }
-u32 PosGetCellCoordsP(i32 cx, i32 cz) { cx=vclampi(cx,0,(WORLDX - 1)); cz=vclampi(cz,0,(WORLDX - 1)); return (u32)cz * WORLDX + (u32)cx; }
 char statusText[T_BUFFER_SIZE];
 void CenterStatusPrint(const char * restrict fmt, ...) { if (!fmt || *fmt == '\0') {return;} va_list args; __builtin_va_start(args, fmt); sFormatV(statusText,T_BUFFER_SIZE,fmt,args); __builtin_va_end(args); DualLog("%s\n",statusText); World.statusTextDecayFinished = get_time() + 3.5;/*secs decay time before text dissappears.*/ }
 void BmpWrite(char const *filename, int x, int y, const void *data) {
@@ -106,7 +102,7 @@ void Screenshot() {
     BmpWrite(filename,w,h,pixels); CenterStatusPrint("Saved screenshot %s\n",filename); OS_Free(pixels,w * h * 4 * sizeof(char));
 }
 size_t g_mmap_live = 0;
-void DebugRAMPeak(void) { // Kernel high-water mark of RSS over process lifetime
+void DebugRAMPeak() { // Kernel high-water mark of RSS over process lifetime
     #if defined(_WIN32)
         (void)0;/*no /proc on Windows*/
     #else
@@ -137,5 +133,3 @@ static u32 xs32() { u32 x = random_range_rng; x ^= x << 13; x ^= x >> 17; x ^= x
 u8 random_range_u8(u8 a, u8 b) { if (a > b) { u8 temp = a; a = b; b = temp; } if (a == b) {return a;} u32 r = (u32)b - a + 1u; u32 v,limit = 256u - (256u % r); do { v = xs32() & 0xFFu; } while (v >= limit); return (u8)(a + (v % r)); }
 u32 random_range_u32(u32 a, u32 b) { if (a > b) { u32 temp = a; a = b; b = temp; } if (a == b) {return a;} u64 range = (u64)b - a + 1u; return a + (u32)(((u64)xs32() * range) >> 32);  }
 float random_range(float a, float b) { float factor = ((float)(xs32() >> 8)) * (1.0f / 16777216.0f); return a + (b - a) * factor; }
-float lerp(float min, float max, float val) { return min + (max - min) * vclamp(val,0.0f,1.0f); }
-float inverse_lerp(float min, float max, float val) { return (min == max) ? 0.0f : vclamp((val - min) / (max - min),0.0f,1.0f); }

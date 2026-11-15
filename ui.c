@@ -57,7 +57,7 @@ void MFD_ShowGeneralItem() { u8 side=World.Sys_UI.lastItemSideRH?2:1; World.Sys_
 void MFD_OpenSearch(bool isRH) { for (u8 side=0;side<2;++side) {u8 tab=World.Sys_UI.mfdTab[1+!!side]; if (!(tab==2 && World.Sys_UI.mfdItemReader[side]) && World.Sys_UI.MFD_Data!=5) { World.Sys_UI.mfdReturnTab[side+1]=tab; World.Sys_UI.mfdReturnView[side+1]=World.Sys_UI.MFD_Data;}} World.Sys_UI.MFD_Data=5; World.Sys_UI.mfdTab[1+!!isRH]=4;}
 void MFD_CloseSearch() {if (World.Sys_UI.MFD_Data!=5) return; for (u8 side=0;side<2;++side) {u8* tab=&World.Sys_UI.mfdTab[1+!!side]; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];} u8 rv=World.Sys_UI.mfdReturnView[1]; if (rv==5) rv=0; World.Sys_UI.MFD_Data=rv;}
 void MFD_OpenData(bool isRH,u8 code) { u8 side=isRH?2:1; u8 tab=World.Sys_UI.mfdTab[1+!!isRH]; if (tab!=4) World.Sys_UI.mfdReturnTab[side]=tab; if (World.Sys_UI.MFD_Data == 0 || World.Sys_UI.MFD_Data == 5) World.Sys_UI.mfdReturnView[side]=World.Sys_UI.MFD_Data; World.Sys_UI.MFD_Data=code; World.Sys_UI.mfdTab[1+!!isRH]=4; }
-void MFD_CloseData(void) { if (World.Sys_UI.MFD_Data == 0 || World.Sys_UI.MFD_Data == 5) return; u8 keepDataTab=(World.Sys_UI.mfdReturnTab[1]==4||World.Sys_UI.mfdReturnTab[2]==4); for (u8 side=0;side<2;++side) {u8* tab=&World.Sys_UI.mfdTab[1+!!side]; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];} World.Sys_UI.MFD_Data=keepDataTab?(((World.invP1.hasHardware&HW_SYS)?7:0)):0; }
+void MFD_CloseData() { if (World.Sys_UI.MFD_Data == 0 || World.Sys_UI.MFD_Data == 5) return; u8 keepDataTab=(World.Sys_UI.mfdReturnTab[1]==4||World.Sys_UI.mfdReturnTab[2]==4); for (u8 side=0;side<2;++side) {u8* tab=&World.Sys_UI.mfdTab[1+!!side]; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];} World.Sys_UI.MFD_Data=keepDataTab?(((World.invP1.hasHardware&HW_SYS)?7:0)):0; }
 INLINE void MFD_SelectTab(u8 panel, u8 tab, bool toggle) {
     World.Sys_UI.genClickSlot = -1;
     if (panel && tab == 2) { World.Sys_UI.lastItemSideRH = (panel == 2); }
@@ -75,7 +75,7 @@ void WeaponSelectSlot(int slot) {
 }
 __attribute__((noinline)) bool MenuEnter() { return !Cheats.consoleActive && (Sys_Input.keyStates[KEY_KP_ENTER].pressed || Sys_Input.keyStates[KEY_ENTER].pressed); }
 static bool uiClickLock = false, uiClickBlocked = false;
-static void UiClickGate(void) { bool anyDown = false; for (u8 b = 0; b < MAX_MOUSE_BUTTONS; ++b) anyDown |= Sys_Input.mouseButtons[b].down; uiClickBlocked = false; if (uiClickLock) { if (!anyDown) uiClickLock = false; else uiClickBlocked = true; } }
+static void UiClickGate() { bool anyDown = false; for (u8 b = 0; b < MAX_MOUSE_BUTTONS; ++b) anyDown |= Sys_Input.mouseButtons[b].down; uiClickBlocked = false; if (uiClickLock) { if (!anyDown) uiClickLock = false; else uiClickBlocked = true; } }
 __attribute__((noinline)) u8 UI_MenuInteractable(u32 id, i16 x, i16 y, float w, float h, bool* cursorOver, i8 this, bool sustained) {
     UIR(id,x,(i16)((float)y-h),(i16)w,(i16)h); bool cursorIsOver = CursorIsOverBounds(x, x + w, (float)y - h, (float)y); if (cursorIsOver && mouseMovementThisFrame && !resDropdownOpen) { currentMenuItem = this; if (cursorOver != NULL) {*cursorOver = cursorIsOver;} } if (uiClickBlocked) return 0u; if ((sustained ? Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].down : Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].pressed) && cursorIsOver) { uiClickBlocked = true; uiClickLock = true; return 1u; }
     if ((sustained ? Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down : Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) && cursorIsOver) { uiClickBlocked = true; uiClickLock = true; return 2u; } return 0u;
@@ -107,9 +107,9 @@ static const float introTextAt[15] = {0.0f,6.7f,9.9f,19.2f,30.7f,37.9f,43.7f,48.
 static const float outroTextAt[3] = {0.0f,7.0f,11.0f};/*CreditsScroll swaps to card 2 at 7s, card 3 at 11s, then hides all cards at 14s*/
 static const float deathTextAt[2] = {0.0f,5.53f};
 static bool vidSkipArmedMouse[MAX_MOUSE_BUTTONS], vidSkipArmedEsc, vidSkipArmedEnter, vidSkipArmedSpace, vidMenuKeyArmed;
-void VidSkipArm(void) { for (int b=0;b<MAX_MOUSE_BUTTONS;++b) vidSkipArmedMouse[b] = !Sys_Input.mouseButtons[b].down; vidSkipArmedEsc = !Sys_Input.keyStates[KEY_ESCAPE].down; vidSkipArmedEnter = !Sys_Input.keyStates[KEY_ENTER].down && !Sys_Input.keyStates[KEY_KP_ENTER].down; vidSkipArmedSpace = !Sys_Input.keyStates[KEY_SPACE].down; vidMenuKeyArmed = !GetKey(25); }
-bool VidMenuKeyArmed(void) { if (currentMenuPage != MPG_INTRO && currentMenuPage != MPG_CREDS && currentMenuPage != MPG_DEATH) return true; return vidMenuKeyArmed; }
-static bool VidSkipPressed(void) {
+void VidSkipArm() { for (int b=0;b<MAX_MOUSE_BUTTONS;++b) vidSkipArmedMouse[b] = !Sys_Input.mouseButtons[b].down; vidSkipArmedEsc = !Sys_Input.keyStates[KEY_ESCAPE].down; vidSkipArmedEnter = !Sys_Input.keyStates[KEY_ENTER].down && !Sys_Input.keyStates[KEY_KP_ENTER].down; vidSkipArmedSpace = !Sys_Input.keyStates[KEY_SPACE].down; vidMenuKeyArmed = !GetKey(25); }
+bool VidMenuKeyArmed() { if (currentMenuPage != MPG_INTRO && currentMenuPage != MPG_CREDS && currentMenuPage != MPG_DEATH) return true; return vidMenuKeyArmed; }
+static bool VidSkipPressed() {
     bool press = false;
     for (int b=0;b<MAX_MOUSE_BUTTONS;++b) { if (!Sys_Input.mouseButtons[b].down) vidSkipArmedMouse[b] = true; else if (Sys_Input.mouseButtons[b].pressed && vidSkipArmedMouse[b]) press = true; }
     if (!Sys_Input.keyStates[KEY_ESCAPE].down) vidSkipArmedEsc = true; else if (Sys_Input.keyStates[KEY_ESCAPE].pressed && vidSkipArmedEsc) press = true;
@@ -588,8 +588,7 @@ void UI_AutomapClick(bool rh,int action) { World.Sys_UI.mouseClickHeldOverGUI=tr
 }
 void CloseFullmap() { World.Sys_UI.fullMapOpen[0]=World.Sys_UI.fullMapOpen[1]=false; }
 void AddItemToInventory(int index, int custIdx); void ResetHeldItem();
-static const u16 vmailStartFrames[6]={1579,1645,1713,1784,1864,1931}; static const u16 vmailEndFrames[6]={1644,1712,1783,1863,1930,1988};
-void AppendTextWarning(i32 sidx, i32 sidx2, i32 sidx3, i32 col, i32 id) { World.Sys_UI.tWrnTextIdx[id]=sidx; World.Sys_UI.tWrnTextIdx2[id]=sidx2; World.Sys_UI.tWrnTextIdx3[id]=sidx3; World.Sys_UI.tWrnFinished[id]=World.Sys_UI.tWrnFinished[id] < World.pauseRelativeTime ? World.pauseRelativeTime + 0.1f : World.Sys_UI.tWrnFinished[id] + 0.1f; World.Sys_UI.tWrnColorIdx[id] = col; }
+const u16 vmailStartFrames[6]={1579,1645,1713,1784,1864,1931}; static const u16 vmailEndFrames[6]={1644,1712,1783,1863,1930,1988};
 enum { EF_POSX,EF_POSY,EF_POSZ,EF_ROTX,EF_ROTY,EF_ROTZ,EF_ROTW,EF_SCLX,EF_SCLY,EF_SCLZ,EF_TEX,EF_MODEL,EF_GLOW,EF_SPEC,EF_NORM,EF_LAST }; bool editFieldEditing=false; static u8 editFieldSlot=EF_LAST; static char editFieldBuffer[40]={0}; static const i16 efRowY[EF_LAST]={160,188,216,244,272,300,328,356,384,412,440,468,496,524,552};
 static const char* efRowLabel[EF_LAST]={"position x","position y","position z","rotation x","rotation y","rotation z","rotation w","scale x","scale y","scale z","texIndex","modelIndex","glowIndex","specIndex","normIndex"};
 extern Quaternion quat_normalize(Quaternion);
@@ -1250,7 +1249,7 @@ static void RenderUI() {
         RenderTextL(16 + 110,72,timingColor,FONT_NORMAL,1.0f,"CPU avg %.2f",avg); RenderTextL(16,72,timingColor,FONT_NORMAL,1.0f,"ms: %.2f",World.thisFrameTime); RenderTextL(16 + 260,72,T_WHITE,FONT_NORMAL,1.0f,"(FPS:%d),Drawcalls:%d [G:%d UI:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u",globalframesPerLastSecond,drawCalls,drawCallsNormal,uiDrawCalls,shadDrawCalls,vertsRendered,Cheats.editMode,World.menuActive,World.paused);
         RenderTextL(16,108,T_WHITE,FONT_NORMAL,1.0f,"GPU ms::All:%.2f, Shad:%.2f, Pre:%.2f, Main:%.2f, SSR:%.2f, Comp:%.2f",World.gpuFrameMs,World.gpuShadowMs,World.gpuPreMs,World.gpuMainMs,World.gpuSsrMs,World.gpuCompMs);
         RenderTextL(16,126,T_WHITE,FONT_NORMAL,1.0f,"CPU ms::Shad:%.3f, Phys:%.3f, Subs:%u, Rend:%.3f, Pre Phys:%.3f, Logic:%.3f, Ray:%.3f(%u)",shadowTime * 1000,physTime * 1000,World.substeps,renderTime * 1000,prePhys * 1000,gameTime * 1000,raycastMs * 1000,raycastCalls);
-        RenderTextL(16,144,T_WHITE,FONT_NORMAL,1.0f,"Test Edx: %u, Time Elapsed: %.3f, Fatigue: %.2f, Sprinting: %u, Reverb: %u, Making Noise: %u, Grounded: %u",editModeTestEntityDefinition,World.pauseRelativeTime - game_actual_start_time,World.invP1.fatigue,Sprint(),World.invP1.inReverbZone,World.invP1.makingNoise,(World.instances[PLAYER1].entflags & EF_GROUNDED) > 0);
+        RenderTextL(16,144,T_WHITE,FONT_NORMAL,1.0f,"Test Edx: %u, Time Elapsed: %.3f, Fatigue: %.2f, Sprinting: %u, Reverb: %u, Making Noise: %u, Grounded: %u",editModeTestEntityDefinition,World.pauseRelativeTime - game_actual_start_time,World.invP1.fatigue,GetKey(9)/*Sprint is held*/,World.invP1.inReverbZone,World.invP1.makingNoise,(World.instances[PLAYER1].entflags & EF_GROUNDED) > 0);
     }
     bool p = (World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused; if (p || !Cheats.noHUD) RenderUIImage(p?World.cursorPos_x-20:663,p?World.cursorPos_y-20:364,40,40,GetCursorTexture()); 
     if(World.invP1.grenActive && World.invP1.holdingObject && !World.menuActive && !World.paused && !Cheats.noHUD) { RenderTextL((World.inventoryMode ? World.cursorPos_x : 683) + 26,(World.inventoryMode ? World.cursorPos_y : 384) - 8,T_YELLOW,FONT_NORMAL,0.8f,"Live"); }

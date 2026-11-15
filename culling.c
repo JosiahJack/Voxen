@@ -6,8 +6,6 @@ bool get_cull_bit(const u32* arr, int idx) { return (arr[idx >> 5] >> (idx & 31)
 INLINE void set_cull_bit(u32* arr, int idx, bool val) {u32* w = arr + (idx >> 5); u32 m = 1U << (idx & 31); *w = val ? (*w | m) : (*w & ~m);}
 bool PositionVisibleFromPlayerCell(float x, float z) { return (get_cull_bit(precomputedVisibleCellsFromHere,((playerCellIdx * ARRSIZE)/*cellIdx*/ + PosGetCellCoords(x,z)/*subIdx*/)/*flat_idx*/)); }
 bool XZPairInBounds(i32 x, i32 z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }
-bool SkyIsVisible() { return ((gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || World.curLev == LEVEL_CYBERSPACE); }
-bool SkySunIsVisible() { return ((gridCellStates[playerCellIdx] & CELL_SEES_SUN) && World.curLev != LEVEL_CYBERSPACE); }
 bool NeighborhoodInPVS(u16 x, u16 z, u8 r) { u32 cellIdx=(z*WORLDX)+x; for(int ix=(int)x-r;ix<=(int)x+r;++ix){for(int iz=(int)z-r;iz<=(int)z+r;++iz){if(unlikely(!XZPairInBounds(ix,iz))){continue;} int subIdx=iz*WORLDX + ix; if(get_cull_bit(precomputedVisibleCellsFromHere,cellIdx*ARRSIZE+subIdx)&&(gridCellStates[subIdx]&CELL_VISIBLE))return true;} } return false; }
 static u8* LoadCullPNG(const char* name, int lev) { char p[256]; sFormat(p,sizeof(p),"./Data/%s_%d.png",name,lev); FHandle fd; int size; u8* data=OS_OpenAndAllocateFileBufferReadonly(p,&fd,&size); if (!data || size > 500000) { DualLogError("PNG missing/too-large: %s\n",p); OS_Exit(1); } i32 w,h; u8* pixels = PngLoad(data,size,&w,&h,&png_arena_main); OS_Free(data,size); if (!pixels) { DualLogError("PngLoad failed: %s\n",p); OS_Exit(1); } return pixels; }
 #define PIXEL_IDX(x, z) ((x) + ((WORLDZ - 1 - (z)) * WORLDX)) * 4 // 4 channels, flip z to have desired bottom-left origin 0,0 vs png's top-left

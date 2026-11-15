@@ -326,7 +326,7 @@ void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light* lit, LightAni
     if (sEqual(k,"intensity")) {lit->intensity = lit->maxIntensity = parse_float(v,il,ln) * 0.35f;}else if(sEqual(k,"type")){flag_set(&lit->lflags, (v[0] == 'S') ? LSPOT : LDIR, true);}else if (sEqual(k,"lightOn") && !alreadyReadLightOnOnce[lIdx]) { alreadyReadLightOnOnce[lIdx] = true; flag_set(&lit->lflags,LIGHTON,parse_bool(v,il,ln)); } else if (sEqual(k,"lerpOn")) {flag_set(&lit->lflags,LERPON,parse_bool(v,il,ln));}
     else if (sEqual(k,"targetname")) {lightTargetnameFile[lIdx] = IOInternName(v);}
 }
-u16 headmountedLanternLight; V3 lanternPos;
+u16 headmountedLanternLight;
 void UpdateLight(u16 i, V3 pos, Color3 col, float range, float intensity, float max, float min, float spotAng, Quaternion spotDir, bool on, bool shad) {
     bool changed = (!!(World.lights[i].lflags & SHADON) - shad) || (!!(World.lights[i].lflags & LIGHTON) -  on) || (vabs(World.lights[i].range - range) > 0.0001f) || (vabs(World.lights[i].pos.x - pos.x) > 0.0001f) || (vabs(World.lights[i].pos.y - pos.y) > 0.0001f) || (vabs(World.lights[i].pos.z - pos.z) > 0.0001f);
     World.lights[i].intensity = intensity; World.lights[i].minIntensity = min; World.lights[i].maxIntensity = max; World.lights[i].spotAng = spotAng; World.lights[i].spotDir = spotDir; World.lights[i].col = col; World.lights[i].pos = World.lightsNewPosition[i] = pos; World.lights[i].range = range; World.lights[i].lflags = (World.lights[i].lflags & ~(LIGHTON | SHADON | LDIRTY)) | ((World.lights[i].lflags & LDIRTY) | (changed << 4) | on | (shad << 1));
@@ -596,8 +596,8 @@ void LoadLevelMod(u8 lev) {
         else if ((entIdx == 21 || entIdx == 22 || entIdx == 130) && src->texIndex > 0 && src->texIndex < MAXTEX) par->texIndex = src->texIndex; // Per-instance material overrides: cyberspace panel colors (21/22) and coolant pipes (130)
         if (entIdx == 21 || entIdx == 22) par->glowIndex = par->texIndex;
         if (entIdx == 592 || entIdx == 593) { DecalPend* pd=NULL; for (u16 k=0;k<pendDecalCount;++k) { if (pendDecals[k].ent == (u16)e) { pd=&pendDecals[k]; break; } } if (pd) { i16 li = (i16)src->messageLingdex;
-            if (li <= 0 || li >= T_LOGSTR_CNT) { if (decalInlineTextCount < DECAL_INLINE_TEXT_MAX) { mcpy(decalInlineText[decalInlineTextCount],pd->text,DECAL_INLINE_TEXT_LEN); decalInlineTextLevel[decalInlineTextCount]=curlevel; decalInlineTextInst[decalInlineTextCount]=parent; ++decalInlineTextCount; } else DualLogError("Too many inline text decals\n"); }
-            if (pd->anchor != 0 || pd->align != 0 || pd->lineSp != 1.0f) { if (decalStyleCount < DECAL_STYLE_MAX) { decalStyles[decalStyleCount]=(DecalStyle){curlevel,parent,pd->anchor,pd->align,pd->lineSp}; ++decalStyleCount; } else DualLogError("Too many decal styles\n"); } } }
+            if (li <= 0 || li >= T_LOGSTR_CNT) { if (decTxtCount < DECAL_INLINE_TEXT_MAX) { mcpy(decTxt[decTxtCount],pd->text,DECAL_INLINE_TEXT_LEN); decTxtLevel[decTxtCount]=curlevel; decTxtInst[decTxtCount]=parent; ++decTxtCount; } else DualLogError("Too many inline text decals\n"); }
+            if (pd->anchor != 0 || pd->align != 0 || pd->lineSp != 1.0f) { if (decStyleCnt < DECAL_STYLE_MAX) { decalStyles[decStyleCnt]=(DecalStyle){curlevel,parent,pd->anchor,pd->align,pd->lineSp}; ++decStyleCnt; } else DualLogError("Too many decal styles\n"); } } }
         par->panelItemPos=src->panelItemPos; par->panelItemRot=src->panelItemRot; par->targetnameIdx=src->targetnameIdx; par->targetIfFalseIdx=src->targetIfFalseIdx; par->questBitID=src->questBitID; par->lockedTargetIdx=src->lockedTargetIdx; par->deferredIoflags=src->deferredIoflags; par->deferredIoflagsHi=src->deferredIoflagsHi; par->useQuestKeycode1=src->useQuestKeycode1; par->useQuestKeycode2=src->useQuestKeycode2;
         par->questTestMode=src->questTestMode; par->branchOnSecond=src->branchOnSecond; par->relayEnabled=src->relayEnabled;
         par->relayOnceEver=src->relayOnceEver; par->relayAlreadyDone=src->relayAlreadyDone; par->startPosition=src->startPosition; par->targetPosition=src->targetPosition; par->funcState=src->funcState; par->speed=src->speed; par->codeScreen=src->codeScreen;
@@ -671,7 +671,8 @@ void FuncWallInitAfterLoad(u16 i) {
 }
 void LogicTimerInitBeforeLoad(u16 i) { Entity* e = &World.instances[i]; if (e->timeInterval <= 0.0f) { e->timeInterval = 0.35f; } if (e->randomMin <= 0.0f) { e->randomMin = 5.0f; } if (e->randomMax <= 0.0f) { e->randomMax = 10.0f; } e->intervalFinished = World.pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval); }
 u16 DoorFrameFromProgress(AnimationClip c, float t) { if(c.frameEnd <= c.frameStart){return c.frameStart;} u16 span = c.frameEnd - c.frameStart; return (u16)(c.frameStart + (u16)(vclamp(t,0.0f,1.0f) * (float)span + 0.5f)); }
-extern u16 npcCountInWorldPerType[NUM_AI_TYPES]; extern i16 targetIDText[INSTANCE_CNT]; extern double targetIDTextFinished[INSTANCE_CNT],targetIDAttachedFinished[INSTANCE_CNT]; extern bool targetIDAttached[INSTANCE_CNT];
+extern u32 levelCamViewTextures[14][64]; extern u16 npcCountInWorldPerType[NUM_AI_TYPES]; extern i16 targetIDText[INSTANCE_CNT]; extern double targetIDTextFinished[INSTANCE_CNT],targetIDAttachedFinished[INSTANCE_CNT]; extern bool targetIDAttached[INSTANCE_CNT]; extern CamView camViews[64],levelCamViews[14][64]; extern u8 levelCamViewCount[14];
+void PSysAddLevelLoops() { for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { u16 type; switch (World.instances[i].index) { case 720: type = 7; break; case 733: type = 45; break; case 734: type = 47; break; default: continue; } const PSysDef *preset = PSysTypeGet(type); if (!preset) continue; PSysDef def = *preset; def.pos = World.position[i]; def.rotation = World.rotation[i]; PSysAddInternal(&def,U16_MAX,U16_MAX); } }
 void LoadAllLevels() {
     double start_time = get_time(); RenderLoading("Loading level data..."); World.levelCurrentlyLoading = true; ioNameCount=1; ioNames[0][0]='\0';
     size_t larsz = INSTANCE_CNT*sizeof(Entity) + INSTANCE_CNT*sizeof(V3) + INSTANCE_CNT*sizeof(V3) + INSTANCE_CNT*sizeof(Quaternion) + INSTANCE_CNT*sizeof(V3) + INSTANCE_CNT*sizeof(V3) + LIGHT_CNT*sizeof(Light) + LIGHT_CNT*sizeof(LightAnimation); entsFromFile = OS_Alloc(larsz);
@@ -699,55 +700,50 @@ void LoadAllLevels() {
         OS_Free(fbuf,(size_t)fsize);
         for (int i = 0; i < World.loadedLights; ++i) World.lightsNewPosition[i] = World.lights[i].pos;
         for (int i = PLAYER1; i < World.instCount; ++i) {
-            i32 cellIdx = PosGetCellCoords(World.position[i].x, World.position[i].z); World.instances[i].cellIndex = cellIdx; World.instances[i].cellX = PosGetCellCoordX(World.position[i].x); World.instances[i].cellZ = PosGetCellCoordZ(World.position[i].z);
-            u16 mi = World.instances[i].modelIndex; World.radius[i] = ((mi < mdlsCnt && modelBounds[mi] > 0.0f) ? modelBounds[mi] : 2.56f) * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z); World.instances[i].shadRadius = World.radius[i] * 2.00f; World.instances[i].massScaled = true;
+            Entity* e = &World.instances[i]; i32 ci=PosGetCellCoords(World.position[i].x,World.position[i].z); e->cellIndex=ci; e->cellX = PosGetCellCoordX(World.position[i].x); e->cellZ = PosGetCellCoordZ(World.position[i].z); u16 mi=e->modelIndex; World.radius[i] = (mi < mdlsCnt && modelBounds[mi] > 0.0f ? modelBounds[mi] : 2.56f) * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z); e->shadRadius=World.radius[i] * 2.0f; e->massScaled=true;
         }
         for (int i=PLAYER1;i<World.instCount;++i) {
-            u16 constIndex = World.instances[i].index;
-            World.instances[i].hasGrav = (i == PLAYER1 || IdxIsDynamicObject(constIndex) || (IdxIsNPC(constIndex) && constIndex < 443));
+            Entity* e = &World.instances[i]; u16 constIndex = e->index; e->hasGrav = (i == PLAYER1 || IdxIsDynamicObject(constIndex) || (IdxIsNPC(constIndex) && constIndex < 443));
             if (IdxIsGeometry(constIndex)) World.layer[i] = L_Geometry;
-            else if (IdxIsUsableObject(constIndex)) {
-                if (World.diffPuz == 3 && World.instances[i].index == 361 && random_range(0.0f,1.0f) < 0.33f) DeleteInstance(i); // 33% chance of not spawning logic probes on Puzzle difficulty of 3
-            } else if (IdxIsDoor(World.instances[i].index)) {
+            else if (IdxIsUsableObject(constIndex)) { if (World.diffPuz == 3 && e->index == 361 && random_range(0.0f,1.0f) < 0.33f) DeleteInstance(i); /*33% chance of not spawning logic probes on Puzzle difficulty of 3*/ }
+            else if (IdxIsDoor(e->index)) {
                 World.layer[i] = L_Door;
-                if (World.instances[i].startOpen) World.instances[i].stayOpen = true;
-                if (World.instances[i].lockedMessageLingdex <= 0) World.instances[i].lockedMessageLingdex = 3; static const u16 doorSFXIndex[19]={75,75,71,72,73,75,71,73,71,70,70,75,75,72,75,75,75,75,75};
-                World.instances[i].SFXIndex = doorSFXIndex[World.instances[i].index-496];
-                if (World.instances[i].doorOpen > DoorState_Opening) World.instances[i].doorOpen = World.instances[i].startOpen ? DoorState_Open : DoorState_Closed;
-                World.instances[i].doorState = World.instances[i].doorOpen;
-                if (World.instances[i].ajar) {
-                    AnimationClip c = mdlAnimClips[World.instances[i].animationNum][A_OPENING]; u16 f = DoorFrameFromProgress(c,World.instances[i].ajarPercentage);
-                    World.instances[i].clip = A_OPENING; World.instances[i].frame = f; World.instances[i].modelIndex = c.frameStartModelIndex + (u16)(f - c.frameStart); World.instances[i].currentFrameFinished = 0.0; // Parked partway; UpdateAnims() holds ajar doors so it stays put.
-                    World.instances[i].doorOpen = World.instances[i].doorState = DoorState_Opening;
-                } else { switch(World.instances[i].doorOpen){case DoorState_Open:ChangeAnim(&World.instances[i],A_IDLE_OPEN); break; case DoorState_Opening:ChangeAnim(&World.instances[i],A_OPENING); break; case DoorState_Closing:ChangeAnim(&World.instances[i],A_CLOSING); break; default:ChangeAnim(&World.instances[i],A_IDLE_CLOSED); break;} }
-                if (IdxIsPortalBlockingDoor(World.instances[i].index) && World.instances[i].doorState != DoorState_Closed) ForceDoorPortalOpen(World.instances[i].portalIndex); // Open/ajar doors start with their portal open. Bounds-checked in culling.c; guard keeps non-portal doors from touching portal 0.
+                if (e->startOpen) e->stayOpen = true;
+                if (e->lockedMessageLingdex <= 0) e->lockedMessageLingdex = 3; static const u16 doorSFXIndex[19]={75,75,71,72,73,75,71,73,71,70,70,75,75,72,75,75,75,75,75};
+                e->SFXIndex = doorSFXIndex[e->index-496];
+                if (e->doorOpen > DoorState_Opening) e->doorOpen = e->startOpen ? DoorState_Open : DoorState_Closed;
+                e->doorState = e->doorOpen;
+                if (e->ajar) {
+                    AnimationClip c = mdlAnimClips[e->animationNum][A_OPENING]; u16 f = DoorFrameFromProgress(c,e->ajarPercentage);
+                    e->clip = A_OPENING; e->frame = f; e->modelIndex = c.frameStartModelIndex + (u16)(f - c.frameStart); e->currentFrameFinished = 0.0; // Parked partway; UpdateAnims() holds ajar doors so it stays put.
+                    e->doorOpen = e->doorState = DoorState_Opening;
+                } else { switch(e->doorOpen){case DoorState_Open:ChangeAnim(e,A_IDLE_OPEN); break; case DoorState_Opening:ChangeAnim(e,A_OPENING); break; case DoorState_Closing:ChangeAnim(e,A_CLOSING); break; default:ChangeAnim(e,A_IDLE_CLOSED); break;} }
+                if (IdxIsPortalBlockingDoor(e->index) && e->doorState != DoorState_Closed) ForceDoorPortalOpen(e->portalIndex); // Open/ajar doors start with their portal open. Bounds-checked in culling.c; guard keeps non-portal doors from touching portal 0.
             } else if (IdxIsSearchable(constIndex) || IdxIsNPC(constIndex)) {
-                if (World.instances[i].generateContents && !World.instances[i].generationDone) {
+                if (e->generateContents && !e->generationDone) {
                     int numRandomGeneratedItems = 0;
-                    for(int j=0;j<7;j++) {
-                        if(numRandomGeneratedItems >= World.instances[i].maxRandomItems){break;} if(World.instances[i].randomItemDropChance[j] <= 0.0f){continue;} u8 tempInt = random_range_u8(0,100); if((float)tempInt <= World.instances[i].randomItemDropChance[j]){World.instances[i].contents[numRandomGeneratedItems] = World.instances[i].randomItem[j]; World.instances[i].custIdx[numRandomGeneratedItems] = World.instances[i].randomItemCustIdx[j]; numRandomGeneratedItems++;}
-                    }
-                    World.instances[i].generationDone = true;
+                    for(int j=0;j<7;j++) { if (numRandomGeneratedItems >= e->maxRandomItems) { break; } if (e->randomItemDropChance[j] <= 0.0f) { continue; } u8 tempInt = random_range_u8(0,100); if ((float)tempInt <= e->randomItemDropChance[j]) { e->contents[numRandomGeneratedItems] = e->randomItem[j]; e->custIdx[numRandomGeneratedItems] = e->randomItemCustIdx[j]; numRandomGeneratedItems++; } }
+                    e->generationDone = true;
                 }
             } else switch (constIndex) {
-                case 21: case 22: World.instances[i].tickFinished = World.pauseRelativeTime + 2.0; World.instances[i].animSwapFinished = 0.0; break; // chunk_cyberpanel, chunk_cyberpanel_slice45
+                case 21: case 22: e->tickFinished = World.pauseRelativeTime + 2.0; e->animSwapFinished = 0.0; break; // chunk_cyberpanel, chunk_cyberpanel_slice45
                 case 515: func_forcebridge(i); break;
                 case 716: World.layer[i] = L_Trigger; break; // fx_reverbzone
                 case 697: World.layer[i] = L_NPCClip; break; // clip_npc
                 case 698: World.layer[i] = L_InterDebris; break; // clip_objects
                 case 517: FuncWallInitAfterLoad(i); break;
-                case 596: World.instances[i].strength=UsableOrDef(World.instances[i].strength,12.0f); World.instances[i].offStrengthFactor=UsableOrDef(World.instances[i].offStrengthFactor,3.0f); World.instances[i].distancePaddingToTopPoint=UsableOrDef(World.instances[i].distancePaddingToTopPoint,0.32f); break; /*trigger_gravitylift*/
+                case 596: e->strength=UsableOrDef(e->strength,12.0f); e->offStrengthFactor=UsableOrDef(e->offStrengthFactor,3.0f); e->distancePaddingToTopPoint=UsableOrDef(e->distancePaddingToTopPoint,0.32f); break; /*trigger_gravitylift*/
                 case 701: LogicTimerInitBeforeLoad(i); break;
-                case 703: World.layer[i] = L_Trigger; if (World.instances[i].teleportID < 8) { teleportDestinations[lev][World.instances[i].teleportID] = i;World.TeleportTouch_allTeleportTouches[World.instances[i].teleportID] = i; } else { DeleteInstance(i); } break; /*info_teleport_destination*/
+                case 703: World.layer[i] = L_Trigger; if (e->teleportID < 8) { teleportDestinations[lev][e->teleportID] = i;World.TeleportTouch_allTeleportTouches[e->teleportID] = i; } else { DeleteInstance(i); } break; /*info_teleport_destination*/
                 case 706: if(lev < MAX_LEVELS && elevatorDestCounts[lev] < MAX_ELEV_DESTS_PER_LEVEL) elevatorDestinations[lev][elevatorDestCounts[lev]++] = i; break;
-                case 555: CyberSwitchInitAfterLoad(i); break; // prop_cyber_switch
+                case 555: if (e->iceActive) { flag_set(&e->entflags,EF_ACTIVE,true); } break; /*prop_cyber_switch*/
                 case 480: CyberMineInitBeforeLoad(i); break;
                 case 402: World.layer[i] = L_NPC; GrenadeInit(i); break;
                 default: if (IdxIsButtonSwitch(constIndex)) ButtonSwitchInitAfterLoad(i); break;/*688..692, 694, 695: disjoint from every case above, so folding this into default preserves the old chain's order*/
             }
-            if (World.instances[i].targetnameIdx != IO_NONE && (World.instances[i].ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE)){flag_set(&World.instances[i].entflags,EF_ACTIVE,false);}
+            if (e->targetnameIdx != IO_NONE && (e->ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE)) { flag_set(&e->entflags,EF_ACTIVE,false); }
         }
-        for (int i=PLAYER1;i<World.instCount;++i){ u16 mi=World.instances[i].messageIndex; World.instances[i].messageIndex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; mi=World.instances[i].messageLingdex; World.instances[i].messageLingdex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; mi=World.instances[i].lockedMessageLingdex; World.instances[i].lockedMessageLingdex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; } // Using blank 427
+        for (int i=PLAYER1;i<World.instCount;++i) { Entity* e = &World.instances[i]; u16 mi = e->messageIndex; e->messageIndex = (mi > 0 && mi < T_LOGSTR_CNT) ? mi : 427; mi = e->messageLingdex; e->messageLingdex = (mi > 0 && mi < T_LOGSTR_CNT) ? mi : 427; mi = e->lockedMessageLingdex; e->lockedMessageLingdex = (mi > 0 && mi < T_LOGSTR_CNT) ? mi : 427; } /*Using blank 427*/
         World.levelLoadedLights[lev] = World.loadedLights; World.levelWepVModel[lev] = World.weaponVModelIndex; mcpy(levelCamViews[lev],camViews,64 * sizeof(CamView)); mcpy(levelCamViewTextures[lev],camViewTextures,64 * sizeof(u32)); levelCamViewCount[lev] = camViewCount; World.levelInstCount[lev] = World.instCount; World.levelLAnimCount[lev] = World.lanimCount; World.levelCurrentlyLoading = false;
     }
     OS_Free(entsFromFile,larsz);

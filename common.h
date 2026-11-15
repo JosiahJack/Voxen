@@ -3,66 +3,44 @@
 #define GAME_TITLE "Citadel"
 #define WIN_ICON "./Textures/UI/menudot1.png"
 #define INLINE static inline __attribute__((always_inline))
-typedef __INT8_TYPE__   i8; typedef  __UINT8_TYPE__  u8;                               /*8bit types*/
-typedef __INT16_TYPE__ i16; typedef __UINT16_TYPE__ u16; typedef u16 half;            /*16bit types*/
-typedef __INT32_TYPE__ i32; typedef __UINT32_TYPE__ u32;                              /*32bit types*/
-typedef __INT64_TYPE__ i64; typedef __UINT64_TYPE__ u64; typedef __SIZE_TYPE__ size_t;/*64bit types*/
-typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTPTR_TYPE__ intptr_t;
-#define bool u8
-#define true 1
-#define false 0
+typedef __INT8_TYPE__   i8; typedef  __UINT8_TYPE__  u8;/*8bit types*/    typedef __INT16_TYPE__ i16; typedef __UINT16_TYPE__ u16; typedef u16 half;/*16bit types*/    typedef __INT32_TYPE__ i32; typedef __UINT32_TYPE__ u32;/*32bit types*/    typedef __INT64_TYPE__ i64; typedef __UINT64_TYPE__ u64; typedef __SIZE_TYPE__ size_t;/*64bit types*/    typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTPTR_TYPE__ intptr_t;
+typedef u8 bool; enum { false = 0, true = 1 };
 #define likely(x)   __builtin_expect(!!(x),1)
 #define unlikely(x) __builtin_expect(!!(x),0)
 #define NULL ((void *)0)
 enum{U16_MAX=65535,U32_MAX=0xFFFFFFFFU,U64_MAX=0xFFFFFFFFFFFFFFFFULL};
 typedef __builtin_va_list va_list;
 extern size_t g_mmap_live; /* diagnostics (lib.c): live bytes from OS_AllocateRAM */
-typedef struct { float r,g,b; } Color3;
-typedef struct { float r,g,b,a; } Color;
-typedef struct { float x,y; } V2;
-typedef struct { float x,y,z; } V3;
-typedef struct { float x,y,z,w; } Quaternion;
+typedef struct { float r,g,b; } Color3;    typedef struct { float r,g,b,a; } Color;    typedef struct { float x,y; } V2;    typedef struct { float x,y,z; } V3;    typedef struct { float x,y,z,w; } Quaternion;    typedef struct { bool hit; V3 point, normal; float pen; } Overlap;    typedef struct { V3 mn,mx; u16 triStart; u16 triCount; i32 children[8]; } BvhNode;
 typedef u8 ColliderType;
-typedef struct { bool hit; V3 point, normal; float pen; } Overlap;
-typedef struct { V3 mn,mx; u16 triStart; u16 triCount; i32 children[8]; } BvhNode;
+typedef int (*cmpfun)(const void*,const void*),(*cmpfun_r)(const void*,const void*,void*);
 #if defined(_WIN32)
     typedef void* FHandle;
 #else
     typedef int FHandle;
 #endif
 // SIMD
-typedef float __v8sf __attribute__((__vector_size__(32)));
-typedef float __m256 __attribute__((__vector_size__(32)));
-typedef long long __m128i __attribute__((__vector_size__(16)));
-typedef __m128i __m128i_u __attribute__((__may_alias__, __aligned__(1)));
-typedef __m256 __m256_u __attribute__((__may_alias__, __aligned__(1)));
-typedef float __v4sf __attribute__((__vector_size__(16)));
-typedef int __v4si __attribute__((__vector_size__(16)));
-typedef float __m128 __attribute__((__vector_size__(16)));
-typedef __m128 __m128_u __attribute__((__may_alias__, __aligned__(1)));
+typedef float __v8sf __attribute__((__vector_size__(32)));    typedef float __m256 __attribute__((__vector_size__(32)));    typedef long long __m128i __attribute__((__vector_size__(16)));         typedef __m128i __m128i_u __attribute__((__may_alias__, __aligned__(1)));    typedef __m256 __m256_u __attribute__((__may_alias__, __aligned__(1)));    typedef float __v4sf __attribute__((__vector_size__(16)));
+typedef int __v4si __attribute__((__vector_size__(16)));      typedef float __m128 __attribute__((__vector_size__(16)));    typedef __m128 __m128_u __attribute__((__may_alias__, __aligned__(1))); typedef long long __m256i __attribute__((__vector_size__(32), __may_alias__, __aligned__(1)));
 #define _mm_storeu_si128(P, V) (*(__m128i_u *)(P) = (V))
 #define _mm_loadu_ps(P) (*(__m128_u const *)(P))
 #define _mm_set1_ps(A) ((__m128){ (A), (A), (A), (A) })
 #define _mm_setr_ps(e0,e1,e2,e3) ((__m128){ (e0), (e1), (e2), (e3) })
 #define _mm_add_ps(A, B) ((__m128)((__v4sf)(A) + (__v4sf)(B)))
 #define _mm_mul_ps(A, B) ((__m128)((__v4sf)(A) * (__v4sf)(B)))
-#define __m256i __m256i_t
-typedef long long __m256i_t __attribute__((__vector_size__(32), __may_alias__, __aligned__(1)));
 INLINE __m256i _mm256_set1_epi8_fast(char c) { __m256i v; char *p = (char*)&v; for (int i = 0; i < 32; ++i) p[i] = c; return v; }
 INLINE __m128i _mm_set1_epi8_fast(char c) { __m128i v; char *p = (char*)&v; for (int i = 0; i < 16; ++i) p[i] = c; return v; }
-typedef int (*cmpfun)(const void*,const void*);
-typedef int (*cmpfun_r)(const void*,const void*,void*);
-#define CHECK_GL_ERROR() do { u32 err = glGetError(); if (err != 0) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
 void DualLogError(const char*, ...), DualLog(const char*, ...), DualLogWarn(const char*, ...), *mcpy(void*,const void*,size_t);
+#define CHECK_GL_ERROR() do { u32 err = glGetError(); if (err != 0) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
 #define THRSTACKSZ (8 * 1024 * 1024)
 #if defined(_WIN32)
     #define DLL_IMP __declspec (dllimport)
     #define WINAPI __stdcall
     #define INVALID_FHANDLE ((void*) (i64)-1)
-    typedef struct { void* handle; } OS_Thread;    typedef i64 (WINAPI *PROC)();    typedef i64 (WINAPI *FARPROC)();    typedef i64 (WINAPI *NEARPROC)();    typedef struct { int unused; } *HINSTANCE;    typedef HINSTANCE HMODULE;    typedef struct { u32 nLength; void* lpSecurityDescriptor; i32 bInheritHandle; } *LPSECURITY_ATTRIBUTES;    typedef struct { i64 QuadPart; } LARGE_INTEGER;    typedef LARGE_INTEGER *PLARGE_INTEGER;
+    typedef struct { void* handle; } OS_Thread;    typedef struct { u32 nLength; void* lpSecurityDescriptor; i32 bInheritHandle; } *LPSECURITY_ATTRIBUTES;    typedef struct { i64 QuadPart; } LARGE_INTEGER;    typedef LARGE_INTEGER *PLARGE_INTEGER;
     DLL_IMP void* WINAPI GetStdHandle(u32);    DLL_IMP void* WINAPI CreateFileMappingA(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,const char*);    DLL_IMP i32 WINAPI VirtualFree(void*,u64,u32);    DLL_IMP void* WINAPI VirtualAlloc(void*,u64,u32,u32); DLL_IMP i32 WINAPI ReadFile(void*,void*,u32,u32*,void*);      DLL_IMP i32 WINAPI GetFileSizeEx(void*,PLARGE_INTEGER);    DLL_IMP i32 WINAPI UnmapViewOfFile(void*);
     DLL_IMP void* WINAPI CreateFileA(const char*,u32,u32,LPSECURITY_ATTRIBUTES,u32,u32,void*);                                                  DLL_IMP i32 WINAPI QueryPerformanceCounter(LARGE_INTEGER*);                                             DLL_IMP void* WINAPI MapViewOfFileEx(void*,u32,u32,u32,u64,void*);                                                       DLL_IMP i32 WINAPI WriteFile(void*,void*,u32,u32*,void*);
-    DLL_IMP i32 WINAPI CloseHandle(void*);     DLL_IMP i32 WINAPI SetFilePointerEx(void*,LARGE_INTEGER,PLARGE_INTEGER,u32);                     DLL_IMP void WINAPI GetSystemInfo(void*);         DLL_IMP HINSTANCE WINAPI LoadLibraryA(const char*);   DLL_IMP i32 WINAPI QueryPerformanceFrequency(LARGE_INTEGER*); DLL_IMP void* WINAPI MapViewOfFile(void*,u32,u32,u32,u64); DLL_IMP __declspec (noreturn) void WINAPI ExitProcess(u32);
+    DLL_IMP i32 WINAPI CloseHandle(void*);     DLL_IMP i32 WINAPI SetFilePointerEx(void*,LARGE_INTEGER,PLARGE_INTEGER,u32);                     DLL_IMP void WINAPI GetSystemInfo(void*);         DLL_IMP i32 WINAPI QueryPerformanceFrequency(LARGE_INTEGER*); DLL_IMP void* WINAPI MapViewOfFile(void*,u32,u32,u32,u64); DLL_IMP __declspec (noreturn) void WINAPI ExitProcess(u32);
     DLL_IMP void* WINAPI CreateFileMappingW(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,u16*);
     INLINE __attribute__((noreturn)) void OS_Exit(i64 exitCode) { ExitProcess((u32)exitCode); __builtin_unreachable(); }
     INLINE void OS_Close(FHandle fd) { if(fd!=INVALID_FHANDLE){CloseHandle(fd);} }
@@ -93,7 +71,6 @@ void DualLogError(const char*, ...), DualLog(const char*, ...), DualLogWarn(cons
     #define INVALID_FHANDLE -1
     typedef struct __attribute__((aligned(16))) OS_ThreadHead { void(*trampoline)(struct OS_ThreadHead*),*(*fn)(void*),*arg; int join_futex,_pad; } OS_ThreadHead;
     typedef struct { struct OS_ThreadHead* head; void* stack_base; } OS_Thread;
-    void *dlopen(const char*,int); void *dlsym(void*,const char*); INLINE long OS_Open(const char*,i32,i32);
     INLINE int OS_MakeFolder(const char* path){long r=83; __asm__ __volatile__("syscall":"+a"(r):"D"(path),"S"(0755LL):"rcx","r11","memory"); return (int)r; }
     INLINE long OS_Read(FHandle f,void*b,size_t c){long r=0; __asm__ __volatile__("syscall":"+a"(r):"D"(f),"S"(b),"d"(c):"rcx","r11","memory"); return r; }
     INLINE __attribute__((noreturn)) void OS_Exit(i64 exitCode){long r=231; __asm__ __volatile__("syscall":"+a"(r):"D"(exitCode):"rcx","r11","memory"); __builtin_unreachable(); }
@@ -195,35 +172,36 @@ enum {JOYSTICK_1=0,JOYSTICK_2=1,JOYSTICK_3=2,JOYSTICK_4=3,JOYSTICK_5=4,JOYSTICK_
 typedef struct {i32 InputCodeSettings[42]; u16 ScreenWidth,ScreenHeight; bool Fullscreen; u8 FOV,Brightness,FXAA,Shadows,Reflections,Vsync,ModelDetail,GI,SpeakerMode,Reverb,VolumeMaster,VolumeMusic,VolumeMessage,VolumeEffects,Language,DynamicMusic,Footsteps,InvertLook,InvertInventoryCycling,InvCybLook,QuickItemPickup,QuickReloadWeapons,MouseSensitivity,NoShootMode,HeadBob,SSR_RES,CurrentMonitor;} SettingsSystem; extern SettingsSystem Sys_Settings;
 typedef struct { u16 god:1,noclip:1,notarget:1,bottomless:1,superoverride:1,fatigueCheat:1,redbull:1,consoleActive:1,noHUD:1,showLocation:1,showFPS:1,showPhys:1,showNPC:1,editMode:1; u8 dizzyLevel:2,animTest:2,editSubMode:2; } CheatsSystem; extern CheatsSystem Cheats;
 typedef struct {
-        double vmailFrameFinished, tickFinished,searchFXStartTime[2],genClickTime,tWrnFinished[10]; float searchFXCursorX[2],searchFXCursorY[2]; i32 lastMultiMediaTabOpened,tWrnTextIdx[10],tWrnTextIdx2[10],tWrnTextIdx3[10],tWrnColorIdx[10],keycodeEntry,keycodeValue; u16 vmailFrame,linkedElevatorDoor,tetheredPGP,tetheredPWP,tetheredSearchable,tetheredKeypadElevator,tetheredKeypadKeycode,elevButtonSpawnIdx[8],genClickCustom,logReferenceIndex;
+        double vmailFrameFinished,tickFinished,searchFXStartTime[2],genClickTime,tWrnFinished[10],shieldAnimationStarted,shieldAnimationFinished;
+        float searchFXCursorX[2],searchFXCursorY[2];
+        i32 lastMultiMediaTabOpened,tWrnTextIdx[10],tWrnTextIdx2[10],tWrnTextIdx3[10],tWrnColorIdx[10],keycodeEntry,keycodeValue; u16 vmailFrame,linkedElevatorDoor,tetheredPGP,tetheredPWP,tetheredSearchable,tetheredKeypadElevator,tetheredKeypadKeycode,elevButtonSpawnIdx[8],genClickCustom,logReferenceIndex;
         i16 genClickItem, logFolderList[16], logReaderPage; u8 highlightTickCount[4], elevButtonLevelIdx[8], vmailActive, mfdTab[3], MFD_Data, MFD_MediaTab, MFD_ReaderView, mfdSelected[3], mfdReturnTab[3], mfdReturnView[3], mfdItemReader[2], mfdConsumable, pg_type[35], pg_gridType, pg_theme, pg_source, pg_output, pg_width, pg_height, pw_wireColor[7], logFolderCount;
         i8 elevButtonLabelIdx[8], genClickSlot, consumableClickRow, keycodeHuns, keycodeTens, keycodeOnes, pw_curL[7], pw_curR[7], pw_tgtL[7], pw_tgtR[7], pw_selectedWire, mg_current;
         u8 lastItemSideRH:1, lastAutomapSideRH:1, lastDataSideRH:1, lastSearchSideRH:1, lastMinigameSideRH:1,         logActive:1,             paperLogInUse:1/*TODO*/, mouseClickHeldOverGUI:1;
         u8 mfdGeneralItem:1,   mfdHardwareItem:1,   keycodeValid:1,    keycodeSolved:1,          pg_solved:1, pw_selectedWireRH:1, shieldAnimationIsActivate:1,                     pw_solved:1;
         u8       pg_fired:1,         firstMain:1,   firstGeneral:1,    firstHardware:1,        firstWeapon:1;
-        bool highlightStatus[4], buttonsEnabled[8], buttonsDarkened[8], searchFXActive[2], pg_cell[35], pg_powered[35], pg_checked[35], pw_wireOn[7], pw_rowActive[7], mg_running[2], autoSide[2], fullMapOpen[2]; double shieldAnimationStarted, shieldAnimationFinished; V3 objectInUsePos;
+        bool highlightStatus[4], buttonsEnabled[8], buttonsDarkened[8], searchFXActive[2], pg_cell[35], pg_powered[35], pg_checked[35], pw_wireOn[7], pw_rowActive[7], mg_running[2], autoSide[2], fullMapOpen[2];
+        V3 objectInUsePos;
 } SystemUI;
 typedef struct { const char* stringTable[T_LOGSTR_CNT]; u16 audioLogImagesRefIndicesLH[LOGCNT],audioLogImagesRefIndicesRH[LOGCNT]; u8 audioLogType[LOGCNT],audioLogLevelFound[LOGCNT]; } TextSystem;     extern TextSystem Sys_Text; extern u32 fontAtlasTex,fontAtlasTexStopD;
 typedef struct { float hitOffset,fireDistance,overheatedPercent,targetY; V3 reloadContainerHome,reloadContainerPos; bool recoiling,pendingMeleeIsRapier,pendingMeleeSilent; RaycastHit tempHit; double pendingMeleeFinished; i32 pendingMeleeWep16; u16 tempHitEnt,pendingMeleeTarget,pendingMeleeHitSnd,pendingMeleeFleshSnd; } WeaponFireCtx;
 typedef struct { // Hw referenceIndex,ref14Index::Sys 21,0 Nav 22,1 Ere 23,2 Sen 24,3 Trg 25,4 Shi 26,5 Bio 27,6 Lan 28,7 Env 29,8 Boo 30,9 Jum 31,10 Nig 32,11
-    double nitroTimeSetting, earthShakerTimeSetting, justFired, waitTilNextFire, reloadFinished, dropFinished, berserkFinished, berserkIncTime, detoxFinished, geniusFinished, mediFinished, reflexFinishedTime, sightFinishedTime, jumpJetSuckFinished, doubleJumpFinished, noiseFinished, radBleedFinished,
-           leanLTapFinished, leanRTapFinished, sightSideEffectFinishedTime, staminupFinishedTime, turboCyberTime, turboFinished, energyDrainTickFinished, painSoundFinished, radSoundFinished, fatigueBleedoffFinished, fatigueMoveFinished, footstepFinished, rustleFinished, fallPainFinished, ressurectingFinished, mediPatchPulseFinished;
+    double nitroTimeSetting,earthShakerTimeSetting,justFired,waitTilNextFire,reloadFinished,dropFinished,berserkFinished,berserkIncTime,detoxFinished,geniusFinished,mediFinished,reflexFinishedTime,sightFinishedTime,jumpJetSuckFinished,doubleJumpFinished,noiseFinished,radBleedFinished,leanLTapFinished,leanRTapFinished,sightSideEffectFinishedTime,staminupFinishedTime,turboCyberTime,turboFinished,energyDrainTickFinished,painSoundFinished,radSoundFinished,
+           fatigueBleedoffFinished,fatigueMoveFinished,footstepFinished,rustleFinished,fallPainFinished,ressurectingFinished,mediPatchPulseFinished;
     float weaponEnergySetting[16], reloadLerpValue, curWepHeat[7], fatigue, energy, currentCrouchRatio, leanTarget, crouchingVelocity, leanVelocity, lastVelY;
     u32 accessCardOwned, wepAmmo[16], wepAmmoSecondary[16];
     i32 lastAddedIndex, wepInvIndices[7], wepInvAmIndices[7], hardwareInvCurrent, genInvIdxRef[14], berserkIncrement, mediPatchPulseCount;
     i16 ladderState, wepCurPending, weaponIndexPending, wepCur;
     u16 hasHardware, hardwareIsActive, hardwareInvReferenceIndex[HW_COUNT], heldObjectIndex, heldObjectCustIdx, heldAmmo, heldAmmo2, weaponIndex, genInvCustIdx[14], patchActive, drainJPM, grenConstIndex[7];
     u8 numLogsFromLevel[10], lerpUp, hasSoft, softVersions[7], hasMinigame, numweapons, currentMagazineAmount[7], currentMagazineAmount2[7], hwVers[HW_COUNT], hwVersSetting[HW_COUNT], grenAmmo[7], grenCur, generalInvCurrent, patchCur, patchCounts[7];
+    u8      beepDone:1, hasNewEmail:1, hasNewNotes:1, isPulserNotDrill:1, overloadEnabled:1, recoiling:1,     heldObjectLoadedAlternate:1;
+    u8 holdingObject:1,  grenActive:1,  hasNewLogs:1,    radiationArea:1,    inReverbZone:1, leanResetting:1, wasGrounded:1,               makingNoise:1;
     i8 cyberItemIndex;
-    u8      beepDone:1, hasNewEmail:1, hasNewNotes:1, isPulserNotDrill:1, overloadEnabled:1,   recoiling:1,     heldObjectLoadedAlternate:1;
-    u8 holdingObject:1,  grenActive:1,  hasNewLogs:1,    radiationArea:1,    inReverbZone:1,   leanResetting:1, wasGrounded:1,               makingNoise:1;
     bool wepLoadedWithAlternate[7], staminupActive, hasLog[134], readLog[134];
 } InventorySystem;
 typedef struct { float damage, penetration, offense, defense, impactVelocity; V3 attacknormal, hitpoint; AttType attackType; u16 owner; bool isOtherNPC, berserkActive; } DamageData;
-typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData;/*For use with LiveSplit or other future speedrunner utilities for doing speedruns*/ extern AutoSplitterData autoSplitter;
+typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData;/*For use with LiveSplit or other future speedrunner utilities for doing speedruns*/
 typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width, height; float near, far, finished; bool visible; } CamView; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
-extern CamView camViews[64],levelCamViews[14][64]; extern u8 camViewCount,levelCamViewCount[14]; extern u32 camViewTextures[64],levelCamViewTextures[14][64];
-extern u8 sensaroundCamViewCenter,sensaroundCamViewLeft,sensaroundCamViewRight; void UpdateSensaroundCamViews();
 typedef struct { AttType type; float damage,range,speed,timeToActual,timeBetween,waitMin,waitMax,waitChance,projectileSpeed; bool hasLaser; int projectilePrefab; } NPCAttack;
 typedef struct { const char* name; NPCAttack attack[3]; float health,healthCyb,def; AIMoveType moveType; float yawSpeed,fov,fovStartMovement,distSeeBhnd,sightRange,walkSpeed,runSpeed,attack3Force,attack3Radius,tToPain,tBtwPain,tTillDead,tToChangeEnemy,tIdleSFXMin,tIdleSFXMax; bool explodeOnAttack3; double huntTime; float flightHt; bool flightHtIsPerc,switchMaterialOnDeath; float hearingRange,timeForTranq; bool hops; NPCType type; } NPCTable;
 extern const NPCTable npcTable[NUM_AI_TYPES];
@@ -267,28 +245,16 @@ typedef struct {
     InventorySystem invP1; SystemUI Sys_UI; MusicSystem Sys_Music; Entity levInstances[MAX_LEVELS][INSTANCE_CNT],*instances; UIComponent uiComponents[MAX_UI_ELEMENTS]; ColliderType levCol[MAX_LEVELS][INSTANCE_CNT],*col; Quaternion levRot[MAX_LEVELS][INSTANCE_CNT],*rotation; Light levLights[MAX_LEVELS][LIGHT_CNT],*lights; LightAnimation levLAnims[MAX_LEVELS][LANIM_MAX],*lanims; Color fogColor[MAX_LEVELS]; LevelParticles levParticles[MAX_LEVELS],*particles;
     char playerName[27]; const char *audiologNames[LOGCNT],*audiologSubjects[LOGCNT],*audiologSenders[LOGCNT],*audioLogSpeech2Text[LOGCNT];
 } GlobalContext; // Savable complete game state data
-extern GlobalContext World;
-extern InputSystem Sys_Input;
-extern double last_mouse_x,last_mouse_y;
-extern float modelMatrices[INSTANCE_CNT*16],**physPos,*world_from_mdl,modelBounds[MAX_MDLS],berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[MAX_SHADOWMAPS][6][4][4],lightViewProj[MAX_SHADOWMAPS][6][16];
-extern size_t cvxAdjOffsetBytes[MAX_UNIQUE_CVX_MESHES],cvxAdjListBytes[MAX_UNIQUE_CVX_MESHES];
+extern GlobalContext World;    extern InputSystem Sys_Input;    extern DecalStyle decalStyles[DECAL_STYLE_MAX];    extern AnimationClip mdlAnimClips[MAXANIM][MAX_ANIMCLIPS];    extern BvhNode** modelBVHNodes;    extern FHandle console_log_file;    extern EPerms EDefs[MAX_ENTITIES];    extern FrustumPlane playerFrustumPlanes[6];    extern const PSysDef particleTypeDefs[192];    extern WeaponFireCtx wfx;
+extern float modelMatrices[INSTANCE_CNT*16],**physPos,*world_from_mdl,modelBounds[MAX_MDLS],berserkSeedTime;
 extern u32 modelVertexCounts[MAX_MDLS],uniqueCvxMeshCount,globalframe,*physVertCounts,modelVBO,modelIBO,drawCalls,vertsRendered,voxelUpdateSP,lightsID,cellVisibleDataID,colorBufferID,texPalID,textureOffsetsID,textureSizesID,texPalOfsID,threadCnt,shadowmapIndirectionList[LIGHT_CNT],*cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES],*rtSrcVertCounts,mdlVboOfs[MAX_MDLS],mdlIboOfs[MAX_MDLS],rtCapNodeWords,rtCapTriWords,rtCapOrderU16,rtPersistNodeWords,rtPersistTriWords,
-           rtPersistOrderU16,modelBVHTriOrderCounts[MAX_MDLS],textDecalVBO[MAX_LEVELS][INSTANCE_CNT],textDecalVertexCount[MAX_LEVELS][INSTANCE_CNT],gridCellStates[ARRSIZE];
-extern u16 **modelBVHTriOrder,mdlsCnt,modelTriangleCounts[MAX_MDLS],**modelTriangles,*cvxAdjLists[MAX_UNIQUE_CVX_MESHES],cvxAdjStart[MAX_UNIQUE_CVX_MESHES],playerCellIdx,texCnt,cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX],uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES],**physTris,modelBVHNodeCounts[MAX_MDLS],headmountedLanternLight,decalInlineTextLevel[DECAL_INLINE_TEXT_MAX],decalInlineTextInst[DECAL_INLINE_TEXT_MAX],decalInlineTextCount,
-           decalStyleCount,fwParentOf[INSTANCE_CNT];
-extern u8 mdlPersistentSet[MAX_MDLS],particleBlendTexture[MAXTEX];
-extern char decalInlineText[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN],statusText[T_BUFFER_SIZE];
-extern bool cullVisibilityValid,instanceIsLODArray[INSTANCE_CNT],doubleSidedTexture[MAXTEX],transparentTexture[MAXTEX],window_has_focus,ignore_next_mouse_delta,returnToPause,mouseMovementThisFrame,firstFrameMouselook;
-extern V3 modelMin[MAX_MDLS],modelMax[MAX_MDLS],cyberSpaceEntryLocations[8],lanternPos,ressurectionLocations[];
-extern DecalStyle decalStyles[DECAL_STYLE_MAX];
-extern AnimationClip mdlAnimClips[MAXANIM][MAX_ANIMCLIPS];
-extern BvhNode** modelBVHNodes;
-extern FHandle console_log_file;
+           rtPersistOrderU16,modelBVHTriOrderCounts[MAX_MDLS],textDecalVBO[MAX_LEVELS][INSTANCE_CNT],textDecalVertexCount[MAX_LEVELS][INSTANCE_CNT],gridCellStates[ARRSIZE],random_range_rng,camViewTextures[64];
+extern u16 **modelBVHTriOrder,mdlsCnt,modelTriangleCounts[MAX_MDLS],**modelTriangles,*cvxAdjLists[MAX_UNIQUE_CVX_MESHES],cvxAdjStart[MAX_UNIQUE_CVX_MESHES],playerCellIdx,texCnt,cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX],uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES],**physTris,modelBVHNodeCounts[MAX_MDLS],headmountedLanternLight,decTxtLevel[DECAL_INLINE_TEXT_MAX],decTxtInst[DECAL_INLINE_TEXT_MAX],decTxtCount,decStyleCnt,fwParentOf[INSTANCE_CNT];
+extern u8 mdlPersistentSet[MAX_MDLS],particleBlendTexture[MAXTEX],camViewCount,sensaroundCamViewCenter,sensaroundCamViewLeft,sensaroundCamViewRight; void UpdateSensaroundCamViews();
+extern char decTxt[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN],statusText[T_BUFFER_SIZE];
 extern const char *audioLogs[LOGCNT],*sounds[SOUNDS_COUNT];
-extern EPerms EDefs[MAX_ENTITIES];
-extern FrustumPlane lightFrustumPlanes[MAX_SHADOWMAPS][6][6],playerFrustumPlanes[6];
-extern const PSysDef particleTypeDefs[192];
-extern WeaponFireCtx wfx;
+extern bool cullVisibilityValid,instanceIsLODArray[INSTANCE_CNT],doubleSidedTexture[MAXTEX],transparentTexture[MAXTEX];
+extern V3 modelMin[MAX_MDLS],modelMax[MAX_MDLS],cyberSpaceEntryLocations[8],ressurectionLocations[];
 // Math, Vectors, Quaternions
 #define vabs(x) ((x) < 0 ? -(x) : (x))
 #define vmin(a,b) ((a) < (b) ? (a) : (b))
@@ -371,6 +337,13 @@ INLINE void hudColorToRGB(u8 hud, float* r, float* g, float* b) { float inv=1.0f
     *r*=inv; *g*=inv; *b*=inv;
 }
 INLINE u8 hudColorToText(u8 hud) { switch (hud) { case HUDC_WHITE:return T_WHITE; case HUDC_RED:return T_RED; case HUDC_ORANGE:return T_ORANGE; case HUDC_YELLOW:return T_YELLOW; case HUDC_GREEN:return T_GREEN; case HUDC_BLUE:return T_BLUE; case HUDC_PURPLE:return T_PURPLE; default:return T_RED; } }
+INLINE void flag_setu16(u16 *flags, u16 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
+INLINE void flag_set(u32 *flags, u32 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
+INLINE bool BvhHasBVH(u16 m) { return (m < MAX_MDLS && modelBVHNodeCounts[m] && modelBVHNodes[m] != NULL); }
+INLINE float fast_atof(const char** p) { const char* c=*p; while (*c == ' ' || *c == '\t') {c++;} float s=1.0f; if(*c == '-'){s=-1.0f; c++;} float v=0.0f; while (*c >= '0' && *c <= '9') { v=v * 10.0f + (*c - '0'); c++; } if (*c == '.') { c++; float sub=0.1f; while (*c >= '0' && *c <= '9') { v += (*c - '0') * sub; sub*=0.1f; c++; } } *p=c; return s * v; }
+INLINE i32 fast_atoi(const char** p) { const char* c = *p; while (*c == ' ' || *c == '\t') {c++;} i32 s=1; if(*c == '-'){s=-1; c++;} i32 v = 0; while (*c >= '0' && *c <= '9') { v = v * 10 + (*c - '0'); c++; } *p = c; return v * s; }
+INLINE i32  mcmp(const void *s1, const void *s2, size_t n) { const u8 *p1 = (const u8 *)s1; const u8 *p2 = (const u8 *)s2; while (n--) { if (*p1 != *p2) {return *p1 - *p2;} p1++; p2++; } return 0; }/*memcmp replacement*/
+INLINE void* mmov(void *dst, const void *src, size_t n) { u8 *d = (u8*)dst; const u8* s = (const u8*)src; if (d < s) { while (n--) { *d++ = *s++; } } else if (d > s) { d += n; s += n; while (n--) { *--d = *--s; } } return dst; }/*memmove replacement*/
 enum{GL_ARRAY_BUFFER=0x8892,GL_DEPTH_BUFFER_BIT=0x100,GL_READ_WRITE=0x88BA,GL_SSBO=0x90D2,GL_CULL_FACE=0xB44,GL_BLEND=0xBE2,GL_DEPTH_TEST=0xB71,GL_RGB=0x1907,GL_TEXTURE0=0x84C0,GL_COLOR_ATTACHMENT0=0x8CE0,GL_RG16F=0x822F,GL_TEXTURE1=0x84C1,GL_TEXTURE6=0x84C6,GL_COLOR_ATTACHMENT1=0x8CE1,GL_ELEMENT_ARRAY_BUFFER=0x8893,GL_TEXTURE2=0x84C2,GL_TEXTURE_2D=0xDE1,GL_COLOR_ATTACHMENT2=0x8CE2,GL_FALSE=0,GL_RGBA=0x1908,GL_TEXTURE3=0x84C3,GL_UNSIGNED_BYTE=0x1401,
      GL_FLOAT=0x1406,GL_TEXTURE4=0x84C4,GL_FRAMEBUFFER=0x8D40,GL_READ_FRAMEBUFFER=0x8CA8,GL_DRAW_FRAMEBUFFER=0x8CA9,GL_LINEAR=0x2601,GL_UNSIGNED_SHORT=0x1403,GL_RGBA8=0x8058,GL_COLOR_BUFFER_BIT=0x4000,GL_STATIC_DRAW=0x88E4,GL_DYNAMIC_DRAW=0x88E8,GL_TRIANGLE_STRIP=0x5,GL_LESS=0x201,GL_LEQUAL=0x203,GL_ONE=1,GL_SRC_ALPHA=0x302,GL_ONE_MINUS_SRC_ALPHA=0x303,GL_DST_COLOR=0x306,GL_ZERO=0,GL_TRUE=1,GL_DEPTH_COMPONENT24=0x81A6,
      GL_DEPTH_COMPONENT=0x1902,GL_UNSIGNED_INT=0x1405,GL_R32UI=0x822E,GL_RED_INTEGER=0x8D94,GL_TEXTURE_MIN_FILTER=0x2801,GL_TEXTURE_MAG_FILTER=0x2800,GL_TEXTURE_WRAP_S=0x2802,GL_TEXTURE_WRAP_T=0x2803,GL_CLAMP_TO_BORDER=0x812D,GL_TEXTURE_BORDER_COLOR=0x1004,GL_TEXTURE_COMPARE_MODE=0x884C,GL_COMPARE_REF_TO_TEXTURE=0x884E,GL_TEXTURE_COMPARE_FUNC=0x884D,GL_DEPTH_ATTACHMENT=0x8D00,GL_TEXTURE10=0x84CA,GL_ACTIVE_TEXTURE=0x84E0};
@@ -381,34 +354,24 @@ typedef void(*FGL_E)(u32), (*FGL_DF)(u32),(*FGL_LP)(u32),  (*FGL_GB)(i32,u32*), 
 typedef void(*FGL_UP)(u32),(*FGL_D)(u32), (*FGL_DM)(bool), (*FGL_LW)(float),    (*FGL_GIV)(u32,i32*),(*FGL_U1UI)(i32,u32),  (*FGL_GSIV)(u32,u32,i32*),  (*FGL_VAF)(u32,i32,u32,bool,u32),  (*FGL_UM3FV)(i32,i32,bool,const float*), (*FGL_U3F)(i32,float,float,float),              (*FGL_U2F)(i32,float,float);
 typedef u32(*FGL_CP)(), (*FGL_GERR)(), (*FGL_CRS)(u32); typedef bool(*FGL_UB)(u32); typedef void(*FGL_GIQ)(i32,u32*),(*FGL_GQOU64)(u32,u32,u64*); typedef void(*FGL_DAI)(u32,i32,i32,i32); typedef void(*FGL_BF)(i32,i32,i32,i32,i32,i32,i32,i32,u32,u32); typedef void(*FGL_GTKP)(u32,i32,u32,i32*); typedef void(*FGL_CISD)(u32,u32,i32,i32,i32,i32,u32,u32,i32,i32,i32,i32,i32,i32,i32);
 typedef void(*FGL_BQ)(u32,u32); extern FGL_BQ glBeginQuery; extern FGL_D glEndQuery; typedef void(*FGL_CBSD)(u32,u32,intptr_t,intptr_t,size_t); extern FGL_CBSD glCopyBufferSubData; typedef void(*FGL_CLBSD)(u32,u32,intptr_t,intptr_t,u32,u32,const void*);    typedef void(*FGL_BBR)(u32,u32,u32,intptr_t,size_t);    typedef void(*FGL_GBSD)(u32,intptr_t,size_t,void*);
-extern FGL_GTKP glGetTexLevelParameteriv; extern FGL_BF glBlitFramebuffer; extern FGL_T2D glTexSubImage2D; extern FGL_BFB glBindFramebuffer; extern FGL_GFS glGenFramebuffers; extern FGL_FBT2D glFramebufferTexture2D; extern FGL_GT glGenTextures; extern FGL_T2D glTexImage2D;
-extern u32 uiFBO; void GenerateAndBindTexture(u32*,i32,i32,i32,u32,u32,i32,u8*),EnsureReflectionResources(),QueueVideoFrame(u32,bool),QueueVideoFrame(u32,bool),ParseAllModels(),LoadModels(),LoadPerLevelModels(u8),RtSwapPatchModels(),MdlBuildLevelConvexAdjacency(u8); bool EntIsLodCardConst(u16); u32 VideoFrameTexIndex(u32),VideoPeekFrame(u32);
-extern FGL_GB glGenBuffers; extern FGL_BB glBindBuffer; extern FGL_BD glBufferData; extern FGL_UB glUnmapBuffer; extern FGL_MBR glMapBufferRange; extern FGL_U2F glUniform2f; extern FGL_U1F glUniform1f; extern FGL_U1UI glUniform1ui; extern FGL_UP glUseProgram; extern FGL_RP glReadPixels; extern FGL_U3F glUniform3f; extern FGL_DC glDispatchCompute; extern FGL_DA glDrawArrays; extern FGL_MB glMemoryBarrier;
-extern FGL_AT glActiveTexture; extern FGL_BVA glBindVertexArray; extern FGL_U1I glUniform1i; extern FGL_E glEnable; extern FGL_U4F glUniform4f; extern FGL_BT glBindTexture; extern FGL_GERR glGetError; extern FGL_GVA glGenVertexArrays; extern FGL_VAF glVertexAttribFormat; extern FGL_VAB glVertexAttribBinding;
-extern FGL_EVAA glEnableVertexAttribArray; extern FGL_BVB glBindVertexBuffer; extern FGL_BSD glBufferSubData; extern FGL_UM4FV glUniformMatrix4fv; extern FGL_DM glDepthMask; extern FGL_DF glDepthFunc; extern FGL_D glDisable; extern FGL_LW glLineWidth; extern FGL_GIQ glGenQueries; extern FGL_GQOU64 glGetQueryObjectui64v; extern FGL_DAI glDrawArraysInstanced; extern FGL_TPFV glTexParameterfv;
+extern FGL_BF glBlitFramebuffer; extern FGL_T2D glTexSubImage2D;   extern FGL_BFB glBindFramebuffer;     extern FGL_GFS glGenFramebuffers; extern FGL_FBT2D glFramebufferTexture2D;   extern FGL_GT glGenTextures;              extern FGL_T2D glTexImage2D;       extern FGL_GB glGenBuffers;     extern FGL_BB glBindBuffer;          extern FGL_BD glBufferData;    extern FGL_UB glUnmapBuffer;      extern FGL_MBR glMapBufferRange; extern FGL_GIQ glGenQueries;
+extern FGL_U2F glUniform2f;      extern FGL_U1F glUniform1f;       extern FGL_U1UI glUniform1ui;         extern FGL_UP glUseProgram;       extern FGL_GQOU64 glGetQueryObjectui64v;   extern FGL_U3F glUniform3f;               extern FGL_DC glDispatchCompute;   extern FGL_DA glDrawArrays;     extern FGL_MB glMemoryBarrier;       extern FGL_AT glActiveTexture; extern FGL_BVA glBindVertexArray; extern FGL_U1I glUniform1i;      extern FGL_E glEnable;
+extern FGL_U4F glUniform4f;      extern FGL_BT glBindTexture;      extern FGL_GERR glGetError;           extern FGL_GVA glGenVertexArrays; extern FGL_VAF glVertexAttribFormat;       extern FGL_VAB glVertexAttribBinding;     extern FGL_BVB glBindVertexBuffer; extern FGL_BSD glBufferSubData; extern FGL_UM4FV glUniformMatrix4fv; extern FGL_DM glDepthMask;     extern FGL_DF glDepthFunc;        extern FGL_D glDisable;
+extern FGL_LW glLineWidth;       extern FGL_TPFV glTexParameterfv; extern FGL_DAI glDrawArraysInstanced; extern FGL_RP glReadPixels;       extern FGL_EVAA glEnableVertexAttribArray; extern FGL_GTKP glGetTexLevelParameteriv;
 extern FGL_F glFinish; extern FGL_BBB glBindBufferBase; extern FGL_BB glBlendFunc; extern FGL_CLBSD glClearBufferSubData; extern FGL_CISD glCopyImageSubData; extern FGL_CPIV glGetBufferParameteriv; extern FGL_GBSD glGetBufferSubData; extern FGL_GB glDeleteBuffers; extern FGL_BBR glBindBufferRange;
-INLINE void flag_setu16(u16 *flags, u16 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
-INLINE void flag_set(u32 *flags, u32 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
-INLINE bool BvhHasBVH(u16 m) { return (m < MAX_MDLS && modelBVHNodeCounts[m] && modelBVHNodes[m] != NULL); }
-INLINE float fast_atof(const char** p) { const char* c=*p; while (*c == ' ' || *c == '\t') {c++;} float s=1.0f; if(*c == '-'){s=-1.0f; c++;} float v=0.0f; while (*c >= '0' && *c <= '9') { v=v * 10.0f + (*c - '0'); c++; } if (*c == '.') { c++; float sub=0.1f; while (*c >= '0' && *c <= '9') { v += (*c - '0') * sub; sub*=0.1f; c++; } } *p=c; return s * v; }
-INLINE i32 fast_atoi(const char** p) { const char* c = *p; while (*c == ' ' || *c == '\t') {c++;} i32 s=1; if(*c == '-'){s=-1; c++;} i32 v = 0; while (*c >= '0' && *c <= '9') { v = v * 10 + (*c - '0'); c++; } *p = c; return v * s; }
-INLINE i32  mcmp(const void *s1, const void *s2, size_t n) { const u8 *p1 = (const u8 *)s1; const u8 *p2 = (const u8 *)s2; while (n--) { if (*p1 != *p2) {return *p1 - *p2;} p1++; p2++; } return 0; }/*memcmp replacement*/
-INLINE void* mmov(void *dst, const void *src, size_t n) { u8 *d = (u8*)dst; const u8* s = (const u8*)src; if (d < s) { while (n--) { *d++ = *s++; } } else if (d > s) { d += n; s += n; while (n--) { *--d = *--s; } } return dst; }/*memmove replacement*/
-void SpawnBeamTrail(u16,V3,V3,Color),ProjectileEffectImpactOnCollision(u16,u16,V3,V3),ProjectileEffectImpactInitAfterLoad(u16),SpawnProjectileImpactParticles(u16,V3,V3),DrawSphereWireframe(Color,ShapeSphere),BioMonitorClearGraphs(),BioMonitorAlignCursors(),CyberSwitchInitAfterLoad(u16),
-     synth_set_reverb_preset(u16),MFD_ResetGeneral(),PSysAddLevelLoops(),PSysClearLevel(u8),PlayTrack(TrackType,MusicType),AutomapTick(),AutomapNewGame(),AutomapOnLoad(),ApplyImpactForceSphere(DamageData*,V3,float,float),UseTargets(u16,u16),AddForce(u16,V3,bool),TriggerTrippedUpdate(u16),CyberItemOnTriggerEnter(u16,u16),CyberMineOnTriggerEnter(u16,u16),CenterStatusPrint(const char * restrict fmt, ...),GameEndSequence(),GameDeathSequence(),
-     DebugRAMActual(const char*),DebugRAMPeak(),play_wav(const char*,float,V3,bool),play_wav_ext(const char*,float,V3,bool,float),play_message(const char*),PlaySparkSound(V3),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),MenuGoBack(),GoIntoGame(),ScreenShake(),TakeEnergy(float),CreateTargetIDInstance(float,u16,float),InputProcessing(),LoadAllLevels(),DrawLine(V3,V3,Color),ForceInventoryMode(),ForceShootMode(),
-     PlayVmail(u8),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),UpdateLights(),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),LoadTextForLanguage(u8),RenderTextL(i16,i16,u32,u8,float,const char* restrict,...),RenderTextC(i16,i16,u32,u8,float,const char* restrict,...),RenderText3DC(V3,u32,u8,float,const char* restrict,...),BuildTextDecalMeshes(),CullCore(),PngArenaInit(PngArena*),
-     AppendTextWarning(i32,i32,i32,i32,i32),ChangeAnim(Entity*,u8),ForceDoorPortalOpen(u16),QuestBitSet(u8),QuestBitClear(u8),QuestBitToggle(u8),SpawnManagerActivate(u16,bool),SpawnManagerUpdate(u16),DualLog(const char*, ...),DualLogWarn(const char*, ...),DualLogError(const char*, ...),CenterStatusPrint(const char* restrict, ...),Screenshot(),qsort_new(void*,size_t,size_t,cmpfun),double2str(char*,double,i32,size_t),
-     scpy_to_a_from_b(char*,const char*,size_t),sCpy2aSubFromb(char*,size_t,const char*,size_t),UI_PuzzleGridClose(),UI_BlockedClose(),PGEvalPuzzle(),*mcpy(void*,const void*,size_t),*mset(void*,i32,size_t),*OS_AllocScratch(size_t),OS_FreeInitPhase(),ai_effect_flash(V3,Color3,float,float,double);
-double get_time();
-float Tranquilize(u16,float,bool),TakeDamage(u16,DamageData),MeasureLineAdvance(const char*,u8),lerp(float,float,float),inverse_lerp(float,float,float),random_range(float,float);
-size_t AudioLiveBytes(),slen(const char*);
-u32 parse_numberu32(const char*, const char*,u32),rand(),random_range_u32(u32,u32),PosGetCellCoordsP(i32,i32);
-i32 sFormatV(char*,size_t,const char*,va_list),sFormat(char*,size_t,const char*,...),PosGetCellCoordX(float),PosGetCellCoordZ(float),PosGetCellCoords(float,float),sCompUpToLen(const char*, const char*,size_t),s2i32(const char*);
-u16 parse_numberu16(const char*, const char*,u32),AddInstance(u16,V3),SpawnDynamicObject(i32),GetCursorTexture(),DoorFrameFromProgress(AnimationClip,float),PSysAddInternal(const PSysDef*,u16,u16),EditModePickLight(V3,V3,float,float*);
+void SpawnBeamTrail(u16,V3,V3,Color),ProjectileEffectImpactOnCollision(u16,u16,V3,V3),ProjectileEffectImpactInitAfterLoad(u16),SpawnProjectileImpactParticles(u16,V3,V3),DrawSphereWireframe(Color,ShapeSphere),BioMonitorClearGraphs(),synth_set_reverb_preset(u16),PSysClearLevel(u8),PlayTrack(TrackType,MusicType),AutomapOnLoad(),ApplyImpactForceSphere(DamageData*,V3,float,float),UseTargets(u16,u16),AddForce(u16,V3,bool),
+     TriggerTrippedUpdate(u16),CyberItemOnTriggerEnter(u16,u16),CenterStatusPrint(const char * restrict fmt,...),GameEndSequence(),GameDeathSequence(),play_wav(const char*,float,V3,bool),play_wav_ext(const char*,float,V3,bool,float),play_message(const char*),PlaySparkSound(V3),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),ScreenShake(),TakeEnergy(float),CreateTargetIDInstance(float,u16,float),LoadAllLevels(),
+     DrawLine(V3,V3,Color),ForceInventoryMode(),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),LoadTextForLanguage(u8),RenderTextL(i16,i16,u32,u8,float,const char* restrict,...),RenderTextC(i16,i16,u32,u8,float,const char* restrict,...),RenderText3DC(V3,u32,u8,float,const char* restrict,...),BuildTextDecalMeshes(),CullCore(),PngArenaInit(PngArena*),
+     ChangeAnim(Entity*,u8),ForceDoorPortalOpen(u16),QuestBitSet(u8),QuestBitClear(u8),QuestBitToggle(u8),CenterStatusPrint(const char* restrict, ...),Screenshot(),qsort_new(void*,size_t,size_t,cmpfun),scpy_to_a_from_b(char*,const char*,size_t),sCpy2aSubFromb(char*,size_t,const char*,size_t),UI_PuzzleGridClose(),UI_BlockedClose(),PGEvalPuzzle(),*mcpy(void*,const void*,size_t),*mset(void*,i32,size_t),*OS_AllocScratch(size_t),OS_FreeInitPhase(),
+     ai_effect_flash(V3,Color3,float,float,double),GenerateAndBindTexture(u32*,i32,i32,i32,u32,u32,i32,u8*),EnsureReflectionResources(),QueueVideoFrame(u32,bool),QueueVideoFrame(u32,bool),ParseAllModels(),LoadModels(),LoadPerLevelModels(u8),RtSwapPatchModels(),MdlBuildLevelConvexAdjacency(u8);
+float Tranquilize(u16,float,bool),TakeDamage(u16,DamageData),MeasureLineAdvance(const char*,u8),random_range(float,float);
+size_t slen(const char*);
+u32 parse_numberu32(const char*, const char*,u32),random_range_u32(u32,u32),VideoFrameTexIndex(u32),VideoPeekFrame(u32);
+i32 sFormatV(char*,size_t,const char*,va_list),sFormat(char*,size_t,const char*,...),PosGetCellCoordX(float),PosGetCellCoordZ(float),PosGetCellCoords(float,float),sCompUpToLen(const char*, const char*,size_t);
+u16 parse_numberu16(const char*, const char*,u32),AddInstance(u16,V3),SpawnDynamicObject(i32),DoorFrameFromProgress(AnimationClip,float),PSysAddInternal(const PSysDef*,u16,u16),EditModePickLight(V3,V3,float,float*);
 u8 parse_numberu8(const char*, const char*,u32),GetCurrentLevelSecurity(),*PngLoad(const u8*,i32,i32*,i32*,PngArena*),random_range_u8(u8,u8);
-bool parse_bool(const char*, const char*,u32),CapsuleTouchesOBB(V3,float,ShapeBox),AreaHasClearance(ShapeCapsule,ShapeCapsule,float,u32,u16),PositionVisibleFromPlayerCell(float,float),FrobHeldItemIntoPanel(V3,V3,V3),HudHeatTickOn(i32),VidMenuKeyArmed(),QuestBitIsSet(u8),PlayerIsMoving(),Forward(),StrafeLeft(),Backpedal(),StrafeRight(),Jump(),JumpDown(),Crouch(),Prone(),LeanLeft(),Sprint(),DoubleTapLeanLeft(),LeanRight(),DoubleTapLeanRight(),Attack(),
-     Use(),Menu(),Reload(),Grenade(),GrenCycUp(),GrenCycDn(),ChangeAmmoType(),Patch(),PatchCycUp(),PatchCycDown(),Console(),NeighborhoodInPVS(u16,u16,u8),AICheckPain(u16),SkyIsVisible(),SkySunIsVisible(),HasHealth(u16),GetKey(i32),cEmpty(const char),sEqual(const char*,const char*),SpawnImpactParticleForPrefab(u16,V3,V3);
-char *StringFindFirstCharWithin(const char*,char),*data_parser_trim(char*),c2Lower(const char),*sFindSub(const char*,const char*),*StringFindFirstCharWithin(const char*,char),*sUpToEndLine(char*,i32,FHandle);
+bool parse_bool(const char*, const char*,u32),CapsuleTouchesOBB(V3,float,ShapeBox),AreaHasClearance(ShapeCapsule,ShapeCapsule,float,u32,u16),PositionVisibleFromPlayerCell(float,float),FrobHeldItemIntoPanel(V3,V3,V3),HudHeatTickOn(i32),QuestBitIsSet(u8),PlayerIsMoving(),NeighborhoodInPVS(u16,u16,u8),AICheckPain(u16),HasHealth(u16),GetKey(i32),GetKeyPressed(int),cEmpty(const char),sEqual(const char*,const char*),SpawnImpactParticleForPrefab(u16,V3,V3),
+     EntIsLodCardConst(u16);
+char *StringFindFirstCharWithin(const char*,char),*sFindSub(const char*,const char*),*StringFindFirstCharWithin(const char*,char);
 const char *JumpSound(FootStepType),*JumpLandSound(FootStepType),*StringFindLastChar(const char*,const char);
 RaycastHit Raycast(V3,V3,float,u32);    RaycastHit RaycastEditPick(V3,V3,float,u32);    V3 ScreenPointToRay(V3,V3),ScreenPointToRayPixels(V3,V3,float,float);    ShapeBox Entity_GetBox(u16);    ShapeCapsule Entity_GetCap(u16);    ShapeSphere Entity_GetSph(u16);    FootStepType GetFootstepTypeForPrefab(i32);    PSysDef* PSysTypeGet(u16);    Quaternion quat_look_rotation(V3,V3);
