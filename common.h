@@ -167,7 +167,7 @@ typedef struct { const u16 *frames; u8 length; const u16 *glowFrames; u8 glowLen
 #define LMASK_EXPLOSION             (L_Default|L_Geometry|L_NPC|L_PlayerBullets|L_Door|L_InterDebris|L_PhysObjects|L_Player|L_Player2|L_CorpseSearchable|L_Corpse)
 #define LMASK_PLAYER_FEET           (L_Default|L_Geometry)
 typedef struct {i32 InputCodeSettings[42]; u16 ScreenWidth,ScreenHeight; bool Fullscreen; u8 FOV,Brightness,FXAA,Shadows,Reflections,Vsync,ModelDetail,GI,SpeakerMode,Reverb,VolumeMaster,VolumeMusic,VolumeMessage,VolumeEffects,Language,DynamicMusic,Footsteps,InvertLook,InvertInventoryCycling,InvCybLook,QuickItemPickup,QuickReloadWeapons,MouseSensitivity,NoShootMode,HeadBob,SSR_RES,CurrentMonitor;} SettingsSystem; extern SettingsSystem Sys_Settings;
-typedef struct { u16 god:1,noclip:1,notarget:1,bottomless:1,superoverride:1,fatigueCheat:1,redbull:1,consoleActive:1,noHUD:1,showLocation:1,showFPS:1,showPhys:1,showNPC:1,editMode:1; u8 dizzyLevel:2,animTest:2,editSubMode:2; } CheatsSystem; extern CheatsSystem Cheats;
+typedef struct { u16 god:1,noclip:1,notarget:1,bottomless:1,superoverride:1,fatigueCheat:1,redbull:1,consoleActive:1,noHUD:1,showLocation:1,showFPS:1,showPhys:1,showNPC:1,editMode:1,stepmode:1; u8 dizzyLevel:2,animTest:2,editSubMode:2; } CheatsSystem; extern CheatsSystem Cheats;
 typedef struct {
         double vmailFrameFinished,tickFinished,searchFXStartTime[2],genClickTime,tWrnFinished[10],shieldAnimationStarted,shieldAnimationFinished;
         float searchFXCursorX[2],searchFXCursorY[2];

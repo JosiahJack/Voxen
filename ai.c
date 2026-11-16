@@ -307,6 +307,7 @@ static void AIDead(u16 idx) {
     else if (World.instances[idx].index == 419) { DeleteInstance(idx); } /*Autobomb removes self*/
     else if (npcID < NUM_AI_TYPES && npcGibRanges[npcID].first != 0) {
         NPCGibRange range = npcGibRanges[npcID]; V3 gibPos = World.position[idx]; Quaternion gibRot = World.rotation[idx];
+        if (World.instances[idx].index == 437) { float servHalf = (180.0f + -99.0f/*gibs are oriented different from the parent*/) * (PI / 180.0f) * 0.5f; Quaternion servYaw = {0.0f,vsinf(servHalf),0.0f,vcosf(servHalf)}; gibRot = quat_multiply(servYaw,gibRot); V3 rightVec = quat_rot_v3(gibRot,(V3){1.0f,0.0f,0.0f}); gibPos = V3Add(gibPos,V3_ScaleByF(rightVec,0.16f)); }
         for (u16 gibConst=range.first;gibConst<=range.last;++gibConst) {
             u16 gib = SpawnDynamicObject(gibConst); if (!EntIdxIsValid(gib) || gib == idx) continue;
             World.position[gib] = gibPos; World.rotation[gib] = gibRot; World.velocity[gib] = (V3){0.0f, World.velocity[idx].y, 0.0f}; World.instances[gib].hasGrav = true;             World.layer[gib] = L_Corpse;
