@@ -14,7 +14,7 @@ void main() {
     // Premultiplied output throughout: the trail batch draws with glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA), so
     // rgb is already scaled by its own alpha.  For the default mode this is algebraically identical to the old
     // straight-alpha texColor*vColor under glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA).
-    if (vBlendMode == 1u) { outColor = vec4(texColor.rgb * vColor.rgb * vColor.a, texColor.a * vColor.a); return; } // Additive (brightness-as-alpha, adds to scene)
+    if (vBlendMode == 1u) { outColor = vec4(texColor.rgb * vColor.rgb * vColor.a * texColor.a, texColor.a * vColor.a); return; } // Additive (brightness-as-alpha, adds to scene)
     if (vBlendMode == 3u) { float blackAsAlpha = max(max(texColor.r, texColor.g), texColor.b); outColor = vec4(texColor.rgb * vColor.rgb, blackAsAlpha * vColor.a); return; }
-    outColor = vec4(texColor.rgb * vColor.rgb * vColor.a, texColor.a * vColor.a);
+    outColor = vec4(texColor.rgb * vColor.rgb * vColor.a * texColor.a, texColor.a * vColor.a);
 }
