@@ -444,7 +444,7 @@ InputElement inputElements[134]={{"A",KEY_A},{"B",KEY_B},{"C",KEY_C},{"D",KEY_D}
                                  {"TAB",KEY_TAB},{"NUMENTER",KEY_KP_ENTER},{"ESCAPE",KEY_ESCAPE},{"SPACE",KEY_SPACE},{"DELETE",KEY_DELETE},{"INSERT",KEY_INSERT},{"HOME",KEY_HOME},{"END",KEY_END},{"PAGEUP",KEY_PAGE_UP},{"PAGEDN",KEY_PAGE_DOWN},{"F1",KEY_F1},{"F2",KEY_F2},{"F3",KEY_F3},{"F4",KEY_F4},{"F5",KEY_F5},{"F6",KEY_F6},{"F7",KEY_F7},{"F8",KEY_F8},{"F9",KEY_F9},{"F10",KEY_F10},{"F11",KEY_F11},{"F12",KEY_F12},{"GRAVE",KEY_GRAVE_ACCENT},
                                  {"-",KEY_MINUS},{"=",KEY_EQUAL},{"[",KEY_LEFT_BRACKET},{"]",KEY_RIGHT_BRACKET},{"\\",KEY_BACKSLASH},{"/",KEY_SLASH},{".",KEY_PERIOD},{",",KEY_COMMA},{";",KEY_SEMICOLON},{"'",KEY_APOSTROPHE},{"CAPSLOCK",KEY_CAPS_LOCK},{"NUM0",KEY_KP_0},{"NUM4",KEY_KP_4},{"NUM5",KEY_KP_5},{"NUM6",KEY_KP_6},{"NUM7",KEY_KP_7},{"NUM8",KEY_KP_8},{"NUM9",KEY_KP_9},{"NUM*",KEY_KP_MULTIPLY},{"NUM-",KEY_KP_SUBTRACT},{"NUM.",KEY_KP_DECIMAL},
                                  {"MENU",KEY_MENU},{"PAUSE",KEY_PAUSE},{"NUMLOCK",KEY_NUM_LOCK},{"MWHEEL+",127},{"MWHEEL-",128},/*Handled special case for mousewheel +/-respectively*/{"PRINT",KEY_PRINT_SCREEN},{"JOY18",4},{"JOY19",8},{"UNUSED",0}};
-static bool uiWheelBlocked; static KeyState unboundInput; bool rebindCaptureActive = false;/*Set by the Input tab when a binding row is capturing a key; suppresses GetKeyPressed(25) Menu ESC-back + wheel capture while capturing.*/ bool UIInteractions(void); void UI_ProcessNavigation(void);
+static bool uiWheelBlocked; static bool f7StepEdge = false, f7DownLatch = false; static KeyState unboundInput; bool rebindCaptureActive = false;/*Set by the Input tab when a binding row is capturing a key; suppresses GetKeyPressed(25) Menu ESC-back + wheel capture while capturing.*/ bool UIInteractions(void); void UI_ProcessNavigation(void);
 KeyState* GetCodeMapping(int settingIndex) { if (settingIndex<0 || settingIndex>=42) return &unboundInput; i32 i=Sys_Settings.InputCodeSettings[settingIndex]; if (i<0 || i>=(i32)(sizeof(inputElements)/sizeof(inputElements[0]))) return &unboundInput; if (i>=53 && i<=60) { int button=inputElements[i].value; return (uiMouseCaptured&(1u<<button)) ? &unboundInput : &Sys_Input.mouseButtons[button]; } return &Sys_Input.keyStates[inputElements[i].value]; }
 void TextEntry(i32 k) {
     if (k == KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { World.playerName[0] = '\0'; currentPlayerNameLength = 0; return; } if (k == KEY_ENTER || k == KEY_KP_ENTER) { currentMenuItem++; return; } if (k == KEY_BACKSPACE && currentPlayerNameLength > 0) { World.playerName[--currentPlayerNameLength] = '\0'; return; } if (currentPlayerNameLength >= 26) return;
@@ -483,7 +483,7 @@ void ToggleInventoryMode() { if (World.inventoryMode) { ForceShootMode();} else 
 void ToggleConsole() { static bool imWasActPrior = false; editFieldEditing = false; if (!Cheats.consoleActive) {imWasActPrior = World.inventoryMode;} Cheats.consoleActive = !Cheats.consoleActive; World.paused = !World.paused; if (Cheats.consoleActive) { World.inventoryMode = true; } else if (!imWasActPrior && World.inventoryMode) {ForceShootMode();} }
 void InputProcessing() {
     for (int i=0;i<MAX_MOUSE_BUTTONS;++i) { if(!Sys_Input.mouseButtons[i].down){uiMouseCaptured &= ~(1u<<i);} }
-    mouseMovementThisFrame = false; Sys_Input.scrollDelta = 0.0f; PollEvents(); World.Sys_UI.mouseClickHeldOverGUI = false; uiWheelBlocked = window_has_focus && UIInteractions(); World.uiIsBlocking = uiWheelBlocked;
+    mouseMovementThisFrame = false; Sys_Input.scrollDelta = 0.0f; PollEvents(); f7StepEdge = Cheats.stepmode && Sys_Input.keyStates[KEY_F7].down && !f7DownLatch; f7DownLatch = Sys_Input.keyStates[KEY_F7].down; World.Sys_UI.mouseClickHeldOverGUI = false; uiWheelBlocked = window_has_focus && UIInteractions(); World.uiIsBlocking = uiWheelBlocked;
     for (int i=0;i<MAX_MOUSE_BUTTONS;++i) if (uiWheelBlocked && Sys_Input.mouseButtons[i].pressed) uiMouseCaptured|=1u<<i;
     if (window_has_focus) {
         UI_ProcessNavigation();
@@ -517,7 +517,7 @@ void InputProcessing() {
         if (!editFieldEditing && (GetKeyPressed(28)/*WepCycUp*/ || (!uiWheelBlocked && Sys_Input.scrollDelta > 0))) { CycleWeaponSlot(Sys_Settings.InvertInventoryCycling ? -1 : +1); Sys_Input.scrollDelta = 0; }
         if (!editFieldEditing && (GetKeyPressed(29)/*WepCycDn*/ || (!uiWheelBlocked && Sys_Input.scrollDelta < 0))) { CycleWeaponSlot(Sys_Settings.InvertInventoryCycling ? +1 : -1); Sys_Input.scrollDelta = 0; }
         if (!editFieldEditing &&  GetKeyPressed(37)/*Map*/) UI_AutomapClick(false,UI_AUTOMAP_FULL);
-        ApplyPlayerMovements(World.dt);
+        if (!Cheats.stepmode || f7StepEdge) ApplyPlayerMovements(World.dt);
         if (!World.inventoryMode) { // Apply mouselook/keyboardlook/lean
             bool cyber = World.curLev == LEVEL_CYBERSPACE, invLook = cyber ? Sys_Settings.InvCybLook : Sys_Settings.InvertLook;
             float ns = vclamp((float)Sys_Settings.MouseSensitivity / 100.0f,0.01f,1.0f), s = ns * 0.2f, kts = 900.0f * ns;
@@ -887,8 +887,8 @@ void UpdateScreenSize(i32 width, i32 height) {
     ignore_next_mouse_delta = true;
 }
 //                        0 mk3 assault rifle              1 blaster             2 dartgun               3 flech                 4 ion       5 rapier         6 pipe               7 magnum            8 magpulse               9 pistol               10 plasma                 11 rail                              12 riot              13 skorp              14 sparq               15 stun
-Quaternion vWepRot[16]={{0,.67623f,.73802f,0},{-.67623f,0,0,.73802f},{.10363f,0,0,.99456f},{0,.66976f,.74389f,0},{0,.68903f,.72611f,0},{.1797f,.44528f,0,.87717f},{.31511f,.13789f,0,.93898f},{.63662f,0,0,-.77238f},{0,.63662f,.77238f,0},{-.67623f,0,0,.73802f},{0,-.70781f,-.70781f,0},{0,-.65003f,-.76116f,0},{-.44581f,-.44581f,-.55061f,.55061f},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0}};                        
-        V3 vWepOfs[16]={{      0,-.54f,.451f},        {0,-.5f,0.28f},  {-.015f,-.34f,.18f},       {0,-.43f,.27f},     {0,-0.57f,0.56f},{-.1484f,-1.1557f,.6663f},{.4667f,-.4741f,2.0903f},        {0,-.39f,.02f},       {0,-.54f,.44f},        {0,-.58f,.43f},     {-.02f,-.64f,.79f},         {0,-.46f,.43f},                       {0,-.5f,.08f},       {0,-.62f,.69f},       {0,-.55f,.58f},       {0,-.56f,.55f}};
+Quaternion vWepRot[16]={{0,.67623f,.73802f,0},{-.67623f,0,0,.73802f},{.10363f,0,0,.99456f},{0,.66976f,.74389f,0},{0,.68903f,.72611f,0},{0,1,0,0},{0,1,0,0},{.63662f,0,0,-.77238f},{0,.63662f,.77238f,0},{-.67623f,0,0,.73802f},{0,-.70781f,-.70781f,0},{0,-.65003f,-.76116f,0},{-.44581f,-.44581f,-.55061f,.55061f},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0}};                        
+        V3 vWepOfs[16]={{      0,-.54f,.451f},        {0,-.5f,0.28f},  {-.015f,-.34f,.18f},       {0,-.43f,.27f},     {0,-0.57f,0.56f},{-0.113f,-1.17f,0.736f},{1.1771f,0.1425f,0.2528f},        {0,-.39f,.02f},       {0,-.54f,.44f},        {0,-.58f,.43f},     {-.02f,-.64f,.79f},         {0,-.46f,.43f},                       {0,-.5f,.08f},       {0,-.62f,.69f},       {0,-.55f,.58f},       {0,-.56f,.55f}};
 extern const u16 wepModelIndices[16];
 void UpdateWeaponViewModel() {
     u16 wvi = World.weaponVModelIndex;
@@ -1915,11 +1915,13 @@ i32 main() {
         World.painStaticAlpha = vmax(0.0f,World.painStaticAlpha - (float)World.dt * 2.0f);
         World.empStaticAlpha = vmax(0.0f,World.empStaticAlpha - (float)World.dt * 4.0f);
         cyberStaticAlpha = vmax(0.0f,cyberStaticAlpha - (float)World.dt * 1.0f);
-        if (!World.paused && !World.menuActive) { if (World.pauseRelativeTime < 0.001f) { World.pauseRelativeTime = World.last_physics_time = curtime; } World.pauseRelativeTime += World.dt * World.timeScale; /*Reflex slow-time at 0.25x while the patch is active, mouse-look stays raw*/ }
-        double input_start = get_time(); InputProcessing();/*Before anims and physics to allow them to respond immediately.*/ /*if (Cheats.stepmode) { if (!Sys_Input.keyStates[KEY_F7].pressed) continue; }*/ UpdateAnims();/*Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.*/
+        double input_start = get_time(); InputProcessing();/*Before anims and physics to allow them to respond immediately.*/
+        bool stepFrame = !Cheats.stepmode || f7StepEdge;
+        if (!World.paused && !World.menuActive && stepFrame) { if (World.pauseRelativeTime < 0.001f) { World.pauseRelativeTime = World.last_physics_time = curtime; } World.pauseRelativeTime += World.dt * World.timeScale; /*Reflex slow-time at 0.25x while the patch is active, mouse-look stays raw*/ }
+        UpdateAnims();/*Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.*/
         prePhys = get_time() - input_start;
-        if (!World.paused && !World.menuActive) { double ps = get_time(); float dt = (float)vclamp((World.pauseRelativeTime - World.last_physics_time), 0.0005, 0.1); World.last_physics_time = World.pauseRelativeTime; World.dt = dt; Physics(dt); physTime = get_time() - ps; } else physTime=0.0;
-        double gameT_start = get_time(); ModUpdate();/*After physics so mod/gamecode can modify velocities before next frame.*/ BioMonitorUpdate(); RessurectionTextUpdate(); if (!World.paused && !World.menuActive){ PSys_Update(World.dt); }/*Particles*/ UpdateAudio();/*Updates states, music triggers, ambients, etc.*/ gameTime = get_time() - gameT_start;
+        if (!World.paused && !World.menuActive && stepFrame) { double ps = get_time(); float dt = (float)vclamp((World.pauseRelativeTime - World.last_physics_time), 0.0005, 0.1); World.last_physics_time = World.pauseRelativeTime; World.dt = dt; Physics(dt); physTime = get_time() - ps; } else physTime=0.0;
+        double gameT_start = get_time(); if (stepFrame) ModUpdate();/*After physics so mod/gamecode can modify velocities before next frame.*/ BioMonitorUpdate(); RessurectionTextUpdate(); if (!World.paused && !World.menuActive && stepFrame){ PSys_Update(World.dt); }/*Particles*/ UpdateAudio();/*Updates states, music triggers, ambients, etc.*/ gameTime = get_time() - gameT_start;
         if (likely((!World.paused && !World.menuActive) || Cheats.editMode)) { UpdateWeaponViewModel(); UpdateInstanceMatrix4x4s(); /*Before camviews so camview shadows render same as main pass*/ }
         drawCalls = uiDrawCalls = shadDrawCalls = vertsRendered = 0;
         UpdateSensaroundCamViews(); RenderCameraViews();/*Before main Render() so that tv screens are up to date*/ if(likely(!World.paused && !World.menuActive)) { CullCore(); } /*Before automap and audio update due to audio occlusion and automap FoW discovery*/ AudioUpdateMix();/*Actually mixes all the audio for output.*/ AutomapTick(); MinigameTick();

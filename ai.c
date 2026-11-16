@@ -277,7 +277,7 @@ static void AIDying(u16 i) {
         World.instances[i].enemy = 0;
         const NPCTable* npc = &npcTable[npcID];
         bool gibs = npcID < NUM_AI_TYPES && npcGibRanges[npcID].first != 0;
-        const float deathBurstTimer[NUM_AI_TYPES] = {0.0f,0.0f, 0.1f,0.0f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.0f,0.45f,0.75f,0.1f,0.0f,0.0f,0.1f,0.224f,0.9f,0.0f,0.1f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.1f,0.1f};
+        const float deathBurstTimer[NUM_AI_TYPES] = {0.0f,0.0f, 0.1f,0.0f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.0f,0.45f,0.75f,0.1f,0.0f,0.0f,0.1f,0.224f,1.05f,0.0f,0.1f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.1f,0.1f};
         float dbt = deathBurstTimer[npcID];
         if (dbt > 0.0f) { World.instances[i].deathBurstFinished = World.pauseRelativeTime + dbt; }
         else if (!(World.instances[i].entflags & EF_DEATH_BURST_DONE)) { SpawnNPCDeathBurst(&World.instances[i]); flag_set(&World.instances[i].entflags, EF_DEATH_BURST_DONE, true); }
@@ -307,10 +307,10 @@ static void AIDead(u16 idx) {
     else if (World.instances[idx].index == 419) { DeleteInstance(idx); } /*Autobomb removes self*/
     else if (npcID < NUM_AI_TYPES && npcGibRanges[npcID].first != 0) {
         NPCGibRange range = npcGibRanges[npcID]; V3 gibPos = World.position[idx]; Quaternion gibRot = World.rotation[idx];
-        if (World.instances[idx].index == 437) { float servHalf = (180.0f + -99.0f/*gibs are oriented different from the parent*/) * (PI / 180.0f) * 0.5f; Quaternion servYaw = {0.0f,vsinf(servHalf),0.0f,vcosf(servHalf)}; gibRot = quat_multiply(servYaw,gibRot); V3 servGibMean = {0.0f,0.0f,0.0f}; for (u16 gc = range.first; gc <= range.last; ++gc) { u16 gm = EDefs[gc].modelIndex; servGibMean = V3Add(servGibMean, V3_ScaleByF(V3Add(modelMin[gm], modelMax[gm]), 0.5f)); } servGibMean = V3_ScaleByF(servGibMean, 1.0f / (float)(range.last - range.first + 1)); gibPos = V3_AsubB(gibPos, quat_rot_v3(gibRot, servGibMean)); }
+        if (World.instances[idx].index == 437) { float servHalf = (200.0f + -99.0f/*gibs are oriented different from the parent*/) * (PI / 180.0f) * 0.5f; Quaternion servYaw = {0.0f,vsinf(servHalf),0.0f,vcosf(servHalf)}; gibRot = quat_multiply(servYaw,gibRot); V3 servGibMean = {0.0f,0.0f,0.0f}; for (u16 gc = range.first; gc <= range.last; ++gc) { u16 gm = EDefs[gc].modelIndex; servGibMean = V3Add(servGibMean, V3_ScaleByF(V3Add(modelMin[gm], modelMax[gm]), 0.5f)); } servGibMean = V3_ScaleByF(servGibMean, 1.0f / (float)(range.last - range.first + 1)); gibPos = V3_AsubB(gibPos, quat_rot_v3(gibRot, servGibMean)); }
         for (u16 gibConst=range.first;gibConst<=range.last;++gibConst) {
             u16 gib = SpawnDynamicObject(gibConst); if (!EntIdxIsValid(gib) || gib == idx) continue;
-            World.position[gib] = gibPos; World.rotation[gib] = gibRot; World.velocity[gib] = (V3){0.0f, World.velocity[idx].y, 0.0f}; World.instances[gib].hasGrav = true;             World.layer[gib] = L_Corpse;
+            World.position[gib] = gibPos; World.rotation[gib] = gibRot; World.velocity[gib] = (V3){0.0f, World.velocity[idx].y, 0.0f}; World.instances[gib].hasGrav = true; World.instances[gib].cellX = World.instances[idx].cellX; World.instances[gib].cellZ = World.instances[idx].cellZ; World.instances[gib].cellIndex = World.instances[idx].cellIndex; World.layer[gib] = L_Corpse;
             Entity* g = &World.instances[gib];
             if (gibConst == range.primary) { for (int s = 0; s < 4; ++s) { g->contents[s] = self->contents[s]; g->custIdx[s] = self->custIdx[s]; self->contents[s] = self->custIdx[s] = -1; } g->lookUpIndex = self->lookUpIndex; g->maxRandomItems = self->maxRandomItems; g->generateContents = false; World.layer[gib] = L_Corpse | L_CorpseSearchable; }
         } DeleteInstance(idx);

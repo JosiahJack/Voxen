@@ -30,7 +30,7 @@ void CompleteWeaponChange() {
     World.invP1.wepCur = (u8)World.invP1.wepCurPending; World.invP1.weaponIndex = (u16)World.invP1.weaponIndexPending; u16 wepIdx = World.invP1.weaponIndex;
     Entity* vwe = &World.instances[World.weaponVModelIndex]; int wep16 = Get16WeaponIndexFromConstIndex((int)wepIdx);
     if (wep16 >= 0 && wep16 < 16) {
-        vwe->modelIndex = wepModelIndices[wep16]; if (vwe->modelIndex >= MAX_MDLS) vwe->modelIndex = MAX_MDLS - 1u; vwe->animationNum = wepAnimNums[wep16];
+        vwe->modelIndex = wepModelIndices[wep16]; if (vwe->modelIndex >= MAX_MDLS) vwe->modelIndex = MAX_MDLS - 1u; vwe->animationNum = wepAnimNums[wep16]; if (vwe->animationNum < MAXANIM) { AnimationClip* idle = &mdlAnimClips[vwe->animationNum][A_IDLE]; vwe->clip = A_IDLE; vwe->frame = idle->frameStart; vwe->modelIndex = idle->frameStartModelIndex; vwe->currentFrameFinished = 0.0; }
         vwe->texIndex = EDefs[wepIdx].texIndex >= MAXTEX ? 0u : EDefs[wepIdx].texIndex; vwe->normIndex = EDefs[wepIdx].normIndex >= MAXTEX ? 0u : EDefs[wepIdx].normIndex; vwe->glowIndex = EDefs[wepIdx].glowIndex >= MAXTEX ? 0u : EDefs[wepIdx].glowIndex; vwe->specIndex = EDefs[wepIdx].specIndex >= MAXTEX ? 0u : EDefs[wepIdx].specIndex; vwe->index = wepIdx;
     } else { vwe->modelIndex = MAX_MDLS; /*hidden; no weapon equipped*/ }
     World.invP1.wepCurPending = World.invP1.weaponIndexPending = -1;
@@ -124,18 +124,19 @@ void MeleeHitUpdate(void) {
     }
     if (wfx.pendingMeleeIsRapier) { TakeEnergy(3.666f); BiomonitorEnergyPulse(3.666f); } // 3 hits per energy tick
 }
+static void SetViewModelMeleeClip(bool isRapier, u8 clip) { u16 wvi = World.weaponVModelIndex; if (wvi == 0 || wvi >= INSTANCE_CNT) return; Entity* vwe = &World.instances[wvi]; vwe->animationNum = isRapier ? 50 : 49; if (clip >= MAX_ANIMCLIPS) return; AnimationClip* c = &mdlAnimClips[vwe->animationNum][clip]; if (c->framerate <= 0 || c->speed <= 0) return; vwe->clip = clip; vwe->frame = c->frameStart; vwe->modelIndex = c->frameStartModelIndex; vwe->currentFrameFinished = 0.0; }
 void FireMelee(int wep16, bool isRapier, bool silent, u16 hitSnd, u16 missSnd, u16 fleshSnd) {
     wfx.fireDistance = 3.2f; bool hit = DidRayHit(wep16); wfx.fireDistance = 200.0f; u16 t = wfx.tempHitEnt; double dt = World.pauseRelativeTime + (isRapier ? 0.28 : 0.15);
-    if (hit) { u16 wvi = World.weaponVModelIndex; if (wvi > 0 && wvi < INSTANCE_CNT) { World.instances[wvi].animationNum = isRapier ? 50 : 49; World.instances[wvi].clip = A_ATTACK_HIT; } wfx.pendingMeleeWep16 = wep16; wfx.pendingMeleeTarget = t; wfx.pendingMeleeIsRapier = isRapier; wfx.pendingMeleeSilent = silent; wfx.pendingMeleeHitSnd = hitSnd; wfx.pendingMeleeFleshSnd = fleshSnd; wfx.pendingMeleeFinished = dt; return; }
+    if (hit) { SetViewModelMeleeClip(isRapier, A_ATTACK_HIT); wfx.pendingMeleeWep16 = wep16; wfx.pendingMeleeTarget = t; wfx.pendingMeleeIsRapier = isRapier; wfx.pendingMeleeSilent = silent; wfx.pendingMeleeHitSnd = hitSnd; wfx.pendingMeleeFleshSnd = fleshSnd; wfx.pendingMeleeFinished = dt; return; }
     V3 p = World.position[PLAYER1], look = V3_Normalize(ScreenPointToRay(World.instances[PLAYER1].forward, World.instances[PLAYER1].right));
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; i++) {
         Entity *in = &World.instances[i]; if(!(in->entflags & EF_ACTIVE) || in->health <= 0.0f || V3_Dist(World.position[i],p) >= 3.2f || V3_dot(look,V3_Normalize(V3_AsubB(World.position[i],p))) <= 0.666f){continue;}/*outside ~+-48deg cone*/
-        u16 wvi = World.weaponVModelIndex; if (wvi > 0 && wvi < INSTANCE_CNT) { World.instances[wvi].animationNum = isRapier ? 50 : 49; World.instances[wvi].clip = A_ATTACK_HIT; }
+        SetViewModelMeleeClip(isRapier, A_ATTACK_HIT);
         wfx.pendingMeleeWep16 = wep16; wfx.pendingMeleeTarget = i; wfx.pendingMeleeIsRapier = isRapier; wfx.pendingMeleeSilent = silent; wfx.pendingMeleeHitSnd = hitSnd;
         wfx.pendingMeleeFleshSnd = fleshSnd; wfx.pendingMeleeFinished = dt; return;
     }
     if(!silent)play_wav(sounds[missSnd], AppliedFXVol(1.0f), World.position[PLAYER1], false);
-    u16 wvi = World.weaponVModelIndex; if (wvi > 0 && wvi < INSTANCE_CNT) { World.instances[wvi].animationNum = isRapier ? 50 : 49; World.instances[wvi].clip = isRapier ? A_ATTACK_MISS : A_ATTACK_MISS; }
+    SetViewModelMeleeClip(isRapier, A_ATTACK_MISS);
 }
 void FireRapier(int wep16) { FireMelee(wep16, true,  false, 246, 247, 246); } // wlaserrapier_hit/swing
 void FirePipe(int wep16)   { FireMelee(wep16, false, false, 253, 254, 252); } // wpipe_hit/swing/dmg
