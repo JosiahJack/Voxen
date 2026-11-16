@@ -1,5 +1,5 @@
 // ui.c - User Interface(UI) aka HUD
-bool enteringSaveName = false; static bool reflDropdownOpen = false,saveSlotUsed[8],uiClickLock = false, uiClickBlocked = false; static i8 reflHoverIdx = -1, rebindRow = -1, saveSlotEditing = -1; static u32 rebindArmedFrame = 0; static char saveSlotNames[8][48],saveNameEntry[48]; static u8 saveNameEntryLen = 0; extern V3 queuedLevelPos; extern u8 queuedLevelToLoad; extern float reloadTime[16];
+bool enteringSaveName = false; static bool reflDropdownOpen = false,saveSlotUsed[8],uiClickLock = false, uiClickBlocked = false; static i8 reflHoverIdx = -1, rebindRow = -1, saveSlotEditing = -1, softwareInvCurrent = -1; static u32 rebindArmedFrame = 0; static char saveSlotNames[8][48],saveNameEntry[48]; static u8 saveNameEntryLen = 0; extern V3 queuedLevelPos; extern u8 queuedLevelToLoad; extern float reloadTime[16];
 #define UI_MFD_IDS(P) UI_ID_##P##_TAB_WEAPON, UI_ID_##P##_TAB_ITEM, UI_ID_##P##_TAB_AUTOMAP, UI_ID_##P##_TAB_DATA,      UI_ID_##P##_PANEL,      UI_ID_##P##_WEAPON_NAME, UI_ID_##P##_WEAPON_ICON,      UI_ID_##P##_WEAPON_AMMO,       UI_ID_##P##_WEAPON_RELOAD,     UI_ID_##P##_WEAPON_UNLOAD, UI_ID_##P##_WEAPON_OVERLOAD, UI_ID_##P##_WEAPON_ENERGY_SLIDER, UI_ID_##P##_MEDIA_HEADER, UI_ID_##P##_MEDIA_TAB_0, UI_ID_##P##_MEDIA_TAB_3 = UI_ID_##P##_MEDIA_TAB_0 + 3, \
                       UI_ID_##P##_ITEM_NAME, UI_ID_##P##_ITEM_ICON, UI_ID_##P##_ITEM_USE,    UI_ID_##P##_ITEM_VAPORIZE, UI_ID_##P##_ITEM_SKATE, UI_ID_##P##_ITEM_BOOST,  UI_ID_##P##_ITEM_TIMER_VALUE, UI_ID_##P##_ITEM_TIMER_SLIDER, UI_ID_##P##_ITEM_ACCESS_CARDS, UI_ID_##P##_BLOCKED_SECURITY_TEXT, UI_ID_##P##_ELEV_FLOOR_INDICATOR, UI_ID_##P##_ELEV_BUTTON_0,    UI_ID_##P##_ELEV_BUTTON_7 = UI_ID_##P##_ELEV_BUTTON_0 + 7, UI_ID_##P##_ELEV_CLOSE, \
                       UI_ID_##P##_KEYCODE_0, UI_ID_##P##_KEYCODE_11 = UI_ID_##P##_KEYCODE_0 + 11, UI_ID_##P##_KEYCODE_DIGIT_0, UI_ID_##P##_KEYCODE_DIGIT_2 = UI_ID_##P##_KEYCODE_DIGIT_0 + 2,          UI_ID_##P##_KEYCODE_CLOSE,     UI_ID_##P##_AUDIOLOG_IMAGE,    UI_ID_##P##_AUDIOLOG_NAME, UI_ID_##P##_AUDIOLOG_SENDER, UI_ID_##P##_AUDIOLOG_SUBJECT, UI_ID_##P##_PUZZLE_NODE_SOURCE, UI_ID_##P##_PUZZLE_NODE, UI_ID_##P##_PUZZLE_CELL_0, \
@@ -44,7 +44,7 @@ void SaveNameEntry(i32 k) {
     char c = (k >= KEY_A && k <= KEY_Z) ? (char)('a' + (k - KEY_A)):((k >= KEY_1 && k <= KEY_9) ? (char)('1' + (k - KEY_1)) : ((k == KEY_0) ? '0' : ((k == KEY_SPACE) ? ' ' : 0))); if (c) { saveNameEntry[saveNameEntryLen] = c; saveNameEntry[++saveNameEntryLen] = '\0'; }
 }
 void MFD_ResetGeneral() { World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.consumableClickRow=-1; World.Sys_UI.genClickSlot = -1; }
-void MFD_ShowGeneralItem() { u8 side=World.Sys_UI.lastItemSideRH?2:1; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdGeneralItem=true; World.Sys_UI.mfdHardwareItem=false; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; World.Sys_UI.mfdTab[side]=2; World.Sys_UI.mfdSelected[side]=2; }
+void MFD_ShowGeneralItem() { u8 side=World.Sys_UI.lastItemSideRH?2:1; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdGeneralItem=true; World.Sys_UI.mfdHardwareItem=false; softwareInvCurrent=-1; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; World.Sys_UI.mfdTab[side]=2; World.Sys_UI.mfdSelected[side]=2; }
 void MFD_OpenSearch(bool isRH) { for (u8 side=0;side<2;++side) {u8 tab=World.Sys_UI.mfdTab[1+!!side]; if (!(tab==2 && World.Sys_UI.mfdItemReader[side]) && World.Sys_UI.MFD_Data!=5) { World.Sys_UI.mfdReturnTab[side+1]=tab; World.Sys_UI.mfdReturnView[side+1]=World.Sys_UI.MFD_Data;}} World.Sys_UI.MFD_Data=5; World.Sys_UI.mfdTab[1+!!isRH]=4;}
 void MFD_CloseSearch() {if (World.Sys_UI.MFD_Data!=5) return; for (u8 side=0;side<2;++side) {u8* tab=&World.Sys_UI.mfdTab[1+!!side]; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];} u8 rv=World.Sys_UI.mfdReturnView[1]; if (rv==5) rv=0; World.Sys_UI.MFD_Data=rv;}
 void MFD_OpenData(bool isRH,u8 code) { u8 side=isRH?2:1; u8 tab=World.Sys_UI.mfdTab[1+!!isRH]; if (tab!=4) World.Sys_UI.mfdReturnTab[side]=tab; if (World.Sys_UI.MFD_Data == 0 || World.Sys_UI.MFD_Data == 5) World.Sys_UI.mfdReturnView[side]=World.Sys_UI.MFD_Data; World.Sys_UI.MFD_Data=code; World.Sys_UI.mfdTab[1+!!isRH]=4; }
@@ -557,8 +557,9 @@ void UI_DataEntryClick(int entry) { World.Sys_UI.mouseClickHeldOverGUI=true; if 
 void UI_LogMore(void) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.MFD_ReaderView!=MFD_READER_TEXT) return; if (UILogHasMore()) { World.Sys_UI.logReaderPage++; return; }/*[MORE]*/ World.Sys_UI.logReaderPage=0; MFD_CloseData();/*[CLOSE]*/ World.Sys_UI.MFD_ReaderView=MFD_READER_FOLDER; }
 void UI_LogBack(void) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.MFD_ReaderView==MFD_READER_TEXT) { if (World.Sys_UI.logReaderPage>0) { World.Sys_UI.logReaderPage--; return; } return; } if (World.Sys_UI.MFD_ReaderView==MFD_READER_FOLDER) World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS; }
 void UI_NoteToggleClick(int note) { World.Sys_UI.mouseClickHeldOverGUI=true; if (note<0||note>17) return; if (!World.questNotesActive[note]) return; World.questNotesChecked[note]=!World.questNotesChecked[note]; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
-void UI_HardwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if (idx<0||idx>=HW_COUNT) return; World.invP1.hardwareInvCurrent=idx; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); bool rh=World.Sys_UI.lastItemSideRH; World.Sys_UI.mfdHardwareItem=true; World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; if (idx==HW_SYS_IDX) { MFD_OpenData(World.Sys_UI.lastDataSideRH,7); return; } World.Sys_UI.mfdTab[1+!!rh]=2; }
-void UI_SoftwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if (idx<0||idx>6) return; bool cyber = World.curLev == LEVEL_CYBERSPACE;/*row 0 ICE Drill, 1 Pulser, 2 Cyber Shield, 3 Turbo, 4 Decoy, 5 Recall, 6 Games*/
+void UI_HardwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if (idx<0||idx>=HW_COUNT) return; World.invP1.hardwareInvCurrent=idx; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); bool rh=World.Sys_UI.lastItemSideRH; World.Sys_UI.mfdHardwareItem=true; World.Sys_UI.mfdGeneralItem=false; softwareInvCurrent=-1; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; if (idx==HW_SYS_IDX) { MFD_OpenData(World.Sys_UI.lastDataSideRH,7); return; } World.Sys_UI.mfdTab[1+!!rh]=2; }
+void UI_SoftwareRowClick(int idx,bool dbl) { World.Sys_UI.mouseClickHeldOverGUI=true; if (idx<0||idx>6) return; bool cyber = World.curLev == LEVEL_CYBERSPACE;/*row 0 ICE Drill, 1 Pulser, 2 Cyber Shield, 3 Turbo, 4 Decoy, 5 Recall, 6 Games*/
+    softwareInvCurrent=(i8)idx; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0},false); bool rh=World.Sys_UI.lastItemSideRH; World.Sys_UI.mfdHardwareItem=false; World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; World.Sys_UI.mfdTab[1+!!rh]=2; if (!dbl) return;
     if (idx==SW_DRILL)  { World.invP1.isPulserNotDrill = false; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ return; }
     if (idx==SW_PULSER) { World.invP1.isPulserNotDrill = true;  play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ return; }
     if (idx==SW_SHIELD) { CenterStatusPrint("%s",Sys_Text.stringTable[cyber ? 461 : 460]); return; }
@@ -636,6 +637,7 @@ void ConsumableSelect(bool patch,int row) { if (!ConsumableCount(patch,row)) ret
 void ConsumableUse(bool patch,int row) { if (!ConsumableCount(patch,row) || World.invP1.holdingObject) return; ConsumableSelect(patch,row); if (patch) PatchUse(ConsumableSlot(true,row)); else UseGrenade(ConsumableItem(false,row)+307); World.Sys_UI.consumableClickRow=-1; }
 static int ConsumableSelectedRow() { if (World.Sys_UI.mfdConsumable==1) return World.invP1.grenCur<7?World.invP1.grenCur:-1; if (World.Sys_UI.mfdConsumable==2) for (int row=0;row<7;++row) if (patchSlots[row]==World.invP1.patchCur) return row; return -1; }
 void ConsumableSetTimer(float fraction) { int row=ConsumableSelectedRow(); if (World.Sys_UI.mfdConsumable!=1 || row<5 || !ConsumableCount(false,row)) return; float min=row==5?2.0f:4.0f,value=min+vclamp(fraction,0.0f,1.0f)*(60.0f-min); if (row==5) World.invP1.nitroTimeSetting=value; else World.invP1.earthShakerTimeSetting=value; }
+static const char* swLabels[7]={"I.C.E. DRILL","PULSER","CYBER SHIELD","TURBO","DECOY","RECALL","GAMES"};
 void RenderConsumableItem(bool isRH) {
     int row=ConsumableSelectedRow(); bool patch=World.Sys_UI.mfdConsumable==2; if (row<0 || !ConsumableCount(patch,row)) return;
     i16 dx=isRH?1059:0; int item=ConsumableItem(patch,row); const char* text=Sys_Text.stringTable[item+326];
@@ -649,6 +651,10 @@ void RenderConsumableItem(bool isRH) {
     }
 }
 static void BoosterSetMode(bool boost) { if (!(World.invP1.hasHardware & HW_BST)) return; World.invP1.hwVersSetting[HW_BST_IDX] = boost ? (u8)vmax(1,(int)World.invP1.hwVers[HW_BST_IDX]-1) : 0; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
+static void RenderSoftwareItem(bool isRH) {
+    int idx=softwareInvCurrent; if (idx<0||idx>6) return; bool owned=idx<SW_GAMES ? ((World.invP1.hasSoft&(1u<<idx))!=0 || World.invP1.softVersions[idx]>0) : World.invP1.hasMinigame!=0; if (!owned) return; i16 dx=isRH?1059:0; UIRText(MID(isRH,ITEM_NAME),dx+28,540,T_YELLOW,FONT_NORMAL,0.8f,260,swLabels[idx]);
+    if (idx<SW_GAMES) RenderTextL(dx+112,650,T_GREEN_MENU,FONT_NORMAL,0.8f,(idx<=SW_SHIELD)?"v%d":"x%d",World.invP1.softVersions[idx]); else RenderTextL(dx+112,650,T_GREEN_MENU,FONT_NORMAL,0.8f,"%d",World.invP1.hasMinigame?1:0);
+}
 static void RenderHardwareItem(bool isRH) {
     int slot=World.invP1.hardwareInvCurrent; i16 dx=isRH?1059:0; int ref=World.invP1.hardwareInvReferenceIndex[slot]; UIRText(MID(isRH,ITEM_NAME),dx+28,540,T_YELLOW,FONT_NORMAL,0.8f,260,ref<0?"":Sys_Text.stringTable[ref+326]);
     if (slot==HW_BST_IDX) { bool skates=World.invP1.hwVersSetting[HW_BST_IDX]==0; for(u8 m=0;m<2;++m){ u32 rid = m ? MID(isRH,ITEM_BOOST) : MID(isRH,ITEM_SKATE); i16 y=m?691:628; UIRImg(rid,dx+34,y,160,40,1087); RenderTextL(dx+34,y,skates==(m==0)?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8,"%s",m?"BOOST":"SKATE"); } return; }
@@ -656,6 +662,7 @@ static void RenderHardwareItem(bool isRH) {
     RenderTextL(dx+112,650,T_GREEN_MENU,FONT_NORMAL,0.8,"v%d",(int)World.invP1.hwVers[slot]);
 }
 void RenderGeneralItem(bool isRH) {
+    if (softwareInvCurrent>=0) { RenderSoftwareItem(isRH); return; }
     if (World.Sys_UI.mfdHardwareItem) { RenderHardwareItem(isRH); return; }
     if (World.Sys_UI.mfdConsumable) { RenderConsumableItem(isRH); return; }
     if (!World.Sys_UI.mfdGeneralItem) return;
@@ -937,7 +944,7 @@ void SideMFD(bool isRH) { // 320x240
                 UIRImg(MID(isRH,SYS_CLOSE),closeButtonX+dx,closeButtonY,29,29,899); RenderTextL(closeButtonTextX+dx,closeButtonTextY,T_STOPD_RED,FONT_NORMAL,0.8,"X");
             }
             if (data==9) {
-                RenderUIImage(21+dx,501,262,262,1025); UIRText(MID(isRH,MINIGAMES_HEADER),28+dx,503,T_RED,FONT_NORMAL,0.8f,0,"TRIOPTIMUM FUNPACK");
+                RenderUIImage(21+dx,501,262,262,1025); if (World.Sys_UI.mg_current!=1) UIRImg(MID(isRH,MINIGAME_VIEW),21+dx,501,262,262,0); UIRText(MID(isRH,MINIGAMES_HEADER),28+dx,503,T_RED,FONT_NORMAL,0.8f,0,"TRIOPTIMUM FUNPACK");
                 if (World.Sys_UI.mg_current==1) {
                     int mgx = 0, mgy = 0, mgw = 0, mgh = 0;
                     MgViewRect(isRH, &mgx, &mgy, &mgw, &mgh);
@@ -946,7 +953,6 @@ void SideMFD(bool isRH) { // 320x240
                 } else {
                     for (u8 g=0;g<9;++g) { UIRImg(MID(isRH,MINIGAME_0)+g,(i16)(mgX[g]+dx),mgY[g],115,24,0); RenderTextL((i16)(mgX[g]+5+dx),(i16)(mgY[g]+1),T_GREEN,FONT_NORMAL,0.8,"%s",mgName[g]); }
                     UIR(MID(isRH,MINIGAMES_FOOTER),97+dx,726,(i16)(MeasureLineAdvance("Don't Play on",FONT_NORMAL)*0.8f),(i16)(3*22.0f*0.8f)); RenderTextL(97+dx,726,T_RED,FONT_NORMAL,0.8,"Don't Play on\n\nCompany Time");
-                    UIRImg(MID(isRH,MINIGAME_VIEW),21+dx,501,262,262,0);
                 }
                 if (World.Sys_UI.mg_current<0) { UIRImg(MID(isRH,MINIGAME_CLOSE),closeButtonX+dx,closeButtonY,22,22,899); RenderTextL(closeButtonTextX+dx,closeButtonTextY,T_STOPD_RED,FONT_NORMAL,0.8,"X"); }
                 else if (World.Sys_UI.mg_current==1) { UIRImg(MID(isRH,MINIGAME_BACK),closeButtonX+dx,501,22,22,899); RenderTextL(closeButtonTextX+dx,511,T_STOPD_RED,FONT_NORMAL,0.8,"X"); }
@@ -959,7 +965,6 @@ void SideMFD(bool isRH) { // 320x240
 
 static const i16 mediaColX[2]={458,681},mediaRowY[8]={570,591,612,633,654,675,696,717};
 static const char* noteText[12]={"Escape neurosurgery suite.  Keycode is 451.","Disengage laser safety override.","Activate the station energy shield.","Destroy the mining laser.","Enable master jettison.","Diagnose and repair broken relay: 428.","Jettison Beta Grove.","Destroy the four relay antennae.","Engage reactor self-destruct.","Escape on escape pod.","Access the bridge.","Destroy SHODAN."};
-static const char* swLabels[7]={"I.C.E. DRILL","PULSER","CYBER SHIELD","TURBO","DECOY","RECALL","GAMES"};
 void CenterMFD() { //640x240
     if (Cheats.noHUD) return;
     static const i16 centerX[4]={400,480,560,902};
@@ -1005,7 +1010,7 @@ void CenterMFD() { //640x240
             for (int i=0;i<7;++i) { bool owned; int count=0;
                 if (i<SW_GAMES) { count=World.invP1.softVersions[i]; if (count<0) count=0; owned=(World.invP1.hasSoft&(1u<<i))!=0 || count>0; } else owned=World.invP1.hasMinigame;
                 if (!owned) continue;
-                i16 y=(i16)(588+i*32); const char* label=swLabels[i]; bool selected = (i==SW_DRILL) ? !World.invP1.isPulserNotDrill : (i==SW_PULSER) ? World.invP1.isPulserNotDrill : (i>=SW_TURBO && i<=SW_RECALL) ? (i-SW_TURBO)==World.invP1.cyberItemIndex : false; float w=MeasureLineAdvance(label,FONT_NORMAL),sc=w>0?vmin(0.8f,210.0f/w):0.8f;
+                i16 y=generalRowY[i]; const char* label=swLabels[i]; bool selected = (i==SW_DRILL) ? !World.invP1.isPulserNotDrill : (i==SW_PULSER) ? World.invP1.isPulserNotDrill : (i>=SW_TURBO && i<=SW_RECALL) ? (i-SW_TURBO)==World.invP1.cyberItemIndex : false; float w=MeasureLineAdvance(label,FONT_NORMAL),sc=w>0?vmin(0.8f,210.0f/w):0.8f;
                 UIRText(UI_ID_CMFD_SOFTWARE_ROW_0+i,454,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,sc,210,label);
                 if (i<SW_GAMES) RenderTextL(680,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8f,(i<=SW_SHIELD)?"v%d":"x%d",count); else RenderTextL(680,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8f,"%d",World.invP1.hasMinigame?1:0); }
         }
@@ -1054,7 +1059,7 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_CMFD_PATCH_USE_0 ... UI_ID_CMFD_PATCH_USE_6: ConsumableUse(true,(int)(id - UI_ID_CMFD_PATCH_USE_0)); return;
         case UI_ID_CMFD_PATCH_ROW_0 ... UI_ID_CMFD_PATCH_ROW_6: { int row=(int)(id - UI_ID_CMFD_PATCH_ROW_0); ConsumableSelect(true,row); if (dbl) ConsumableUse(true,row); return; }
         case UI_ID_CMFD_HARDWARE_ROW_0 ... UI_ID_CMFD_HARDWARE_ROW_11: UI_HardwareRowClick((int)(id - UI_ID_CMFD_HARDWARE_ROW_0)); return;
-        case UI_ID_CMFD_SOFTWARE_ROW_0 ... UI_ID_CMFD_SOFTWARE_ROW_6: UI_SoftwareRowClick((int)(id - UI_ID_CMFD_SOFTWARE_ROW_0)); return;
+        case UI_ID_CMFD_SOFTWARE_ROW_0 ... UI_ID_CMFD_SOFTWARE_ROW_6: UI_SoftwareRowClick((int)(id - UI_ID_CMFD_SOFTWARE_ROW_0),dbl); return;
         case UI_ID_CMFD_GENERAL_USE_0 ... UI_ID_CMFD_GENERAL_USE_13: { u8 s=(u8)(id - UI_ID_CMFD_GENERAL_USE_0); World.Sys_UI.genClickSlot = -1; GenInvClick(s); GenInvApply(s); return; }
         case UI_ID_CMFD_GENERAL_ROW_0 ... UI_ID_CMFD_GENERAL_ROW_13: { u8 s = (u8)(id - UI_ID_CMFD_GENERAL_ROW_0); int item = GeneralInvItem(s); if (item<0) { return; } if (!left) { World.Sys_UI.genClickSlot = -1; if (s) GenInvTake(s); return; }
             World.Sys_UI.genClickSlot = -1; GenInvClick(s); if (dbl && World.Sys_UI.genClickSlot == (i8)s && World.Sys_UI.genClickItem == (i16)item && World.Sys_UI.genClickCustom == World.invP1.genInvCustIdx[s]) GenInvApply(s); else { World.Sys_UI.genClickSlot=(i8)s; World.Sys_UI.genClickItem=(i16)item; World.Sys_UI.genClickCustom=World.invP1.genInvCustIdx[s]; World.Sys_UI.genClickTime=World.pauseRelativeTime; } return; }

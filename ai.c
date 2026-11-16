@@ -1,6 +1,6 @@
 // ai.c - NPC logic
 #include "common.h"
-u16 npcCountInWorldPerType[NUM_AI_TYPES],AddLightSimple(V3,Color3,float,float,u16); void TextureSequenceStart(u16,u8);    bool PositionVisibleFromPlayerCell(float,float), XZPairInBounds(i32,i32);    Quaternion quat_normalize(Quaternion);    float GetDamageTakeAmount(DamageData*);
+u16 npcCountInWorldPerType[NUM_AI_TYPES],AddLightSimple(V3,Color3,float,float,u16); void TextureSequenceStart(u16,u8),GrenadeInit(u16);    bool PositionVisibleFromPlayerCell(float,float), XZPairInBounds(i32,i32),IsLiveGrenade(u16);    Quaternion quat_normalize(Quaternion);    float GetDamageTakeAmount(DamageData*);
 const NPCTable npcTable[NUM_AI_TYPES] = { // Name, attacks[3] (type,damage,range,speed,timeToActual,timeBetween,waitMin,waitMax,waitChance,projectileSpeed,hasLaser,projectilePrefab), remaining NPCTable fields.
     /* 0*/{"AUTOBOMB",{{0,0,0,0,0,0,0.5,1,0.1,0,0,0},{0,0,0,0,0,0,1,3,0.5,0,0,0},{1,200,2.4,0,0,0,0,0,0,0,0,0}},50,0,1,1,300,180,55,3.84,50,2.5,2.5,100,6,0,0,0.1,3,5,12,1,20,0,0,0,10,3,0,2},
     /* 1*/{"CYBORG ASSASSIN",{{0,30,3.3,0,0,0.91,0.5,1,0.1,0,0,0},{5,50,10,0,0.25,0.91,1,2,0.5,0,0,0},{8,35,20,0,0.2,1.58,1,2,0.5,3,0,489}},65,0,4,1,180,180,15,3.2,50,2,2,0,0,0.45,5,2.083,3,5,12,0,60,0,0,0,10,3,0,3},
@@ -345,7 +345,7 @@ static void ProjectileLaunched(Entity* self, int n) {
     DamageData dd = SetNPCData(self,n); dd.attackType=Att_Ball;
     V3 spos=n==1?ai_sight_pos(self):ai_gun_pos(self,n); u16 eidx=self->enemy; V3 targ=eidx ? self->targettingPosition : (V3){spos.x + self->forward.x*20.0f,spos.y,spos.z + self->forward.z*20.0f}; V3 dir=V3_Normalize(V3_AsubB(targ,spos)); u16 bb = SpawnDynamicObject(masterIdx>0?masterIdx:370);
     if (!EntIdxIsValid(bb)) bb=SpawnDynamicObject(370); if (!EntIdxIsValid(bb)) return; Entity* proj=&World.instances[bb]; World.layer[bb]=L_NPCBullet; World.position[bb]=spos; proj->forward=dir; World.rotation[bb]=(masterIdx==489 && vabs(dir.y)<0.999f)?quat_look_rotation(dir,(V3){0.0f,1.0f,0.0f}):QuatFromToRotation((V3){0.0f,0.0f,1.0f},dir);
-    proj->damage=dd.damage; proj->strength=dd.penetration; proj->speed=dd.offense; proj->attackType=dd.attackType; proj->recentMostActivator=sidx; ProjectileEffectImpactInitAfterLoad(bb);
+    if (IsLiveGrenade(proj->index)) GrenadeInit(bb); else { proj->damage=dd.damage; proj->strength=dd.penetration; proj->speed=dd.offense; } proj->attackType=dd.attackType; proj->recentMostActivator=sidx; ProjectileEffectImpactInitAfterLoad(bb);
     V3 shove = V3_ScaleByF(dir, launchSpd); if (World.instances[sidx].hasGrav) { shove.x += World.velocity[sidx].x; shove.z += World.velocity[sidx].z; } World.velocity[bb] = (V3){0}; AddForce(bb,shove,true); flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);
 }
 static void AIExplodeAttack(Entity* self) { u16 selfIdx=(u16)(self - World.instances); float radius = npcTable[self->index - 419].attack3Radius; float force=npcTable[self->index - 419].attack3Force; V3 epos = ai_sight_pos(self); DamageData dd = SetNPCData(self, 3); dd.damage = GetDamageTakeAmount(&dd); ApplyImpactForceSphere(&dd, epos, radius, force); DamageData selfdd = SetNPCData(self, 3); TakeDamage(selfIdx, selfdd); }
