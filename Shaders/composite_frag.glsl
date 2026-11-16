@@ -28,11 +28,12 @@ layout(location = 28) uniform float staticIntensity;
 layout(location = 29) uniform uint grayscaleEnabled;
 layout(location = 30) uniform float sunYaw; /*CPU-computed sun yaw phase (rotates smoothly with the same shared clock the chunk sun shadow direction uses); replaces timeVal*skyRotateSpeed so the sky sun and the shadow angle stay bit-exact and rotate without any quantization mismatch*/
 layout(location = 31) uniform sampler2D uiImage;
-layout(location=32) uniform sampler2D inputDepthID;
-layout(location=33) uniform mat4 invViewProj; /*
-layout(location=34) some weird
-layout(location=35) padding apparently, so say some docs anyhow
-layout(location=36) */
+layout(location = 32) uniform sampler2D inputDepthID;
+layout(location = 33) uniform mat4 invViewProj; /*
+layout(location = 34) some weird
+layout(location = 35) padding apparently, so say some docs anyhow
+layout(location = 36) */
+layout(location = 37) uniform float healFlashAlpha;
 const float vhsBlurAmount=0.5 /* Cannot be overstated just how magical and impactful this setting is.  DO NOT EVER TURN OFF EVER!!  I recant my former statement about avoiding blur at all costs in all scenarios.*/,vhsRadiusMax=3.0,staticBandThickness=0.005,staticScrollSpeed=200.0,WORLDCELL_WIDTH_F=2.56,VOXEL_SIZE=0.32,PI=3.14159265359,aaThreshold=0.05;
 // Simplex noise
 vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -121,7 +122,8 @@ void main() {
                     }
                 } vec3 sunDir = normalize(-saturnCenter); float sunSize = 0.009; float sunDist = acos(dot(skyDir, sunDir)); float sunMask = smoothstep(sunSize, sunSize * 0.8, sunDist); vec3 sunColor = vec3(1.0, 0.97, 0.85); float corona = exp(-pow(sunDist / (sunSize * 1.5), 2.0)) * 1.2; skyColor += sunColor * (sunMask * 3.0 + corona * 1.5); // Sun
             } if (grayscaleEnabled > 0){skyColor = Grayscale(skyColor);} vec4 uiSkySample = texture(uiImage,texCoordUsed); FragColor = vec4(mix((color.rgb * max(0.1,color.a)) + skyColor, uiSkySample.rgb, uiSkySample.a), 1.0); // Add window alpha weighted color tint, then the UI on top (sky pixels returned here before ever reaching the UI mix at the end of main, so the UI vanished over the skybox)
-            return;
+            if (healFlashAlpha > 0.9) FragColor.rgb += vec3(0.98823535*.75,0.5803922*.75,0.5647059*.75);
+            else if (healFlashAlpha > 0.1) FragColor.rgb += vec3(0.1,0.1,0.46);
         }
     }
     vec2 ssRatio = vec2(screenWidth/SSR_RES, screenHeight/SSR_RES); ivec2 pixel = ivec2(texCoordUsed * ssRatio);
@@ -130,7 +132,7 @@ void main() {
         reflectionColor.rgb /= 4.51; if (isSky) { FragColor.rgb += reflectionColor.rgb; return; } color.rgb += reflectionColor.rgb;
     }
     vec3 aaColor = color.rgb; vec2 texelSize = 1.0 / vec2(screenWidth,screenHeight);
-    if (aaEnabled > 0.0) {
+    if (aaEnabled > 0.0 && !isSky) {
         vec3 centerColor=texture(tex,texCoordUsed).rgb; float lumaCenter = dot(centerColor,vec3(0.299,0.587,0.114)); vec3 cLeft  = texture(tex,texCoordUsed + vec2(-texelSize.x, 0.0)).rgb; vec3 cRight = texture(tex,texCoordUsed + vec2( texelSize.x, 0.0)).rgb; vec3 cUp = texture(tex,texCoordUsed + vec2(0.0, -texelSize.y)).rgb;
         vec3 cDown  = texture(tex,texCoordUsed + vec2(0.0,  texelSize.y)).rgb;
         float lumaLeft  = dot(cLeft,vec3(0.299,0.587,0.114)); float lumaRight = dot(cRight,vec3(0.299,0.587,0.114)); float lumaUp    = dot(cUp,  vec3(0.299,0.587,0.114)); float lumaDown  = dot(cDown, vec3(0.299,0.587,0.114)); float lumaDx = abs(lumaRight - lumaLeft); float lumaDy = abs(lumaDown  - lumaUp); float gradientMag = max(lumaDx, lumaDy);
@@ -143,5 +145,10 @@ void main() {
     const float r = vhsRadiusMax * vhsBlurAmount; vec3 acc = vec3(0.0); const float w[7] = float[](0.05,0.12,0.20,0.26,0.20,0.12,0.05); for (int i=0;i<7;i++) { float o = (i-3) * (r/3.0); vec3 s = texture(tex, texCoordUsed + vec2(o*texelSize.x,0.0)).rgb; acc += s * w[i]; }
     acc += texture(tex,texCoordUsed + vec2(0.0,-texelSize.y)).rgb * 0.25; acc += texture(tex,texCoordUsed + vec2(0.0, texelSize.y)).rgb * 0.25; vec3 vhsBlur = acc * 0.666666667;/*renormalize*/ aaColor = mix(aaColor, vhsBlur, clamp(vhsBlurAmount, 0.0, 1.0)); // VHS Blur
     if (staticIntensity > 0.0) aaColor += bandedStatic(texCoordUsed);/*Banded Static (red for pain, blue shield/emp effects, etc.)*/ aaColor.rgb = pow(aaColor.rgb, vec3(1.0 / (float(brightnessSetting + 50) / 100.0))); // Brightness Adjustment Setting
-    if (berserkTimeRemaining > 0.0) { vec3 worldPos = reconstructWorldPos(texCoordUsed); if (worldPos != vec3(0.0)) aaColor = applyBerserk(worldPos,aaColor);/*Berserk last as it's a brain effect not an eye effect*/ } if (grayscaleEnabled > 0){aaColor = Grayscale(aaColor);} vec4 uiSample = texture(uiImage,texCoordUsed); FragColor = vec4(mix(aaColor,uiSample.rgb,uiSample.a),1.0);
+    if (berserkTimeRemaining > 0.0) { vec3 worldPos = reconstructWorldPos(texCoordUsed);
+    if (worldPos != vec3(0.0)) aaColor = applyBerserk(worldPos,aaColor);/*Berserk last as it's a brain effect not an eye effect*/ }
+    if (grayscaleEnabled > 0) { aaColor = Grayscale(aaColor); }
+    if (healFlashAlpha > 0.9) aaColor += vec3(0.98823535*.75,0.5803922*.75,0.5647059*.75);
+    else if (healFlashAlpha > 0.1) aaColor += vec3(0.1,0.1,0.46);
+    vec4 uiSample = texture(uiImage,texCoordUsed); FragColor = vec4(mix(aaColor,uiSample.rgb,uiSample.a),1.0);
 }

@@ -153,7 +153,7 @@ void AddItemToInventory(int index, int custIdx) {
     } play_wav(sounds[87], AppliedFXVol(1.0f), (V3){0}, false);
 }
 void CyberTimerReset(u16 self, int diff) { Entity* e = &World.instances[self]; switch (diff) { case 0: e->cyberTimer = 600.0f; break; case 1: e->cyberTimer = 300.0f; break; case 2: e->cyberTimer = 240.0f; break; case 3: e->cyberTimer = 180.0f; break; } }
-void ExitCyberspace() { if (World.curLev != LEVEL_CYBERSPACE) return; Entity* p = &World.instances[PLAYER1]; if (p->cyberHealth <= 0.0f) { p->cyberHealth = 1.0f; } play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false); LoadLevel((World.cyberReturnLevel >= 0 && (u8)World.cyberReturnLevel < MAX_LEVELS) ? (u8)World.cyberReturnLevel : 1, World.cybRetPos); }
+void ExitCyberspace() { if (World.curLev != LEVEL_CYBERSPACE) return; Entity* p = &World.instances[PLAYER1]; if (p->cyberHealth <= 0.0f) { p->cyberHealth = 1.0f; } play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false); LoadLevel((World.cyberReturnLevel >= 0 && (u8)World.cyberReturnLevel < MAX_LEVELS) ? (u8)World.cyberReturnLevel : 1, World.cybRetPos); cyberStaticAlpha = 1.0f; }
 void CyberTimerUpdate(u16 self) { if(World.curLev != LEVEL_CYBERSPACE){return;} Entity* e = &World.instances[self]; if (e->timerFinished >= World.pauseRelativeTime) { return; } e->cyberTimer-=1.0f; e->timerFinished = World.pauseRelativeTime + 1.0; if (e->cyberTimer <= 0.0f) { ExitCyberspace(); return; } }
 float cyberWallFade[INSTANCE_CNT]; static u8 cyberWallWasTouching[INSTANCE_CNT];
 typedef struct { V3 ctr, tip, base; float rad, bound; u8 isCap; } CyberWallToucher; static CyberWallToucher cyberWallTouchers[128]; static u16 cyberWallToucherCount;
@@ -255,7 +255,7 @@ void ButtonSwitchUse(u16 self, u16 activator) {
     if (e->messageIndex >= 0 && e->messageIndex < T_LOGSTR_CNT) CenterStatusPrint("%s",Sys_Text.stringTable[e->messageIndex]); if (e->delay > 0.0f) { e->recentMostActivator = activator; e->delayFinished = World.pauseRelativeTime + e->delay; } else ButtonSwitchUseTargets(self);
 }
 void ButtonSwitchUpdate(u16 self) { double t=World.pauseRelativeTime; Entity* e=&World.instances[self]; if (e->switchAnimFinished > 0.0 && e->switchAnimFinished <= t){ ButtonSwitchHoldPose(e); } if (e->delayFinished > 0.0 && e->delayFinished < t){e->delayFinished=0.0; ButtonSwitchUseTargets(self);} if (e->index == 689 && e->active && e->tickFinished < t) { TextureChangerToggle(self); e->tickFinished=t+1.5f; } }
-void HealingBedUse(u16 self, u16 owner) { Entity* e=&World.instances[self]; if (GetCurrentLevelSecurity() <= UsableOrDef(e->minSecurityLevel,100.0f)) { if(!e->broken){HealthManagerHealingBed(PLAYER1,UsableOrDef(e->amount,170.0f)); World.instances[PLAYER1].radiation=0.0f; World.invP1.radiationArea=false; CenterStatusPrint("%s",Sys_Text.stringTable[23],owner); play_wav(sounds[103], AppliedFXVol(1.0f), World.position[self], false);} else {CenterStatusPrint("%s",Sys_Text.stringTable[24],owner);} } else UIBlockedBySecurity(World.position[self]); }
+void HealingBedUse(u16 self, u16 owner) { Entity* e=&World.instances[self]; if (GetCurrentLevelSecurity() <= UsableOrDef(e->minSecurityLevel,100.0f)) { if(!e->broken){HealthManagerHealingBed(PLAYER1,UsableOrDef(e->amount,170.0f)); healFlashFinished = World.pauseRelativeTime + 0.10; World.instances[PLAYER1].radiation=0.0f; World.invP1.radiationArea=false; CenterStatusPrint("%s",Sys_Text.stringTable[23],owner); play_wav(sounds[103], AppliedFXVol(1.0f), World.position[self], false);} else {CenterStatusPrint("%s",Sys_Text.stringTable[24],owner);} } else UIBlockedBySecurity(World.position[self]); }
 int GeneralInvItem(int slot) { if (slot<0 || slot>=14) return -1; if (!slot) return 81; int item=World.invP1.genInvIdxRef[slot]; if (item<0) return -1; item=UseableFromConst(item); return IdxIsGenericItem(item + 307) ? item : -1; }
 bool GeneralInvCanVaporize(int slot) { int item=GeneralInvItem(slot); return slot>0 && item>=0 && (item<6 || item==33 || item==35 || item==58 || item==62); }
 void GeneralInvRemove(int slot) {
@@ -319,7 +319,7 @@ void ChargeStationUse(u16 self, u16 owner) {
     Entity* e=&World.instances[self]; if (GetCurrentLevelSecurity() > UsableOrDef(e->minSecurityLevel,100.0f)) { UIBlockedBySecurity(World.position[self]); return; }
     if (e->rechargeFinished < World.pauseRelativeTime) {
         if (World.invP1.energy >= 255.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[303]); return; }
-        GiveEnergy(UsableOrDef(e->amount,170.0f),EnergyType_ChargeStation);
+        GiveEnergy(UsableOrDef(e->amount,170.0f),EnergyType_ChargeStation); chargeFlashFinished = World.pauseRelativeTime + 0.10;
         if (e->damage > 0.0f) { DamageData dd={0}; dd.damage = vmin(e->damage,World.instances[PLAYER1].health - 1.0f); /*zap, never lethal*/ if (dd.damage > 0.0f) TakeDamage(PLAYER1,dd); } if (e->usedMsgLingdex < T_LOGSTR_CNT) { CenterStatusPrint("%s",Sys_Text.stringTable[e->usedMsgLingdex]); } if (e->requireRecharge) { e->rechargeFinished = World.pauseRelativeTime + UsableOrDef(e->resetTime,150.0f); } UseTargets(owner,e->targetIdx);
     } else if (e->rechargeMsgLingdex < T_LOGSTR_CNT) CenterStatusPrint("%s",Sys_Text.stringTable[e->rechargeMsgLingdex]);
 }

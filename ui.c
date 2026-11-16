@@ -746,6 +746,7 @@ void DrawSensaroundQuad(i16 x, i16 y, i16 w, i16 h, u8 camViewIdx) {// Draw the 
         glVertexAttribFormat(1,3,GL_FLOAT,GL_FALSE,3*sizeof(float));    glVertexAttribBinding(1,0); glEnableVertexAttribArray(1); /*normal xyz float*/
         glVertexAttribFormat(2,2,GL_FLOAT,GL_FALSE,6*sizeof(float));    glVertexAttribBinding(2,0); glEnableVertexAttribArray(2); /*uv xy float*/
         glBindVertexBuffer(0,sensaroundVBO,0,8*sizeof(float));
+        glBindBuffer(GL_ARRAY_BUFFER,sensaroundVBO); glBufferData(GL_ARRAY_BUFFER,6*8*sizeof(float),NULL,GL_DYNAMIC_DRAW);
     }
     float verts[6*8],*p=verts;/*pos3 normal3 uv2; 2 triangles.  Top row (world y=0, screen top) gets v=1, bottom row v=0: camview texture v=0 is the GL framebuffer bottom (ground), so this keeps the image upright.*/
     #define SENVA(x,y,u,v) { float*n=p; n[0]=(x);n[1]=(y);n[2]=0.0f;n[3]=0.0f;n[4]=1.0f;n[5]=0.0f;n[6]=u;n[7]=v; p+=8; }

@@ -779,7 +779,7 @@ void LoadLevel(u8 curlevel, V3 pos) {
     World.position[PLAYER1] = pos; World.velocity[PLAYER1] = (V3){0.0f,0.0f,0.0f};
     World.invP1.lastVelY = 0.0f; World.invP1.wasGrounded = true; World.invP1.ladderState = 0; World.invP1.noiseFinished=World.pauseRelativeTime - 1.0;
     if (curlevel == LEVEL_CYBERSPACE) {
-        World.cybRecallPnt = World.position[PLAYER1]; World.col[PLAYER1] = CT_SPH; World.colliderSize[PLAYER1] = (V3){0.48f,0.48f,0.48f}; World.colliderCenter[PLAYER1] = (V3){0.0f,0.0f,0.0f}; World.radius[PLAYER1] = 0.48f; World.instances[PLAYER1].hasGrav = false; if (prevLevel != LEVEL_CYBERSPACE) { play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false); CyberTimerReset(PLAYER1,World.diffCyb); cyberGolBuilt = 0;
+        World.cybRecallPnt = World.position[PLAYER1]; World.col[PLAYER1] = CT_SPH; World.colliderSize[PLAYER1] = (V3){0.48f,0.48f,0.48f}; World.colliderCenter[PLAYER1] = (V3){0.0f,0.0f,0.0f}; World.radius[PLAYER1] = 0.48f; World.instances[PLAYER1].hasGrav = false; if (prevLevel != LEVEL_CYBERSPACE) { play_wav(sounds[81],AppliedFXVol(1.0f),(V3){0},false); CyberTimerReset(PLAYER1,World.diffCyb); cyberGolBuilt = 0; cyberStaticAlpha = 1.0f;
         World.instances[PLAYER1].timerFinished = World.pauseRelativeTime + 1.0; }
     } else {
         World.col[PLAYER1] = CT_CAP; World.colliderSize[PLAYER1] = (V3){0.48f,2.0f * World.invP1.currentCrouchRatio,1.0f}; World.colliderCenter[PLAYER1].y = -PLYR_CAM_OFS_Y + (2.0f - World.colliderSize[PLAYER1].y) * 0.5f; World.instances[PLAYER1].hasGrav = true;

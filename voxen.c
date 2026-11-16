@@ -3,8 +3,8 @@
 #include "credits.h"
 #include "Shaders/shaders.h"
 GlobalContext World = {0}; // Full game state
-double game_start_time,game_actual_start_time,shadowTime,physTime,renderTime,prePhys,gameTime,raycastMs,last_mouse_x,last_mouse_y;
-float rasterPerspectiveProjection[16],modelMatrices[INSTANCE_CNT*16],*world_from_mdl = modelMatrices,modelBounds[MAX_MDLS],**physPos,lightView[MAX_SHADOWMAPS][6][4][4],lightViewProj[MAX_SHADOWMAPS][6][16],shadowmapsPerspectiveProjection[16],sunShadowMatrix[16],berserkSeedTime;
+double game_start_time,game_actual_start_time,shadowTime,physTime,renderTime,prePhys,gameTime,raycastMs,last_mouse_x,last_mouse_y,healFlashFinished,chargeFlashFinished;
+float rasterPerspectiveProjection[16],modelMatrices[INSTANCE_CNT*16],*world_from_mdl = modelMatrices,modelBounds[MAX_MDLS],**physPos,lightView[MAX_SHADOWMAPS][6][4][4],lightViewProj[MAX_SHADOWMAPS][6][16],shadowmapsPerspectiveProjection[16],sunShadowMatrix[16],berserkSeedTime,cyberStaticAlpha;
 static float shakeAmp = 0.15f,amMapScaleX,amMapScaleY,amMapOffsetX;
 size_t scratch_peak,cvxAdjOffsetBytes[MAX_UNIQUE_CVX_MESHES],cvxAdjListBytes[MAX_UNIQUE_CVX_MESHES];
 static u32 globalframesPerLastSecond,inputImageID,inputUIID,inputDepthID,inputSpecID,inputNormalID,outputImageID,gBufferFBO,uiSP,depthPrepassSP,chunkSP,chunkVAO,matricesBufferID,ssrSP,rtSP,rtCopySP,imageBlitSP,quadVAO,quadVBO,rtInstanceInfoID,rtCellCountsID,rtCellListsID,rtGeomID,rtOrderBufID,gpuQ[5][5],wireVertCount,raycastPickMode;
@@ -1516,12 +1516,14 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u32 shieldOnType = 0u/*No shield green tint*/;
     if (World.instances[WORLD].ioflags & QB_ShieldActivated) { shieldOnType=(World.curLev <= 5) ? 1u/*Shielding everywhere*/ : 2u/*Shielding only below, levels 6+*/; }
     glUniform1ui(20,shieldOnType); // Green Shield
-    Color3 painStaticColor = (Color3){1.0f,0.0f,0.0f}; // TODO reuse for blue EMP static effect
+    Color3 painStaticColor = cyberStaticAlpha > 0.0f ? (Color3){1.0f,1.0f,1.0f} : (Color3){1.0f,0.0f,0.0f}; // TODO reuse for blue EMP static effect
     glUniform3f(23,painStaticColor.r, painStaticColor.g, painStaticColor.b);
     glUniformMatrix4fv(24,1,0,viewProj);
     glUniformMatrix3fv(25,1,0,invViewRot);
     glUniform1i(27,0);
-    glUniform1f(28,vclamp(World.painStaticAlpha + World.empStaticAlpha, 0.0f, 1.0f));
+    glUniform1f(28,vclamp(World.painStaticAlpha + World.empStaticAlpha + cyberStaticAlpha,0.0f,1.0f));
+    float flash = World.pauseRelativeTime < healFlashFinished ? 1.0f : 0.0f; if (World.pauseRelativeTime < chargeFlashFinished) flash = 0.5f;
+    glUniform1f(37,flash);
     glUniform1ui(29,(u32)((World.invP1.hasHardware & HW_INF) && (World.invP1.hardwareIsActive & HW_INF) > 0));
     glBindVertexArray(quadVAO);
     glDisable(GL_DEPTH_TEST);
@@ -1895,8 +1897,9 @@ i32 main() {
     while(1) {
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad,queuedLevelPos); queuedLevelToLoad = 255u; continue; }
         double curtime = get_time(); raycastCalls = 0; raycastMs = 0.0; World.dt = World.current_time < 0.001f ? 0.000f : vmax(curtime - World.current_time, 0.0); World.absoluteTime += World.dt; World.current_time = curtime;
-        World.painStaticAlpha = vmax(0.0f, World.painStaticAlpha - (float)World.dt * 2.0f);
-        World.empStaticAlpha = vmax(0.0f, World.empStaticAlpha - (float)World.dt * 4.0f);
+        World.painStaticAlpha = vmax(0.0f,World.painStaticAlpha - (float)World.dt * 2.0f);
+        World.empStaticAlpha = vmax(0.0f,World.empStaticAlpha - (float)World.dt * 4.0f);
+        cyberStaticAlpha = vmax(0.0f,cyberStaticAlpha - (float)World.dt * 1.0f);
         if (!World.paused && !World.menuActive) { if (World.pauseRelativeTime < 0.001f) { World.pauseRelativeTime = World.last_physics_time = curtime; } World.pauseRelativeTime += World.dt * World.timeScale; /*Reflex slow-time at 0.25x while the patch is active, mouse-look stays raw*/ }
         double input_start = get_time(); InputProcessing();/*Before anims and physics to allow them to respond immediately.*/ UpdateAnims();/*Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.*/
         prePhys = get_time() - input_start;
