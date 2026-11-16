@@ -1,6 +1,6 @@
 // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
 #include "common.h"
-typedef struct { u16 x,z; } PortalCell; typedef struct { PortalCell cellA,cellB; bool portalNS,open,dirty; u8 lev;} Portal;
+typedef struct { u16 x,z; } PortalCell; typedef struct { PortalCell cellA,cellB; bool portalNS,open,dirty; u8 lev; u16 owner; } Portal;
 u32 gridCellStates[ARRSIZE]; static u32 precomputedVisibleCellsFromHere[524288];/*4096 * 4096 / 32*/ u16 playerCellIdx = 0u; bool instanceIsLODArray[INSTANCE_CNT]; static Portal activePortals[MAX_PORTALS]; u32 numActivePortals = 0; bool cullVisibilityValid;
 bool get_cull_bit(const u32* arr, int idx) { return (arr[idx >> 5] >> (idx & 31)) & 1; }
 INLINE void set_cull_bit(u32* arr, int idx, bool val) {u32* w = arr + (idx >> 5); u32 m = 1U << (idx & 31); *w = val ? (*w | m) : (*w & ~m);}
@@ -43,14 +43,14 @@ void AddDoorPortal(u16 entIdx, u16 parent) {
                 //             South pair\/
         PortalCell cellN = (PortalCell){PosGetCellCoordX(obj_x), (cellN_idx != cellCurrent) ? cellIndexUp : PosGetCellCoordZ(obj_z)}; // Ensure that cellA is always the north cell of the pair
         PortalCell cellS = (PortalCell){                cellN.x, (cellS_idx != cellCurrent) ? cellIndexDn : PosGetCellCoordZ(obj_z)};
-        activePortals[numActivePortals] = (Portal){ .cellA=cellN, .cellB=cellS, .portalNS=true, .open=isOpen, .dirty=true, .lev=World.curLev };
+        activePortals[numActivePortals] = (Portal){ .cellA=cellN, .cellB=cellS, .portalNS=true, .open=isOpen, .dirty=true, .lev=World.curLev, .owner=parent };
     } else { // Portal is an East<>West pair
         PortalCell cellE = (PortalCell){(cellE_idx != cellCurrent) ? cellIndexRight : PosGetCellCoordX(obj_x), PosGetCellCoordZ(obj_z)}; // Ensure that cellA is always the east cell of the pair
         PortalCell cellW = (PortalCell){(cellW_idx != cellCurrent) ?  cellIndexLeft : PosGetCellCoordX(obj_x), cellE.z};
-        activePortals[numActivePortals] = (Portal){ .cellA=cellE, .cellB=cellW, .portalNS=false, .open=isOpen, .dirty=true, .lev=World.curLev };
+        activePortals[numActivePortals] = (Portal){ .cellA=cellE, .cellB=cellW, .portalNS=false, .open=isOpen, .dirty=true, .lev=World.curLev, .owner=parent };
     } numActivePortals++;
 }
-bool ToggleDoorPortal(u32 p, u16 dr, u16 closedMdx) { if (p>=numActivePortals) return false; Portal* prt=&activePortals[p]; bool open=World.instances[dr].modelIndex!=closedMdx; if (prt->open==open) return false; prt->open=open; prt->dirty=true; return true; }
+bool ToggleDoorPortal(u32 p, u16 dr, u16 closedMdx) { if (p>=numActivePortals || activePortals[p].owner != dr) return false; Portal* prt=&activePortals[p]; bool open=World.instances[dr].modelIndex!=closedMdx; if (prt->open==open) return false; prt->open=open; prt->dirty=true; return true; }
 void ForceDoorPortalOpen(u16 p) { if (p >= numActivePortals) {return;} activePortals[p].open = true; activePortals[p].dirty = true; } // Used at load for doors that start open/ajar. Bounds-checked so non-portal doors (portalIndex==0 default) can't corrupt portal 0.
 i32 CastRayCellCheck(i32 x, i32 z, i32 lastX, i32 lastZ, u32* cs) {
     if (lastX != x || lastZ != z) {

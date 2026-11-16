@@ -884,6 +884,7 @@ void UpdateAnims(void) {
         if (e->currentFrameFinished >= timePerFrame) {
             u32 framesToAdvance = (u32)(e->currentFrameFinished / timePerFrame), frameCount = clip->frameEnd - clip->frameStart + 1; u16 prevFrame = e->frame;
             e->currentFrameFinished -= (double)framesToAdvance * timePerFrame; e->frame = clip->frameStart + ((e->frame - clip->frameStart + framesToAdvance) % frameCount); e->modelIndex = clip->frameStartModelIndex + (e->frame - clip->frameStart);
+            if (IdxIsDoor(e->index) && (e->clip == A_OPENING || e->clip == A_CLOSING) && (u32)prevFrame - clip->frameStart + framesToAdvance >= frameCount) { e->frame = clip->frameEnd; e->modelIndex = clip->frameStartModelIndex + (clip->frameEnd - clip->frameStart); }
             if (e->frame != prevFrame) e->animFinished = World.current_time;
             if (e->index == 585 && e->frame == 16) { /*prop_sparkingwire sparks effects*/ V3 sparkPos = V3Add(World.position[i],(V3){0.0f,-0.88f * World.scale[i].y,0.0f}); PlaySparkSound(sparkPos); SpawnImpactParticleForPrefab(729,sparkPos,(V3){0.0f,1.0f,0.0f}); ai_effect_flash(sparkPos,(Color3){0.9f,0.8f,0.6f},2.84f,4.0f,0.2f); }
             if (IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, mdlAnimClips[e->animationNum][A_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;

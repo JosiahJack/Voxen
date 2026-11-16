@@ -890,6 +890,19 @@ void UpdateScreenSize(i32 width, i32 height) {
 Quaternion vWepRot[16]={{0,.67623f,.73802f,0},{-.67623f,0,0,.73802f},{.10363f,0,0,.99456f},{0,.66976f,.74389f,0},{0,.68903f,.72611f,0},{.1797f,.44528f,0,.87717f},{.31511f,.13789f,0,.93898f},{.63662f,0,0,-.77238f},{0,.63662f,.77238f,0},{-.67623f,0,0,.73802f},{0,-.70781f,-.70781f,0},{0,-.65003f,-.76116f,0},{-.44581f,-.44581f,-.55061f,.55061f},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0}};                        
         V3 vWepOfs[16]={{      0,-.54f,.451f},        {0,-.5f,0.28f},  {-.015f,-.34f,.18f},       {0,-.43f,.27f},     {0,-0.57f,0.56f},{-.1484f,-1.1557f,.6663f},{.4667f,-.4741f,2.0903f},        {0,-.39f,.02f},       {0,-.54f,.44f},        {0,-.58f,.43f},     {-.02f,-.64f,.79f},         {0,-.46f,.43f},                       {0,-.5f,.08f},       {0,-.62f,.69f},       {0,-.55f,.58f},       {0,-.56f,.55f}};
 extern const u16 wepModelIndices[16];
+void UpdateWeaponViewModel() {
+    u16 wvi = World.weaponVModelIndex;
+    if (wvi > 0 && wvi < INSTANCE_CNT) {
+        int wep16 = Get16WeaponIndexFromConstIndex(World.instances[wvi].index);
+        if (wep16 >= 0 && wep16 < 16 && World.instances[wvi].modelIndex < MAX_MDLS) {
+            V3 weaponViewOffset = vWepOfs[wep16];
+            weaponViewOffset.y += wfx.reloadContainerPos.y;
+            weaponViewOffset = V3Add(weaponViewOffset, debugWepOffset);
+            World.position[wvi] = V3Add(World.position[PLAYER1], quat_rot_v3(World.rotation[PLAYER1], weaponViewOffset));
+            World.rotation[wvi] = quat_multiply(World.rotation[PLAYER1], vWepRot[wep16]);
+        }
+    }
+}
 static bool clearRenderTargetsOnNextFrame = false;
 // CPU automap, side MFD, 320x200
 static u8 amPx[AM_W*AM_H*4],amFullPx[AM_FULL_W*AM_FULL_H*4],amBuiltLev=255,amMdlState[MAX_MDLS]/*0=unknown,1=ok,2=no mesh*/,amMdlWall[MAX_MDLS]/*1=wall-like (draw), 0=floor-like (skip)*/,amHullN[MAX_MDLS],amCardState[MAX_MDLS]/*0=unknown,1=ok*/,amRadCells[ARRSIZE],amElevCells[ARRSIZE],amDiagCell[ARRSIZE],amDoorXR[256]/*1=X-running span, 0=Z-running*/;
@@ -1906,7 +1919,7 @@ i32 main() {
         prePhys = get_time() - input_start;
         if (!World.paused && !World.menuActive) { double ps = get_time(); float dt = (float)vclamp((World.pauseRelativeTime - World.last_physics_time), 0.0005, 0.1); World.last_physics_time = World.pauseRelativeTime; World.dt = dt; Physics(dt); physTime = get_time() - ps; } else physTime=0.0;
         double gameT_start = get_time(); ModUpdate();/*After physics so mod/gamecode can modify velocities before next frame.*/ BioMonitorUpdate(); RessurectionTextUpdate(); if (!World.paused && !World.menuActive){ PSys_Update(World.dt); }/*Particles*/ UpdateAudio();/*Updates states, music triggers, ambients, etc.*/ gameTime = get_time() - gameT_start;
-        if (likely((!World.paused && !World.menuActive) || Cheats.editMode)) { UpdateInstanceMatrix4x4s(); /*Before camviews so camview shadows render same as main pass*/ }
+        if (likely((!World.paused && !World.menuActive) || Cheats.editMode)) { UpdateWeaponViewModel(); UpdateInstanceMatrix4x4s(); /*Before camviews so camview shadows render same as main pass*/ }
         drawCalls = uiDrawCalls = shadDrawCalls = vertsRendered = 0;
         UpdateSensaroundCamViews(); RenderCameraViews();/*Before main Render() so that tv screens are up to date*/ if(likely(!World.paused && !World.menuActive)) { CullCore(); } /*Before automap and audio update due to audio occlusion and automap FoW discovery*/ AudioUpdateMix();/*Actually mixes all the audio for output.*/ AutomapTick();
         Render(false/*!camview*/,0u);
