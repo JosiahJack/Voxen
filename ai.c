@@ -287,7 +287,7 @@ static void AIDying(u16 i) {
         World.layer[i] = L_Corpse | L_CorpseSearchable;
         flag_set(&World.instances[i].entflags,EF_FIRST_SIGHTING,true);
         double deathWait = npc->tTillDead;
-        if (gibs) { double animWait = AIDeathAnimationDuration(&World.instances[i]); if (animWait > deathWait) deathWait = animWait; }
+        if (gibs && npcID != 18) { double animWait = AIDeathAnimationDuration(&World.instances[i]); if (animWait > deathWait) deathWait = animWait; }
         World.instances[i].tTillDeadFinished = World.pauseRelativeTime + deathWait;
         const u16 npcDeathTexture[NUM_AI_TYPES] = { [16] = 564 }; /*npc_invisomut_dead.png*/
         if (npc->switchMaterialOnDeath && npcDeathTexture[npcID] != 0) { World.instances[i].texIndex = npcDeathTexture[npcID]; }
@@ -307,7 +307,7 @@ static void AIDead(u16 idx) {
     else if (World.instances[idx].index == 419) { DeleteInstance(idx); } /*Autobomb removes self*/
     else if (npcID < NUM_AI_TYPES && npcGibRanges[npcID].first != 0) {
         NPCGibRange range = npcGibRanges[npcID]; V3 gibPos = World.position[idx]; Quaternion gibRot = World.rotation[idx];
-        if (World.instances[idx].index == 437) { float servHalf = (180.0f + -99.0f/*gibs are oriented different from the parent*/) * (PI / 180.0f) * 0.5f; Quaternion servYaw = {0.0f,vsinf(servHalf),0.0f,vcosf(servHalf)}; gibRot = quat_multiply(servYaw,gibRot); gibPos = V3Add(gibPos,V3_ScaleByF(self->right,0.32f)); }
+        if (World.instances[idx].index == 437) { float servHalf = (180.0f + -99.0f/*gibs are oriented different from the parent*/) * (PI / 180.0f) * 0.5f; Quaternion servYaw = {0.0f,vsinf(servHalf),0.0f,vcosf(servHalf)}; gibRot = quat_multiply(servYaw,gibRot); V3 servGibMean = {0.0f,0.0f,0.0f}; for (u16 gc = range.first; gc <= range.last; ++gc) { u16 gm = EDefs[gc].modelIndex; servGibMean = V3Add(servGibMean, V3_ScaleByF(V3Add(modelMin[gm], modelMax[gm]), 0.5f)); } servGibMean = V3_ScaleByF(servGibMean, 1.0f / (float)(range.last - range.first + 1)); gibPos = V3_AsubB(gibPos, quat_rot_v3(gibRot, servGibMean)); }
         for (u16 gibConst=range.first;gibConst<=range.last;++gibConst) {
             u16 gib = SpawnDynamicObject(gibConst); if (!EntIdxIsValid(gib) || gib == idx) continue;
             World.position[gib] = gibPos; World.rotation[gib] = gibRot; World.velocity[gib] = (V3){0.0f, World.velocity[idx].y, 0.0f}; World.instances[gib].hasGrav = true;             World.layer[gib] = L_Corpse;

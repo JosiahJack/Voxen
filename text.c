@@ -244,6 +244,73 @@ void BuildAtlasCPU(int* numPacked, font_packedchar* packedChars, float* fixedNum
         } int idx=(*numPacked)++; cpPackedIndex[fontID][cp]=(u16)idx; if(cp>='0' && cp<='9') *fixedNumAdv=vmax(*fixedNumAdv,bc->xadvance);
     }
 }
+typedef struct { u16 cp; u32 off; u8 w, h; float xoff, yoff, xadv; } Font0CacheEntry;
+static Font0CacheEntry font0Cache[64];
+static u32 font0CacheCnt = 0;
+static u8* font0CacheBmp = NULL;
+void Font0CacheBuild(const u16* cps, u32 n) {
+    if (font0CacheBmp) return;
+    if (n > 64) n = 64;
+    u32 total = 0;
+    for (u32 i = 0; i < n; ++i) {
+        u32 cp = cps[i];
+        int idx = (cp < 65536u) ? cpPackedIndex[FONT_NORMAL][cp] : 0;
+        const font_packedchar* b = fontPackedChar + idx;
+        int rw = (int)b->x1 - (int)b->x0, rh = (int)b->y1 - (int)b->y0;
+        if (rw < 0) rw = 0;
+        if (rh < 0) rh = 0;
+        int w1 = rw / 3, h1 = rh / 3;
+        if (rw % 3) w1++;
+        if (rh % 3) h1++;
+        if (w1 > 64) w1 = 64;
+        if (h1 > 64) h1 = 64;
+        font0Cache[font0CacheCnt] = (Font0CacheEntry){(u16)cp, total, (u8)w1, (u8)h1, b->xoff, b->yoff, b->xadvance};
+        font0CacheCnt++;
+        total += (u32)w1 * (u32)h1;
+    }
+    font0CacheBmp = OS_Alloc(total ? total : 1);
+    mset(font0CacheBmp, 0, total ? total : 1);
+    for (u32 i = 0; i < font0CacheCnt; ++i) {
+        Font0CacheEntry* e = &font0Cache[i];
+        if (!e->w || !e->h) continue;
+        int idx = cpPackedIndex[FONT_NORMAL][e->cp];
+        const font_packedchar* b = fontPackedChar + idx;
+        int rw = (int)b->x1 - (int)b->x0, rh = (int)b->y1 - (int)b->y0;
+        u8* dst = font0CacheBmp + e->off;
+        for (int oy = 0; oy < e->h; ++oy) {
+            for (int ox = 0; ox < e->w; ++ox) {
+                u32 sum = 0, cnt = 0;
+                for (int ay = 0; ay < 3; ++ay) {
+                    int sy = oy * 3 + ay;
+                    if (sy >= rh) break;
+                    for (int ax = 0; ax < 3; ++ax) {
+                        int sx = ox * 3 + ax;
+                        if (sx >= rw) break;
+                        sum += fontBmp1[(b->y0 + sy) * FONT_ATLAS_SIZE + (b->x0 + sx)];
+                        cnt++;
+                    }
+                }
+                dst[oy * e->w + ox] = cnt ? (u8)(sum / cnt) : 0;
+            }
+        }
+    }
+}
+int Font0CacheGet(u32 cp, const u8** bmp, int* w, int* h, float* xoff, float* yoff, float* xadv) {
+    for (u32 i = 0; i < font0CacheCnt; ++i) {
+        if (font0Cache[i].cp != cp) continue;
+        *bmp = (font0Cache[i].w && font0Cache[i].h) ? font0CacheBmp + font0Cache[i].off : NULL;
+        *w = font0Cache[i].w;
+        *h = font0Cache[i].h;
+        *xoff = font0Cache[i].xoff;
+        *yoff = font0Cache[i].yoff;
+        *xadv = font0Cache[i].xadv;
+        return 1;
+    }
+    *bmp = NULL;
+    *w = *h = 0;
+    *xoff = *yoff = *xadv = 0.0f;
+    return 0;
+}
 void InitFontAtlasses() {
     FHandle fd1,fd2;int sz1,sz2; fontData[0]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[0],&fd1,&sz1); fontData[1]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[1],&fd2,&sz2); if (!fontData[0] || !fontData[1]) { DualLogError("Failed to load font\n"); OS_Exit(1); }
     if(!font_InitFont_internal(&fontInfo[0],fontData[0],0)){DualLogError("%s font init failed\n",fontPaths[0]); OS_Exit(1);}

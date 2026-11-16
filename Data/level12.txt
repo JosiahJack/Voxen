@@ -1192,7 +1192,7 @@ constIndex:586|lP.x:5.552|lP.y:196.5875|lP.z:18.562|lR.x:-.70711|lR.w:.70711
 constIndex:541|lP.x:5.94|lP.y:191.523|lP.z:-21.00999|lR.x:-.51685|lR.y:-.53901|lR.z:.48256|lR.w:.45768
 constIndex:541|lP.x:25.181|lP.y:197.8611|lP.z:-12.24|lR.x:-.65317|lR.y:-.27065|lR.z:-.27055|lR.w:.6534
 constIndex:593|lR.y:0.38268|lR.w:0.92388|lS.x:0.05|lS.y:0.05|text:DELTA|lingdex:634|texIndex:1225|lP.x:19.689|lP.y:196.834|lP.z:16.206|tAl:1|tLs:0.8
-constIndex:597|lP.x:-10.346|lP.y:194.98|lP.z:1.181|size.x:1|size.y:1|size.z:1
+constIndex:597|lP.x:-10.346|lP.y:194.98|lP.z:1.181|lS.y:2.4|size.x:1|size.y:1|size.z:1
 constIndex:712|lP.x:35.71893|lP.y:194.942|lP.z:-1.69238|SFXClip:230|playEverywhere:1|burstemittcnt1:15|burstemittcnt2:30|targetname:g4jettisonenable|AudioSource.enabled:1|clip.name:vox_safetyinterlockdisabled
 constIndex:710|lP.x:35.362|lP.y:194.9458|lP.z:-1.78|lR.x:-.70711|lR.w:.70711|GroveDeltaJettisonEnabled:1|targetname:g4jettisonenable
 constIndex:658|lP.x:8.802|lP.y:193.848|lP.z:-22.84499|lR.y:.70711|lR.w:-.70711

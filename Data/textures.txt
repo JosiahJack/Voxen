@@ -1969,6 +1969,7 @@ index: 907
 transparent: 1
 #Textures/UI/buttonborder_orange.png
 index: 908
+cpuresident: 1
 #Textures/UI/frobicons/hw_sensaround.png
 index: 909
 transparent: 1
@@ -2429,6 +2430,7 @@ index: 1086
 transparent: 1
 #Textures/UI/vaporizebutton_outline.png
 index: 1087
+cpuresident: 1
 transparent: 1
 #Textures/sequences/ammo_magcart_00.png
 index: 1088

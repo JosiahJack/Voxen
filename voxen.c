@@ -1861,6 +1861,7 @@ void InitalizeEnvironment() {
     glUseProgram(textSP); glUniform1i(1,2);
     GenerateAndBindTexture(&inputUIID, GL_RGBA8, UI_W, UI_H, GL_RGBA, GL_UNSIGNED_BYTE, 0x2600/*GL_NEAREST*/, NULL);/*UI Fixed Size Raster*/ glGenFramebuffers(1, &uiFBO); glBindFramebuffer(GL_FRAMEBUFFER, uiFBO); glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, inputUIID);
     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,inputUIID,0); u32 drawBuffersUI[] = {GL_COLOR_ATTACHMENT0}; glDrawBuffers(1,drawBuffersUI); glBindImageTexture(0,inputUIID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);/* UI Rendered Color*/
+    MinigameInit();
     RenderLoading("Loading...");
     float* m = shadowmapsPerspectiveProjection, lightRangeMax = 15.36f; float viewRange = (lightRangeMax - 0.02f);
     m[0] = 1.0f; m[1] = 0.0f; m[2] = 0.0f; m[3] = 0.0f; m[4] = 0.0f; m[5] = 1.0f; m[6] = 0.0f; m[7] = 0.0f; m[8] = 0.0f; m[9] = 0.0f; m[10] = -(lightRangeMax + 0.02f) / viewRange; m[11] = -1.0f; m[12] = 0.0f; m[13] = 0.0f; m[14] = -2.0f * lightRangeMax * 0.02f / viewRange; m[15] = 0.0f;
@@ -1921,7 +1922,7 @@ i32 main() {
         double gameT_start = get_time(); ModUpdate();/*After physics so mod/gamecode can modify velocities before next frame.*/ BioMonitorUpdate(); RessurectionTextUpdate(); if (!World.paused && !World.menuActive){ PSys_Update(World.dt); }/*Particles*/ UpdateAudio();/*Updates states, music triggers, ambients, etc.*/ gameTime = get_time() - gameT_start;
         if (likely((!World.paused && !World.menuActive) || Cheats.editMode)) { UpdateWeaponViewModel(); UpdateInstanceMatrix4x4s(); /*Before camviews so camview shadows render same as main pass*/ }
         drawCalls = uiDrawCalls = shadDrawCalls = vertsRendered = 0;
-        UpdateSensaroundCamViews(); RenderCameraViews();/*Before main Render() so that tv screens are up to date*/ if(likely(!World.paused && !World.menuActive)) { CullCore(); } /*Before automap and audio update due to audio occlusion and automap FoW discovery*/ AudioUpdateMix();/*Actually mixes all the audio for output.*/ AutomapTick();
+        UpdateSensaroundCamViews(); RenderCameraViews();/*Before main Render() so that tv screens are up to date*/ if(likely(!World.paused && !World.menuActive)) { CullCore(); } /*Before automap and audio update due to audio occlusion and automap FoW discovery*/ AudioUpdateMix();/*Actually mixes all the audio for output.*/ AutomapTick(); MinigameTick();
         Render(false/*!camview*/,0u);
         if (GetKeyPressed(40)/*Screenshot*/ && World.current_time > World.screenshotTimeout) { Screenshot(); }
         for(i32 i=0;i<MAX_KEYS;++i){ Sys_Input.keyStates[i].pressed = false; } /*Clear input states, can't mset as we want to preserve down(held) state*/

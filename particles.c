@@ -313,7 +313,7 @@ void PSys_Update(float dt) {
                 float y = random_range(-1.0f,1.0f), radial = vsqrtf((1.0f-y*y)>0.0f ? (1.0f-y*y) : 0.0f), radius = random_range(0.0f,em->shapeRadius);
                 dir=quat_rot_v3(em->orientation,(V3){radial*vcosf(angle),y,radial*vsinf(angle)}); part->pos.x=em->position.x+dir.x*radius; part->pos.y=em->position.y+dir.y*radius; part->pos.z=em->position.z+dir.z*radius;
             } else if (em->shapeType == 2) {
-                float halfAngle = em->shapeAngle*0.0174532925f, cosMin = vcosf(halfAngle), y = random_range(-1.0f,-cosMin), radial = vsqrtf((1.0f-y*y)>0.0f ? (1.0f-y*y) : 0.0f);
+                float halfAngle = em->shapeAngle*0.0174532925f, cosMin = vcosf(halfAngle), y = random_range(cosMin,1.0f), radial = vsqrtf((1.0f-y*y)>0.0f ? (1.0f-y*y) : 0.0f);
                 V3 localDir = (V3){radial*vcosf(angle),y,radial*vsinf(angle)}; float radius = random_range(0.0f,em->shapeRadius); V3 offset = quat_rot_v3(em->orientation,(V3){localDir.x,0.0f,localDir.z});
                                              dir = quat_rot_v3(em->orientation,localDir);                                                 part->pos = (V3){em->position.x+offset.x*radius,em->position.y,em->position.z+offset.z*radius};
             } else if (em->shapeType == 3) { dir = quat_rot_v3(em->orientation,(V3){0,1,0});                                              part->pos = em->position; }

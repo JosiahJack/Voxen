@@ -510,8 +510,8 @@ void UI_WireNodeClick(bool rh,int node) {
 void UI_WireClose() { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredPWP=U16_MAX; World.Sys_UI.pw_solved=false; World.Sys_UI.pw_selectedWire=-1; SysUIDataClose(); }
 void UI_BlockedClose() { World.Sys_UI.mouseClickHeldOverGUI=true; SysUIDataClose(); }
 void UI_SysAnalyzerClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; MFD_CloseData(); }
-void UI_MinigameStart(bool rh,int game) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastMinigameSideRH=rh; if (game<0||game>8) return; if (!World.invP1.hasMinigame) return; World.Sys_UI.mg_current=(i8)game; World.Sys_UI.mg_running[rh?1:0]=true; CenterStatusPrint("%s %s",Sys_Text.stringTable[1021],mgName[game]); play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
-void UI_MinigameInput(bool rh,int x,int y) { (void)rh;(void)x;(void)y; /*The Funpack gameplay engines are not ported yet; a click inside the running view would land here and is only consumed.*/ World.Sys_UI.mouseClickHeldOverGUI=true; }
+void UI_MinigameStart(bool rh,int game) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastMinigameSideRH=rh; if (game<0||game>8) return; if (!World.invP1.hasMinigame) return; World.Sys_UI.mg_current=(i8)game; World.Sys_UI.mg_running[rh?1:0]=true; if (game==1) Mg15Reset(); CenterStatusPrint("%s %s",Sys_Text.stringTable[1021],mgName[game]); play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
+void UI_MinigameInput(bool rh,int x,int y) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.mg_current==1) Mg15Click(rh,x,y); }
 void UI_MinigameBack(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.mg_current<0) return; World.Sys_UI.mg_current=-1; World.Sys_UI.mg_running[rh?1:0]=false; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
 #define LOG_TLINES 8
 #define LOG_PAGE_CHARS 568
@@ -936,14 +936,22 @@ void SideMFD(bool isRH) { // 320x240
                 char sysVal[128]; for (u8 r=0;r<11;++r) { SystemStatusValue(r,sysVal,sizeof(sysVal)); UIRText(MID(isRH,SYS_DESC_0)+r,24+dx,sysRowY[r],T_GREEN,FONT_NORMAL,0.65f,0,Sys_Text.stringTable[474+r]); UIRText(MID(isRH,SYS_VAL_0)+r,200+dx,sysRowY[r],T_GREEN,FONT_NORMAL,0.65f,0,sysVal); }
                 UIRImg(MID(isRH,SYS_CLOSE),closeButtonX+dx,closeButtonY,29,29,899); RenderTextL(closeButtonTextX+dx,closeButtonTextY,T_STOPD_RED,FONT_NORMAL,0.8,"X");
             }
-            if (data==9) {/*Minigames*/
-                RenderUIImage(21+dx,501,262,262,1025);/*MinigamesContainer*/ UIRText(MID(isRH,MINIGAMES_HEADER),28+dx,503,T_RED,FONT_NORMAL,0.8f,0,"TRIOPTIMUM FUNPACK");
-                for (u8 g=0;g<9;++g) { UIRImg(MID(isRH,MINIGAME_0)+g,(i16)(mgX[g]+dx),mgY[g],115,24,0);/*QUAD:builtin-white*/ RenderTextL((i16)(mgX[g]+5+dx),(i16)(mgY[g]+1),T_GREEN,FONT_NORMAL,0.8,"%s",mgName[g]); }
-                UIR(MID(isRH,MINIGAMES_FOOTER),97+dx,726,(i16)(MeasureLineAdvance("Don't Play on",FONT_NORMAL)*0.8f),(i16)(3*22.0f*0.8f)); RenderTextL(97+dx,726,T_RED,FONT_NORMAL,0.8,"Don't Play on\n\nCompany Time");
-                UIRImg(MID(isRH,MINIGAME_VIEW),21+dx,501,262,262,0);/*MinigameView QUAD:none*/
-                if (World.Sys_UI.mg_current<0) { UIRImg(MID(isRH,MINIGAME_CLOSE),closeButtonX+dx,closeButtonY,22,22,899); RenderTextL(closeButtonTextX+dx,closeButtonTextY,T_STOPD_RED,FONT_NORMAL,0.8,"X"); }/*list active, puzzles deactive: close shuts the data tab, returning to the last user-selected tab*/
-                else { UIRImg(MID(isRH,MINIGAME_BACK),closeButtonX+dx,closeButtonY,22,22,899); RenderTextL(closeButtonTextX+dx,closeButtonTextY,T_STOPD_RED,FONT_NORMAL,0.8,"X"); }/*game running: back returns to the list*/
-                RenderTextL(30+dx,545,T_WHITE,FONT_NORMAL,0.8,"PUZZLE SOLVED!"); RenderTextL(91+dx,710,T_WHITE,FONT_NORMAL,0.8,"YOU LOSE");
+            if (data==9) {
+                RenderUIImage(21+dx,501,262,262,1025); UIRText(MID(isRH,MINIGAMES_HEADER),28+dx,503,T_RED,FONT_NORMAL,0.8f,0,"TRIOPTIMUM FUNPACK");
+                if (World.Sys_UI.mg_current==1) {
+                    int mgx = 0, mgy = 0, mgw = 0, mgh = 0;
+                    MgViewRect(isRH, &mgx, &mgy, &mgw, &mgh);
+                    UIR(MID(isRH,MINIGAME_VIEW), (i16)mgx, (i16)mgy, (i16)mgw, (i16)mgh);
+                    MgBlitToUI(isRH);
+                } else {
+                    for (u8 g=0;g<9;++g) { UIRImg(MID(isRH,MINIGAME_0)+g,(i16)(mgX[g]+dx),mgY[g],115,24,0); RenderTextL((i16)(mgX[g]+5+dx),(i16)(mgY[g]+1),T_GREEN,FONT_NORMAL,0.8,"%s",mgName[g]); }
+                    UIR(MID(isRH,MINIGAMES_FOOTER),97+dx,726,(i16)(MeasureLineAdvance("Don't Play on",FONT_NORMAL)*0.8f),(i16)(3*22.0f*0.8f)); RenderTextL(97+dx,726,T_RED,FONT_NORMAL,0.8,"Don't Play on\n\nCompany Time");
+                    UIRImg(MID(isRH,MINIGAME_VIEW),21+dx,501,262,262,0);
+                }
+                if (World.Sys_UI.mg_current<0) { UIRImg(MID(isRH,MINIGAME_CLOSE),closeButtonX+dx,closeButtonY,22,22,899); RenderTextL(closeButtonTextX+dx,closeButtonTextY,T_STOPD_RED,FONT_NORMAL,0.8,"X"); }
+                else if (World.Sys_UI.mg_current==1) { UIRImg(MID(isRH,MINIGAME_BACK),closeButtonX+dx,501,22,22,899); RenderTextL(closeButtonTextX+dx,511,T_STOPD_RED,FONT_NORMAL,0.8,"X"); }
+                else { UIRImg(MID(isRH,MINIGAME_BACK),closeButtonX+dx,closeButtonY,22,22,899); RenderTextL(closeButtonTextX+dx,closeButtonTextY,T_STOPD_RED,FONT_NORMAL,0.8,"X"); }
+                if (World.Sys_UI.mg_current!=1) { RenderTextL(30+dx,545,T_WHITE,FONT_NORMAL,0.8,"PUZZLE SOLVED!"); RenderTextL(91+dx,710,T_WHITE,FONT_NORMAL,0.8,"YOU LOSE"); }
             }
         }
     }

@@ -1,7 +1,15 @@
 // textures.c - 2D Texture Loading System and Texture Animations
 #include "common.h"
 static u8* LoadPng(const u8*,int,int*,int*,PngArena*,u32*,u32*);
-typedef struct { u16 index; bool transparent, doublesided; u8 blend; char path[128]; } TextureData;    typedef struct { TextureData* entries; u32 count, capacity; } TextureDataParser;    typedef struct { u8 r, g, b; } PngPalEntry;    typedef struct { char path[96]; u32 texIdx; } VidFrameRec;    typedef struct { u32 state; u32 frameTexIdx, palSize, w, h; u8* idx; u32* pal; } VidSlot;
+typedef struct { u16 index; bool transparent, doublesided, cpuresident; u8 blend; char path[128]; } TextureData;    typedef struct { TextureData* entries; u32 count, capacity; } TextureDataParser;    typedef struct { u8 r, g, b; } PngPalEntry;    typedef struct { char path[96]; u32 texIdx; } VidFrameRec;    typedef struct { u32 state; u32 frameTexIdx, palSize, w, h; u8* idx; u32* pal; } VidSlot;
+typedef struct { u16 texIdx, w, h; u8* rgba; } CpuResidentEntry;
+static CpuResidentEntry cpuResident[64];
+static u32 cpuResidentCnt = 0;
+const u8* CpuResidentPixels(u16 texIdx, int* w, int* h) {
+    for (u32 i = 0; i < cpuResidentCnt; ++i) if (cpuResident[i].texIdx == texIdx) { *w = cpuResident[i].w; *h = cpuResident[i].h; return cpuResident[i].rgba; }
+    *w = *h = 0;
+    return NULL;
+}
 static u32 g_vidFrameCnt,g_vidPalOffs[VIDEO_RING],g_vidIdxOffs[VIDEO_RING],g_vidTexBase,g_vidReqGen,g_vidReqFrame = 0xFFFFFFFFu,g_vidPreFrame = 0xFFFFFFFFu; static u16 *g_vidFrameMap,g_vidSlotTex[VIDEO_RING]; static VidFrameRec* g_vidFrames; static VidSlot g_vidSlot[VIDEO_RING]; static void* g_vidRingBuf; static i32* g_vidSizesCPU; static PngArena g_vidArena; static OS_Thread g_vidThr;
 static VidFrameRec* vid_find(u32 texIdx) { return texIdx<texCnt && g_vidFrameMap[texIdx] ? &g_vidFrames[g_vidFrameMap[texIdx]-1] : NULL; }
 static const u8 bayer8[64] = { 0,32, 8,40, 2,34,10,42, 48,16,56,24,50,18,58,26, 12,44, 4,36,14,46, 6,38, 60,28,52,20,62,30,54,22, 3,35,11,43, 1,33, 9,41, 51,19,59,27,49,17,57,25, 15,47, 7,39,13,45, 5,37, 63,31,55,23,61,29,53,21};    static u8 first_row_filter[5] = {PNGFMT_NONE, PNGFMT_SUB, PNGFMT_NONE, PNGFMT_AVG_1ST, PNGFMT_SUB};
@@ -54,7 +62,7 @@ u32 VideoFrameTexIndex(u32 texIdx) {
         } if (s->frameTexIdx == texIdx) best = g_vidSlotTex[r];
     } if (best == 0xFFFFFFFFu) return 0xFFFFFFFFu; return best;
 }
-typedef struct { u32 img_x,img_y; i32 img_n,img_out_n; u8 img_depth, img_color_type, img_error; u16 img_palette_count; PngPalEntry img_palette[256]; u8 img_trns[256],*img_buffer,*img_buffer_end; } PngContext;    typedef struct { u8* indices; u32* palette,palSize; i32 w,h; } TexResult;    typedef struct TextureParseTask { u32 texCnt; _Atomic u32* shared_idx; const TextureDataParser* parser; TexResult* results; int tid; } TextureParseTask;
+typedef struct { u32 img_x,img_y; i32 img_n,img_out_n; u8 img_depth, img_color_type, img_error; u16 img_palette_count; PngPalEntry img_palette[256]; u8 img_trns[256],*img_buffer,*img_buffer_end; } PngContext;    typedef struct { u8* indices; u32* palette,palSize; i32 w,h; u8* cpuRgba; } TexResult;    typedef struct TextureParseTask { u32 texCnt; _Atomic u32* shared_idx; const TextureDataParser* parser; TexResult* results; int tid; } TextureParseTask;
 typedef struct { PngContext* s; u8* idata, *expanded, *out; } PngData;    typedef struct { u16 fast[1 << 9], firstcode[16], firstsymbol[16], value[288]; i32 maxcode[17]; u8 size[288]; } PngHuffman;    typedef struct { u8 *zbuffer,*zbuffer_end,*zout,*zout_start; i32 num_bits; u32 code_buffer; PngHuffman z_length,z_distance; } pngzbuf;
 PngArena png_arena_main; static PngArena* thread_png_arenas = NULL; static u32 totalPixels, totalPaletteColors;
 void PngArenaInit(PngArena* arena) { if (!arena->base) { arena->base = OS_Alloc(16777216); arena->cursor = arena->base; arena->end = arena->base + 16777216; } }
@@ -155,6 +163,12 @@ static void* TextureParsingWorker(void* arg) {
         FHandle dummy_fd; int sz = 0; const char* d = (const char*)OS_OpenAndAllocateFileBufferReadonly(t->parser->entries[i].path, &dummy_fd, &sz); if(unlikely(!d || sz <= 0)) continue;
         int w = 0, h = 0; u32 pngPal[256],pSz; u8* pix=LoadPng((const u8*)d,sz,&w,&h,&thread_png_arenas[t->tid],pngPal,&pSz); if (!pix || w < 1 || h < 1) { OS_Free((void*)d,(size_t)sz); continue; }
         u32 nP = (u32)w*h; u8 *idx = (u8*)OS_Alloc(nP); u32 *pal = (u32*)OS_Alloc(256*sizeof(u32));
+        u8* cpuRgba = NULL;
+        if (t->parser->entries[i].cpuresident && pix) {
+            cpuRgba = (u8*)OS_Alloc(nP * 4);
+            if (pSz) { for (u32 p = 0; p < nP; ++p) { u32 c = pngPal[pix[p]]; cpuRgba[p * 4 + 0] = (u8)(c & 255u); cpuRgba[p * 4 + 1] = (u8)((c >> 8) & 255u); cpuRgba[p * 4 + 2] = (u8)((c >> 16) & 255u); cpuRgba[p * 4 + 3] = (u8)((c >> 24) & 255u); } }
+            else mcpy(cpuRgba, pix, nP * 4);
+        }
         if (pSz) { mcpy(idx,pix,nP); mcpy(pal,pngPal,pSz*sizeof(u32)); }
         else {
             u32* exact_hash = (u32*)OS_Alloc(TEXHASH_SZ*sizeof(u32));
@@ -175,7 +189,7 @@ static void* TextureParsingWorker(void* arg) {
             OS_Free(exact_hash,TEXHASH_SZ*sizeof(u32));
             OS_Free(exact_idx,TEXHASH_SZ);
             OS_Free(nearest_cache,32768);
-        } t->results[i] = (TexResult){.indices = idx, .palette = pal, .palSize = pSz, .w = w, .h = h}; OS_Free((void*)d,(size_t)sz);
+        } t->results[i] = (TexResult){.indices = idx, .palette = pal, .palSize = pSz, .w = w, .h = h, .cpuRgba = cpuRgba}; OS_Free((void*)d,(size_t)sz);
     } return NULL;
 }
 static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
@@ -197,7 +211,7 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
                 char *k = s,*v = col + 1, tk[256] = {0}, tv[256] = {0}; while(cEmpty(*k) && k < col) { k++; } while(cEmpty(*v) && v <= le) { v++; } size_t kL = col - k, vL = (le >= v) ? (le - v + 1) : 0;
                 if (kL&&vL) {
                     sCpy2aSubFromb(tk, kL, k, 256); sCpy2aSubFromb(tv, vL, v, 256); char *ke = tk + slen(tk) - 1, *ve = tv + slen(tv) - 1; while(ke>tk&&cEmpty(*ke)) {*ke-- = 0; } while(ve>tv&&cEmpty(*ve)) {*ve-- = 0; }
-                    if (sEqual(tk,"index")) { e.index = parse_numberu16(tv,s,line); } else if (sEqual(tk,"transparent")) { e.transparent = parse_bool(tv,s,line); } else if (sEqual(tk,"doublesided")) { e.doublesided = parse_bool(tv,s,line); } else if (sEqual(tk,"blend")) { e.blend = parse_numberu8(tv,s,line); }
+                    if (sEqual(tk,"index")) { e.index = parse_numberu16(tv,s,line); } else if (sEqual(tk,"transparent")) { e.transparent = parse_bool(tv,s,line); } else if (sEqual(tk,"doublesided")) { e.doublesided = parse_bool(tv,s,line); } else if (sEqual(tk,"blend")) { e.blend = parse_numberu8(tv,s,line); } else if (sEqual(tk,"cpuresident")) { e.cpuresident = parse_bool(tv,s,line); }
                 }
             }
         } if (cur < end && (*cur == '\r' || *cur == '\n')) { cur++; }
@@ -234,6 +248,11 @@ void LoadTextures() {
     for (u16 i=0;i<texCnt;++i) {
         if (!texResults[i].indices) { continue; } u32 numP = (u32)texResults[i].w * texResults[i].h; textureOffsets[i] = g_vidTexBase + pixel_base; texturePaletteOffsets[i] = color_base;
         textureSizes[i*2] = texResults[i].w; textureSizes[i*2 + 1] = texResults[i].h; mcpy(all_indices+pixel_base,texResults[i].indices,numP); mcpy(texturePalettes + color_base, texResults[i].palette, texResults[i].palSize * sizeof(u32)); pixel_base += numP; color_base += texResults[i].palSize; OS_Free(texResults[i].indices,numP); OS_Free(texResults[i].palette,texResults[i].palSize * sizeof(u32));
+    }
+    for (u16 i=0;i<texCnt;++i) {
+        if (!texResults[i].cpuRgba) continue;
+        if (cpuResidentCnt >= 64) { DualLogWarn("cpuresident list full, skipping texture %u\n", i); continue; }
+        cpuResident[cpuResidentCnt++] = (CpuResidentEntry){i, (u16)texResults[i].w, (u16)texResults[i].h, texResults[i].cpuRgba};
     }
     DualLog("total palette colors: %u, total pixels: %u....", totalPaletteColors, totalPixels);
     i32 packed_size = ((i32)totalPixels + 3) / 4 * sizeof(u32); if (packed_size > (i32)MAX_TOTAL_PIXELS || indices_size + ringidx_size > MAX_TOTAL_PIXELS) { DualLogError("colorBufferID too small: need %zu B (textures %zu + video ring %zu), MAX_TOTAL_PIXELS is %u\n",packed_size,(size_t)indices_size,ringidx_size,MAX_TOTAL_PIXELS); OS_Exit(1); }
