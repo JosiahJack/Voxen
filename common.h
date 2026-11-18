@@ -114,7 +114,7 @@ enum {/*Initialization*/ SCRATCH_ARENA_SIZE = 96468992 /*92mb*/,
       /*Animations*/ MAX_ANIMCLIPS = 10, MAXANIM = 59, A_LOOP_ALL = 0, A_IDLE_CLOSED = 0, A_IDLE = 0, A_INACTIVE = 0, A_ATTACK_MISS = 1, A_OPENING = 1, A_WALK = 1, A_ACTIVATE = 1, A_ATTACK_HIT = 2, A_ACTIVATED = 2, A_IDLE_OPEN = 2, A_RUN = 2, A_CLOSING = 3, A_DEACTIVATE = 3, A_ATTACK1 = 3, A_ATTACK2 = 4, A_INSTALL = 4, A_ATTACK3 = 5, A_INSTALLED = 5, A_PAIN = 6, A_PAIN2 = 7, A_PAIN3 = 8, A_DYING = 9,
       /*Physics*/ CT_NONE = 0, CT_BOX = 1, CT_SPH = 2, CT_CAP = 3, CT_CVX = 4, CT_MSH = 5, MAX_UNIQUE_CVX_MESHES = 5989, BVH_MAX_DEPTH = 6, BVH_LEAF_MAX_TRIS = 8, BVH_MAX_NODES_PER_MDL = 586, BVH_MAX_TRIS_PER_MDL = 8000, MAX_LINEVRTS = 128000, MANIFOLD_MAX = 4, EPA_MAX_FACES = 64, EPA_MAX_VERTS = 128, EPA_MAX_EDGES = EPA_MAX_FACES * 3, GJK_ITER = 32, EPA_ITER = 16, SOLVER_ITER_GLOBAL = 32, MAX_GLOBAL_CONTACTS = 8192,
       /*Input*/ MAX_KEYS = 512, MAX_MOUSE_BUTTONS = 8, WS_KEYCOUNT = 349, INPUT_RELEASE = 0, INPUT_PRESS = 1, INPUT_REPEAT = 2, CONFIG_CNT = 73,
-      /*Audio*/ MAX_CHANNELS = 128, SOUNDS_COUNT = 670, MAX_SYNTH_VOICES = 16, AUDIO_RATE = 48000, AUDIO_CHANNELS = 2, AUDIO_PERIOD_MS = 10, AUDIO_PERIODS = 4, AUDIO_FRAMES = ((AUDIO_RATE * AUDIO_PERIOD_MS) / 1000), AUDBUF_SIZE = (AUDIO_FRAMES * AUDIO_PERIODS), REV_BUF_LEN = 16384, MAXAMB = 256,
+      /*Audio*/ MAX_CHANNELS = 128, MAX_SYNTH_VOICES = 16, AUDIO_RATE = 48000, AUDIO_CHANNELS = 2, AUDIO_PERIOD_MS = 10, AUDIO_PERIODS = 4, AUDIO_FRAMES = ((AUDIO_RATE * AUDIO_PERIOD_MS) / 1000), AUDBUF_SIZE = (AUDIO_FRAMES * AUDIO_PERIODS), REV_BUF_LEN = 16384, MAXAMB = 256,
       /*Text*/ T_BUFFER_SIZE = 4096, MAX_GLYPHS = 4096, LINE_LEN_MAX = 81920, TARG_STRLEN = 38, T_LOGSTR_CNT = 1100, T_LOGSTR_MAX = 1280 * 3, LOGCNT = 134, TEXT_VTX_FLOATS = 65536, T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8, T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_VIDEOTEXT = 13, T_BLUE = 14,
                T_PURPLE = 15, FONT_ATLAS_SIZE = 1984, FONT_ATLAS_SIZE2 = 3968, FONT_NORMAL = 0, FONT_STOPD = 1, FONT_vmove = 1, FONT_vline = 2, FONT_vcurve = 3, HUDC_WHITE = 0, HUDC_RED = 1, HUDC_ORANGE = 2, HUDC_YELLOW = 3, HUDC_GREEN = 4, HUDC_BLUE = 5, HUDC_PURPLE = 6, DECAL_INLINE_TEXT_MAX = 128, DECAL_INLINE_TEXT_PEND = 64, DECAL_INLINE_TEXT_LEN = 96, DECAL_STYLE_MAX = 256,
       /*Menu*/ MPG_FRONT = 0, MPG_SINGPLYR = 1, MPG_MULTPLYR = 2, MPG_NEWGM = 3, MPG_LOAD = 4, MPG_OPTS = 5, MPG_SAVE = 6, MPG_INTRO = 7, MPG_CREDS = 8, MPG_DEATH = 9,
@@ -250,7 +250,7 @@ extern u32 modelVertexCounts[MAX_MDLS],uniqueCvxMeshCount,globalframe,*physVertC
 extern u16 **modelBVHTriOrder,mdlsCnt,modelTriangleCounts[MAX_MDLS],**modelTriangles,*cvxAdjLists[MAX_UNIQUE_CVX_MESHES],cvxAdjStart[MAX_UNIQUE_CVX_MESHES],playerCellIdx,texCnt,cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX],uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES],**physTris,modelBVHNodeCounts[MAX_MDLS],headmountedLanternLight,decTxtLevel[DECAL_INLINE_TEXT_MAX],decTxtInst[DECAL_INLINE_TEXT_MAX],decTxtCount,decStyleCnt,fwParentOf[INSTANCE_CNT];
 extern u8 mdlPersistentSet[MAX_MDLS],particleBlendTexture[MAXTEX],camViewCount,sensaroundCamViewCenter,sensaroundCamViewLeft,sensaroundCamViewRight; void UpdateSensaroundCamViews();
 extern char decTxt[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN],statusText[T_BUFFER_SIZE];
-extern const char *audioLogs[LOGCNT],*sounds[SOUNDS_COUNT];
+extern const char *audioLogs[LOGCNT];
 extern bool cullVisibilityValid,instanceIsLODArray[INSTANCE_CNT],doubleSidedTexture[MAXTEX],transparentTexture[MAXTEX];
 extern V3 modelMin[MAX_MDLS],modelMax[MAX_MDLS],cyberSpaceEntryLocations[8],ressurectionLocations[];
 // Math, Vectors, Quaternions
@@ -326,7 +326,6 @@ INLINE float SfxVol(){return vclamp((float)Sys_Settings.VolumeEffects/100.f,0,1.
 INLINE float AppliedFXVol(float v){return vclamp(v*SfxMaster()*SfxVol(),0,1.f);}
 INLINE float AppliedMsgVol(float v){return vclamp(v*SfxMaster()*SfxMsg(),0,1.f);}
 INLINE float AppliedMusicVol(float v){return vclamp(v*SfxMaster()*SfxMusic(),0,1.f);}
-INLINE const char* SoundPath(i32 id) { return (id >= 0 && id < (i32)SOUNDS_COUNT) ? sounds[id] : ""; }
 INLINE const char* AudioLogPath(i32 id) { return (id >= 0 && id < (i32)LOGCNT) ? audioLogs[id] : ""; }
 INLINE float EntMass(u16 i) { if (i == 0) return 0.0f; const Entity* e = &World.instances[i]; float m = EDefs[e->index].mass > 0.0f ? EDefs[e->index].mass : 1.0f; return e->massScaled ? m * 10.0f : m; }
 INLINE void hudColorToRGB(u8 hud, float* r, float* g, float* b) { float inv=1.0f/(222.0f/255.0f); switch (hud) {
@@ -372,5 +371,5 @@ u8 parse_numberu8(const char*, const char*,u32),GetCurrentLevelSecurity(),*PngLo
 bool parse_bool(const char*, const char*,u32),CapsuleTouchesOBB(V3,float,ShapeBox),AreaHasClearance(ShapeCapsule,ShapeCapsule,float,u32,u16),PositionVisibleFromPlayerCell(float,float),FrobHeldItemIntoPanel(V3,V3,V3),HudHeatTickOn(i32),QuestBitIsSet(u8),PlayerIsMoving(),NeighborhoodInPVS(u16,u16,u8),AICheckPain(u16),HasHealth(u16),GetKey(i32),GetKeyPressed(int),cEmpty(const char),sEqual(const char*,const char*),SpawnImpactParticleForPrefab(u16,V3,V3),
      EntIsLodCardConst(u16);
 char *StringFindFirstCharWithin(const char*,char),*sFindSub(const char*,const char*),*StringFindFirstCharWithin(const char*,char);
-const char *JumpSound(FootStepType),*JumpLandSound(FootStepType),*StringFindLastChar(const char*,const char);
+const char *JumpSound(FootStepType),*JumpLandSound(FootStepType),*StringFindLastChar(const char*,const char),*GetSndPath(u16);
 RaycastHit Raycast(V3,V3,float,u32);    RaycastHit RaycastEditPick(V3,V3,float,u32);    V3 ScreenPointToRay(V3,V3),ScreenPointToRayPixels(V3,V3,float,float);    ShapeBox Entity_GetBox(u16);    ShapeCapsule Entity_GetCap(u16);    ShapeSphere Entity_GetSph(u16);    FootStepType GetFootstepTypeForPrefab(i32);    PSysDef* PSysTypeGet(u16);    Quaternion quat_look_rotation(V3,V3);

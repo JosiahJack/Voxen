@@ -135,7 +135,7 @@ static void AISetEnemy(u16 idx, u16 eidx) {
     World.instances[idx].enemy=eidx; World.instances[idx].posCheckFinished=World.pauseRelativeTime + AI_POS_CHECK_DELAY; flag_set(&World.instances[idx].entflags,EF_WANDERING,false); World.instances[idx].wanderFinished=World.pauseRelativeTime; 
     World.instances[idx].lastPosition = World.position[idx]; World.instances[idx].targettingPosition = V3Add(V3Add(World.position[eidx],World.colliderCenter[eidx]),(V3){0.0f,AI_TARGET_OFFSET_Y,0.0f}); AISetHuntFinished(idx);
 }
-static void AIPlaySightSound(u16 idx) { if ((!(World.instances[idx].entflags&EF_FIRST_SIGHTING)) || (!HasHealth(idx)) || (World.instances[idx].entflags&EF_ACT_AS_CORPSE_ONLY)){return;} flag_set(&World.instances[idx].entflags,EF_FIRST_SIGHTING,false); i16 sfx = aiSFX[1][World.instances[idx].index - 419]; if (sfx >= 39 && sfx < SOUNDS_COUNT){play_wav(sounds[sfx],AppliedFXVol(1.0f),World.position[idx],true);} }
+static void AIPlaySightSound(u16 idx) { if ((!(World.instances[idx].entflags&EF_FIRST_SIGHTING)) || (!HasHealth(idx)) || (World.instances[idx].entflags&EF_ACT_AS_CORPSE_ONLY)){return;} flag_set(&World.instances[idx].entflags,EF_FIRST_SIGHTING,false); i16 sfx = aiSFX[1][World.instances[idx].index - 419]; play_wav(GetSndPath(sfx),AppliedFXVol(1.0f),World.position[idx],true); }
 bool AICheckIfPlayerInSight(u16 idx) {
     u16 n = (u16)(World.instances[idx].index - 419); const NPCTable* npc=&npcTable[n]; bool cyber = npc->type == NPCType_Cyber; int diff = cyber ? World.diffCyb : World.diffCbt; if (!NPCInPlayerPVS(idx) || (diff == 0 && n != 28)) return false; if (World.instances[idx].enemy) return AICheckIfEnemyInSight(idx);
     flag_set(&World.instances[idx].entflags,EF_ENEM_IN_LOS,false); if (Cheats.notarget || World.invP1.ressurectingFinished > World.pauseRelativeTime){return false;} V3 playerPos=World.position[PLAYER1], spos=ai_sight_pos(&World.instances[idx]); float dist=V3_Dist(playerPos,spos); if (dist > npc->sightRange) return false;
@@ -167,7 +167,7 @@ bool AICheckPain(u16 self) {
 
 static void AIIdle(u16 sidx) {
     if (World.instances[sidx].enemy && HasHealth(sidx)) { World.instances[sidx].currentState = AIState_Run; return; } const NPCTable* npc = &npcTable[World.instances[sidx].index - 419];
-    if (World.instances[sidx].idleTime < World.pauseRelativeTime) { int sidle = aiSFX[0][World.instances[sidx].index - 419]; if (random_range(0.0f, 1.0f) < 0.5f && sidle >= 0 && sidle < (i16)SOUNDS_COUNT) play_wav(sounds[sidle],AppliedFXVol(1.0f),World.position[sidx],true); World.instances[sidx].idleTime = World.pauseRelativeTime + random_range(npc->tIdleSFXMin,npc->tIdleSFXMax); } AICheckPain(sidx);
+    if (World.instances[sidx].idleTime < World.pauseRelativeTime) { int sidle = aiSFX[0][World.instances[sidx].index - 419]; if (random_range(0.0f, 1.0f) < 0.5f) { play_wav(GetSndPath(sidle),AppliedFXVol(1.0f),World.position[sidx],true); } World.instances[sidx].idleTime = World.pauseRelativeTime + random_range(npc->tIdleSFXMin,npc->tIdleSFXMax); } AICheckPain(sidx);
 }
 static V3 AIGetWanderPoint(Entity* self) { u16 sidx = (u16)(self - World.instances); return (V3){World.position[sidx].x + random_range(-AI_WANDER_RANGE,AI_WANDER_RANGE),npcTable[World.instances[sidx].index - 419].type == NPCType_Cyber ? World.position[sidx].y + random_range(-AI_WANDER_RANGE,AI_WANDER_RANGE) : World.position[sidx].y,World.position[sidx].z + random_range(-AI_WANDER_RANGE,AI_WANDER_RANGE)}; }
 static V3 AIGetAStarPoint(Entity* self) {
@@ -281,7 +281,7 @@ static void AIDying(u16 i) {
         float dbt = deathBurstTimer[npcID];
         if (dbt > 0.0f) { World.instances[i].deathBurstFinished = World.pauseRelativeTime + dbt; }
         else if (!(World.instances[i].entflags & EF_DEATH_BURST_DONE)) { SpawnNPCDeathBurst(&World.instances[i]); flag_set(&World.instances[i].entflags, EF_DEATH_BURST_DONE, true); }
-        if (!(World.instances[i].entflags & EF_ACT_AS_CORPSE_ONLY) && !(World.instances[i].entflags & EF_TELEPORT_ON_DEATH)) { int sded = aiSFX[5][npcID]; if (sded >= 0 && sded < (i16)SOUNDS_COUNT) { play_wav(sounds[sded],AppliedFXVol(1.0f),World.position[i],true); } }
+        if (!(World.instances[i].entflags & EF_ACT_AS_CORPSE_ONLY) && !(World.instances[i].entflags & EF_TELEPORT_ON_DEATH)) { int sded = aiSFX[5][npcID]; play_wav(GetSndPath(sded),AppliedFXVol(1.0f),World.position[i],true); }
         World.instances[i].hasGrav = !(npcTable[npcID].type == NPCType_Cyber || gibs);
         flag_set(&World.instances[i].entflags,EF_ASLEEP,false);
         World.layer[i] = L_Corpse | L_CorpseSearchable;
@@ -353,7 +353,7 @@ static void AIMakeAttack(Entity* self, AttType att, int ind) { if (ind < 1 || in
 static void AIAttack(Entity* self, int slot) {
     if (self->entflags & EF_ASLEEP) { return; }
     u16 sidx = (u16)(self - World.instances); const NPCTable* npc = &npcTable[self->index - 419]; if (slot == 3 && npc->explodeOnAttack3) { World.fogFac += 5; AIExplodeAttack(self); return; } AIApplyAttackMovement(self, npc->attack[slot-1].speed);
-    if (self->gracePeriodFinished < World.pauseRelativeTime && !(self->entflags & EF_SHOT_FIRED)) { flag_set(&self->entflags,EF_SHOT_FIRED,true); int sat = aiSFX[slot + 1][self->index - 419]; float* s_time = slot == 1 ? &self->attack1SoundTime : (slot == 2 ? &self->attack2SoundTime : &self->attack3SoundTime); float tb = npc->attack[slot-1].timeBetween; AttType attack = npc->attack[slot-1].type; if (*s_time < World.pauseRelativeTime && sat >= 0 && sat < (i16)SOUNDS_COUNT) { play_wav(sounds[sat],AppliedFXVol(1.0f),World.position[sidx],true); *s_time=World.pauseRelativeTime + tb; } AIMakeAttack(self,attack,slot); }
+    if (self->gracePeriodFinished < World.pauseRelativeTime && !(self->entflags & EF_SHOT_FIRED)) { flag_set(&self->entflags,EF_SHOT_FIRED,true); int sat = aiSFX[slot + 1][self->index - 419]; float* s_time = slot == 1 ? &self->attack1SoundTime : (slot == 2 ? &self->attack2SoundTime : &self->attack3SoundTime); float tb = npc->attack[slot-1].timeBetween; AttType attack = npc->attack[slot-1].type; if (*s_time < World.pauseRelativeTime) { play_wav(GetSndPath(sat),AppliedFXVol(1.0f),World.position[sidx],true); *s_time=World.pauseRelativeTime + tb; } AIMakeAttack(self,attack,slot); }
     if (Cheats.showNPC) { (slot == 3 && self->enemy) ? (self->index == 427 ? DrawLine(ai_sight_pos(self),World.position[self->enemy],(Color){1.0f, 0.15f, 0.18f, 0.85f}) : self->index == 433 ? DrawLine(ai_sight_pos(self),World.position[self->enemy],(Color){0.96f,1.0f,0.0f,0.88f}) : (void)0) : (void)0; } if (self->attackFinished < World.pauseRelativeTime) AITransitionAttackToRun(self,slot);
 }
 static void AIFlierMoveToHoverHeight(Entity* self) {
