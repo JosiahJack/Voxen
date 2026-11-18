@@ -10,7 +10,8 @@ u8 magazinePitchCountForWeapon[16]={10,0,15,60,0,0,0,12,25,20,0,12,20,50,0,0},ma
 float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0f,1.5f,2.0f,0.8f,0.8f},recoilForWeapon[16]={1.3f,0.0f,0.1f,0.2f,0.0f,0.0f,0.0f,1.2f,0.8f,0.5f,1.5f,1.0f,0.9f,0.7f,0.0f,0.1f},driftForWeapon[16]={5.0f,0.0f,15.0f,50.0f,0.0f,0.0f,0.0f,8.0f,3.0f,3.0f,3.0f,12.0f,10.0f,30.0f,0.0f,3.0f};
 AttType attTypeWep[16]={Att_HitS,Att_Beam,Att_PjNd,Att_HitS,Att_Beam,Att_MlEg,Att_HitS,Att_HitS,Att_Magn,Att_HitS,Att_PjBm,Att_Ball,Att_HitS,Att_HitS,Att_Beam,Att_Trnq};
 // mk3,blaster,dart,flechette,ion,rapier,pipe,magnum,magpulse,pistol,plasma,rail,riot,skorp,sparq,stun
-u16 wepFireSound[16]={251,239,240,243,245,246,254,249,250,255,257,259,262,263,264,265},wepBHole[16]={518,520,522,521,519,520,522,518,519,521,519,519,523,518,520,520},wepSmoke[16]={506,0,0,509,0,0,0,507,0,510,0,511,512,513,0,0},wepModelIndices[16]={646,638,640,642,643,5748,5728,644,645,650,651,652,654,655,656,657},wepAnimNums[16]={MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,50,49,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM};
+const char* const wepFireSound[16]={"weapons/wmarksman","weapons/wblaster","weapons/wdartgun","weapons/wflechette","weapons/wion","weapons/wlaserrapier_hit","weapons/wpipe_swing","weapons/wmagnum","weapons/wmagpulse","weapons/wpistol","weapons/wplasma","weapons/wrailgun","weapons/wriotgun","weapons/wskorpion","weapons/wsparq","weapons/wstungun"};
+u16 wepBHole[16]={518,520,522,521,519,520,522,518,519,521,519,519,523,518,520,520},wepSmoke[16]={506,0,0,509,0,0,0,507,0,510,0,511,512,513,0,0},wepModelIndices[16]={646,638,640,642,643,5748,5728,644,645,650,651,652,654,655,656,657},wepAnimNums[16]={MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,50,49,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM};
 static u8 wepClass[16] = {WC_STD,WC_ENERGY,WC_STD,WC_STD,WC_ENERGY,WC_MELEE,WC_MELEE,WC_STD,WC_STD,WC_STD,WC_ENERGY,WC_STD,WC_STD,WC_STD,WC_ENERGY,WC_ENERGY};
 float magpulseShotForce = 2.2f, stungunShotForce = 2.2f, railgunShotForce = 5.0f, plasmaShotForce = 1.5f;
 WeaponFireCtx wfx = { .hitOffset = 0.16f, .fireDistance = 200.0f, .overheatedPercent = 80.0f, .reloadContainerHome = {0}, .pendingMeleeFinished = 0.0 };
@@ -104,7 +105,7 @@ void HitScanFire(int wep16) {
     CreateTargetIDInstance(dmgFinal,ent,tranq);
     if (b && (!dd.isOtherNPC || wep16==12)) { float force=(wep16==12 ? 10.0f : 1.0f)*dd.impactVelocity; if (isBeam) ApplyImpactForce(ent,force,dd.attacknormal,dd.hitpoint); else ApplyImpactForceWithSound(ent,force,dd.attacknormal,dd.hitpoint); } if (isBeam){CreateBeamEffects(wep16);}
 }
-void MeleeHitUpdate(void) {
+void MeleeHitUpdate() {
     if (wfx.pendingMeleeFinished <= 0.0 || World.pauseRelativeTime < wfx.pendingMeleeFinished) return;
     wfx.pendingMeleeFinished = 0.0; int wep16 = wfx.pendingMeleeWep16; u16 targ = wfx.pendingMeleeTarget; if (targ == PLAYER1) return; // can't hit self
     DamageData dd = {.isOtherNPC = IdxIsNPC(World.instances[targ].index),.attacknormal = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right),.damage = dmgForWep[wep16],.offense = offenseWep[wep16],.penetration = penetrationWep[wep16],.owner = PLAYER1,.attackType = Att_Melee,.berserkActive = (World.invP1.patchActive & PATCH_BERSERK) != 0};
@@ -112,20 +113,20 @@ void MeleeHitUpdate(void) {
     dd.damage = GetDamageTakeAmount(&dd); wfx.tempHitEnt = targ;
     CreateStandardImpactEffects(); if (IdxIsGeometry(World.instances[targ].index)) CreateStandardImpactMarks(wep16);
     if(!IsDamageable(&World.instances[targ])){
-        if(!wfx.pendingMeleeSilent){if(!wfx.pendingMeleeIsRapier){FootStepType fstp=GetFootstepTypeForPrefab(World.instances[targ].index);play_wav(JumpLandSound(fstp),AppliedFXVol(1.0f),World.position[PLAYER1],false);play_wav(GetSndPath(wfx.pendingMeleeHitSnd),AppliedFXVol(0.65f),World.position[PLAYER1],false);}
-        else{play_wav(GetSndPath(wfx.pendingMeleeHitSnd),AppliedFXVol(1.0f),World.position[PLAYER1],false);}World.invP1.makingNoise=true;World.invP1.noiseFinished=World.pauseRelativeTime+0.5;}return;
+        if(!wfx.pendingMeleeSilent){if(!wfx.pendingMeleeIsRapier){FootStepType fstp=GetFootstepTypeForPrefab(World.instances[targ].index);play_wav(JumpLandSound(fstp),AppliedFXVol(1.0f),World.position[PLAYER1],false);play_wav(wfx.pendingMeleeHitSnd,AppliedFXVol(0.65f),World.position[PLAYER1],false);}
+        else{play_wav(wfx.pendingMeleeHitSnd,AppliedFXVol(1.0f),World.position[PLAYER1],false);}World.invP1.makingNoise=true;World.invP1.noiseFinished=World.pauseRelativeTime+0.5;}return;
     }
     dd.impactVelocity = 80.0f + dd.damage;
     if ((!dd.isOtherNPC || wep16==12) && (!wfx.pendingMeleeIsRapier || World.invP1.energy >= 4.0f)) { ApplyImpactForceWithSound(targ,dd.impactVelocity,dd.attacknormal,World.position[targ]); }
     float dmgFinal = TakeDamage(targ,dd); if (dmgFinal < 0.0f) {dmgFinal = 0.0f;} CreateTargetIDInstance(dmgFinal,targ,-1.0f);
     if (!wfx.pendingMeleeSilent) {
         World.invP1.makingNoise=true;World.invP1.noiseFinished=World.pauseRelativeTime+0.5;BloodType bt=World.instances[targ].bloodType;
-        if(bt==BloodType_Red||bt==BloodType_Yellow||bt==BloodType_Green)play_wav(GetSndPath(wfx.pendingMeleeFleshSnd), AppliedFXVol(1.0f), (V3){0}, false);else if(wfx.pendingMeleeIsRapier && World.invP1.energy<4.0f)play_wav("destroy/hit2", AppliedFXVol(1.0f), (V3){0}, false);else play_wav(GetSndPath(wfx.pendingMeleeHitSnd),AppliedFXVol(1.0f),(V3){0},false);
+        if(bt==BloodType_Red||bt==BloodType_Yellow||bt==BloodType_Green)play_wav(wfx.pendingMeleeFleshSnd, AppliedFXVol(1.0f), (V3){0}, false);else if(wfx.pendingMeleeIsRapier && World.invP1.energy<4.0f)play_wav("destroy/hit2", AppliedFXVol(1.0f), (V3){0}, false);else play_wav(wfx.pendingMeleeHitSnd,AppliedFXVol(1.0f),(V3){0},false);
     }
     if (wfx.pendingMeleeIsRapier) { TakeEnergy(3.666f); BiomonitorEnergyPulse(3.666f); } // 3 hits per energy tick
 }
 static void SetViewModelMeleeClip(bool isRapier, u8 clip) { u16 wvi = World.weaponVModelIndex; if (wvi == 0 || wvi >= INSTANCE_CNT) return; Entity* vwe = &World.instances[wvi]; vwe->animationNum = isRapier ? 50 : 49; if (clip >= MAX_ANIMCLIPS) return; AnimationClip* c = &mdlAnimClips[vwe->animationNum][clip]; if (c->framerate <= 0 || c->speed <= 0) return; vwe->clip = clip; vwe->frame = c->frameStart; vwe->modelIndex = c->frameStartModelIndex; vwe->currentFrameFinished = 0.0; }
-void FireMelee(int wep16, bool isRapier, bool silent, u16 hitSnd, u16 missSnd, u16 fleshSnd) {
+void FireMelee(int wep16, bool isRapier, bool silent, const char* hitSnd, const char* missSnd, const char* fleshSnd) {
     wfx.fireDistance = 3.2f; bool hit = DidRayHit(wep16); wfx.fireDistance = 200.0f; u16 t = wfx.tempHitEnt; double dt = World.pauseRelativeTime + (isRapier ? 0.28 : 0.15);
     if (hit) { SetViewModelMeleeClip(isRapier, A_ATTACK_HIT); wfx.pendingMeleeWep16 = wep16; wfx.pendingMeleeTarget = t; wfx.pendingMeleeIsRapier = isRapier; wfx.pendingMeleeSilent = silent; wfx.pendingMeleeHitSnd = hitSnd; wfx.pendingMeleeFleshSnd = fleshSnd; wfx.pendingMeleeFinished = dt; return; }
     V3 p = World.position[PLAYER1], look = V3_Normalize(ScreenPointToRay(World.instances[PLAYER1].forward, World.instances[PLAYER1].right));
@@ -135,11 +136,11 @@ void FireMelee(int wep16, bool isRapier, bool silent, u16 hitSnd, u16 missSnd, u
         wfx.pendingMeleeWep16 = wep16; wfx.pendingMeleeTarget = i; wfx.pendingMeleeIsRapier = isRapier; wfx.pendingMeleeSilent = silent; wfx.pendingMeleeHitSnd = hitSnd;
         wfx.pendingMeleeFleshSnd = fleshSnd; wfx.pendingMeleeFinished = dt; return;
     }
-    if(!silent)play_wav(GetSndPath(missSnd), AppliedFXVol(1.0f), World.position[PLAYER1], false);
+    if(!silent)play_wav(missSnd,AppliedFXVol(1.0f),World.position[PLAYER1],false);
     SetViewModelMeleeClip(isRapier, A_ATTACK_MISS);
 }
-void FireRapier(int wep16) { FireMelee(wep16, true,  false, 246, 247, 246); } // wlaserrapier_hit/swing
-void FirePipe(int wep16)   { FireMelee(wep16, false, false, 253, 254, 252); } // wpipe_hit/swing/dmg
+void FireRapier(int wep16) { FireMelee(wep16,true, false,"weapons/wlaserrapier_hit","weapons/wlaserrapier_swing","weapons/wlaserrapier_hit"); }
+void FirePipe(int wep16)   { FireMelee(wep16,false,false,"weapons/wpipe_hit",       "weapons/wpipe_swing",       "weapons/wpipe_dmg"); }
 void FireBeachball(int wep16, float shoveForce, u16 prefabID) { // Acts like a beachball for NPC collisions, but a baseball for walls/floor (prevents corner-catching); handled by the projectile's own collider setup.
     u16 ball = SpawnDynamicObject(prefabID); if (!EntIdxIsValid(ball)) return;
     Entity* proj = &World.instances[ball]; u16 wc = World.invP1.wepCur; bool alt = World.invP1.wepLoadedWithAlternate[wc];
@@ -165,9 +166,9 @@ void FireCyberWeapon(void) {
 }
 void FirePlasma(int w){FireBeachball(w,plasmaShotForce,485);} void FireRailgun(int w){FireBeachball(w,railgunShotForce,484);} void FireMagpulse(int w){FireBeachball(w,magpulseShotForce,482);} void FireStungun(int w){FireBeachball(w,stungunShotForce,483);}
 typedef void (*FireFn)(int); FireFn wepSpecialFire[16]={0,0,0,0,0,FireRapier,FirePipe,0,FireMagpulse,0,FirePlasma,FireRailgun,0,0,0,FireStungun};
-void FireWeapon(int wep16,bool isSilent){
+void FireWeapon(int wep16, bool isSilent) {
     if(wep16<0||wep16>15)return;
-    if (wep16 != 5 && wep16 != 6){World.invP1.makingNoise=true; World.invP1.noiseFinished=World.pauseRelativeTime+0.5;} if (!isSilent&&wepClass[wep16] != WC_MELEE) play_wav(GetSndPath(wepFireSound[wep16]), AppliedFXVol(1.0f), World.position[PLAYER1], false);
+    if (wep16 != 5 && wep16 != 6){World.invP1.makingNoise=true; World.invP1.noiseFinished=World.pauseRelativeTime+0.5;} if (!isSilent&&wepClass[wep16] != WC_MELEE) play_wav(wepFireSound[wep16],AppliedFXVol(1.0f),World.position[PLAYER1],false);
     if (wepClass[wep16]!=WC_MELEE) { const PSysDef* mfp = PSysTypeGet(53/*centerFlash*/); if (mfp) { PSysDef mfd=*mfp;mfd.pos=V3Add(wfx.reloadContainerPos,V3_ScaleByF(World.instances[PLAYER1].forward,0.5f));mfd.lifetimeMin=mfd.lifetimeMax=0.05f; PSysAddInternal(&mfd,U16_MAX,U16_MAX); } }
     bool didHit=false;if(wepSpecialFire[wep16])wepSpecialFire[wep16](wep16);else{didHit=DidRayHit(wep16);if(didHit)HitScanFire(wep16);}if(wepSmoke[wep16]){u16 smk=SpawnDynamicObject(wepSmoke[wep16]);if(EntIdxIsValid(smk)){World.position[smk]=wfx.reloadContainerPos;World.rotation[smk]=World.rotation[PLAYER1];flag_set(&World.instances[smk].entflags,EF_ACTIVE,true);World.instances[smk].tickFinished=World.pauseRelativeTime+1.0;}}
     World.fogFac += wepFogInc[wep16]; u16 wc = World.invP1.wepCur;

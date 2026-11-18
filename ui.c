@@ -367,26 +367,20 @@ void TickBar(bool isEnergy) {
     if (isEnergy && World.invP1.drainJPM > 0) RenderTextL(1340,tY+8,T_GREEN,FONT_NORMAL,0.8f,"%d J/min",(int)World.invP1.drainJPM);
 }
 INLINE int HwActiveTexIndex(int active, int version, int off, int v1, int v2, int v3, int v4) { if (!active) return off; if (v4 >= 0 && version >= 4) return v4; if (version >= 3) return v3; if (version == 2) return v2; return v1; }
-typedef struct { u32 bit; u8 idx; i16 x,y; u16 t[5]; u8 sOn,sOff,eng; } HwBtn;
-static const HwBtn hwBtns[8]={{HW_BIO,HW_BIO_IDX,0,180,{989,991,992,992,992},78,78,1},{HW_SNS,HW_SNS_IDX,0,240,{1009,1011,1012,1013,1013},93,82,0},{HW_LAN,HW_LAN_IDX,0,300,{1004,1006,1007,1008,1008},78,78,0},{HW_SHD,HW_SHD_IDX,0,360,{1014,1015,1016,1017,1018},96,95,0},
-                              {HW_INF,HW_INF_IDX,1326,180,{998,999,999,999,999},98,82,0},{HW_ERD,HW_ERD_IDX,1326,240,{996,997,997,997,997},0,0,3},{HW_BST,HW_BST_IDX,1326,300,{993,994,995,995,995},78,78,2},{HW_JET,HW_JET_IDX,1326,360,{1000,1001,1002,1003,1003},78,78,0}};
+typedef struct { u32 bit; u8 idx; i16 x,y; u16 t[5]; const char *sOn,*sOff; u8 eng; } HwBtn;
+static const HwBtn hwBtns[8]={{HW_BIO,HW_BIO_IDX,0,180,{989,991,992,992,992},"hud/activate","hud/activate",1},{HW_SNS,HW_SNS_IDX,0,240,{1009,1011,1012,1013,1013},"hud/sensaround","hud/deactivate",0},{HW_LAN,HW_LAN_IDX,0,300,{1004,1006,1007,1008,1008},"hud/activate","hud/activate",0},{HW_SHD,HW_SHD_IDX,0,360,{1014,1015,1016,1017,1018},"hud/shield_on","hud/shield_off",0},
+                              {HW_INF,HW_INF_IDX,1326,180,{998,999,999,999,999},"hud/targetacquire","hud/deactivate",0},{HW_ERD,HW_ERD_IDX,1326,240,{996,997,997,997,997},"","",3},{HW_BST,HW_BST_IDX,1326,300,{993,994,995,995,995},"hud/activate","hud/activate",2},{HW_JET,HW_JET_IDX,1326,360,{1000,1001,1002,1003,1003},"hud/activate","hud/activate",0}};
 void HardwareButtons() {
-    u32 hw=World.invP1.hasHardware;
     for(u8 i=0;i<8;++i){
-        const HwBtn* b = &hwBtns[i]; if (!(hw & b->bit)) { continue; } u16 tex; if (b->eng==3) tex = ((World.inventoryMode && UIOver(UI_ID_HUD_HW_0+i) && AnyLeftRightMouseDown()) || ((World.invP1.hasNewEmail || World.invP1.hasNewLogs) && ((int)World.pauseRelativeTime & 1))) ? 997 : 996; else tex = (u16)HwActiveTexIndex((World.invP1.hardwareIsActive & b->bit)!=0,World.invP1.hwVers[b->idx],b->t[0],b->t[1],b->t[2],b->t[3],b->t[4]);
+        const HwBtn* b = &hwBtns[i]; if (!(World.invP1.hasHardware & b->bit)) { continue; } u16 tex; if (b->eng==3) tex = ((World.inventoryMode && UIOver(UI_ID_HUD_HW_0+i) && AnyLeftRightMouseDown()) || ((World.invP1.hasNewEmail || World.invP1.hasNewLogs) && ((int)World.pauseRelativeTime & 1))) ? 997 : 996; else tex = (u16)HwActiveTexIndex((World.invP1.hardwareIsActive & b->bit)!=0,World.invP1.hwVers[b->idx],b->t[0],b->t[1],b->t[2],b->t[3],b->t[4]);
         UIRImg(UI_ID_HUD_HW_0+i,b->x,b->y,40,40,tex);
     }
-}
-void RenderShieldEffect() {
-    if (World.pauseRelativeTime > World.Sys_UI.shieldAnimationFinished) { return; } float t = vclamp((float)(World.pauseRelativeTime - World.Sys_UI.shieldAnimationStarted),0.0f,1.2f);
-    if (World.Sys_UI.shieldAnimationIsActivate) { float upY = 384.0f + (0.0f - 384.0f) * t; float dnY = 384.0f + (768.0f - 384.0f) * t; RenderUIImage(0, (i16)(upY + 40 - 80.0f), 1366, 160, 1076); RenderUIImageExtended(0, (i16)(dnY - 40 - 80.0f), 1366, 160, 1076, 3.14159265f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f); }
-    else                                        { float upY = 0.0f + (384.0f - 0.0f) * t;   float dnY = 768.0f + (384.0f - 768.0f) * t; RenderUIImage(0, (i16)(upY + 0 - 80.0f), 1366, 160, 1076);  RenderUIImageExtended(0, (i16)(dnY - 0 - 80.0f), 1366, 160, 1076, 3.14159265f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f);  }
 }
 void HwToggle(u8 i) {
     const HwBtn* b = &hwBtns[i]; bool noEng = World.invP1.energy <= 0.0f, on = (World.invP1.hardwareIsActive & b->bit) != 0; if (!(World.invP1.hasHardware & b->bit)) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } if (b->bit == HW_BIO && Cheats.showFPS) { return; }
     if (b->eng == 3) { MFD_ResetGeneral(); World.Sys_UI.mfdTab[0] = 5; World.Sys_UI.mfdTab[1] = 2; World.Sys_UI.mfdItemReader[0] = true; World.Sys_UI.MFD_ReaderView = MFD_READER_CONTENTS; World.Sys_UI.MFD_MediaTab = World.Sys_UI.lastMultiMediaTabOpened; if (World.Sys_UI.MFD_MediaTab > MM_NOTES || (World.Sys_UI.MFD_MediaTab == MM_NOTES && !World.diffMis)) World.Sys_UI.MFD_MediaTab = MM_LOG_TABLE; play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0},false); return; }
     if (noEng && (b->eng==0 || (b->eng==1 && World.invP1.hwVersSetting[b->idx]==0) || (b->eng==2 && World.invP1.hwVersSetting[b->idx]>=1))) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; }
-    play_wav(GetSndPath(on ? b->sOff : b->sOn),AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive ^= b->bit; if (b->bit==HW_SHD) { World.Sys_UI.shieldAnimationIsActivate = !on; World.Sys_UI.shieldAnimationStarted = World.pauseRelativeTime; World.Sys_UI.shieldAnimationFinished = World.pauseRelativeTime + (World.Sys_UI.shieldAnimationIsActivate ? 1.0 : 1.167); } if (b->bit==HW_BIO && on && !Cheats.showFPS) BioMonitorClearGraphs();
+    play_wav(on ? b->sOff : b->sOn,AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive ^= b->bit; if (b->bit==HW_SHD) { World.Sys_UI.shieldAnimationIsActivate = !on; World.Sys_UI.shieldAnimationStarted = World.pauseRelativeTime; World.Sys_UI.shieldAnimationFinished = World.pauseRelativeTime + (World.Sys_UI.shieldAnimationIsActivate ? 1.0 : 1.167); } if (b->bit==HW_BIO && on && !Cheats.showFPS) BioMonitorClearGraphs();
 }
 static const char* mgName[9]={"Ping","15","Wing 0","Botbounce","Eel Zapper","Road","TriopToe","Corp Conq","Chess"};
 static void SysUIDataClose(void) { MFD_CloseData(); World.Sys_UI.objectInUsePos=(V3){999.0f,999.0f,999.0f}; }
@@ -1171,7 +1165,15 @@ static void RenderUI() {
             }
             bool cyber = World.curLev == LEVEL_CYBERSPACE;
             if (cyber) { World.Sys_UI.mfdTab[0] = 4; World.Sys_UI.mfdSelected[0] = 4; }
-            bool editPanelActive=EditSelIsActive()||EditLightSelIsActive(); if (!editPanelActive) { TickBar(false); if (!cyber) TickBar(true); } if (!cyber) HardwareButtons(); UIRImg(UI_ID_HUD_SHOOTMODE,667,0,32,32,1020); RenderShieldEffect();
+            bool editPanelActive=EditSelIsActive()||EditLightSelIsActive();
+            if (!editPanelActive) { TickBar(false); if (!cyber) TickBar(true); }
+            if (!cyber) HardwareButtons();
+            UIRImg(UI_ID_HUD_SHOOTMODE,667,0,32,32,1020);
+            if (World.pauseRelativeTime <= World.Sys_UI.shieldAnimationFinished) {
+                float t = vclamp((float)(World.pauseRelativeTime - World.Sys_UI.shieldAnimationStarted),0.0f,1.2f);
+                if (World.Sys_UI.shieldAnimationIsActivate) { float upY = 384.0f + (0.0f - 384.0f) * t; float dnY = 384.0f + (768.0f - 384.0f) * t; RenderUIImage(0, (i16)(upY + 40 - 80.0f), 1366, 160, 1076); RenderUIImageExtended(0, (i16)(dnY - 40 - 80.0f), 1366, 160, 1076, 3.14159265f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f); }
+                else                                        { float upY = 0.0f + (384.0f - 0.0f) * t;   float dnY = 768.0f + (384.0f - 768.0f) * t; RenderUIImage(0, (i16)(upY + 0 - 80.0f), 1366, 160, 1076);  RenderUIImageExtended(0, (i16)(dnY - 0 - 80.0f), 1366, 160, 1076, 3.14159265f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f);  }
+            }
             for (u8 i=0;i<10;++i) if (World.Sys_UI.tWrnFinished[i]>World.pauseRelativeTime) {
                 char flt[6]; if (World.Sys_UI.tWrnTextIdx[i]==185) sFormat(flt,6,"%.1f",(double)World.instances[PLAYER1].radiation);
                 RenderTextL(340,72+i*18,World.Sys_UI.tWrnColorIdx[i],FONT_NORMAL,0.8f,"%s%s%s",Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx[i]],World.Sys_UI.tWrnTextIdx[i]==185?flt:World.Sys_UI.tWrnTextIdx2[i]>=0?Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx2[i]]:"",World.Sys_UI.tWrnTextIdx3[i]>=0?Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx3[i]]:"");

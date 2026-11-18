@@ -35,7 +35,7 @@ void PatchUse(int patchSlot) {
         case 6: if(World.invP1.staminupFinishedTime > World.pauseRelativeTime) World.invP1.staminupFinishedTime += 60.0; else World.invP1.staminupFinishedTime = World.pauseRelativeTime + 60.0; World.invP1.staminupActive = true; World.invP1.fatigue = 0.0f; break;
     }
     if (World.invP1.patchCounts[patchSlot] <= 0) { for (int i = 0; i < 7; i++) { if (World.invP1.patchCounts[i] > 0) { World.invP1.patchCur = (i8)i; break; } } CenterStatusPrint("%s%s%s",Sys_Text.stringTable[590],Sys_Text.stringTable[340+patchSlot],Sys_Text.stringTable[589]); } else CenterStatusPrint("%s%s",Sys_Text.stringTable[340+patchSlot],Sys_Text.stringTable[589]);
-    play_wav(GetSndPath(89),AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);
+    play_wav("hud/patchuse",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);
 }
 void WeaponFireStartWeaponDip(float t) { if (t <= 0.0f) { World.invP1.reloadFinished = 0.0; return; } World.invP1.reloadFinished = World.pauseRelativeTime + (double)t; lerpStartTime = World.pauseRelativeTime; }
 bool InventoryHasAccessCard(AccCardType card) { return (World.invP1.accessCardOwned & (1u << card)) != 0; }
@@ -74,8 +74,8 @@ void AddAudioLogToInventory(int index) {
 INLINE void ItemAdd(u8 *cur, u8 *counts, int idx, int uIdx, int sysIdx) { if (!counts[*cur]) {*cur=(i8)idx;} counts[idx]++; CenterStatusPrint("%s%s", Sys_Text.stringTable[ItemStringIdx(uIdx)], Sys_Text.stringTable[sysIdx]); }
 void AddGrenadeToInventory(int i, int u) { if (i >= 0){if (!World.Sys_UI.firstMain){World.Sys_UI.firstMain=true; World.Sys_UI.mfdTab[0]=1;} World.invP1.grenConstIndex[i]=(i16)u; ItemAdd(&World.invP1.grenCur,World.invP1.grenAmmo,i,u,34);} }
 void   AddPatchToInventory(int i, int u) { if (i >= 0){if (!World.Sys_UI.firstMain){World.Sys_UI.firstMain=true; World.Sys_UI.mfdTab[0]=1;} ItemAdd(&World.invP1.patchCur,World.invP1.patchCounts,i,u,35);} }
-INLINE void GrenadeCycle(int step){int cur= World.invP1.grenCur, next=cur; for(int i=0;i<7;++i){next=(next+step+7)%7; if(   World.invP1.grenAmmo[next]>0){ if (next==cur) return; World.invP1.grenCur =(i8)next; play_wav(GetSndPath(80),AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ CenterStatusPrint("%s",Sys_Text.stringTable[579+next]); return;}}}
-INLINE void   PatchCycle(int step){int cur=World.invP1.patchCur, next=cur; for(int i=0;i<7;++i){next=(next+step+7)%7; if(World.invP1.patchCounts[next]>0){World.invP1.patchCur=(i8)next; play_wav(GetSndPath(80),AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ CenterStatusPrint("%s",Sys_Text.stringTable[340+next]); return;}}}
+INLINE void GrenadeCycle(int step){int cur= World.invP1.grenCur, next=cur; for(int i=0;i<7;++i){next=(next+step+7)%7; if(   World.invP1.grenAmmo[next]>0){ if (next==cur) return; World.invP1.grenCur =(i8)next; play_wav("hud/changeweapon",AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ CenterStatusPrint("%s",Sys_Text.stringTable[579+next]); return;}}}
+INLINE void   PatchCycle(int step){int cur=World.invP1.patchCur, next=cur; for(int i=0;i<7;++i){next=(next+step+7)%7; if(World.invP1.patchCounts[next]>0){World.invP1.patchCur=(i8)next; play_wav("hud/changeweapon",AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ CenterStatusPrint("%s",Sys_Text.stringTable[340+next]); return;}}}
 void RemoveGrenade(int i) { if(World.invP1.grenAmmo[i] > 0){World.invP1.grenAmmo[i]--;} if(!World.invP1.grenAmmo[i]){GrenadeCycle(-1);} }
 static i8 GetExistingCyberItemIndex() { if (World.invP1.softVersions[SW_TURBO]  > 0) {return 0;} if (World.invP1.softVersions[SW_DECOY]  > 0) {return 1;} if (World.invP1.softVersions[SW_RECALL] > 0) {return 2;} return -1; }
 static void UseTurbo() {if(World.invP1.softVersions[SW_TURBO]<=0){World.invP1.hasSoft&=(u8)~(1u << SW_TURBO); return;} if(--World.invP1.softVersions[SW_TURBO]==0)World.invP1.hasSoft&=(u8)~(1u << SW_TURBO); if(World.invP1.turboFinished > World.pauseRelativeTime){World.invP1.turboFinished+=World.invP1.turboCyberTime;}else{World.invP1.turboFinished=World.invP1.turboCyberTime+World.pauseRelativeTime;}}
@@ -150,10 +150,10 @@ void AddItemToInventory(int index, int custIdx) {
                 u8 w = ammo[index-367].weapon; if (!w) return; --w; bool alt = ammo[index-367].alt; if (w >= 0) { int amount = alt ? magazinePitchCountForWeapon2[w] : magazinePitchCountForWeapon[w]; if (alt) { World.invP1.wepAmmoSecondary[w] += (u16)amount; } else { World.invP1.wepAmmo[w] += (u16)amount; } CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[630]); } break;
             } default: return;
         }
-    } play_wav(GetSndPath(87), AppliedFXVol(1.0f), (V3){0}, false);
+    } play_wav("hud/frob_item",AppliedFXVol(1.0f),(V3){0},false);
 }
 void CyberTimerReset(u16 self, int diff) { Entity* e = &World.instances[self]; switch (diff) { case 0: e->cyberTimer = 600.0f; break; case 1: e->cyberTimer = 300.0f; break; case 2: e->cyberTimer = 240.0f; break; case 3: e->cyberTimer = 180.0f; break; } }
-void ExitCyberspace() { if (World.curLev != LEVEL_CYBERSPACE) return; Entity* p = &World.instances[PLAYER1]; if (p->cyberHealth <= 0.0f) { p->cyberHealth = 1.0f; } play_wav(GetSndPath(81),AppliedFXVol(1.0f),(V3){0},false); LoadLevel((World.cyberReturnLevel >= 0 && (u8)World.cyberReturnLevel < MAX_LEVELS) ? (u8)World.cyberReturnLevel : 1, World.cybRetPos); cyberStaticAlpha = 1.0f; }
+void ExitCyberspace() { if (World.curLev != LEVEL_CYBERSPACE) return; Entity* p = &World.instances[PLAYER1]; if (p->cyberHealth <= 0.0f) { p->cyberHealth = 1.0f; } play_wav("hud/cyber",AppliedFXVol(1.0f),(V3){0},false); LoadLevel((World.cyberReturnLevel >= 0 && (u8)World.cyberReturnLevel < MAX_LEVELS) ? (u8)World.cyberReturnLevel : 1, World.cybRetPos); cyberStaticAlpha = 1.0f; }
 void CyberTimerUpdate(u16 self) { if(World.curLev != LEVEL_CYBERSPACE){return;} Entity* e = &World.instances[self]; if (e->timerFinished >= World.pauseRelativeTime) { return; } e->cyberTimer-=1.0f; e->timerFinished = World.pauseRelativeTime + 1.0; if (e->cyberTimer <= 0.0f) { ExitCyberspace(); return; } }
 float cyberWallFade[INSTANCE_CNT]; static u8 cyberWallWasTouching[INSTANCE_CNT];
 typedef struct { V3 ctr, tip, base; float rad, bound; u8 isCap; } CyberWallToucher; static CyberWallToucher cyberWallTouchers[128]; static u16 cyberWallToucherCount;
@@ -178,7 +178,7 @@ void CyberWallUpdate(u16 s) {
     if (touching && !cyberWallWasTouching[s]) { cyberWallFade[s] = 1.0f; if (gol) cyberGolCur[cell] = 1; } cyberWallWasTouching[s] = touching;
 }
 void CyberItemUpdate(u16 self)     { Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE)) return; if (V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f) { CyberItemOnTriggerEnter(self,PLAYER1); } }
-void CyberMineUpdate(u16 self)     { Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE)) return; if (V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f) { DamageData dd = {0}; dd.damage = e->damage; dd.owner = self; TakeDamage(PLAYER1,dd); play_wav(GetSndPath(67),AppliedFXVol(1.0f),World.position[self],false); flag_set(&e->entflags,EF_ACTIVE,false); } }
+void CyberMineUpdate(u16 self)     { Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE)) return; if (V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f) { DamageData dd = {0}; dd.damage = e->damage; dd.owner = self; TakeDamage(PLAYER1,dd); play_wav("destroy/hit2",AppliedFXVol(1.0f),World.position[self],false); flag_set(&e->entflags,EF_ACTIVE,false); } }
 void CyberExitUpdate(u16 self)     { Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE)) return; if (World.curLev != LEVEL_CYBERSPACE) return; if (V3_Dist(World.position[self],World.position[PLAYER1]) < 2.0f) { ExitCyberspace(); } }
 void CyberSwitchUpdate(u16 self)   { Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE)) return; if (e->active)  return; if (V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f) { e->active  = true; ChangeAnim(e,A_ACTIVATED); if (e->textIndex > 0) CenterStatusPrint("%s",Sys_Text.stringTable[e->textIndex]); UseTargets(self,e->targetIdx); } }
 void CyberDataFragUpdate(u16 self) { Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE)) return; if (e->allDone) return; if (V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f) { e->allDone = true; if (e->textIndex > 0) CenterStatusPrint("%s",Sys_Text.stringTable[e->textIndex]); } }
@@ -247,7 +247,7 @@ static __attribute__((noinline)) void EntitySetLocked(Entity* e, bool locked) { 
 u8 GetCurrentLevelSecurity() { return (World.diffMis < 1 || Cheats.superoverride) ? 0u : World.levelSecurity[World.curLev]; }
 void ButtonSwitchUse(u16 self, u16 activator) {
     Entity* e = &World.instances[self]; if (Cheats.superoverride || World.diffMis == 0) { EntitySetLocked(e,false); } else if (GetCurrentLevelSecurity() > UsableOrDef((float)e->securityThreshold,100.0f)) { UIBlockedBySecurity(World.position[self]); return;  }
-    if ((e->entflags & EF_LOCKED) != 0) { if (e->lockedMessageLingdex >= 0 && e->lockedMessageLingdex < T_LOGSTR_CNT) CenterStatusPrint("%s",Sys_Text.stringTable[e->lockedMessageLingdex]); play_wav(GetSndPath(e->SFXLockedIndex),AppliedFXVol(1.0f),World.position[self],true); return; }
+    if ((e->entflags & EF_LOCKED) != 0) { if (e->lockedMessageLingdex >= 0 && e->lockedMessageLingdex < T_LOGSTR_CNT) CenterStatusPrint("%s",Sys_Text.stringTable[e->lockedMessageLingdex]); play_wav("buttons/locked_deny",AppliedFXVol(1.0f),World.position[self],true); return; }
     static const char* buttonSwitchSFX[] = {"buttons/button_lswitch","buttons/button_chonk","buttons/button_lswitch","buttons/button_chuck","buttons/button_chuck","","buttons/button_swipe","buttons/button_chonk"}; play_wav(buttonSwitchSFX[World.instances[self].index - 688],AppliedFXVol(1.0f),World.position[self],true);
     if (e->messageIndex >= 0 && e->messageIndex < T_LOGSTR_CNT) CenterStatusPrint("%s",Sys_Text.stringTable[e->messageIndex]); if (e->delay > 0.0f) { e->recentMostActivator = activator; e->delayFinished = World.pauseRelativeTime + e->delay; } else ButtonSwitchUseTargets(self);
 }
@@ -347,9 +347,18 @@ void SpawnExplosionEffect(V3 pos, int explosionType) { switch (explosionType) { 
 void GrenadeExplode(u16 self) {
     if(self>=World.instCount)return; Entity* e = &World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; flag_set(&e->entflags,EF_ACTIVE,false);
     DamageData dd={.damage=e->damage,.penetration=e->strength,.offense=e->speed,.defense=0.0f,.impactVelocity=e->damage*1.5f,.attacknormal=(V3){0.0f,1.0f,0.0f},.hitpoint=World.position[self],.attackType=e->attackType,.owner=e->recentMostActivator,.isOtherNPC=false,.berserkActive=(World.invP1.patchActive & PATCH_BERSERK) != 0};
-    i16 idx=GrenadeTypeFromConst(e->index); float radius=(idx>=7&&idx<=13) ? grenadeRadius[idx-7] : (e->strength>0.0f ? e->strength : 4.0f); ApplyImpactForceSphere(&dd,World.position[self],radius,e->damage * 0.1f);  if (!GrenadeIsNPCMine(self)) { World.invP1.makingNoise = true; World.invP1.noiseFinished = World.pauseRelativeTime + 2.0; } int soundIndex=60,explosionType=2;
-    switch (idx) {case 7: case 11: soundIndex = 64; World.fogFac += 5; explosionType = 1; break;/*frag, mine*/ case 8: case 10: soundIndex = 60; World.fogFac += 7; explosionType = 2; break;/*conc, earth*/ case 9:  soundIndex = 67; explosionType = 4; break;/*emp*/ case 12: soundIndex = 60; World.fogFac += 6;  explosionType = 2; break;/*nitro*/ case 13: soundIndex = 63; World.fogFac += 10; explosionType = 3; break;/*gas*/}
-    play_wav(GetSndPath(soundIndex), AppliedFXVol(1.0f), World.position[self], true); SpawnExplosionEffect(World.position[self],explosionType); ScreenShake(); DeleteInstance(self);
+    i16 idx=GrenadeTypeFromConst(e->index); float radius=(idx>=7&&idx<=13) ? grenadeRadius[idx-7] : (e->strength>0.0f ? e->strength : 4.0f);
+    ApplyImpactForceSphere(&dd,World.position[self],radius,e->damage * 0.1f);
+    if (!GrenadeIsNPCMine(self)) { World.invP1.makingNoise = true; World.invP1.noiseFinished = World.pauseRelativeTime + 2.0; }
+    const char* snd = "destroy/attack1_explode"; int explosionType = 2;
+    switch (idx) {
+        case 7: case 11: snd = "destroy/explosion1";      World.fogFac +=  5; explosionType = 1; break; /*frag, mine*/
+        case 8: case 10: snd = "destroy/attack1_explode"; World.fogFac +=  7; explosionType = 2; break; /*conc, earth*/
+        case 9:          snd = "destroy/hit2";            explosionType =  4;                    break; /*emp*/
+        case 12:         snd = "destroy/attack1_explode"; World.fogFac +=  6; explosionType = 2; break; /*nitro*/
+        case 13:         snd = "destroy/explode_minor";   World.fogFac += 10; explosionType = 3; break; /*gas*/
+    }
+    play_wav(snd, AppliedFXVol(1.0f), World.position[self], true); SpawnExplosionEffect(World.position[self],explosionType); ScreenShake(); DeleteInstance(self);
 }
 void GrenadeUpdate(u16 self) { Entity* e = &World.instances[self]; i16 idx=GrenadeTypeFromConst(e->index); if(idx == 14){GrenadeExplode(self); return;} /*Plastique*/ if((idx == 10 || idx == 12) && e->timerFinished <= World.pauseRelativeTime) { GrenadeExplode(self); return; } if (idx == 11) { V3 origin = World.position[self]; float pr=1.451f;  bool npcMine = GrenadeIsNPCMine(self);  for (u16 i = PLAYER1; i < World.instCount; i++) { Entity* o = &World.instances[i]; if (i == self || !(o->entflags & EF_ACTIVE) || (o->entflags & EF_DEAD)) continue; if (npcMine ? (i != PLAYER1) : (i == PLAYER1 || !IdxIsNPC(o->index))) continue; float rr = pr + ((World.col[i] == CT_CAP || World.col[i] == CT_SPH) ? World.colliderSize[i].x : 0.0f); if (V3_SqDist(World.position[i], origin) < (rr * rr)) { GrenadeExplode(self); return; } } } }
 void GrenadeOnCollision(u16 self) { i16 idx=GrenadeTypeFromConst(World.instances[self].index); if ((idx >= 7 && idx <= 9) || idx == 13) GrenadeExplode(self); }
@@ -391,7 +400,6 @@ void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNorm
 void ProjectileEffectImpactInitAfterLoad(u16 self) { if(self>=World.instCount)return;Entity* e=&World.instances[self]; e->counter=0;e->currentTargetIdx=0;e->lookUpIndex=(e->index==484||e->index==491)?5:0;if(e->countToTrigger<1){e->countToTrigger=e->index==485?5:(e->index==495?2:1);} }
  // None  Melee  MelEn  EnBm   Mag    Proj   Needle ProjEB ProjLn Gas    Tranq  Drill
 static const float attackTypeMult[7][12]={[NPCType_Mutant]={1,1,1,1,0,1,2,1,1,2,1,1},[NPCType_Supermutant]={1,1,1,1,0,1,1,1,1,1.5,1,1},[NPCType_Robot]={1,1,1,1,4,1,0,1,1,0,1,1},[NPCType_Cyborg]={1,1,1,1,2,1,1,1,1,1,1,1},[NPCType_Supercyborg]={1,1,1,1,2,1,0,1,1,0,1,1},[NPCType_MutantCyborg]={1,1,1,1,0.5,1,2,1,1,2,1.5,1},[NPCType_Cyber]={1,1,1,1,1,1,1,1,1,1,1,0}}; // Attack type damage multiplier table [NPCType][AttType], 1.0f = no change, 0.0f = immune, other = multiplier
-static const i16 objectDeathSound[] = {[458]=63,[459]=66,[460]=66,[464]=62,[465]=532,[466]=532,[467]=532,[468]=532,[469]=532,[470]=532,[471]=532,[472]=62,[473]=62,[474]=62,[475]=62,[476]=62,[477]=61,[478]=65,[479]=69,[525]=68,[526]=68,};
 static bool IsCyberEntity(u16 self) { if (World.curLev == LEVEL_CYBERSPACE){return true;} Entity* e=&World.instances[self]; if (self != PLAYER1 && e->cyberHealth > 0.0f){return true;} return (IdxIsNPC(e->index) && (e->index - 419) > 23);/*24-28 are cyber enemies*/}
 static float ApplyAttTypeAdjustments(u16 self,float take,AttType at) { if (!IdxIsNPC(World.instances[self].index) || World.instances[self].health <= 0.0f){return take;} NPCType t = npcTable[World.instances[self].index - 419].type; if (at >= 12){return take;} return take * attackTypeMult[t][at]; }
 static void UseDeathTargets(u16 self) { if(self == PLAYER1){return;} if (World.instances[self].targetOnDeathIdx != IO_NONE) UseTargets(self,World.instances[self].targetOnDeathIdx); }
@@ -405,12 +413,16 @@ static void SpawnSecCpuNodeGibs(u16 self) {
 static void SpawnDeathEffectAt(u16 type, V3 pos) { const PSysDef* preset = PSysTypeGet(type); if (!preset) return; PSysDef def = *preset; def.pos = pos; PSysAddInternal(&def,U16_MAX,U16_MAX); }
 static void NPCDeath(u16 self) { if (World.instances[self].entflags & EF_DEAD_CHECKS_DONE) {return;} flag_set(&World.instances[self].entflags,EF_DEAD_CHECKS_DONE,true); CreateDeathEffects(self,World.instances[self].deathBurst); if (World.instances[self].index == 419/*npc_autobomb*/) play_wav("destroy/explosion1",AppliedFXVol(1.0f),World.position[self],true); if (npcTable[World.instances[self].index - 419].type == NPCType_Cyber) { SpawnDeathEffectAt(190,World.position[self]); SpawnDeathEffectAt(191,World.position[self]); DeleteInstance(self); } }
 static void ObjectDeath(u16 self) {
-    Entity* e = &World.instances[self]; if (World.instances[self].entflags & EF_DEAD_CHECKS_DONE) return;
-    if (World.instances[self].entflags & EF_DEATH_BURST_DONE) { CreateDeathEffects(self,World.instances[self].deathBurst); DropSearchables(self); if (World.instances[self].index != 279){World.col[self]=CT_NONE;} HideSelf(self); } else { World.col[self] = CT_NONE; DropSearchables(self); CreateDeathEffects(self,World.instances[self].deathBurst); }
-    flag_set(&World.instances[self].entflags,EF_DEAD_CHECKS_DONE,true);
-    { SecurityType stype = SecurityType_None; if(World.instances[self].index == 477){stype=SecurityType_Camera;}else if(World.instances[self].index == 479){stype=SecurityType_NodeSmall;} else if(World.instances[self].index == 478){stype=SecurityType_NodeLarge;} if(stype != SecurityType_None){ReduceCurrentLevelSecurity(stype);} }
-    if ((World.instances[self].index == 478 || World.instances[self].index == 479) && !CPUNodesRemainOnLevel()) CodeScreensSetForLevel(World.curLev);
-    u16 idx = World.instances[self].index; SpawnSecCpuNodeGibs(self); play_wav(GetSndPath((idx < 527 && objectDeathSound[idx] != 0) ? objectDeathSound[idx] : 62/*crate_break*/), AppliedFXVol(1.0f), World.position[self], true); if(e->deathBurst != 0){HideSelf(self);}
+    static const char* const objDeathSnd[] = {"destroy/explode_minor","destroy/explosion3","destroy/explosion3",NULL,NULL,NULL/*458-463*/,"destroy/crate_break"/*464*/,"physics/impact_soft","physics/impact_soft","physics/impact_soft","physics/impact_soft","physics/impact_soft","physics/impact_soft","physics/impact_soft"/*465-471*/,"destroy/crate_break","destroy/crate_break","destroy/crate_break","destroy/crate_break","destroy/crate_break"/*472-476*/,
+                                              "destroy/camera_destroy","destroy/explosion2","destroy/screen_destroy"/*477-479*/};
+    Entity* e = &World.instances[self]; if (e->entflags & EF_DEAD_CHECKS_DONE) return;
+    if (e->entflags & EF_DEATH_BURST_DONE) { CreateDeathEffects(self,e->deathBurst); DropSearchables(self); if (e->index != 279){World.col[self]=CT_NONE;} HideSelf(self); } else { World.col[self] = CT_NONE; DropSearchables(self); CreateDeathEffects(self,e->deathBurst); }
+    flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
+    SecurityType stype = SecurityType_None; if(e->index == 477){stype=SecurityType_Camera;}else if(e->index == 479){stype=SecurityType_NodeSmall;} else if(e->index == 478){stype=SecurityType_NodeLarge;} if(stype != SecurityType_None){ReduceCurrentLevelSecurity(stype);}
+    if ((e->index == 478 || e->index == 479) && !CPUNodesRemainOnLevel()) CodeScreensSetForLevel(World.curLev);
+    u16 idx = e->index; SpawnSecCpuNodeGibs(self);
+    const char* snd = (u32)(idx - 458) < sizeof(objDeathSnd)/sizeof(objDeathSnd[0]) ? objDeathSnd[idx - 458] : (idx==525||idx==526) ? "destroy/hit3" : NULL;
+    play_wav(snd ? snd : "destroy/crate_break", AppliedFXVol(1.0f), World.position[self], true); if(e->deathBurst != 0){HideSelf(self);}
 }
 static void ScreenDeath(u16 self) { Entity* e=&World.instances[self]; if(e->entflags & EF_DEAD_CHECKS_DONE){return;} flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true); play_wav("destroy/screen_destroy",AppliedFXVol(1.0f),World.position[self],true);/*screen_destroy*/ if (e->entflags & EF_DEATH_BURST_DONE) ObjectDeath(self);/*gib path*/ }
 INLINE bool IsGrenade(u16 i) { return ((i >= 314 && i <= 320) || i == 370 || i == 372 || i == 387 || i == 389 || (i >= 402 && i <= 404)); }
@@ -517,9 +529,10 @@ static void QuestBitNoteSideEffects(u8 qb, bool isOn) {
     }
 }
 // Doors
+static const char* const doorSFX[19]={"doorpnuematic_open","doorpnuematic_open","doorbulkhead_open","doorbulkhead_open2","doorcompartment_open","doorpnuematic_open","doorbulkhead_open","doorcompartment_open","doorbulkhead_open","door_platform","door_platform","doorpnuematic_open","doorpnuematic_open","doorbulkhead_open2","doorpnuematic_open","doorpnuematic_open","doorpnuematic_open","doorpnuematic_open","doorpnuematic_open"};
 static bool DoorInventoryHasAccessCard(AccCardType card) { return card == ACC_None || (World.invP1.accessCardOwned & (1u << card)); }
-static void DoorOpen(u16 self) { Entity* e = &World.instances[self]; ChangeAnim(e,A_OPENING); e->doorOpen = e->doorState = DoorState_Opening; e->waitBefClose = World.pauseRelativeTime + e->delay; play_wav(GetSndPath(e->SFXIndex), AppliedFXVol(1.0f), World.position[self], true); }
-static void DoorClose(u16 self) { Entity* e = &World.instances[self]; ChangeAnim(e,A_CLOSING); e->doorOpen = e->doorState = DoorState_Closing; play_wav(GetSndPath(e->SFXIndex), AppliedFXVol(1.0f), World.position[self], true); }
+static void DoorOpen(u16 self) { Entity* e = &World.instances[self]; ChangeAnim(e,A_OPENING); e->doorOpen = e->doorState = DoorState_Opening; e->waitBefClose = World.pauseRelativeTime + e->delay; char path[64]; sFormat(path,sizeof(path),"doors/%s",doorSFX[e->index - 496]); play_wav(path,AppliedFXVol(1.0f),World.position[self],true); }
+static void DoorClose(u16 self) { Entity* e = &World.instances[self]; ChangeAnim(e,A_CLOSING); e->doorOpen = e->doorState = DoorState_Closing; char path[64]; sFormat(path,sizeof(path),"doors/%s",doorSFX[e->index - 496]); play_wav(path,AppliedFXVol(1.0f),World.position[self],true); }
 void DoorForceOpen(u16 self) { World.instances[self].requiredAccessCard = ACC_None; EntitySetLocked(&World.instances[self],false); DoorOpen(self); }
 void DoorForceClose(u16 self) { if (World.instances[self].doorOpen == DoorState_Closed) {return;} DoorClose(self); }
 void DoorActuate(u16 self) {
@@ -535,7 +548,7 @@ void DoorActuate(u16 self) {
         float p = (srcClip.frameEnd > srcClip.frameStart) ? (float)(f - srcClip.frameStart) / (float)(srcClip.frameEnd - srcClip.frameStart) : 1.0f;
         u16 newFrm = DoorFrameFromProgress(dstClip,1.0f - p);
         e->clip = dst; e->frame = newFrm; e->currentFrameFinished = 0.0; e->modelIndex = dstClip.frameStartModelIndex + (u16)(newFrm - dstClip.frameStart); e->doorOpen = e->doorState = op ? DoorState_Closing : DoorState_Opening;
-        if (!op) e->waitBefClose = World.pauseRelativeTime + e->delay; play_wav(GetSndPath(e->SFXIndex),AppliedFXVol(1.0f),World.position[self],true);
+        if (!op) e->waitBefClose = World.pauseRelativeTime + e->delay; char path[64]; sFormat(path,sizeof(path),"doors/%s",doorSFX[e->index - 496]); play_wav(path,AppliedFXVol(1.0f),World.position[self],true);
     }
 }
 void DoorUse(u16 self, u16 activator) {
@@ -558,6 +571,7 @@ bool QuestBitIsSet(u8 qb) { return (qb < QB_COUNT) && ((World.missionBits >> qb)
 void QuestBitSet(u8 qb)    { if (qb < QB_COUNT && !QuestBitIsSet(qb)) { World.missionBits |=  (1u << qb); QuestBitNoteSideEffects(qb, true); } }
 void QuestBitClear(u8 qb)  { if (qb < QB_COUNT &&  QuestBitIsSet(qb)) { World.missionBits &= ~(1u << qb); QuestBitNoteSideEffects(qb, false); } }
 void QuestBitToggle(u8 qb) { if (qb < QB_COUNT) { World.missionBits ^=  (1u << qb); QuestBitNoteSideEffects(qb, QuestBitIsSet(qb)); } }
+const char *GetSndPath(u16);
 void Targetted(u16 activator, u16 self) {
     Entity* e = &World.instances[self]; u32 aioflags = World.targetIOActive ? World.targetIOActivatorIoflags : World.instances[activator].ioflags; u32 aioflagsHi = World.targetIOActive ? World.targetIOActivatorIoflagsHi : World.instances[activator].ioflagsHi;
     if (e->index == 699) { if (!e->relayEnabled) return; if (e->relayOnceEver) { if (e->relayAlreadyDone) return; e->relayAlreadyDone = true; } if (e->delay > 0.0f) { LogicRelayDelayTarget(self, activator); return; } u32 savedFlags = World.targetIOActivatorIoflags, savedFlagsHi = World.targetIOActivatorIoflagsHi; World.targetIOActivatorIoflags = e->ioflags; World.targetIOActivatorIoflagsHi = e->ioflagsHi; UseTargets(activator,e->targetIdx); World.targetIOActivatorIoflags = savedFlags; World.targetIOActivatorIoflagsHi = savedFlagsHi; return; }
@@ -572,7 +586,7 @@ void Targetted(u16 activator, u16 self) {
         if (tm) { bool bitOn = QuestBitIsSet(e->questBitID); u32 savedFlags = World.targetIOActivatorIoflags, savedFlagsHi = World.targetIOActivatorIoflagsHi; World.targetIOActivatorIoflags = e->ioflags; World.targetIOActivatorIoflagsHi = e->ioflagsHi; UseTargets(activator, (tm == 1) == bitOn ? e->targetIdx : e->targetIfFalseIdx); World.targetIOActivatorIoflags = savedFlags; World.targetIOActivatorIoflagsHi = savedFlagsHi; }
     }
     if (e->index == 709/*info_message*/) { CenterStatusPrint("%s", Sys_Text.stringTable[e->messageLingdex]); return; } if (e->index == 708) { GameEndSequence(); return; }
-    if (e->index == 712/*info_playsound*/) {  if (e->playEverywhere) play_wav(GetSndPath(e->SFXIndex),AppliedFXVol(1.0f),(V3){0},false); else play_wav(GetSndPath(e->SFXIndex),AppliedFXVol(1.0f),World.position[self],true); return; }
+    if (e->index == 712/*info_playsound*/) {  if (e->playEverywhere) play_wav(GetSndPath(e->SFXClip),AppliedFXVol(1.0f),(V3){0},false); else play_wav(GetSndPath(e->SFXClip),AppliedFXVol(1.0f),World.position[self],true); return; }
     if (e->index == 707/*info_email*/) { EmailTargetted(self); return; } if (aioflags & TARG_IOFLAGS_TRIPTRIGGER) { if(e->index == 598 || e->index == 600){TriggerTargetted(self,activator);}else if(e->index == 594){TriggerCounterTargetted(self,activator);} }
     if (aioflags & TARG_IOFLAGS_UNLOCK) { EntitySetLocked(e, false); if (IdxIsDoor(e->index) && (aioflags & (TARG_IOFLAGS_DOOROPEN | TARG_IOFLAGS_DOOROPENIFUNLOCKED))) e->requiredAccessCard = ACC_None; } if ((aioflags & TARG_IOFLAGS_LOCK) && IdxIsDoor(e->index)) EntitySetLocked(e, true); if (IdxIsButtonSwitch(e->index)) ButtonSwitchUse(self,activator);
          if ((aioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index) && !(aioflags & TARG_IOFLAGS_UNLOCK)) { DoorForceOpen(self); }
@@ -650,17 +664,16 @@ static bool PanelUseAllowed(u16 i) {
     return true;
 }
 typedef enum { PanelInstallFrame, PanelInstallEntity, PanelInstallAnim } PanelInstallKind;
-typedef struct { const char* name; u8 item; u16 itemConst; PanelInstallKind kind; u16 msgOpen,msgInst,msgWrong,msgAlready; i16 sfxOpen,sfxInst,sfxAlready; const char* target; bool blowUp; u16 wreckTex; } RelayPanelScript;
+typedef struct { const char* name; u8 item; u16 itemConst; PanelInstallKind kind; u16 msgOpen,msgInst,msgWrong,msgAlready; const char *sfxOpen,*sfxInst,*sfxAlready; const char* target; bool blowUp; u16 wreckTex; } RelayPanelScript;
 static const RelayPanelScript relayPanelScripts[] = {
-    /*name             item itemConst kind               open inst wrong already  sfxO sfxI sfxA target                     fuse wreck*/
-    {"panelRelay428",   57,  364,      PanelInstallFrame,  262, 260, 259,  261,    225,  42,  226, "lev3fixtherelay",        false, 0     },/*level 3 maintenance "relay 428": interface demodulator, chipset baked into the frame*/
-    {"panelAntenna1",   56,  363,      PanelInstallEntity, 152, 606, 604,  605,     91,  42,  166, "lev7antenna1",           true,  618   },/*level 7 engineering antennas: Z-44 plastique placed on the panel, 15s fuse*/
-    {"panelAntenna2",   56,  363,      PanelInstallEntity, 152, 606, 604,  605,     91,  42,  166, "lev7antenna2",           true,  618   },
-    {"panelAntenna3",   56,  363,      PanelInstallEntity, 152, 606, 604,  605,     91,  42,  166, "lev7antenna3",           true,  618   },
-    {"panelAntenna4",   56,  363,      PanelInstallEntity, 152, 606, 604,  605,     91,  42,  166, "lev7antenna4",           true,  618   },
-    {"panelIsolinear",  64,  371,      PanelInstallEntity, 151, 211, 210,  212,     91,  42,  166, "lev9isolinearactivated", false, 0     },/*level 9: isolinear chipset placed on the panel*/
-    {"panelIsotope",    61,  0,        PanelInstallAnim,   285, 283, 282,  284,     91, 235,  235, "levRinstallisotope",     false, 0     },/*level 0 reactor "isotope panel": X-22 goes in via A_INSTALL then A_INSTALLED*/
-};
+    /*name         item itemConst      kind     open inst wrong alrdy                 sfxOpen                          sfxInst                       sfxAlready                   target  fuse wreck*/
+    {"panelRelay428", 57,364, PanelInstallFrame,262, 260, 259,  261,"vox/vox_relay428faulty", "buttons/button_clickclocktuck", "vox/vox_relayfixed",           "lev3fixtherelay",       false,  0},/*level 3 maintenance "relay 428": interface demodulator, chipset baked into the frame*/
+    {"panelAntenna1", 56,363,PanelInstallEntity,152, 606, 604,  605,"hud/searchsound",        "buttons/button_clickclocktuck", "vox/vox_accesspanelunlocked",  "lev7antenna1",           true,618},/*level 7 engineering antennas: Z-44 plastique placed on the panel, 15s fuse*/
+    {"panelAntenna2", 56,363,PanelInstallEntity,152, 606, 604,  605,"hud/searchsound",        "buttons/button_clickclocktuck", "vox/vox_accesspanelunlocked",  "lev7antenna2",           true,618},
+    {"panelAntenna3", 56,363,PanelInstallEntity,152, 606, 604,  605,"hud/searchsound",        "buttons/button_clickclocktuck", "vox/vox_accesspanelunlocked",  "lev7antenna3",           true,618},
+    {"panelAntenna4", 56,363,PanelInstallEntity,152, 606, 604,  605,"hud/searchsound",        "buttons/button_clickclocktuck", "vox/vox_accesspanelunlocked",  "lev7antenna4",           true,618},
+    {"panelIsolinear",64,371,PanelInstallEntity,151, 211, 210,  212,"hud/searchsound",        "buttons/button_clickclocktuck", "vox/vox_accesspanelunlocked",  "lev9isolinearactivated",false,  0},/*level 9: isolinear chipset placed on the panel*/
+    {"panelIsotope",  61,  0,  PanelInstallAnim,285, 283, 282,  284,"hud/searchsound",        "vox/vox_shieldgeneratorsready", "vox/vox_shieldgeneratorsready","levRinstallisotope",    false,  0},/*level 0 reactor "isotope panel": X-22 goes in via A_INSTALL then A_INSTALLED*/};
 extern char ioNames[MAX_IO_NAMES][TARG_STRLEN];
 static const RelayPanelScript* RelayPanelScriptFor(const Entity* e) { if (!e->targetnameIdx || e->targetnameIdx>=MAX_IO_NAMES) { return NULL; } for (u32 i=0;i<sizeof(relayPanelScripts)/sizeof(relayPanelScripts[0]);++i) if (sEqual(ioNames[e->targetnameIdx],relayPanelScripts[i].name)) { return &relayPanelScripts[i]; } return NULL; }
 static void RelayPanelMsg(u16 msg) { if (msg>0 && msg<T_LOGSTR_CNT) CenterStatusPrint("%s",Sys_Text.stringTable[msg]); }
@@ -668,13 +681,13 @@ static void RelayPanelUse(u16 self) {
     Entity* e = &World.instances[self]; if (!PanelUseAllowed(self)) { return; }
     const RelayPanelScript* sc = RelayPanelScriptFor(e);
     i16 held = (World.invP1.holdingObject && World.invP1.heldObjectIndex>=INSTS_1ST_IDX) ? (i16)(World.invP1.heldObjectIndex-307) : -1;
-    if (!e->panelOpen) { e->panelOpen=true; ChangeAnim(e,A_OPENING); play_wav(GetSndPath(sc?sc->sfxOpen:91),AppliedFXVol(1.0f),World.position[self],true); RelayPanelMsg(sc?sc->msgOpen:0); return; }
+    if (!e->panelOpen) { e->panelOpen=true; ChangeAnim(e,A_OPENING); play_wav(sc?sc->sfxOpen:"hud/searchsound",AppliedFXVol(1.0f),World.position[self],true); RelayPanelMsg(sc?sc->msgOpen:0); return; }
     if (e->panelInstalled && held<0) { RelayPanelMsg(sc?sc->msgAlready:0); return; }
     if (sc && held==(i16)sc->item) {
-        if (e->panelInstalled) { play_wav(GetSndPath(sc->sfxAlready),AppliedFXVol(1.0f),World.position[self],true); return; }
+        if (e->panelInstalled) { play_wav(sc->sfxAlready,AppliedFXVol(1.0f),World.position[self],true); return; }
         e->panelInstalled=true;
         if (sc->kind==PanelInstallFrame) { ChangeAnim(e,A_INSTALLED); } else if (sc->kind==PanelInstallAnim) { ChangeAnim(e,A_INSTALL); } else if (sc->itemConst) { u16 it=AddInstance(sc->itemConst,e->panelItemPos); if (it) World.rotation[it]=e->panelItemRot; }
-        play_wav(GetSndPath(sc->sfxInst?sc->sfxInst:42),AppliedFXVol(1.0f),World.position[self],true); RelayPanelMsg(sc?sc->msgInst:0); ResetHeldItem(); if (sc->target && *sc->target) { UseTargets(self,IOInternName(sc->target)); }
+        play_wav((sc->sfxInst && *sc->sfxInst) ? sc->sfxInst : "buttons/button_clickclocktuck",AppliedFXVol(1.0f),World.position[self],true); RelayPanelMsg(sc?sc->msgInst:0); ResetHeldItem(); if (sc->target && *sc->target) { UseTargets(self,IOInternName(sc->target)); }
         if (sc->blowUp) { e->panelArmed=true; e->panelTimer = World.pauseRelativeTime + (e->delay>0.0f?(double)e->delay:15.0); }
         return;
     }

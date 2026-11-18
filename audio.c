@@ -77,7 +77,6 @@ const char* audioLogs[LOGCNT] = {"logs/ghiran-2"/*0*/,"logs/steinberg-1"/*1*/,"l
                                  "shodan/shodan_shecanthelp"/*101*/,""/*102*/,""/*103*/,""/*104*/,""/*105*/,""/*106*/,""/*107*/,""/*108*/,"hud/vmailalert"/*109*/,""/*110*/,""/*111*/,"shodan/shodan_thankyou"/*112*/,"hud/vmailalert"/*113*/,""/*114*/,"hud/vmailalert"/*115*/,"hud/vmailalert"/*116*/,""/*117*/,"hud/vmailalert"/*118*/,"hud/vmailalert"/*119*/,""/*120*/,""/*121*/,
                                  ""/*122*/,""/*123*/,""/*124*/,""/*125*/,""/*126*/,""/*127*/,""/*128*/,""/*129*/,""/*130*/,""/*131*/,""/*132*/};
 const char* GetSndPath(u16 idx) { return idx < 670 ? sounds[idx] : ""; }
-static const char* GetRandomSound(FootStepType fstep,const int* starts,const int* counts,int size) { int idx=(int)fstep; if (idx<=0 || idx>=size) return GetSndPath(0); return GetSndPath(random_range_u32(starts[idx],starts[idx]+counts[idx]-1)); }
 FootStepType GetFootstepTypeForPrefab(int pid) {
     static FootStepType table[530]; static int initialized = 0;
     if (!initialized) {
@@ -92,9 +91,24 @@ FootStepType GetFootstepTypeForPrefab(int pid) {
     }
     if (pid<0 || pid>=530) { return FSTP_Plastic; } return table[pid];
 }
-const char* FootStepSound(FootStepType fstep) { static const int starts[]={0,268,276,284,292,300,308,316,324,332,340,348,356,364,372,380,388,396,404,412,428,438,443,451}; static const int counts[]={0,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,16,10,5,8,8}; return GetRandomSound(fstep,starts,counts,(int)(sizeof(starts)/sizeof(starts[0]))); }
-const char*     JumpSound(FootStepType fstep) { static const int starts[]={0,540,546,552,558,564,570,576,582,588,594,600,606,612,618,624,630,636,642,648,429,651,661,667}; static const int counts[]={0,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,2,4,3,3};   return GetRandomSound(fstep,starts,counts,(int)(sizeof(starts)/sizeof(starts[0]))); }
-const char* JumpLandSound(FootStepType fstep) { static const int starts[]={0,537,543,549,555,561,567,573,579,585,591,597,603,609,615,621,627,633,639,645,428,655,658,664}; static const int counts[]={0,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,10,3,3,3};  return GetRandomSound(fstep,starts,counts,(int)(sizeof(starts)/sizeof(starts[0]))); }
+typedef struct { const char* fmt; u8 first,count; } FsSnd;
+#define FS(dir,nm,a,n) {"footsteps/" dir "/" nm "%d",a,n}
+static const char* GetRandomSound(FootStepType fstep,const FsSnd* t,int size) { static char buf[4][96]; static u32 n; int idx=(int)fstep; if (idx<=0 || idx>=size) return ""; char* p=buf[n++&3]; sFormat(p,sizeof(p[0])*96,t[idx].fmt,(i32)random_range_u32(t[idx].first,t[idx].first+t[idx].count-1)); return p; }
+const char* FootStepSound(FootStepType fstep) {
+    static const FsSnd t[]={ {"",0,0},FS("Carpet","carpet_step",1,8), FS("Concrete","concrete_step",1,8), FS("Concrete Gritty","concrete_grit_step",1,8),FS("Earth","earth_step",1,8), FS("Earth","gravel_step",1,8), FS("Earth","rock_step",1,8),FS("Glass","glasssolid_step",1,8), FS("Marble","marble_step",1,8),FS("Metal","metal_step",1,8), FS("Metal","metalgrate_step",1,8), FS("Metal","metalsolid_step",1,8), FS("Metal","metalthin_step",1,8),
+                             FS("Panel","panel_step",1,8), FS("Plaster","plaster_step",1,8),FS("Plastic","plastic_step",1,8), FS("Plastic","plasticsolid_step",1,8),FS("Rubber","rubber_step",1,8), FS("Sand","sand_step",1,8), FS("Squish","squish_step",1,16),FS("Vent","vent_step",1,10), FS("Water","water_foot_step",1,5),FS("Wood","wood_step",1,8), FS("Wood","woodcrate_step",1,8) };
+    return GetRandomSound(fstep,t,(int)(sizeof(t)/sizeof(t[0])));
+}
+const char* JumpSound(FootStepType fstep) {
+    static const FsSnd t[]={ {"",0,0},FS("Carpet","carpet_jump",1,3), FS("Concrete","concrete_jump",1,3), FS("Concrete Gritty","concrete_grit_jump",1,3),FS("Earth","earth_jump",1,3), FS("Earth","gravel_jump",1,3), FS("Earth","rock_jump",1,3),FS("Glass","glasssolid_jump",1,3), FS("Marble","marble_jump",1,3),FS("Metal","metal_jump",1,3), FS("Metal","metalgrate_jump",1,3), FS("Metal","metalsolid_jump",1,3), FS("Metal","metalthin_jump",1,3),
+                             FS("Panel","panel_jump",1,3), FS("Plaster","plaster_jump",1,3),FS("Plastic","plastic_jump",1,3), FS("Plastic","plasticsolid_jump",1,3),FS("Rubber","rubber_jump",1,3), FS("Sand","sand_jump",1,3), FS("Squish","squish_jump",1,3),FS("Vent","vent_step",2,2), FS("Water","water_wade",1,4),FS("Wood","wood_jump",1,3), FS("Wood","woodcrate_jump",1,3) };
+    return GetRandomSound(fstep,t,(int)(sizeof(t)/sizeof(t[0])));
+}
+const char* JumpLandSound(FootStepType fstep) {
+    static const FsSnd t[]={ {"",0,0},FS("Carpet","carpet_land",1,3), FS("Concrete","concrete_land",1,3), FS("Concrete Gritty","concrete_grit_land",1,3),FS("Earth","earth_land",1,3), FS("Earth","gravel_land",1,3), FS("Earth","rock_land",1,3),FS("Glass","glasssolid_land",1,3), FS("Marble","marble_land",1,3),FS("Metal","metal_land",1,3), FS("Metal","metalgrate_land",1,3), FS("Metal","metalsolid_land",1,3), FS("Metal","metalthin_land",1,3),
+                             FS("Panel","panel_land",1,3), FS("Plaster","plaster_land",1,3),FS("Plastic","plastic_land",1,3), FS("Plastic","plasticsolid_land",1,3),FS("Rubber","rubber_land",1,3), FS("Sand","sand_land",1,3), FS("Squish","squish_land",1,3),FS("Vent","vent_step",1,10), FS("Water","water_step",6,3),FS("Wood","wood_land",1,3), FS("Wood","woodcrate_land",1,3) };
+    return GetRandomSound(fstep,t,(int)(sizeof(t)/sizeof(t[0])));
+}
 #define MP3_HDR_TEST_MPEG1(h)     ((h[1]) & 0x8)
 static u8 g_scf_long[8][23]={{0},{12,12,12,12,12,12,16,20,24,28,32,40,48,56,64,76,90,2,2,2,2,2,0},{0},{6,6,6,6,6,6,8,10,12,14,16,18,22,26,32,38,46,54,62,70,76,36,0},{0},{4,4,4,4,4,4,6,6,8,8,10,12,16,20,24,28,34,42,50,54,76,158,0},{4,4,4,4,4,4,6,6,6,8,10,12,16,18,22,28,34,40,46,54,54,192,0},{4,4,4,4,4,4,6,6,8,10,12,16,20,24,30,38,46,56,68,84,102,26,0}};
 static const u8 g_sfc_long_024[23] = { 6,6,6,6,6,6,8,10,12,14,16,20,24,28,32,38,46,52,60,68,58,54,0 };
