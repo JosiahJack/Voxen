@@ -847,7 +847,7 @@ AnimationClip mdlAnimClips[MAXANIM][MAX_ANIMCLIPS] = { // speed, frameStart, fra
 };
 void PortalCulling(); bool ToggleDoorPortal(u32,u16,u16);
 void ChangeAnim(Entity* e, u8 c) { if (e->animationNum >= MAXANIM || c >= MAX_ANIMCLIPS) return; AnimationClip* clip=&mdlAnimClips[e->animationNum][c]; if (clip->framerate <= 0 || clip->speed <= 0 || e->clip == c) return; e->clip=c; e->frame=clip->frameStart; e->modelIndex=clip->frameStartModelIndex; e->currentFrameFinished=0.0; }
-extern WeaponFireCtx wfx;
+extern WeaponFireCtx wfx; void PlaySparkSound(V3);
 void UpdateAnims(void) {
     if (World.paused || World.menuActive){return;} static double lastPauseTime=0; if(lastPauseTime == 0.0){lastPauseTime=World.pauseRelativeTime;} double animDT=World.pauseRelativeTime-lastPauseTime; lastPauseTime=World.pauseRelativeTime; if(animDT > 0.1){animDT=0.1;} if(animDT <= 0.0){return;} bool portalsNeedUpdated=false; u8 animTest=Cheats.animTest;
     for (u16 i = INSTS_1ST_IDX; i < INSTANCE_CNT; ++i) {

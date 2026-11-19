@@ -113,8 +113,8 @@ void MeleeHitUpdate() {
     dd.damage = GetDamageTakeAmount(&dd); wfx.tempHitEnt = targ;
     CreateStandardImpactEffects(); if (IdxIsGeometry(World.instances[targ].index)) CreateStandardImpactMarks(wep16);
     if(!IsDamageable(&World.instances[targ])){
-        if(!wfx.pendingMeleeSilent){if(!wfx.pendingMeleeIsRapier){FootStepType fstp=GetFootstepTypeForPrefab(World.instances[targ].index);play_wav(JumpLandSound(fstp),AppliedFXVol(1.0f),World.position[PLAYER1],false);play_wav(wfx.pendingMeleeHitSnd,AppliedFXVol(0.65f),World.position[PLAYER1],false);}
-        else{play_wav(wfx.pendingMeleeHitSnd,AppliedFXVol(1.0f),World.position[PLAYER1],false);}World.invP1.makingNoise=true;World.invP1.noiseFinished=World.pauseRelativeTime+0.5;}return;
+        if (!wfx.pendingMeleeSilent) { if (!wfx.pendingMeleeIsRapier) { FootStepType fstp = GetFootstepTypeForPrefab(World.instances[targ].index); play_wav(FsSound(fstp,FSK_LAND),AppliedFXVol(1.0f),World.position[PLAYER1],false); play_wav(wfx.pendingMeleeHitSnd,AppliedFXVol(0.65f),World.position[PLAYER1],false); }
+        else { play_wav(wfx.pendingMeleeHitSnd,AppliedFXVol(1.0f),World.position[PLAYER1],false); } World.invP1.makingNoise = true; World.invP1.noiseFinished = World.pauseRelativeTime + 0.5; } return;
     }
     dd.impactVelocity = 80.0f + dd.damage;
     if ((!dd.isOtherNPC || wep16==12) && (!wfx.pendingMeleeIsRapier || World.invP1.energy >= 4.0f)) { ApplyImpactForceWithSound(targ,dd.impactVelocity,dd.attacknormal,World.position[targ]); }

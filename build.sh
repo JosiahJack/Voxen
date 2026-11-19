@@ -74,7 +74,7 @@ else
 fi
 $LINKER "$TEMP_DIR"/*.o $LDFLAGS $LINK_OUTPUT
 if ! $IS_CI; then
-    strip --strip-all "$BINARY_NAME"; upx -qqq --best --lzma "$BINARY_NAME"
+    strip --strip-all "$BINARY_NAME"; #upx -qqq --best --lzma "$BINARY_NAME"
     echo "Built engine as game in $(( $(now_ms) - shader_start )) ms"
     if [[ $PLATFORM == windows ]]; then
         wine "./$BINARY_NAME"

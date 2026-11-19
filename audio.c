@@ -23,23 +23,16 @@ FootStepType GetFootstepTypeForPrefab(int pid) {
     }
     if (pid<0 || pid>=530) { return FSTP_Plastic; } return table[pid];
 }
-typedef struct { const char* fmt; u8 first,count; } FsSnd;
-#define FS(dir,nm,a,n) {"footsteps/" dir "/" nm "%d",a,n}
-static const char* GetRandomSound(FootStepType fstep,const FsSnd* t,int size) { static char buf[4][96]; static u32 n; int idx=(int)fstep; if (idx<=0 || idx>=size) return ""; char* p=buf[n++&3]; sFormat(p,sizeof(p[0])*96,t[idx].fmt,(i32)random_range_u32(t[idx].first,t[idx].first+t[idx].count-1)); return p; }
-const char* FootStepSound(FootStepType fstep) {
-    static const FsSnd t[]={ {"",0,0},FS("Carpet","carpet_step",1,8), FS("Concrete","concrete_step",1,8), FS("Concrete Gritty","concrete_grit_step",1,8),FS("Earth","earth_step",1,8), FS("Earth","gravel_step",1,8), FS("Earth","rock_step",1,8),FS("Glass","glasssolid_step",1,8), FS("Marble","marble_step",1,8),FS("Metal","metal_step",1,8), FS("Metal","metalgrate_step",1,8), FS("Metal","metalsolid_step",1,8), FS("Metal","metalthin_step",1,8),
-                             FS("Panel","panel_step",1,8), FS("Plaster","plaster_step",1,8),FS("Plastic","plastic_step",1,8), FS("Plastic","plasticsolid_step",1,8),FS("Rubber","rubber_step",1,8), FS("Sand","sand_step",1,8), FS("Squish","squish_step",1,16),FS("Vent","vent_step",1,10), FS("Water","water_foot_step",1,5),FS("Wood","wood_step",1,8), FS("Wood","woodcrate_step",1,8) };
-    return GetRandomSound(fstep,t,(int)(sizeof(t)/sizeof(t[0])));
-}
-const char* JumpSound(FootStepType fstep) {
-    static const FsSnd t[]={ {"",0,0},FS("Carpet","carpet_jump",1,3), FS("Concrete","concrete_jump",1,3), FS("Concrete Gritty","concrete_grit_jump",1,3),FS("Earth","earth_jump",1,3), FS("Earth","gravel_jump",1,3), FS("Earth","rock_jump",1,3),FS("Glass","glasssolid_jump",1,3), FS("Marble","marble_jump",1,3),FS("Metal","metal_jump",1,3), FS("Metal","metalgrate_jump",1,3), FS("Metal","metalsolid_jump",1,3), FS("Metal","metalthin_jump",1,3),
-                             FS("Panel","panel_jump",1,3), FS("Plaster","plaster_jump",1,3),FS("Plastic","plastic_jump",1,3), FS("Plastic","plasticsolid_jump",1,3),FS("Rubber","rubber_jump",1,3), FS("Sand","sand_jump",1,3), FS("Squish","squish_jump",1,3),FS("Vent","vent_step",2,2), FS("Water","water_wade",1,4),FS("Wood","wood_jump",1,3), FS("Wood","woodcrate_jump",1,3) };
-    return GetRandomSound(fstep,t,(int)(sizeof(t)/sizeof(t[0])));
-}
-const char* JumpLandSound(FootStepType fstep) {
-    static const FsSnd t[]={ {"",0,0},FS("Carpet","carpet_land",1,3), FS("Concrete","concrete_land",1,3), FS("Concrete Gritty","concrete_grit_land",1,3),FS("Earth","earth_land",1,3), FS("Earth","gravel_land",1,3), FS("Earth","rock_land",1,3),FS("Glass","glasssolid_land",1,3), FS("Marble","marble_land",1,3),FS("Metal","metal_land",1,3), FS("Metal","metalgrate_land",1,3), FS("Metal","metalsolid_land",1,3), FS("Metal","metalthin_land",1,3),
-                             FS("Panel","panel_land",1,3), FS("Plaster","plaster_land",1,3),FS("Plastic","plastic_land",1,3), FS("Plastic","plasticsolid_land",1,3),FS("Rubber","rubber_land",1,3), FS("Sand","sand_land",1,3), FS("Squish","squish_land",1,3),FS("Vent","vent_step",1,10), FS("Water","water_step",6,3),FS("Wood","wood_land",1,3), FS("Wood","woodcrate_land",1,3) };
-    return GetRandomSound(fstep,t,(int)(sizeof(t)/sizeof(t[0])));
+static const char* const fsBase[] = {"","footsteps/Carpet/carpet_%s","footsteps/Concrete/concrete_%s","footsteps/Concrete Gritty/concrete_grit_%s","footsteps/Earth/earth_%s","footsteps/Earth/gravel_%s","footsteps/Earth/rock_%s","footsteps/Glass/glasssolid_%s","footsteps/Marble/marble_%s","footsteps/Metal/metal_%s","footsteps/Metal/metalgrate_%s","footsteps/Metal/metalsolid_%s","footsteps/Metal/metalthin_%s","footsteps/Panel/panel_%s",
+                                     "footsteps/Plaster/plaster_%s","footsteps/Plastic/plastic_%s","footsteps/Plastic/plasticsolid_%s","footsteps/Rubber/rubber_%s","footsteps/Sand/sand_%s","footsteps/Squish/squish_%s","footsteps/Vent/vent_%s","footsteps/Water/water_%s","footsteps/Wood/wood_%s","footsteps/Wood/woodcrate_%s"};
+const char* FsSound(FootStepType fstep, int kind) {
+    static char buf[4][96]; static u32 n; int idx=(int)fstep; if (idx<=0 || idx>=(int)(sizeof(fsBase)/sizeof(fsBase[0]))) return "";
+    static const char* const kindName[]={"step","jump","land"}; const char* nm = kindName[kind]; u32 first=1, count=(kind==FSK_STEP) ? 8 : 3;
+         if (fstep==FSTP_Squish) { if (kind==FSK_STEP) count=16; }
+    else if (fstep==FSTP_Vent)   { nm="step"; if (kind==FSK_JUMP) { first=2; count=2; } else { count=10; } }
+    else if (fstep==FSTP_Water)  { if (kind==FSK_STEP) { nm="foot_step"; count=5; } else if (kind==FSK_JUMP) { nm="wade"; count=4; } else { nm="step"; first=6; } }
+    char sfx[32]; sFormat(sfx,sizeof(sfx),"%s%d",nm,(i32)random_range_u32(first,first+count-1));
+    char* p=buf[n++&3]; sFormat(p,sizeof(buf[0]),fsBase[idx],sfx); return p;
 }
 #define MP3_HDR_TEST_MPEG1(h)     ((h[1]) & 0x8)
 static u8 g_scf_long[8][23]={{0},{12,12,12,12,12,12,16,20,24,28,32,40,48,56,64,76,90,2,2,2,2,2,0},{0},{6,6,6,6,6,6,8,10,12,14,16,18,22,26,32,38,46,54,62,70,76,36,0},{0},{4,4,4,4,4,4,6,6,8,8,10,12,16,20,24,28,34,42,50,54,76,158,0},{4,4,4,4,4,4,6,6,6,8,10,12,16,18,22,28,34,40,46,54,54,192,0},{4,4,4,4,4,4,6,6,8,10,12,16,20,24,30,38,46,56,68,84,102,26,0}};
@@ -465,36 +458,36 @@ void play_mp3(const char *path, i32 fade_ms) {
 INLINE bool sEndsWith(const char *str, const char *suffix) { size_t slen=0, suflen=0; while(str[slen]){slen++;} while(suffix[suflen]){suflen++;} if(slen < suflen){return false;} for (size_t i=0;i<suflen;i++){ char a=str[slen - suflen + i], b=suffix[i]; if(a >= 'A' && a <= 'Z'){a+=32;} if(b >= 'A' && b <= 'Z'){b+=32;} if(a != b){return false;} } return true; }
 i32 SndInit(const char *path, wav_channel_t *w) { u32 frames; size_t sz=0; bool isMp3=sEndsWith(path,".mp3"); float* buf=NULL; i32 cslot=audioCacheAcquire(path,isMp3,&buf,&frames,&sz); if(!buf){return -1;} w->samples=buf; w->allocSize=sz; w->frame_count=frames; w->frame_pos=0; w->volume=1.0f; w->pitch=0.0f; w->looping=w->positional=false; w->playing=false; w->cacheSlot=cslot; return 0; }
 void PlaySparkSound(V3 pos) { /*prop_sparkingwire: random spark at end of animation loop*/
-    static const char* sparkSnds[3] = {"./Audio/ambient/sparks1.mp3","./Audio/ambient/sparks3.mp3","./Audio/ambient/sparks3.mp3"};
-    const char* sp = sparkSnds[random_range_u32(0,2)];
-    i32 slot = GetFreeWavSlot(); if(slot==-1){ if(wav_count < MAX_CHANNELS){ slot=(i32)wav_count; wav_count++; } } if(slot==-1) return;
-    wav_channel_t w; if(SndInit(sp,&w)!=0) return;
-    w.volume=AppliedFXVol(0.7f); w.positional = true; w.pos = pos; w.playing = true; wav_ch[slot] = w;
+    static const char* sparkSnds[3] = {"./Audio/ambient/sparks1.mp3","./Audio/ambient/sparks3.mp3","./Audio/ambient/sparks3.mp3"}; const char* sp = sparkSnds[random_range_u32(0,2)]; i32 slot = GetFreeWavSlot(); if(slot==-1){ if(wav_count < MAX_CHANNELS){ slot=(i32)wav_count; wav_count++; } } if(slot==-1) return; wav_channel_t w; if(SndInit(sp,&w)!=0) return; w.volume=AppliedFXVol(0.7f); w.positional = true; w.pos = pos; w.playing = true; wav_ch[slot] = w;
 }
 i32 SndStart(wav_channel_t* w) { w->frame_pos = 0; w->playing = true; u32 n = ext_count; for (u32 i=0;i<n;++i) if (ext_ch[i] == w) return 0; if (n < MAX_CHANNELS) { ext_ch[n] = w; ext_count = n+1; } return 0; }
 void SndUninit(wav_channel_t* w) { if (w->samples) { WavReleaseSamples(w); } w->playing = false; u32 n = ext_count; for (u32 i=0;i<n;++i) if (ext_ch[i] == w) { ext_ch[i] = ext_ch[n-1]; ext_count = n-1; break; } }
 void mp3_clear() { for (i32 i=0;i<2;i++) { mp3_fade_out_target[i]=NULL; mp3_channel_t *old=mp3_ch[i]; mp3_ch[i]=NULL; if (old) { mp3_uninit(&old->dec); } } mp3_slot=0; }
 #if defined(_WIN32)
-    typedef struct IMMDevice IMMDevice; typedef struct IMMDeviceEnumerator IMMDeviceEnumerator;  typedef struct { unsigned long Data1; u16 Data2,Data3; u8 Data4[8]; } GUID; typedef struct{ i32(__stdcall*q)(void*,const void*,void**); u32(__stdcall*a)(void*); u32(__stdcall*Release)(void*); i32(__stdcall* Activate)(void*,const void*,u32,void*,void**);} IMMDeviceVtbl; struct IMMDevice{IMMDeviceVtbl*lpVtbl;};
-    typedef struct{ i32(__stdcall*q)(void*,const void*,void**); u32(__stdcall*a)(void*); u32(__stdcall*Release)(void*); i32(__stdcall*e)(void*,int,u32,void**); i32(__stdcall*GetDefaultAudioEndpoint)(void*,int,int,IMMDevice**);}IMMDeviceEnumeratorVtbl; struct IMMDeviceEnumerator{IMMDeviceEnumeratorVtbl*lpVtbl;}; typedef struct IAudioClient IAudioClient; typedef struct IAudioRenderClient IAudioRenderClient; typedef struct{u16 t,n; u32 s,a; u16 b,w,c;}WAVEFORMATEX;
+    typedef struct IMMDevice IMMDevice;    typedef struct IMMDevEnum IMMDevEnum;    typedef struct { unsigned long Data1; u16 Data2,Data3; u8 Data4[8]; } GUID;    typedef struct{ i32(__stdcall*q)(void*,const void*,void**); u32(__stdcall*a)(void*); u32(__stdcall*Release)(void*); i32(__stdcall* Activate)(void*,const void*,u32,void*,void**);} IMMDeviceVtbl;    struct IMMDevice{IMMDeviceVtbl*lpVtbl;};
+    typedef struct{ i32(__stdcall*q)(void*,const void*,void**); u32(__stdcall*a)(void*); u32(__stdcall*Release)(void*); i32(__stdcall*e)(void*,int,u32,void**); i32(__stdcall*GetDefaultAudioEndpoint)(void*,int,int,IMMDevice**);}IMMDevEnumVtbl; struct IMMDevEnum{IMMDevEnumVtbl*lpVtbl;}; typedef struct IAudioClient IAudioClient; typedef struct IAudioRenderClient IAudioRenderClient; typedef struct{u16 t,n; u32 s,a; u16 b,w,c;}WAVEFORMATEX;
     typedef struct IAudioClientVtbl { i32 (__stdcall *QueryInterface)(void*, const void*,void**); u32 (__stdcall *AddRef)(void*); u32 (__stdcall *Release)(void*); i32 (__stdcall *Initialize)(void*,int,u32,i64,i64,const WAVEFORMATEX*,const void*); i32 (__stdcall *GetBufferSize)(void*,u32*); i32 (__stdcall *GetStreamLength)(void*,i64*); i32 (__stdcall *GetCurrentPadding)(void*,u32*);
     i32 (__stdcall *IsFormatSupported)(void*, int, const WAVEFORMATEX*, WAVEFORMATEX**); i32 (__stdcall *GetMixFormat)(void*,WAVEFORMATEX**); i32 (__stdcall *GetDevicePeriod)(void*,i64*,i64*); i32 (__stdcall *Start)(void*); i32 (__stdcall *Stop)(void*); i32 (__stdcall *Reset)(void*); i32 (__stdcall *SetEventHandle)(void*,void*); i32 (__stdcall *GetService)(void*,const void*,void**); } IAudioClientVtbl;
     struct IAudioClient { IAudioClientVtbl* lpVtbl; }; typedef struct IAudioRenderClientVtbl { i32 (__stdcall *QueryInterface)(void*,const void*,void**); u32 (__stdcall *AddRef)(void*); u32 (__stdcall *Release)(void*); i32 (__stdcall *GetBuffer)(void*,u32,u8**); i32 (__stdcall *ReleaseBuffer)(void*,u32,u32); } IAudioRenderClientVtbl;
     struct IAudioRenderClient { IAudioRenderClientVtbl* lpVtbl; }; typedef struct IUnknown IUnknown; typedef struct IUnknownVtbl { i32 (__stdcall *QueryInterface)(IUnknown* This, const GUID* riid, void** ppvObject); u32 (__stdcall *AddRef)(IUnknown* This); u32 (__stdcall *Release)(IUnknown* This); } IUnknownVtbl; struct IUnknown { const IUnknownVtbl* lpVtbl; };
     typedef struct {IAudioClient *client; IAudioRenderClient *render; u32 buffer_frames; i32 rate,channels,period_frames; bool open; } wasapi_dev_t;
     i32 WINAPI CoInitializeEx(void*,u32); i32 WINAPI CoCreateInstance(const GUID*,IUnknown*,u32,const GUID *const,void**); static wasapi_dev_t wasapi_devs[8]; static int wasapi_dev_count=0; static FHandle pcm_fds[8]; static i32 audfdcnt = 0; static const GUID IID_IAudioClient={0x1CB9AD4C,0xDBFA,0x4C32,{0xB1,0x78,0xC2,0xF5,0x68,0xA7,0x3,0xB2}}; static const GUID IID_IAudioRenderClient={0xF294ACFC,0x3146,0x4483,{0xA7,0xBF,0xAD,0xDC,0xA7,0xC2,0x60,0xE2}};
-    static const GUID CLSID_MMDeviceEnumerator_ = {0xBCDE0395,0xE52F,0x467C,{0x8E,0x3D,0xC4,0x57,0x92,0x91,0x69,0x2E}}; static const GUID IID_IMMDeviceEnumerator_ = {0xA95664D2,0x9614,0x4F35,{0xA7,0x46,0xDE,0x8D,0xB6,0x36,0x17,0xE6}};
+    static const GUID CLSID_MMDeviceEnumerator_ = {0xBCDE0395,0xE52F,0x467C,{0x8E,0x3D,0xC4,0x57,0x92,0x91,0x69,0x2E}}; static const GUID IID_IMMDevEnum_ = {0xA95664D2,0x9614,0x4F35,{0xA7,0x46,0xDE,0x8D,0xB6,0x36,0x17,0xE6}};
     void AudioUpdateMix() {
         if(!audfdcnt){return;} int idx=(int)(intptr_t)pcm_fds[0]-100; if(idx < 0 || idx >= wasapi_dev_count || !wasapi_devs[idx].open){return;} u32 pad=0; wasapi_devs[idx].client->lpVtbl->GetCurrentPadding(wasapi_devs[idx].client,&pad); u32 avail=AUDBUF_SIZE-(pad>AUDBUF_SIZE ? 0 : pad); i16 b[AUDIO_FRAMES * AUDIO_CHANNELS];
-        for (; avail >= AUDIO_FRAMES; avail -= AUDIO_FRAMES) { audio_mix_period(b); for (int i = 0; i < wasapi_dev_count; i++) { wasapi_dev_t *w = &wasapi_devs[i]; u8* d; if(!w->open){continue;} if ((i32)w->render->lpVtbl->GetBuffer(w->render,AUDIO_FRAMES,&d)<0){w->client->lpVtbl->Stop(w->client); w->client->lpVtbl->Reset(w->client); w->client->lpVtbl->Start(w->client);}else{mcpy(d,b,AUDIO_FRAMES*w->channels*2); w->render->lpVtbl->ReleaseBuffer(w->render,AUDIO_FRAMES,0);} } }
+        for (; avail >= AUDIO_FRAMES; avail -= AUDIO_FRAMES) {
+            audio_mix_period(b); for (int i = 0; i < wasapi_dev_count; i++) { wasapi_dev_t *w = &wasapi_devs[i]; u8* d; if(!w->open){continue;} if ((i32)w->render->lpVtbl->GetBuffer(w->render,AUDIO_FRAMES,&d)<0){w->client->lpVtbl->Stop(w->client); w->client->lpVtbl->Reset(w->client); w->client->lpVtbl->Start(w->client);}else{mcpy(d,b,AUDIO_FRAMES*w->channels*2); w->render->lpVtbl->ReleaseBuffer(w->render,AUDIO_FRAMES,0);} }
+        }
     }
-    
     static int wasapi_init_device(IMMDevice *dev,int r,int ch,int period_frames,int p) {
-        if(wasapi_dev_count>=8){return -1;} wasapi_dev_t *w=&wasapi_devs[wasapi_dev_count]; i32 hr=dev->lpVtbl->Activate(dev,&IID_IAudioClient,23,NULL,(void**)&w->client); if(((i32)(hr)<0)){DualLogError("WASAPI init failed, %u\n",hr); return -1;} WAVEFORMATEX fmt = {1,(u16)ch,(u32)r,(u32)(r*ch*2),(u16)(ch*2),16,0}; i64 buf_dur = (i64)(period_frames*p)*10000000LL/r; hr = w->client->lpVtbl->Initialize(w->client,0,524288,buf_dur,0,&fmt,NULL); if(((i32)(hr)<0)){w->client->lpVtbl->Release(w->client); return -1;}
+        if(wasapi_dev_count>=8){return -1;} wasapi_dev_t *w=&wasapi_devs[wasapi_dev_count]; i32 hr=dev->lpVtbl->Activate(dev,&IID_IAudioClient,23,NULL,(void**)&w->client); if(((i32)(hr)<0)){DualLogError("WASAPI init failed, %u\n",hr); return -1;}
+        WAVEFORMATEX fmt = {1,(u16)ch,(u32)r,(u32)(r*ch*2),(u16)(ch*2),16,0}; i64 buf_dur = (i64)(period_frames*p)*10000000LL/r; hr = w->client->lpVtbl->Initialize(w->client,0,524288,buf_dur,0,&fmt,NULL); if(((i32)(hr)<0)){w->client->lpVtbl->Release(w->client); return -1;}
         w->client->lpVtbl->GetBufferSize(w->client,&w->buffer_frames); hr = w->client->lpVtbl->GetService(w->client,&IID_IAudioRenderClient,(void**)&w->render); if(((i32)(hr)<0)){ w->client->lpVtbl->Release(w->client); return -1;} w->client->lpVtbl->Start(w->client);w->rate=r; w->channels=ch; w->period_frames=period_frames; w->open=true; return wasapi_dev_count++;
     }
-    
-    void InitAudio() { CoInitializeEx(0,0); IMMDeviceEnumerator *en; IMMDevice *dev; if(CoCreateInstance(&CLSID_MMDeviceEnumerator_,0,23,&IID_IMMDeviceEnumerator_,(void**)&en)<0){DualLogError("CoCreateInstance fail\n"); return;} i32 hr=en->lpVtbl->GetDefaultAudioEndpoint(en,0,0,&dev); en->lpVtbl->Release(en); if(hr>=0&&dev){int idx=wasapi_init_device(dev,AUDIO_RATE,AUDIO_CHANNELS,AUDIO_FRAMES,AUDIO_PERIODS); dev->lpVtbl->Release(dev); if(idx>=0){pcm_fds[0]=(FHandle)(intptr_t)100; audfdcnt=1; return;}} DualLogError("No WASAPI device\n"); }
+    void InitAudio() {
+        CoInitializeEx(0,0); IMMDevEnum *en; IMMDevice *dev; if (CoCreateInstance(&CLSID_MMDeviceEnumerator_,0,23,&IID_IMMDevEnum_,(void**)&en) < 0) { DualLogError("CoCreateInstance fail\n"); return; }
+        i32 hr = en->lpVtbl->GetDefaultAudioEndpoint(en,0,0,&dev); en->lpVtbl->Release(en); if (hr >= 0 && dev) { int idx = wasapi_init_device(dev,AUDIO_RATE,AUDIO_CHANNELS,AUDIO_FRAMES,AUDIO_PERIODS); dev->lpVtbl->Release(dev); if (idx >= 0) { pcm_fds[0] = (FHandle)(intptr_t)100; audfdcnt = 1; return; } } DualLogError("No WASAPI device\n");
+    }
 #else // Linux
     typedef void snd_pcm_t; typedef int (*pfnspo)(snd_pcm_t**,const char*,int,int); typedef int (*pfnspw)(snd_pcm_t*,const void*,u32); typedef int (*pfnspr)(snd_pcm_t*,int,int); typedef int (*pfnspp)(snd_pcm_t*); typedef int (*pfnsphpa)(snd_pcm_t*,void*); typedef int (*pfnsphpsa)(snd_pcm_t*,void*,u32); 
     typedef int (*pfnsphpsf)(snd_pcm_t*,void*,int); typedef int (*pfnsphp)(snd_pcm_t*,void*);  typedef int (*pfnsphpsc)(snd_pcm_t*, void*,u32); typedef int (*pfnsphpsrn)(snd_pcm_t*,void*,u32*,int*); typedef int (*pfnsphpspsn)(snd_pcm_t*,void*,u64*,int*); typedef int (*pfnsphpspn)(snd_pcm_t*,void*,u32*,int*); typedef int (*pfnspa)(snd_pcm_t*);
@@ -507,37 +500,28 @@ void mp3_clear() { for (i32 i=0;i<2;i++) { mp3_fade_out_target[i]=NULL; mp3_chan
         u32 rate=AUDIO_RATE; int dir=0; if((r=sphpsrn(apcm,hwp,&rate,&dir))<0){DualLogError("set_rate(%u) failed\n",AUDIO_RATE); return false;} u64 period=AUDIO_FRAMES; dir=0; if((r=sphpspsn(apcm,hwp,&period,&dir))<0){DualLogError("set_period_size(%d) failed\n",AUDIO_FRAMES); return false;} u32 periods=AUDIO_PERIODS; dir=0;
         if((r=sphpspn(apcm,hwp,&periods,&dir))<0){DualLogError("set_periods(%d) failed\n",AUDIO_PERIODS); return false;} if ((r=snd_pcm_hw_params(apcm,hwp))<0){DualLogError("hw_params apply failed\n"); return false;} if((r=spp(apcm))<0){DualLogError("snd_pcm_prepare failed\n"); return false;} if ((r=spn(apcm,1)) < 0){DualLogError("spn failed:%d\n",r); return false;} return true;
     }
-
     void AudioUpdateMix() {
         if(!apcm){return;} i16 b[AUDIO_FRAMES*AUDIO_CHANNELS];
-        for(i32 guard=0;guard<(i32)AUDIO_PERIODS*4+8;guard++){ int a=snd_pcm_avail_update(apcm); if(a<0){if(snd_pcm_recover(apcm,a,1/*silent; ALSA's own "underrun occurred" spam is not useful per-frame*/)<0){return;} continue;} if(a<(int)AUDIO_FRAMES){return;}
-            audio_mix_period(b); u32 off=0,left=AUDIO_FRAMES; while(left>0){int r=snd_pcm_writei(apcm,b+off*AUDIO_CHANNELS,left); if(r==-11/*EAGAIN, ring full though avail said otherwise*/){return;} if(r<0){if(snd_pcm_recover(apcm,r,1)<0){return;} continue;} off+=(u32)r; left-=(u32)r;}
-        }
+        for(i32 guard=0;guard<(i32)AUDIO_PERIODS*4+8;guard++){ int a=snd_pcm_avail_update(apcm); if(a<0){if(snd_pcm_recover(apcm,a,1)<0){return;} continue;} if(a<(int)AUDIO_FRAMES){return;} audio_mix_period(b); u32 off=0,left=AUDIO_FRAMES; while(left>0){int r=snd_pcm_writei(apcm,b+off*AUDIO_CHANNELS,left); if(r==-11/*EAGAIN*/){return;} if(r<0){if(snd_pcm_recover(apcm,r,1)<0){return;} continue;} off+=(u32)r; left-=(u32)r;} }
     }
     void InitAudio() { if (!alsa_try_open_default()) { DualLogError("Audio: no output device found\n"); return; } }
 #endif
 // Looping Ambients SFX System
 typedef struct { wav_channel_t sound; u32 loaded; } AmbientSlot; typedef struct { u16 index; float vol; const char* filename; } AmbientDef; static u16 ambReg[MAXAMB]; static AmbientSlot ambientSlots[MAXAMB] = {0}; static u16 ambs=0;
 static const AmbientDef ambientSounds[] = {{621,0.05f,"airhiss"},{622,0.20f,"clicker"},{623,0.4f,"compressor"},{624,0.2f,"dishwasher"},{625,0.5f,"drip_amb"},{626,0.3f,"fan1"},{627,0.3f,"generator_gas"},{628,0.3f,"gurgle"},{629,0.6f,"icemaker"},{630,0.2f,"intake"},{631,0.4f,"lathe"},{632,0.1f,"lev3loop1"},{633,0.1f,"lev3loop2"},{634,0.1f,"lev3loop3"},{635,0.1f,"lev3loop4"},{636,1.0f,"liquid_bubble"},{637,0.4f,"lava2"},{638,0.4f,"rain"/*looping*/},
-                                                 {639,0.4f,"machgear_loop"},{640,0.8f,"machine_ambience"},{641,0.6f,"machine_go"},{642,1.0f,"machine_humamb7"},{643,0.4f,"machine_humlonoise"},{644,0.4f,"machine_loop1"},{645,0.4f,"machine_loop2"},{646,0.4f,"machinea1"},{647,0.8f,"machinevat_loop"},{648,0.02f,"steam_loop" },{649,0.65f,"pipewater_loop"},{650,0.3f,"powerloom"},{651,0.2f,"pump"},{652,0.05f,"pump2"},{653,0.55f,"rain"},{654,0.1f,"steam_loop"},{655,0.5f,"washing_machine"}};
+                                           {639,0.4f,"machgear_loop"},{640,0.8f,"machine_ambience"},{641,0.6f,"machine_go"},{642,1.0f,"machine_humamb7"},{643,0.4f,"machine_humlonoise"},{644,0.4f,"machine_loop1"},{645,0.4f,"machine_loop2"},{646,0.4f,"machinea1"},{647,0.8f,"machinevat_loop"},{648,0.02f,"steam_loop" },{649,0.65f,"pipewater_loop"},{650,0.3f,"powerloom"},{651,0.2f,"pump"},{652,0.05f,"pump2"},{653,0.55f,"rain"},{654,0.1f,"steam_loop"},
+                                           {655,0.5f,"washing_machine"}};
 void MixAmbs() {
     u32 loadsLeft = 1;
     for (u16 i=0;i<ambs;++i) {
         u16 a=ambReg[i]; u32 j=(u32)World.instances[a].index-621u; if (j>=sizeof(ambientSounds)/sizeof(ambientSounds[0])) continue; const AmbientDef* def=&ambientSounds[j]; float d = V3_Dist(World.position[PLAYER1],World.position[ambReg[i]]); AmbientSlot* slot = &ambientSlots[(size_t)(def - ambientSounds)];
         if (d < 7.68f && PositionVisibleFromPlayerCell(World.position[ambReg[i]].x,World.position[ambReg[i]].z)) {
-            if (!slot->loaded) {
-                if (!loadsLeft) { continue; }
-                loadsLeft--; SndUninit(&slot->sound); char p[512]; sFormat(p,sizeof(p),"./Audio/ambient/%s.mp3",def->filename); if(SndInit(p,&slot->sound) != 0) { continue; }
-                if (((float)slot->sound.frame_count / (float)AUDIO_RATE) <= 0.0f) { SndUninit(&slot->sound); continue; }
-                
-                slot->sound.looping = true; slot->loaded = 1;
-            }
+            if (!slot->loaded) { if (!loadsLeft) { continue; } loadsLeft--; SndUninit(&slot->sound); char p[512]; sFormat(p,sizeof(p),"./Audio/ambient/%s.mp3",def->filename); if(SndInit(p,&slot->sound) != 0) { continue; } if (((float)slot->sound.frame_count / (float)AUDIO_RATE) <= 0.0f) { SndUninit(&slot->sound); continue; } slot->sound.looping = true; slot->loaded = 1; }
             if (!slot->sound.playing) { SndStart(&slot->sound); }
             slot->sound.volume = (def->vol * (d <= 1.0f ? 1.0f : d >= 7.68f ? 0.0f : (7.68f - d) / 6.68f));
         } else if (slot->sound.playing) slot->sound.playing = false;
     }
 }
-
 void ResetLevelAudio(){ambs=0; mset(ambReg,0,MAXAMB*sizeof(u16)); for(u32 s=0;s<MAXAMB;++s){if(ambientSlots[s].loaded){ambientSlots[s].sound.playing=false;}} for(u16 i=INSTS_1ST_IDX;i<World.instCount;++i){if(IdxIsAmbient(World.instances[i].index)){ambReg[ambs]=i; ambs++; if(ambs>=MAXAMB){DualLogError("Ambients %u > %u!\n",ambs,MAXAMB); break;}}}}
 void SndClearAll() { for (u32 i=0;i<wav_count;++i) { if (wav_ch[i].playing) SndUninit(&wav_ch[i]); } for (u32 s=0;s<MAXAMB;++s) { ambientSlots[s].sound.playing=false; } ext_count=0; if (log_ch) { mp3_uninit(&log_ch->dec); log_ch=NULL; } mset(rev_buf,0,sizeof(rev_buf)); mset(ap_buf,0,sizeof(ap_buf)); mset(rev_lp,0,sizeof(rev_lp)); }
 // Music System
@@ -557,15 +541,12 @@ void PlayMenuMusic() { videoPageClip = NULL; mp3_clear(); play_mp3("./Audio/musi
 void StopVideoPageMusic() { videoPageClip = NULL; mp3_clear(); } // Clip teardown with no replacement track, for leaving a clip page straight back into the paused game where no menu music belongs. Clearing videoPageClip also stops UpdateAudio from looping the bed back in.
 const char* GetCorrespondingLevelClip(TrackType ttype) {
     switch(ttype) { case TT_Revive:return reviveMusic[World.curLev]; case TT_Die:return dieMusic; case TT_Elev:return elevMusic; case TT_Distortion:return distrtMusic[World.curLev]; }/*Override types*/
-    static const struct { const char** tracks; u8 entry,combatMin,combatMax,walkMin,walkMax; } lists[]={
-        {reactorMusic,6,0,5,6,12},{medMusic,0,5,10,1,4},{sciMusic,0,8,9,1,7},{securityMusic,9,0,5,6,18},{execMusic,0,9,12,0,9},{groveMusic,19,0,8,9,23}
-    };
+    static const struct { const char** tracks; u8 entry,combatMin,combatMax,walkMin,walkMax; } lists[]={{reactorMusic,6,0,5,6,12},{medMusic,0,5,10,1,4},{sciMusic,0,8,9,1,7},{securityMusic,9,0,5,6,18},{execMusic,0,9,12,0,9},{groveMusic,19,0,8,9,23}};
     static const u8 levelList[MAX_LEVELS]={0,1,2,255,2,0,4,0,3,255,5,5,5,255};
     u8 li=World.curLev<MAX_LEVELS ? levelList[World.curLev] : 255;
     if (li<sizeof(lists)/sizeof(lists[0])) { if (World.Sys_Music.levelEntry) return lists[li].tracks[lists[li].entry]; bool combat=ttype==TT_Combat; return lists[li].tracks[random_range_u8(combat ? lists[li].combatMin : lists[li].walkMin,combat ? lists[li].combatMax : lists[li].walkMax)]; }
     if (World.curLev==13){if(World.Sys_Music.levelEntry){return cyberMusic[0];} if(World.Sys_Music.cyberTube){return cyberMusic[random_range_u8(4,7)];} if (random_range(0.0f,1.0f) < 0.5f){return cyberMusic[random_range_u8(1,4)];} return cyberMusic[8]; }/*13 CYBERSPACE*/     return loopMusic[0];
 }
-
 void PlayTrack(TrackType ttype, MusicType mtype) {
     const char* clip; bool dynamic=Sys_Settings.DynamicMusic;
     if (dynamic) { if (mtype==MT_Override) mp3_clear(); clip=GetCorrespondingLevelClip(ttype); }
@@ -573,29 +554,15 @@ void PlayTrack(TrackType ttype, MusicType mtype) {
     else { if (World.curLev==9) return; clip=loopMusic[World.curLev]; }
     char p[128]; sFormat(p,sizeof(p),"./Audio/music/%s.mp3",clip); play_mp3(p,dynamic ? 50 : 0); if (dynamic && !World.Sys_Music.elevator) World.Sys_Music.levelEntry=false;
 }
-
 void UpdateAudio() {
-    if (!World.paused && !World.menuActive) {MixAmbs();}
-    if ((World.paused && !World.menuActive) || (!Sys_Settings.VolumeMusic && !videoPageClip)) { mp3_paused = true; return; }
-    
-    mp3_paused = false;
-    u32 zone = World.Sys_Music.inZone ? (((u32)World.Sys_Music.zoneTrack & 0xFFu) | ((u32)World.Sys_Music.zoneMusic << 8)) : 0u;
-    if (!zone && (World.Sys_Music.elevator || World.Sys_Music.distortion)) zone = (u32)(World.Sys_Music.distortion ? TT_Distortion : TT_Elev) | ((u32)MT_Override << 8);
-    static u32 musicZoneLast = 0U;
-    bool zoneChanged=(zone!=musicZoneLast); musicZoneLast=zone;
-    if (zoneChanged && !World.menuActive) {
-        if (zone) { PlayTrack((TrackType)(zone&0xFFu),(MusicType)((zone>>8)&0xFFu)); return; }
-        
-        if (Sys_Settings.DynamicMusic) { PlayTrack(TT_Walking,MT_Walking); }
-        return;
-    }
-    
-    float remaining = mp3_remaining[mp3_slot];
-    if (remaining > 0.05f){return;}
+    if (!World.paused && !World.menuActive) {MixAmbs();} if ((World.paused && !World.menuActive) || (!Sys_Settings.VolumeMusic && !videoPageClip)) { mp3_paused = true; return; }
+    mp3_paused = false; u32 zone = World.Sys_Music.inZone ? (((u32)World.Sys_Music.zoneTrack & 0xFFu) | ((u32)World.Sys_Music.zoneMusic << 8)) : 0u; if (!zone && (World.Sys_Music.elevator || World.Sys_Music.distortion)) zone = (u32)(World.Sys_Music.distortion ? TT_Distortion : TT_Elev) | ((u32)MT_Override << 8);
+    static u32 musicZoneLast = 0U; bool zoneChanged=(zone!=musicZoneLast); musicZoneLast=zone;
+    if (zoneChanged && !World.menuActive) { if (zone) { PlayTrack((TrackType)(zone&0xFFu),(MusicType)((zone>>8)&0xFFu)); return; } if (Sys_Settings.DynamicMusic) { PlayTrack(TT_Walking,MT_Walking); } return; }
+    float remaining = mp3_remaining[mp3_slot]; if (remaining > 0.05f){return;}
     if (videoPageClip) { play_mp3(videoPageClip,150); return; }
     if (World.menuActive) { play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500); return; }
     if (World.pauseRelativeTime - World.invP1.justFired < 15.0 && !World.Sys_Music.inZone && World.Sys_Music.combatImpulseFinished < World.pauseRelativeTime) { PlayTrack(TT_Combat,MT_Override); World.Sys_Music.combatImpulseFinished=World.pauseRelativeTime + 20.0; return; }
     if (World.Sys_Music.inZone){ if (zone) { PlayTrack((TrackType)(zone&0xFFu),(MusicType)((zone>>8)&0xFFu)); return; } }
-    
     if (Sys_Settings.DynamicMusic) { PlayTrack(TT_Walking,MT_Walking); }
 }

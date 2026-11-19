@@ -620,7 +620,7 @@ bool CantStand(u16 playerIdx, float targetHeight) {
     World.colliderSize[playerIdx].y=oldHeight; World.colliderCenter[playerIdx].y=oldCenterY; return !clear;
 }
 INLINE bool StandBlocked(float targetHeight) { if (!CantStand(PLAYER1, targetHeight)) return false; CenterStatusPrint("%s", Sys_Text.stringTable[targetHeight >= 2.0f ? 187 : 188]); return true; }
-KeyState* GetCodeMapping(int settingIndex); const char* FootStepSound(FootStepType);
+KeyState* GetCodeMapping(int settingIndex);
 bool DoubleTapLeanLeft(void)  { if(!GetKeyPressed(7)){ return false; } if (World.pauseRelativeTime < World.invP1.leanLTapFinished) { World.invP1.leanLTapFinished = 0.0; return true; } World.invP1.leanLTapFinished = World.pauseRelativeTime + 0.5; return false; }
 bool DoubleTapLeanRight(void) { if(!GetKeyPressed(8)){ return false; } if (World.pauseRelativeTime < World.invP1.leanRTapFinished) { World.invP1.leanRTapFinished = 0.0; return true; } World.invP1.leanRTapFinished = World.pauseRelativeTime + 0.5; return false; } 
 void ApplyPlayerMovements(float dt) {
@@ -655,7 +655,7 @@ void ApplyPlayerMovements(float dt) {
             RaycastHit jhit = Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET);
             FootStepType jfstp=jhit.hit ? GetFootstepTypeForPrefab(World.instances[jhit.hitInstanceIndex].index) : FSTP_Concrete;
             float jumpVol=World.invP1.fatigue > 80.0f ? 0.5f : 1.0f;
-            play_wav(JumpSound(jfstp),AppliedFXVol(jumpVol),World.position[PLAYER1],true);
+            play_wav(FsSound(jfstp,FSK_JUMP),AppliedFXVol(jumpVol),World.position[PLAYER1],true);
         }
     }
     if (GetKey(4)/*Jump still held*/ && jumpjettin && World.invP1.energy > 0.0f) {
@@ -670,7 +670,7 @@ void ApplyPlayerMovements(float dt) {
     bool isSprinting = GetKey(9)/*Sprint*/ && (grounded || inGravLift || World.invP1.ladderState > 0 || Cheats.noclip);
     if(World.invP1.fatigueMoveFinished<World.pauseRelativeTime && (vabs(h)>0.0f || vabs(s)>0.0f) && grounded && (V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1])>0.1f && !Cheats.noclip)&&!boostAct){World.invP1.fatigue+=isSprinting ? 2.85f : 1.0f; World.invP1.fatigueMoveFinished=World.pauseRelativeTime+0.298f;/*Ensure no sync w/ bleedoff*/}
     if(World.invP1.footstepFinished < World.pauseRelativeTime && (vabs(h) > 0.0f || vabs(s) > 0.0f) && grounded && (PlayerIsMoving() && !Cheats.noclip) && !boostAct){
-        RaycastHit fstep=Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); play_wav(FootStepSound(fstep.hit ? GetFootstepTypeForPrefab(World.instances[fstep.hitInstanceIndex].index) : FSTP_Concrete),AppliedFXVol(random_range(0.4f,0.55f)),World.position[PLAYER1],true); World.invP1.footstepFinished = World.pauseRelativeTime + (isSprinting ? random_range(0.2f,0.3f) : random_range(0.35f,0.65f));
+        RaycastHit fstep=Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); play_wav(FsSound(fstep.hit ? GetFootstepTypeForPrefab(World.instances[fstep.hitInstanceIndex].index) : FSTP_Concrete,FSK_STEP),AppliedFXVol(random_range(0.4f,0.55f)),World.position[PLAYER1],true); World.invP1.footstepFinished = World.pauseRelativeTime + (isSprinting ? random_range(0.2f,0.3f) : random_range(0.35f,0.65f));
     }
     if (World.invP1.rustleFinished<World.pauseRelativeTime && (vabs(h)>0.0f || vabs(s)>0.0f) && (V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1])>0.1f && !Cheats.noclip) && PlayerIsMoving() && !boostAct) {
         u32 n = random_range_u32(1,7); if(n==4) n=1; char path[64]; sFormat(path,sizeof(path),"footsteps/Clothes/rustle0%d",(i32)n); play_wav(path,AppliedFXVol(random_range(0.3f,0.5f)), World.position[PLAYER1],true); World.invP1.rustleFinished=World.pauseRelativeTime+(isSprinting ? random_range(0.4f,0.6f) : random_range(0.8f,1.2f));
@@ -688,7 +688,7 @@ void ApplyPlayerMovements(float dt) {
     if (World.invP1.noiseFinished < World.pauseRelativeTime) World.invP1.makingNoise = false;
     if (!cyber && grounded && !World.invP1.wasGrounded) {
         float velChange = vabs(World.invP1.lastVelY - World.velocity[PLAYER1].y);
-        if(velChange>2.0f && World.invP1.noiseFinished<World.pauseRelativeTime){RaycastHit lhit=Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); FootStepType lstp=lhit.hit ? GetFootstepTypeForPrefab(World.instances[lhit.hitInstanceIndex].index) : FSTP_Concrete; play_wav(JumpLandSound(lstp),AppliedFXVol(vclamp(velChange/11.72f,0.5f,1.0f)),World.position[PLAYER1],true); World.invP1.makingNoise=true; World.invP1.noiseFinished=World.pauseRelativeTime+0.2f;}
+        if(velChange>2.0f && World.invP1.noiseFinished<World.pauseRelativeTime){RaycastHit lhit=Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); FootStepType lstp=lhit.hit ? GetFootstepTypeForPrefab(World.instances[lhit.hitInstanceIndex].index) : FSTP_Concrete; play_wav(FsSound(lstp,FSK_LAND),AppliedFXVol(vclamp(velChange/11.72f,0.5f,1.0f)),World.position[PLAYER1],true); World.invP1.makingNoise=true; World.invP1.noiseFinished=World.pauseRelativeTime+0.2f;}
         if(velChange>=11.72f&&World.invP1.fallPainFinished<World.pauseRelativeTime){World.invP1.fallPainFinished=World.pauseRelativeTime+0.5f; DamageData dd={0}; float falltake=75.f-random_range(0,68.f); if(falltake>World.instances[PLAYER1].health&&falltake-World.instances[PLAYER1].health<5.0f)falltake=World.instances[PLAYER1].health-1.f; dd.damage=falltake; TakeDamage(PLAYER1,dd); World.invP1.makingNoise=true; World.invP1.noiseFinished=World.pauseRelativeTime+0.2f;}
     } World.invP1.wasGrounded=grounded; World.invP1.lastVelY=World.velocity[PLAYER1].y;
 }
