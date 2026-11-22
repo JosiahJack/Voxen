@@ -81,11 +81,11 @@ void qsort_new(void* base, size_t nel, size_t w, cmpfun cmp) {
     while (hd<high) {if ((p[0]&3)==3) { sift(hd,w,cmp_r,arg,ps,lp); shr(p,2); ps+=2; }else { if(lp[ps-1]>=((size_t)(high-hd))){trinkle(hd,w,cmp_r,arg,p,ps,0,lp);}else {sift(hd,w,cmp_r,arg,ps,lp);}  if(ps==1){shl(p,1); ps=0;}else{shl(p,ps-1); ps=1;} } p[0]|=1; hd+=w;}
     trinkle(hd,w,cmp_r,arg,p,ps,0,lp); while (ps!=1||p[0]!=1||p[1]!=0) { if(ps<=1) {trail=pntz(p); shr(p,trail); ps+=trail;}else{shl(p,2); ps-=2; p[0]^=7; shr(p,1); trinkle(hd-lp[ps]-w,w,cmp_r,arg,p,ps+1,1,lp); shl(p,1); p[0]|=1; trinkle(hd-w,w,cmp_r,arg,p,ps,1,lp);} hd-=w; }
 }
-i32 PosGetCellCoordX(float x) { return (u16)vclampi((i32)vfloor((x - World.worldMin_x[World.curLev] + CELLXHALF) / CELLSZ),0,(WORLDX - 1)); }
-i32 PosGetCellCoordZ(float z) { return (u16)vclampi((i32)vfloor((z - World.worldMin_z[World.curLev] + CELLXHALF) / CELLSZ),0,(WORLDX - 1)); }
-i32 PosGetCellCoords(float x, float z) { return (PosGetCellCoordZ(z) * WORLDX) + PosGetCellCoordX(x); }
+u16 PosGetCellCoordX(float x) { return (u16)vclampi((i32)vfloor((x - World.worldMin_x[World.curLev] + CELLXHALF) / CELLSZ),0,(WORLDX - 1)); }
+u16 PosGetCellCoordZ(float z) { return (u16)vclampi((i32)vfloor((z - World.worldMin_z[World.curLev] + CELLXHALF) / CELLSZ),0,(WORLDX - 1)); }
+u16 PosGetCellCoords(float x, float z) { return (u16)((PosGetCellCoordZ(z) * WORLDX) + PosGetCellCoordX(x)); }
 char statusText[T_BUFFER_SIZE];
-void CenterStatusPrint(const char * restrict fmt, ...) { if (!fmt || *fmt == '\0') {return;} va_list args; __builtin_va_start(args, fmt); sFormatV(statusText,T_BUFFER_SIZE,fmt,args); __builtin_va_end(args); DualLog("%s\n",statusText); World.statusTextDecayFinished = get_time() + 3.5;/*secs decay time before text dissappears.*/ }
+void CenterStatusPrint(const char * restrict fmt, ...) { if (!fmt || *fmt == '\0') {return;} va_list args; __builtin_va_start(args, fmt); sFormatV(statusText,T_BUFFER_SIZE,fmt,args); __builtin_va_end(args); DualLog("%s\n",statusText); World.statusTextDecayFinished = get_time() + 3.5f;/*secs decay time before text dissappears.*/ }
 void BmpWrite(char const *filename, int x, int y, const void *data) {
     FHandle f = OS_OpenWriteonly(filename); if (f == INVALID_FHANDLE) { DualLogError("Failed to open %s for writing\n", filename); return; }
     u32 fileSize = 14 + 108 + (u32)x * y * 4;/*BMP file header (14 bytes)*/ u8 fileHeader[14] = {'B','M',fileSize & 255,(fileSize >> 8) & 255,(fileSize >> 16) & 255,(fileSize >> 24) & 255,0,0,0,0,14 + 108,0,0,0}; u8 infoHeader[108]={0}; *(u32*)(infoHeader+0)=108;/*size*/
@@ -94,7 +94,7 @@ void BmpWrite(char const *filename, int x, int y, const void *data) {
 }
 void Screenshot() {
     World.screenshotTimeout = World.current_time + 1.0;/*Prevent saving more than 1 per second for sanity purposes.*/ OS_MakeFolder("Screenshots"); u16 w=Sys_Settings.ScreenWidth, h=Sys_Settings.ScreenHeight; u8* pixels = OS_Alloc(w * h * 4 * sizeof(char)); glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,pixels);  
-    char filename[96]; sFormat(filename,sizeof(filename),"Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp",get_time(),World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z); BmpWrite(filename,w,h,pixels); CenterStatusPrint("Saved screenshot %s\n",filename); OS_Free(pixels,w * h * 4 * sizeof(char));
+    char filename[96]; sFormat(filename,sizeof(filename),"Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp",get_timed(),(double)World.position[PLAYER1].x,(double)World.position[PLAYER1].y,(double)World.position[PLAYER1].z); BmpWrite(filename,w,h,pixels); CenterStatusPrint("Saved screenshot %s\n",filename); OS_Free(pixels,w * h * 4 * sizeof(char));
 }
 size_t g_mmap_live = 0;
 void DebugRAMPeak() { // Kernel high-water mark of RSS over process lifetime
@@ -113,7 +113,7 @@ void DebugRAMActual(const char *context) { // Get USS aka the total RAM uniquely
     size_t heap_bytes = (size_t)((char*)current_brk - (char*)heap_start); size_t uss_bytes = 0; FHandle fd = OS_OpenReadonly("/proc/self/smaps_rollup"); if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); return; }
     char buf[4096]; long bytes_read = OS_Read(fd,buf,sizeof(buf)-1); if (bytes_read > 0) { buf[bytes_read] = '\0'; } else buf[0] = '\0'; OS_Close(fd); char* p = buf;
     while (*p) { if (mcmp(p,"Private_",8) == 0) { p += 8; size_t val = 0; if (mcmp(p,"Clean",5) !=0 && mcmp(p,"Dirty",5) != 0) { p++; continue; }    while (*p && *p != ':') p++; if (*p != ':') { p++; continue; } p++; while(*p == ' ' || *p == '\t'){p++;} while(*p >= '0' && *p <= '9'){val=val * 10 + (*p - '0'); p++;} uss_bytes += val * 1024; } p++; }
-    u32 mmapped=(u32)__atomic_load_n(&g_mmap_live,__ATOMIC_RELAXED); DualLog("Mem at %s: Heap %ub(%uKB|%.2fMB), USS %ub(%uKB|%.2fMB), MMAP %uKB|%.2fMB\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0,mmapped / 1024,mmapped / 1024.0 / 1024.0);
+    u32 mmapped=(u32)__atomic_load_n(&g_mmap_live,__ATOMIC_RELAXED); DualLog("Mem at %s: Heap %ub(%uKB|%.2fMB), USS %ub(%uKB|%.2fMB), MMAP %uKB|%.2fMB\n",context,heap_bytes,(heap_bytes / 1024),(double)heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,(double)uss_bytes / 1024.0 / 1024.0,mmapped / 1024,(double)mmapped / 1024.0 / 1024.0);
     #endif
 }
 u32 random_range_rng = 0x12345678u;

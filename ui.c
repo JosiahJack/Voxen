@@ -30,10 +30,10 @@ INLINE void UIRImg(u32 id, i16 x, i16 y, i16 w, i16 h, u16 tex) { UIR(id,x,y,w,h
 INLINE i16 UITextW(const char* t, float sc, i16 maxW) { float w=MeasureLineAdvance(t,FONT_NORMAL)*sc; if (w<1.0f) w=1.0f; return (maxW>0 && w>(float)maxW) ? maxW : (i16)w; }
 INLINE void UIRText(u32 id, i16 x, i16 y, u32 col, u8 font, float sc, i16 maxW, const char* t) { UIR(id,x,y,UITextW(t,sc,maxW),(i16)(22.0f*sc)); RenderTextL(x,y,col,font,sc,"%s",t); }
 INLINE bool UIOver(u32 id) { return UIC(id).active && CursorIsOverBounds(UIC(id).min.x,UIC(id).max.x,UIC(id).min.y,UIC(id).max.y); }
-static void UI_BeginFrame() { for (u32 i=1;i<UI_ID_COUNT;++i) UIC(i).active=false; }
+static void UI_BeginFrame() { for (u32 i=1;i<UI_ID_COUNT;++i) UIC(i).active = false; }
 static u8 UIClicked(u32 id) {
     if (id >= UI_ID_COUNT || id == 0) return 0; if (!UIOver(id)) return 0; bool l=Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed, r=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed; if (!l && !r) return 0;
-    Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed=false; World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; double* t=l?&World.uiComponents[id].lastLMB:&World.uiComponents[id].lastRMB; u8 dbl=(*t>0.0 && (World.pauseRelativeTime-*t)<=0.5f)?4u:0u; *t=dbl?0.0:World.pauseRelativeTime; return (u8)((l?1u:2u)|dbl);
+    Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed = Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed = false; World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true; float* t = l ? &World.uiComponents[id].lastLMB : &World.uiComponents[id].lastRMB; u8 dbl = (*t > 0.0f && (World.pauseRelativeTime - *t) <= 0.5f) ? 4u : 0u; *t = dbl ? 0.0f : World.pauseRelativeTime; return (u8)((l ? 1u : 2u) | dbl);
 }
 static void RefreshSaveSlots(void) { for (u8 i=0;i<8;++i) { saveSlotUsed[i] = ReadSaveSlotName(i,saveSlotNames[i],sizeof(saveSlotNames[i])); if (!saveSlotUsed[i]) { const char* t = (i==7) ? "- unused quicksave -" : "- unused -"; size_t n = 0; while (t[n] && n < sizeof(saveSlotNames[i]) - 1) { saveSlotNames[i][n] = t[n]; ++n; } saveSlotNames[i][n] = '\0'; } } }
 static void SaveSlotCancelTyping(void) { saveSlotEditing=-1; enteringSaveName=false; saveNameEntryLen=0; saveNameEntry[0]='\0'; }
@@ -61,7 +61,7 @@ INLINE void MFD_SelectTab(u8 panel, u8 tab, bool toggle) {
     play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0},false);
 }
 void WeaponSelectSlot(int slot) {
-    int wi = (int)World.invP1.wepInvIndices[slot]; if (wi < 0 || wi >= MAX_ENTITIES || (int)World.invP1.wepCur == slot || World.invP1.reloadFinished > World.pauseRelativeTime) { return; } play_wav("hud/changeweapon",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); World.invP1.wepCurPending = (i16)slot; World.invP1.weaponIndexPending = (i16)wi; int w = Get16WeaponIndexFromConstIndex(wi); WeaponFireStartWeaponDip((w >= 0 && w < 16) ? reloadTime[w] : 0.5f);
+    int wi = (int)World.invP1.wepInvIndices[slot]; if (wi < 0 || wi >= MAX_ENTS || (int)World.invP1.wepCur == slot || World.invP1.reloadFinished > World.pauseRelativeTime) { return; } play_wav("hud/changeweapon",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); World.invP1.wepCurPending = (i16)slot; World.invP1.weaponIndexPending = (i16)wi; int w = Get16WeaponIndexFromConstIndex(wi); WeaponFireStartWeaponDip((w >= 0 && w < 16) ? reloadTime[w] : 0.5f);
 }
 __attribute__((noinline)) bool MenuEnter() { return !Cheats.consoleActive && (Sys_Input.keyStates[KEY_KP_ENTER].pressed || Sys_Input.keyStates[KEY_ENTER].pressed); }
 static void UiClickGate() { bool anyDown = false; for (u8 b = 0; b < MAX_MOUSE_BUTTONS; ++b) anyDown |= Sys_Input.mouseButtons[b].down; uiClickBlocked = false; if (uiClickLock) { if (!anyDown) uiClickLock = false; else uiClickBlocked = true; } }
@@ -117,19 +117,19 @@ static void RenderVideoPage(u8 page) {
     double elapsed = World.absoluteTime - start;
     const float* at = isIntro ? introTextAt : (isDeath ? deathTextAt : outroTextAt);
     int cardCount = isIntro ? 15 : (isDeath ? 2 : 3);
-    double vidLen = isIntro ? 117.141f : (isDeath ? 16.8f : 54.144f); double cardsEnd = isIntro ? vidLen : (isDeath ? 16.8f : 14.0);
+    double vidLen = isIntro ? 117.141 : (isDeath ? 16.8 : 54.144); double cardsEnd = isIntro ? vidLen : (isDeath ? 16.8 : 14.0);
     int frames = isIntro ? 735 : (isDeath ? 506 : 408); u32 frameBase = isIntro ? 2166u : (isDeath ? 3454u : 2901u);
     if (frameBase + (u32)frames > (u32)texCnt) frames = 0;
-    i32 frame = frames>0 ? (i32)(elapsed*(double)frames/vidLen) : 0; if (frame<0) frame = 0; else if (frame>=frames) frame = frames-1;
+    i32 frame = frames > 0 ? (i32)(elapsed * (double)frames / vidLen) : 0; if (frame<0) frame = 0; else if (frame>=frames) frame = frames-1;
     static u32 heldRt = 0xFFFFFFFFu, heldBase = 0xFFFFFFFFu;
     if (heldBase != frameBase) { heldBase = frameBase; heldRt = 0xFFFFFFFFu; }
     if (frames>0) { u32 want = frameBase+(u32)frame; u32 nxt = VideoPeekFrame(want); QueueVideoFrame(want,false); if (nxt != 0xFFFFFFFFu) QueueVideoFrame(nxt,true); u32 rt = VideoFrameTexIndex(want); if (rt != 0xFFFFFFFFu) heldRt = rt; if (heldRt != 0xFFFFFFFFu) RenderUIImage(43,isIntro ? 39 : 0,1280,isIntro ? 600 : 720,heldRt); }    
     int card = -1;
-    if (elapsed < cardsEnd) { for (int i=cardCount-1;i>=0;--i) { if (elapsed >= at[i]) { card = i; break; } } }
+    if (elapsed < cardsEnd) { for (int i=cardCount-1;i>=0;--i) { if (elapsed >= (double)at[i]) { card = i; break; } } }
     if (card >= 0) { RenderTextC(546,544,T_VIDEOTEXT,FONT_NORMAL,1.25f,"%s",Sys_Text.stringTable[(isIntro?613:(isDeath?628:610))+card]); }
     bool click = VidSkipPressed();
     if (click) { uiClickBlocked = uiClickLock = true; }
-    bool skip = (isIntro || isDeath) ? (elapsed>1.5 && click) : click;
+    bool skip = (isIntro || isDeath) ? (elapsed > 1.5 && click) : click;
     if(skip || elapsed >= vidLen){if (isIntro || isDeath) MenuGoBack(); else { World.creditsActive=true; World.creditsPageIndex=0; }}
 }
 static void MenuBackButton(i16 bgX, i16 bgY, i16 tX, i16 tY, i8 item) { RenderUIImage(bgX,bgY,84,36,1252);/*Back Button background*/ bool over=false; if (UI_Button(UI_ID_MENU_BACK,bgX,bgY+34,84,32,&over,item) || (MenuEnter() && currentMenuItem==item && !rebindCaptureActive)) MenuGoBack(); over=over||currentMenuItem==item; RenderTextL(tX,tY,over ? T_STOPD_RED_HIGHLIGHT : T_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]); }
@@ -242,13 +242,13 @@ void RenderMenu() {
                 if (Sys_Input.keyStates[KEY_ESCAPE].pressed) { Sys_Input.keyStates[KEY_ESCAPE].pressed=false; rebindRow = -1; rebindCaptureActive = false; }
                 else {
                     i32 newIdx = -1;
-                    if (Sys_Input.scrollDelta > 0) newIdx = 127; else if (Sys_Input.scrollDelta < 0) newIdx = 128;
+                    if (Sys_Input.scrollDelta > 0.0) newIdx = 127; else if (Sys_Input.scrollDelta < 0.0) newIdx = 128;
                     if (newIdx < 0) for (int b=0;b<MAX_MOUSE_BUTTONS && newIdx<0;++b) if (Sys_Input.mouseButtons[b].pressed && !(World.cursorPos_x>=1087 && World.cursorPos_x<=1171 && World.cursorPos_y>=723 && World.cursorPos_y<=759)) newIdx = 53 + b;/*LMB..MB7 fit inputElements 53..60*/
                     if (newIdx < 0) for (int k=0;k<MAX_KEYS && newIdx<0;++k) if (Sys_Input.keyStates[k].pressed && k != KEY_ESCAPE)
                         for (int e=0;e<134 && newIdx<0;++e) if (inputElements[e].name && inputElements[e].value==k && e!=127 && e!=128) newIdx = e;
                     if (newIdx >= 0) {
                         *(u16*)configTable[rebindRow].ptr = (u16)newIdx; SaveConfig();
-                        if (newIdx==127 || newIdx==128) Sys_Input.scrollDelta = 0;
+                        if (newIdx==127 || newIdx==128) Sys_Input.scrollDelta = 0.0;
                         else if (newIdx>=53 && newIdx<=60) Sys_Input.mouseButtons[inputElements[newIdx].value].pressed = false;
                         else if (newIdx<134 && inputElements[newIdx].value>=0 && inputElements[newIdx].value<MAX_KEYS) Sys_Input.keyStates[inputElements[newIdx].value].pressed = false;
                         rebindRow = -1; rebindCaptureActive = false;
@@ -380,7 +380,7 @@ void HwToggle(u8 i) {
     const HwBtn* b = &hwBtns[i]; bool noEng = World.invP1.energy <= 0.0f, on = (World.invP1.hardwareIsActive & b->bit) != 0; if (!(World.invP1.hasHardware & b->bit)) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } if (b->bit == HW_BIO && Cheats.showFPS) { return; }
     if (b->eng == 3) { MFD_ResetGeneral(); World.Sys_UI.mfdTab[0] = 5; World.Sys_UI.mfdTab[1] = 2; World.Sys_UI.mfdItemReader[0] = true; World.Sys_UI.MFD_ReaderView = MFD_READER_CONTENTS; World.Sys_UI.MFD_MediaTab = World.Sys_UI.lastMultiMediaTabOpened; if (World.Sys_UI.MFD_MediaTab > MM_NOTES || (World.Sys_UI.MFD_MediaTab == MM_NOTES && !World.diffMis)) World.Sys_UI.MFD_MediaTab = MM_LOG_TABLE; play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0},false); return; }
     if (noEng && (b->eng==0 || (b->eng==1 && World.invP1.hwVersSetting[b->idx]==0) || (b->eng==2 && World.invP1.hwVersSetting[b->idx]>=1))) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; }
-    play_wav(on ? b->sOff : b->sOn,AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive ^= b->bit; if (b->bit==HW_SHD) { World.Sys_UI.shieldAnimationIsActivate = !on; World.Sys_UI.shieldAnimationStarted = World.pauseRelativeTime; World.Sys_UI.shieldAnimationFinished = World.pauseRelativeTime + (World.Sys_UI.shieldAnimationIsActivate ? 1.0 : 1.167); } if (b->bit==HW_BIO && on && !Cheats.showFPS) BioMonitorClearGraphs();
+    play_wav(on ? b->sOff : b->sOn,AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive ^= b->bit; if (b->bit==HW_SHD) { World.Sys_UI.shieldAnimationIsActivate = !on; World.Sys_UI.shieldAnimationStarted = World.pauseRelativeTime; World.Sys_UI.shieldAnimationFinished = World.pauseRelativeTime + (World.Sys_UI.shieldAnimationIsActivate ? 1.0f : 1.167f); } if (b->bit==HW_BIO && on && !Cheats.showFPS) BioMonitorClearGraphs();
 }
 static const char* mgName[9]={"Ping","15","Wing 0","Botbounce","Eel Zapper","Road","TriopToe","Corp Conq","Chess"};
 static void SysUIDataClose(void) { MFD_CloseData(); World.Sys_UI.objectInUsePos=(V3){999.0f,999.0f,999.0f}; }
@@ -573,47 +573,38 @@ void UI_AutomapClick(bool rh,int action) { World.Sys_UI.mouseClickHeldOverGUI=tr
 void CloseFullmap() { World.Sys_UI.fullMapOpen[0]=World.Sys_UI.fullMapOpen[1]=false; }
 void AddItemToInventory(int index, int custIdx); void ResetHeldItem();
 const u16 vmailStartFrames[6]={1579,1645,1713,1784,1864,1931}; static const u16 vmailEndFrames[6]={1644,1712,1783,1863,1930,1988};
-enum { EF_POSX,EF_POSY,EF_POSZ,EF_ROTX,EF_ROTY,EF_ROTZ,EF_ROTW,EF_SCLX,EF_SCLY,EF_SCLZ,EF_TEX,EF_MODEL,EF_GLOW,EF_SPEC,EF_NORM,EF_LAST }; bool editFieldEditing=false; static u8 editFieldSlot=EF_LAST; static char editFieldBuffer[40]={0}; static const i16 efRowY[EF_LAST]={160,188,216,244,272,300,328,356,384,412,440,468,496,524,552};
+enum { EF_POSX,EF_POSY,EF_POSZ,EF_ROTX,EF_ROTY,EF_ROTZ,EF_ROTW,EF_SCLX,EF_SCLY,EF_SCLZ,EF_TEX,EF_MODEL,EF_GLOW,EF_SPEC,EF_NORM,EF_LAST }; bool editFieldEditing; static u8 editFieldSlot = EF_LAST; static char editFieldBuffer[40] = {0}; static const i16 efRowY[EF_LAST]={160,188,216,244,272,300,328,356,384,412,440,468,496,524,552};
 static const char* efRowLabel[EF_LAST]={"position x","position y","position z","rotation x","rotation y","rotation z","rotation w","scale x","scale y","scale z","texIndex","modelIndex","glowIndex","specIndex","normIndex"};
 extern Quaternion quat_normalize(Quaternion);
-static void* EditFieldPtr(u8 slot,u16 s) {
-    static const u16 offsets[]={__builtin_offsetof(Entity,texIndex),__builtin_offsetof(Entity,modelIndex),__builtin_offsetof(Entity,glowIndex),__builtin_offsetof(Entity,specIndex),__builtin_offsetof(Entity,normIndex)};
-    if (slot<EF_ROTX) return (u8*)&World.position[s]+slot*sizeof(float);
-    if (slot<EF_SCLX) return (u8*)&World.rotation[s]+(slot-EF_ROTX)*sizeof(float);
-    if (slot<EF_TEX) return (u8*)&World.scale[s]+(slot-EF_SCLX)*sizeof(float);
-    return slot<EF_LAST ? (u8*)&World.instances[s]+offsets[slot-EF_TEX] : NULL;
-}
-static void EditFieldValueText(u8 slot,u16 sel,char* out,size_t n) { void* p=EditFieldPtr(slot,sel); if (!p) { if (n) out[0]=0; return; } if (slot<EF_TEX) sFormat(out,n,slot>=EF_ROTX && slot<=EF_ROTW ? "%.3f" : "%.2f",*(float*)p); else sFormat(out,n,"%u",*(u16*)p); }
-static bool EditSelIsActive(void){return Cheats.editMode&&editModeSelection<U16_MAX&&editModeSelection>=INSTS_1ST_IDX&&editModeSelection<World.instCount;}
-static bool EditLightSelIsActive(void){return Cheats.editMode&&editModeLightSelection<U16_MAX&&editModeLightSelection<World.loadedLights;}
+static void* EditFieldPtr(u8 slot, u16 s) { static const u16 offsets[]={__builtin_offsetof(Entity,texIndex),__builtin_offsetof(Entity,modelIndex),__builtin_offsetof(Entity,glowIndex),__builtin_offsetof(Entity,specIndex),__builtin_offsetof(Entity,normIndex)}; if (slot<EF_ROTX) return (u8*)&World.position[s]+slot*sizeof(float); if (slot<EF_SCLX) return (u8*)&World.rotation[s]+(slot-EF_ROTX)*sizeof(float); if (slot<EF_TEX) return (u8*)&World.scale[s]+(slot-EF_SCLX)*sizeof(float); return slot<EF_LAST ? (u8*)&World.instances[s]+offsets[slot-EF_TEX] : NULL; }
+static void EditFieldValueText(u8 slot, u16 sel, char* out, size_t n) { void* p = EditFieldPtr(slot,sel); if (!p) { if (n) out[0] = 0; return; } if (slot < EF_TEX) sFormat(out,n,slot >= EF_ROTX && slot <= EF_ROTW ? "%.3f" : "%.2f",(double)(*(float*)p)); else sFormat(out,n,"%u",*(u16*)p); }
+static bool EditSelIsActive() { return Cheats.editMode && editModeSelection < U16_MAX && editModeSelection >= INSTS_1ST_IDX && editModeSelection < World.instCount; }
+static bool EditLightSelIsActive() { return Cheats.editMode && editModeLightSelection < U16_MAX && editModeLightSelection < World.loadedLights; }
 enum { LF_POSX,LF_POSY,LF_POSZ,LF_INT,LF_RANGE,LF_SPOTANG,LF_COLR,LF_COLG,LF_COLB,LF_MINI,LF_MAXI,LF_SDIRX,LF_SDIRY,LF_SDIRZ,LF_SDIRW,LF_LAST };
 static const char* lfRowLabel[LF_LAST]={"position x","position y","position z","intensity","range","spotAng","color r","color g","color b","minIntensity","maxIntensity","spotDir x","spotDir y","spotDir z","spotDir w"};
-static const u16 lfOffsets[LF_LAST]={
-    __builtin_offsetof(Light,pos.x),__builtin_offsetof(Light,pos.y),__builtin_offsetof(Light,pos.z),__builtin_offsetof(Light,intensity),__builtin_offsetof(Light,range), 
-    __builtin_offsetof(Light,spotAng),__builtin_offsetof(Light,col.r),__builtin_offsetof(Light,col.g),__builtin_offsetof(Light,col.b),__builtin_offsetof(Light,minIntensity),
-    __builtin_offsetof(Light,maxIntensity),__builtin_offsetof(Light,spotDir.x),__builtin_offsetof(Light,spotDir.y),__builtin_offsetof(Light,spotDir.z),__builtin_offsetof(Light,spotDir.w)};
-static void LightFieldValueText(u8 slot,u16 li,char* out,size_t n) { if (slot>=LF_LAST) { if (n) out[0]=0; return; } sFormat(out,n,(slot>=LF_COLR && slot<=LF_COLB) || slot>=LF_SDIRX ? "%.3f" : "%.2f",*(float*)((u8*)&World.lights[li]+lfOffsets[slot])); }
-static void LightFieldWrite(u16 li,float f){Light* L=&World.lights[li];if (editFieldSlot>=LF_LAST) return; *(float*)((u8*)L+lfOffsets[editFieldSlot])=f; if(editFieldSlot<=LF_POSZ){World.lightsNewPosition[li]=L->pos;flag_set(&L->lflags,LDIRTY,true);} if(editFieldSlot>=LF_SDIRX&&editFieldSlot<=LF_SDIRW)L->spotDir=quat_normalize(L->spotDir); }
-static void LightFieldCommitLive(void){if(!EditLightSelIsActive())return;float f=0;{const char* p=editFieldBuffer;f=fast_atof(&p);}LightFieldWrite(editModeLightSelection,f);}
-static void LightFieldStep(float delta){if(!editFieldEditing||!EditLightSelIsActive())return;float cur;{const char* p=editFieldBuffer;cur=fast_atof(&p);}int steps=delta>0?(int)(delta+0.5f):-(int)((-delta)+0.5f);cur+=steps*0.01f;int prec=((editFieldSlot>=LF_COLR&&editFieldSlot<=LF_COLB)||(editFieldSlot>=LF_SDIRX&&editFieldSlot<=LF_SDIRW))?3:2;sFormat(editFieldBuffer,40,prec==3 ? "%.3f" : "%.2f",cur);LightFieldCommitLive();}
-static void LightTypeCycle(void){if(!EditLightSelIsActive())return;Light* L=&World.lights[editModeLightSelection];bool spot=!(L->lflags&LSPOT);flag_set(&L->lflags,LSPOT,spot);flag_set(&L->lflags,LDIR,false);}
-static const Quaternion lfDirQuat[6]={{0,0,0,1},{0,0.70710678f,0,0.70710678f},{0,1,0,0},{0,-0.70710678f,0,0.70710678f},{-0.70710678f,0,0,0.70710678f},{0.70710678f,0,0,0.70710678f}};/*N,E,S,W,Up,Dn*/
-static void LightDirSet(u8 d){if(!EditLightSelIsActive()||d>=6)return;World.lights[editModeLightSelection].spotDir=lfDirQuat[d];}
-static bool LightDirIs(u8 d){if(!EditLightSelIsActive()||d>=6)return false;Quaternion q=World.lights[editModeLightSelection].spotDir;V3 sd=V3_Normalize((V3){2.0f*(q.x*q.z+q.w*q.y),2.0f*(q.y*q.z-q.w*q.x),1.0f-2.0f*(q.x*q.x+q.y*q.y)});static const V3 lfAxes[6]={{0,0,1},{1,0,0},{0,0,-1},{-1,0,0},{0,1,0},{0,-1,0}};return V3_dot(sd,lfAxes[d])>0.99f;}/*direction-dot, so -q matches the same button as q*/
-bool EditPanelPointerHover(void){if(!EditSelIsActive()&&!EditLightSelIsActive())return false;if(!World.inventoryMode)return false;for(int i=0;i<EF_LAST;++i)if(UIOver(UI_ID_CMFD_EDIT_ROW_0+i))return true;if(UIOver(UI_ID_CMFD_EDIT_LIGHT_TYPE))return true;for(int d=0;d<6;++d)if(UIOver(UI_ID_CMFD_EDIT_LIGHT_DIR_N+d))return true;return false;}
+static const u16 lfOffsets[LF_LAST]={__builtin_offsetof(Light,pos.x),__builtin_offsetof(Light,pos.y),__builtin_offsetof(Light,pos.z),__builtin_offsetof(Light,intensity),__builtin_offsetof(Light,range),__builtin_offsetof(Light,spotAng),__builtin_offsetof(Light,col.r),__builtin_offsetof(Light,col.g),__builtin_offsetof(Light,col.b),__builtin_offsetof(Light,minIntensity),__builtin_offsetof(Light,maxIntensity),__builtin_offsetof(Light,spotDir.x),__builtin_offsetof(Light,spotDir.y),__builtin_offsetof(Light,spotDir.z),__builtin_offsetof(Light,spotDir.w)};
+static void LightFieldValueText(u8 slot, u16 li, char* out, size_t n) { if (slot >= LF_LAST) { if (n) out[0] = 0; return; } sFormat(out,n,(slot >= LF_COLR && slot <= LF_COLB) || slot >= LF_SDIRX ? "%.3f" : "%.2f",(double)(*(float*)((u8*)&World.lights[li]+lfOffsets[slot]))); }
+static void LightFieldWrite(u16 li, float f) { Light* L = &World.lights[li]; if (editFieldSlot>=LF_LAST) return; *(float*)((u8*)L+lfOffsets[editFieldSlot])=f; if(editFieldSlot<=LF_POSZ){World.lightsNewPosition[li]=L->pos;flag_set(&L->lflags,LDIRTY,true);} if(editFieldSlot>=LF_SDIRX&&editFieldSlot<=LF_SDIRW)L->spotDir=quat_normalize(L->spotDir); }
+static void LightFieldCommitLive() { if (!EditLightSelIsActive()) return; float f = 0; {const char* p = editFieldBuffer; f = fast_atof(&p); } LightFieldWrite(editModeLightSelection,f); }
+static void LightFieldStep(float delta) { if (!editFieldEditing || !EditLightSelIsActive()) return; float cur; {const char* p = editFieldBuffer; cur = fast_atof(&p); } i32 steps = delta > 0 ? (i32)(delta + 0.5f) : -(i32)((-delta) + 0.5f); cur += steps*0.01f; i32 prec = ((editFieldSlot >= LF_COLR && editFieldSlot <= LF_COLB) || (editFieldSlot >= LF_SDIRX && editFieldSlot <= LF_SDIRW)) ? 3 : 2; sFormat(editFieldBuffer,40,prec == 3 ? "%.3f" : "%.2f",(double)cur); LightFieldCommitLive();}
+static void LightTypeCycle(void) { if (!EditLightSelIsActive()) return; Light* L = &World.lights[editModeLightSelection]; bool spot = !(L->lflags & LSPOT); flag_set(&L->lflags,LSPOT,spot); flag_set(&L->lflags,LDIR,false); }
+static const Quaternion lfDirQuat[6] = {{0,0,0,1},{0,0.70710678f,0,0.70710678f},{0,1,0,0},{0,-0.70710678f,0,0.70710678f},{-0.70710678f,0,0,0.70710678f},{0.70710678f,0,0,0.70710678f}};/*N,E,S,W,Up,Dn*/
+static void LightDirSet(u8 d) { if (!EditLightSelIsActive()||d>=6) return; World.lights[editModeLightSelection].spotDir = lfDirQuat[d]; }
+static bool LightDirIs(u8 d) { if (!EditLightSelIsActive()||d>=6) return false; Quaternion q = World.lights[editModeLightSelection].spotDir; V3 sd = V3_Normalize((V3){2.0f*(q.x*q.z + q.w*q.y),2.0f*(q.y*q.z - q.w*q.x),1.0f - 2.0f*(q.x*q.x + q.y*q.y)}); static const V3 lfAxes[6] = {{0,0,1},{1,0,0},{0,0,-1},{-1,0,0},{0,1,0},{0,-1,0}}; return V3_dot(sd,lfAxes[d]) > 0.99f; }
+bool EditPanelPointerHover(void) { if (!EditSelIsActive() && !EditLightSelIsActive()) return false; if (!World.inventoryMode) return false; for(i32 i=0;i<EF_LAST;++i) if (UIOver(UI_ID_CMFD_EDIT_ROW_0 + i)) return true; if (UIOver(UI_ID_CMFD_EDIT_LIGHT_TYPE)) return true; for(i32 d=0;d<6;++d) if (UIOver(UI_ID_CMFD_EDIT_LIGHT_DIR_N + d)) return true; return false; }
 static void EditStop(void){editFieldEditing=false;editFieldSlot=EF_LAST;}
 static void EditFieldWrite(u16 s,float f,i32 iv) { void* p = EditFieldPtr(editFieldSlot,s); if (!p) return; if (editFieldSlot<EF_TEX) *(float*)p = f; else *(u16*)p=(u16)vclamp(iv,0,(editFieldSlot == EF_MODEL ? MAX_MDLS : MAXTEX) - 1); if (editFieldSlot >= EF_ROTX && editFieldSlot <= EF_ROTW) World.rotation[s] = quat_normalize(World.rotation[s]); }
 static void EditFieldCommitLive(void) { if(EditLightSelIsActive()){LightFieldCommitLive();return;}if(!EditSelIsActive())return;u16 s=editModeSelection;float f=0;{const char* p=editFieldBuffer;f=fast_atof(&p);}EditFieldWrite(s,f,s2i32(editFieldBuffer)); }
 static void EditFieldStep(float delta) {
-    if(!editFieldEditing)return;if(EditLightSelIsActive()){LightFieldStep(delta);return;}if(!EditSelIsActive())return;float cur;{const char* p=editFieldBuffer;cur=fast_atof(&p);}
-    if(editFieldSlot<EF_TEX){int steps=delta>0?(int)(delta+0.5f):-(int)((-delta)+0.5f);cur+=steps*0.01f;int prec=(editFieldSlot>=EF_ROTX&&editFieldSlot<=EF_ROTW)?3:2;sFormat(editFieldBuffer,40,prec==3 ? "%.3f" : "%.2f",cur);}
-    else{int steps=delta>0?(int)(delta+0.5f):-(int)((-delta)+0.5f);i32 iv=(i32)cur+steps;iv=vclamp(iv,0,(editFieldSlot==EF_MODEL?MAX_MDLS-1:MAXTEX-1));sFormat(editFieldBuffer,40,"%d",iv);}
+    if (!editFieldEditing) return; if (EditLightSelIsActive()) { LightFieldStep(delta); return; } if (!EditSelIsActive()) return; float cur; { const char* p = editFieldBuffer; cur = fast_atof(&p); }
+    if (editFieldSlot < EF_TEX) { i32 steps = delta > 0 ? (i32)(delta + 0.5f) : -(i32)((-delta) + 0.5f); cur += steps*0.01f; i32 prec = (editFieldSlot >= EF_ROTX && editFieldSlot <= EF_ROTW) ? 3 : 2; sFormat(editFieldBuffer,40,prec == 3 ? "%.3f" : "%.2f",(double)cur); }
+    else { i32 steps = delta > 0 ? (i32)(delta + 0.5f) : -(i32)((-delta) + 0.5f); i32 iv = (i32)cur + steps; iv = vclamp(iv,0,(editFieldSlot == EF_MODEL?MAX_MDLS - 1 : MAXTEX - 1)); sFormat(editFieldBuffer,40,"%d",iv); }
     EditFieldCommitLive();
 }
 void EditFieldKey(i32 keycode){
     if(!editFieldEditing)return; if(keycode==KEY_ESCAPE){EditStop();return;} if(keycode==KEY_ENTER||keycode==KEY_KP_ENTER){EditStop();return;}
     size_t len=slen(editFieldBuffer); bool changed = false, isTopRow = (keycode >= KEY_0 && keycode <= KEY_9);
-         if ((isTopRow || (keycode >= KEY_KP_0 && keycode <= KEY_KP_9)) && len < 39) { int base = isTopRow ? KEY_0 : KEY_KP_0; editFieldBuffer[len] = (char)('0' + (keycode - base)); editFieldBuffer[len + 1] = '\0'; changed = true; }
+         if ((isTopRow || (keycode >= KEY_KP_0 && keycode <= KEY_KP_9)) && len < 39) { i32 base = isTopRow ? KEY_0 : KEY_KP_0; editFieldBuffer[len] = (char)('0' + (keycode - base)); editFieldBuffer[len + 1] = '\0'; changed = true; }
     else if ((keycode == KEY_MINUS || keycode == KEY_KP_SUBTRACT) && len == 0 && len < 39) { editFieldBuffer[len] = '-'; editFieldBuffer[len + 1] = '\0'; changed = true; }
     else if (keycode == KEY_PERIOD || keycode == KEY_KP_DECIMAL) { bool hasdot = false; for(size_t k=0;k<len&&!hasdot;++k)if(editFieldBuffer[k]=='.')hasdot=true;if(!hasdot&&len<39){editFieldBuffer[len]='.';editFieldBuffer[len+1]='\0';changed=true;}}
     else if (keycode == KEY_BACKSPACE) { if(len>0){editFieldBuffer[len-1]='\0';changed=true;}}
@@ -621,20 +612,20 @@ void EditFieldKey(i32 keycode){
 }
 bool UIInteractions() { if (!World.inventoryMode) return false; if (World.menuActive || World.paused || World.creditsActive || Cheats.consoleActive) return true; if (Cheats.noHUD || World.Sys_UI.vmailActive) return false; for (u32 i=UI_ID_NONE+1;i<UI_ID_COUNT;++i) if (UIOver(i)) return true; return false; }
 static const i16 generalStartRowY=586,generalColX[2]={372,684},generalRowY[7]={generalStartRowY,generalStartRowY+1*TXT_H,generalStartRowY+2*TXT_H,generalStartRowY+3*TXT_H,generalStartRowY+4*TXT_H,generalStartRowY+5*TXT_H,generalStartRowY+6*TXT_H};
-static const char* GeneralInvLabel(int slot) { int item=GeneralInvItem(slot); return item<0?"":Sys_Text.stringTable[slot?item+326:597]; }
+static const char* GeneralInvLabel(i32 slot) { i32 item = GeneralInvItem(slot); return item<0?"":Sys_Text.stringTable[slot?item+326:597]; }
 static const u8 grenadeItems[7]={7,9,13,8,11,12,10},patchSlots[7]={6,5,0,3,4,2,1};
-void UseGrenade(int),PatchUse(int);
-int ConsumableSlot(bool patch,int row) { return row<0 || row>=7?-1:patch?patchSlots[row]:row; }
-int ConsumableItem(bool patch,int row) { int slot=ConsumableSlot(patch,row); return slot<0?-1:patch?14+slot:grenadeItems[row]; }
-static u8 ConsumableCount(bool patch,int row) { int slot=ConsumableSlot(patch,row); return slot<0?0:patch?World.invP1.patchCounts[slot]:World.invP1.grenAmmo[slot]; }
-void ConsumableSelect(bool patch,int row) { if (!ConsumableCount(patch,row)) return; play_wav("hud/changeweapon",AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ if (patch) World.invP1.patchCur=(u8)ConsumableSlot(true,row); else World.invP1.grenCur=(u8)row; MFD_ShowGeneralItem(); World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=patch?2:1; }
-void ConsumableUse(bool patch,int row) { if (!ConsumableCount(patch,row) || World.invP1.holdingObject) return; ConsumableSelect(patch,row); if (patch) PatchUse(ConsumableSlot(true,row)); else UseGrenade(ConsumableItem(false,row)+307); World.Sys_UI.consumableClickRow=-1; }
-static int ConsumableSelectedRow() { if (World.Sys_UI.mfdConsumable==1) return World.invP1.grenCur<7?World.invP1.grenCur:-1; if (World.Sys_UI.mfdConsumable==2) for (int row=0;row<7;++row) if (patchSlots[row]==World.invP1.patchCur) return row; return -1; }
-void ConsumableSetTimer(float fraction) { int row=ConsumableSelectedRow(); if (World.Sys_UI.mfdConsumable!=1 || row<5 || !ConsumableCount(false,row)) return; float min=row==5?2.0f:4.0f,value=min+vclamp(fraction,0.0f,1.0f)*(60.0f-min); if (row==5) World.invP1.nitroTimeSetting=value; else World.invP1.earthShakerTimeSetting=value; }
+void UseGrenade(i32),PatchUse(i32);
+i32 ConsumableSlot(bool patch, i32 row) { return row<0 || row>=7?-1:patch?patchSlots[row]:row; }
+i32 ConsumableItem(bool patch, i32 row) { i32 slot = ConsumableSlot(patch,row); return slot<0?-1:patch?14+slot:grenadeItems[row]; }
+static u8 ConsumableCount(bool patch, i32 row) { i32 slot=ConsumableSlot(patch,row); return slot<0?0:patch?World.invP1.patchCounts[slot]:World.invP1.grenAmmo[slot]; }
+void ConsumableSelect(bool patch, i32 row) { if (!ConsumableCount(patch,row)) return; play_wav("hud/changeweapon",AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ if (patch) World.invP1.patchCur=(u8)ConsumableSlot(true,row); else World.invP1.grenCur=(u8)row; MFD_ShowGeneralItem(); World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=patch?2:1; }
+void ConsumableUse(bool patch, i32 row) { if (!ConsumableCount(patch,row) || World.invP1.holdingObject) return; ConsumableSelect(patch,row); if (patch) PatchUse(ConsumableSlot(true,row)); else UseGrenade(ConsumableItem(false,row)+307); World.Sys_UI.consumableClickRow=-1; }
+static i32 ConsumableSelectedRow() { if (World.Sys_UI.mfdConsumable==1) return World.invP1.grenCur<7?World.invP1.grenCur:-1; if (World.Sys_UI.mfdConsumable==2) for (u8 row=0;row<7;++row) if (patchSlots[row]==World.invP1.patchCur) return row; return -1; }
+void ConsumableSetTimer(float fraction) { i32 row=ConsumableSelectedRow(); if (World.Sys_UI.mfdConsumable != 1 || row < 5 || !ConsumableCount(false,row)) return; float min = row == 5 ? 2.0f : 4.0f,value = min + vclamp(fraction,0.0f,1.0f)*(60.0f - min); if (row == 5) World.invP1.nitroTimeSetting = (double)value; else World.invP1.earthShakerTimeSetting = (double)value; }
 static const char* swLabels[7]={"I.C.E. DRILL","PULSER","CYBER SHIELD","TURBO","DECOY","RECALL","GAMES"};
 void RenderConsumableItem(bool isRH) {
-    int row=ConsumableSelectedRow(); bool patch=World.Sys_UI.mfdConsumable==2; if (row<0 || !ConsumableCount(patch,row)) return;
-    i16 dx=isRH?1059:0; int item=ConsumableItem(patch,row); const char* text=Sys_Text.stringTable[item+326];
+    i32 row=ConsumableSelectedRow(); bool patch=World.Sys_UI.mfdConsumable==2; if (row<0 || !ConsumableCount(patch,row)) return;
+    i16 dx=isRH?1059:0; i32 item=ConsumableItem(patch,row); const char* text=Sys_Text.stringTable[item+326];
     UIRText(MID(isRH,ITEM_NAME),dx+28,540,T_YELLOW,FONT_NORMAL,0.8f,260,text);
     u16 tex=GetItemFrobTexture(item+307); if (tex<MAXTEX) UIRImg(MID(isRH,ITEM_ICON),dx+112,560,80,64,tex);
     UIRImg(MID(isRH,ITEM_USE),dx+72,691,160,40,1087); RenderTextL(dx+72,691,T_GREEN_MENU,FONT_NORMAL,0.8f,"%s",Sys_Text.stringTable[736]);
@@ -644,48 +635,38 @@ void RenderConsumableItem(bool isRH) {
         UIRImg(MID(isRH,ITEM_TIMER_SLIDER),dx+40,650,224,24,1087); RenderUIImage(dx+40+(i16)(204.0f*vclamp((value-min)/(60.0f-min),0.0f,1.0f)),652,20,20,1086);
     }
 }
-static void BoosterSetMode(bool boost) { if (!(World.invP1.hasHardware & HW_BST)) return; World.invP1.hwVersSetting[HW_BST_IDX] = boost ? (u8)vmax(1,(int)World.invP1.hwVers[HW_BST_IDX]-1) : 0; play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
+static void BoosterSetMode(bool boost) { if (!(World.invP1.hasHardware & HW_BST)) return; World.invP1.hwVersSetting[HW_BST_IDX] = boost ? (u8)vmax(1,(i32)World.invP1.hwVers[HW_BST_IDX]-1) : 0; play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
 static void RenderSoftwareItem(bool isRH) {
-    int idx=softwareInvCurrent; if (idx<0||idx>6) return; bool owned=idx<SW_GAMES ? ((World.invP1.hasSoft&(1u<<idx))!=0 || World.invP1.softVersions[idx]>0) : World.invP1.hasMinigame!=0; if (!owned) return; i16 dx=isRH?1059:0; UIRText(MID(isRH,ITEM_NAME),dx+28,540,T_YELLOW,FONT_NORMAL,0.8f,260,swLabels[idx]);
+    i32 idx=softwareInvCurrent; if (idx<0||idx>6) return; bool owned=idx<SW_GAMES ? ((World.invP1.hasSoft&(1u<<idx))!=0 || World.invP1.softVersions[idx]>0) : World.invP1.hasMinigame!=0; if (!owned) return; i16 dx=isRH?1059:0; UIRText(MID(isRH,ITEM_NAME),dx+28,540,T_YELLOW,FONT_NORMAL,0.8f,260,swLabels[idx]);
     if (idx<SW_GAMES) RenderTextL(dx+112,650,T_GREEN_MENU,FONT_NORMAL,0.8f,(idx<=SW_SHIELD)?"v%d":"x%d",World.invP1.softVersions[idx]); else RenderTextL(dx+112,650,T_GREEN_MENU,FONT_NORMAL,0.8f,"%d",World.invP1.hasMinigame?1:0);
 }
 static void RenderHardwareItem(bool isRH) {
-    int slot=World.invP1.hardwareInvCurrent; i16 dx=isRH?1059:0; int ref=World.invP1.hardwareInvReferenceIndex[slot]; UIRText(MID(isRH,ITEM_NAME),dx+28,540,T_YELLOW,FONT_NORMAL,0.8f,260,ref<0?"":Sys_Text.stringTable[ref+326]);
+    i32 slot = World.invP1.hardwareInvCurrent; i16 dx=isRH?1059:0; i32 ref=World.invP1.hardwareInvReferenceIndex[slot]; UIRText(MID(isRH,ITEM_NAME),dx+28,540,T_YELLOW,FONT_NORMAL,0.8f,260,ref<0?"":Sys_Text.stringTable[ref+326]);
     if (slot==HW_BST_IDX) { bool skates=World.invP1.hwVersSetting[HW_BST_IDX]==0; for(u8 m=0;m<2;++m){ u32 rid = m ? MID(isRH,ITEM_BOOST) : MID(isRH,ITEM_SKATE); i16 y=m?691:628; UIRImg(rid,dx+34,y,160,40,1087); RenderTextL(dx+34,y,skates==(m==0)?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8,"%s",m?"BOOST":"SKATE"); } return; }
     u16 tex = ref < 0 ? MAXTEX : GetItemFrobTexture((u16)(ref+307)); if (tex<MAXTEX) UIRImg(MID(isRH,ITEM_ICON),dx+112,560,80,64,tex);
-    RenderTextL(dx+112,650,T_GREEN_MENU,FONT_NORMAL,0.8,"v%d",(int)World.invP1.hwVers[slot]);
+    RenderTextL(dx+112,650,T_GREEN_MENU,FONT_NORMAL,0.8,"v%d",(i32)World.invP1.hwVers[slot]);
 }
 void RenderGeneralItem(bool isRH) {
     if (softwareInvCurrent>=0) { RenderSoftwareItem(isRH); return; }
     if (World.Sys_UI.mfdHardwareItem) { RenderHardwareItem(isRH); return; }
     if (World.Sys_UI.mfdConsumable) { RenderConsumableItem(isRH); return; }
     if (!World.Sys_UI.mfdGeneralItem) return;
-    int slot=World.invP1.generalInvCurrent,item=GeneralInvItem(slot); if (item<0) return;
-    i16 dx=isRH?1059:0; UIRText(MID(isRH,ITEM_NAME),dx+28,540,T_YELLOW,FONT_NORMAL,0.8f,260,GeneralInvLabel(slot));
-    u16 tex=GetItemFrobTexture((u16)(item+307));
+    i32 slot = World.invP1.generalInvCurrent, item = GeneralInvItem(slot); if (item<0) return;
+    i16 dx = isRH ? 1059 : 0; UIRText(MID(isRH,ITEM_NAME),dx + 28,540,T_YELLOW,FONT_NORMAL,0.8f,260,GeneralInvLabel(slot));
+    u16 tex = GetItemFrobTexture((u16)(item + 307));
     if (item>=92 && item<=94) { static const u8 heads[19]={37,11,32,1,7,9,10,12,13,14,15,17,25,27,28,31,33,35,36}; u16 custom=World.invP1.genInvCustIdx[slot]; tex=(u16)(1272+heads[custom<19?custom:0]); }
     if (tex<MAXTEX) UIRImg(MID(isRH,ITEM_ICON),dx+112,560,80,64,tex);
     if (!slot) {
         i16 x=dx+36,y=638;
-        for (int card=ACC_Std;card<=ACC_Per5;++card) if (InventoryHasAccessCard((AccCardType)card)) {
-            const char* code=AccessCardCodeForType((AccCardType)card); float w=MeasureLineAdvance(code,FONT_NORMAL)*0.8f;
-            if (x+w>dx+280) { x=dx+36; y+=20; }
-            RenderTextL(x,y,T_YELLOW,FONT_NORMAL,0.8,"%s",code); x+=(i16)(w+8);
-        }
+        for (int card=ACC_Std;card<=ACC_Per5;++card) if (InventoryHasAccessCard((AccCardType)card)) { const char* code=AccessCardCodeForType((AccCardType)card); float w=MeasureLineAdvance(code,FONT_NORMAL)*0.8f; if (x+w>dx+280) { x=dx+36; y+=20; } RenderTextL(x,y,T_YELLOW,FONT_NORMAL,0.8,"%s",code); x+=(i16)(w+8); }
         UIR(MID(isRH,ITEM_ACCESS_CARDS),dx+36,638,244,(i16)((y+20)-638));/*One region over the whole wrapped card block; the codes are display only*/
-    } else if (GeneralInvCanUse(slot) || GeneralInvCanVaporize(slot)) {
-        bool use=GeneralInvCanUse(slot); i16 y=use?691:628;
-        UIRImg(use?MID(isRH,ITEM_USE):MID(isRH,ITEM_VAPORIZE),dx+72,y,160,40,1087); RenderTextL(dx+72,y,T_GREEN_MENU,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[use?736:883]);
-    }
+    } else if (GeneralInvCanUse(slot) || GeneralInvCanVaporize(slot)) { bool use=GeneralInvCanUse(slot); i16 y=use?691:628; UIRImg(use?MID(isRH,ITEM_USE):MID(isRH,ITEM_VAPORIZE),dx+72,y,160,40,1087); RenderTextL(dx+72,y,T_GREEN_MENU,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[use?736:883]); }
 }
 void UpdateSearchTether(void),CloseSearch(void); bool SearchTakeSlot(u8 slot);
 void RenderSearchFX(void) {
     for (int side=0;side<2;++side) {
-        if (!World.Sys_UI.searchFXActive[side]) continue;
-        double elapsed = World.pauseRelativeTime - World.Sys_UI.searchFXStartTime[side];
-        if (elapsed >= 1.0) { World.Sys_UI.searchFXActive[side] = false; continue; }
-        if (Cheats.noHUD || (World.Sys_UI.mfdTab[1+!!side])!=4 || World.Sys_UI.MFD_Data!=5 || World.Sys_UI.tetheredSearchable==U16_MAX) continue;
-        float t = (float)elapsed / 1.0f; if (t > 1.0f) t = 1.0f;
+        if (!World.Sys_UI.searchFXActive[side]) continue; float elapsed = World.pauseRelativeTime - World.Sys_UI.searchFXStartTime[side]; if (elapsed >= 1.0f) { World.Sys_UI.searchFXActive[side] = false; continue; } if (Cheats.noHUD || (World.Sys_UI.mfdTab[1+!!side])!=4 || World.Sys_UI.MFD_Data!=5 || World.Sys_UI.tetheredSearchable==U16_MAX) continue;
+        float t = elapsed / 1.0f; if (t > 1.0f) t = 1.0f;
         float p = t < 0.4f ? t / 0.4f : 1.0f;/*scale up first 0.4s, hold*/
         float ep = 1.0f - (1.0f - p) * (1.0f - p) * (1.0f - p);/*ease-out cubic*/
         float scale = 40.0f + ep * (263.0f - 40.0f), w = scale, h = scale * 240.0f / 263.0f;
@@ -694,7 +675,6 @@ void RenderSearchFX(void) {
         RenderUIImage((i16)(cx - w * 0.5f),(i16)(cy - h * 0.5f),(i16)(w + 0.5f),(i16)(h + 0.5f),1074);
     }
 }
-
 void RenderSearch(bool isRH) {
     u16 s=World.Sys_UI.tetheredSearchable;
     if (s<INSTS_1ST_IDX || s>=World.instCount || !(World.instances[s].entflags&EF_ACTIVE) || !World.instances[s].srchInUse) return;
@@ -715,7 +695,6 @@ void RenderSearch(bool isRH) {
     if (!any) RenderTextL(dx+24,633,T_YELLOW,FONT_NORMAL,0.8f,Sys_Text.stringTable[891]);
     UIRImg(MID(isRH,SEARCH_CLOSE),dx+291,508,29,29,899); RenderTextL(dx+300,518,T_STOPD_RED,FONT_NORMAL,0.8,"X");
 }
-
 static const i16 elevBtnY[4]={578,620,663,705};
 static const i16 keyBtnX[3]={86,127,169},keyBtnY[4]={577,620,663,706}; static const u8 keyBtnK[12]={1,2,3,4,5,6,7,8,9,10,0,11}; static const char* keyBtnLabel[12]={"1","2","3","4","5","6","7","8","9","-","0","C"};
 static const i16 puzCellX[7]={51,80,109,138,166,195,224},puzCellY[5]={565,594,622,651,680};
@@ -1040,6 +1019,22 @@ static void UI_DragRegions(void) {
         id = MID(s,WEAPON_ENERGY_SLIDER); if (UIOver(id)) UI_WeaponEnergySliderSet(s != 0);
     }
 }
+void CompleteWeaponChange();
+void RemoveWeapon(i32 slot) {
+    if (slot < 0 || slot >= 7 || World.invP1.wepInvIndices[slot] < 0 || World.invP1.holdingObject) { return; }
+    World.invP1.heldAmmo = World.invP1.currentMagazineAmount[slot]; World.invP1.heldAmmo2 = World.invP1.currentMagazineAmount2[slot]; World.invP1.heldObjectLoadedAlternate = World.invP1.wepLoadedWithAlternate[slot];
+    World.invP1.heldObjectCustIdx = U16_MAX; World.invP1.heldObjectIndex = (u16)World.invP1.wepInvIndices[slot]; World.invP1.grenActive = false; World.invP1.holdingObject = true;
+    for (i32 i=slot;i<6;++i) { World.invP1.wepInvIndices[i]=World.invP1.wepInvIndices[i+1]; World.invP1.wepInvAmIndices[i]=World.invP1.wepInvAmIndices[i+1]; World.invP1.currentMagazineAmount[i]=World.invP1.currentMagazineAmount[i+1]; World.invP1.currentMagazineAmount2[i]=World.invP1.currentMagazineAmount2[i+1]; World.invP1.wepLoadedWithAlternate[i]=World.invP1.wepLoadedWithAlternate[i+1]; World.invP1.curWepHeat[i]=World.invP1.curWepHeat[i+1]; }
+    World.invP1.wepInvIndices[6]=World.invP1.wepInvAmIndices[6]=-1; World.invP1.currentMagazineAmount[6]=World.invP1.currentMagazineAmount2[6]=0; World.invP1.wepLoadedWithAlternate[6]=false; World.invP1.curWepHeat[6]=0.0f;
+    if (slot <= World.invP1.wepCur && World.invP1.wepCur > 0) World.invP1.wepCur--;
+    if (World.invP1.wepCur < 0) { World.invP1.wepCur = 0; }
+    World.invP1.wepCurPending = World.invP1.wepCur;
+    World.invP1.weaponIndexPending = (World.invP1.wepInvIndices[World.invP1.wepCur] >= 0) ? (i16)World.invP1.wepInvIndices[World.invP1.wepCur] : -1;
+    World.invP1.numweapons = 0; for (int i = 0; i < 7; i++) if (World.invP1.wepInvIndices[i] >= 0) { World.invP1.numweapons++; }
+    if (!World.invP1.numweapons) { for (int i = 0; i < 7; i++) World.invP1.currentMagazineAmount[i] = World.invP1.currentMagazineAmount2[i] = 0; }
+    if (World.invP1.weaponIndexPending < 0) { World.instances[World.weaponVModelIndex].modelIndex = MAX_MDLS; World.invP1.wepCurPending = World.invP1.weaponIndexPending = -1; ForceInventoryMode(); return; } /* no valid weapon selected: hide the view model */
+    CompleteWeaponChange(); ForceInventoryMode();
+}
 static void UI_OnRegionClick(u32 id, u8 c) {
     bool dbl = (c & 4) != 0, left = (c & 3) == 1, rh = false; if (id >= UI_ID_RMFD_TAB_WEAPON && id < UI_ID_CMFD_EDIT_PANEL) { id -= (UI_ID_RMFD_TAB_WEAPON - UI_ID_LMFD_TAB_WEAPON); rh = true; }
     switch (id) {
@@ -1056,7 +1051,7 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_CMFD_SOFTWARE_ROW_0 ... UI_ID_CMFD_SOFTWARE_ROW_6: UI_SoftwareRowClick((int)(id - UI_ID_CMFD_SOFTWARE_ROW_0),dbl); return;
         case UI_ID_CMFD_GENERAL_USE_0 ... UI_ID_CMFD_GENERAL_USE_13: { u8 s=(u8)(id - UI_ID_CMFD_GENERAL_USE_0); World.Sys_UI.genClickSlot = -1; GenInvClick(s); GenInvApply(s); return; }
         case UI_ID_CMFD_GENERAL_ROW_0 ... UI_ID_CMFD_GENERAL_ROW_13: { u8 s = (u8)(id - UI_ID_CMFD_GENERAL_ROW_0); int item = GeneralInvItem(s); if (item<0) { return; } if (!left) { World.Sys_UI.genClickSlot = -1; if (s) GenInvTake(s); return; }
-            World.Sys_UI.genClickSlot = -1; GenInvClick(s); if (dbl && World.Sys_UI.genClickSlot == (i8)s && World.Sys_UI.genClickItem == (i16)item && World.Sys_UI.genClickCustom == World.invP1.genInvCustIdx[s]) GenInvApply(s); else { World.Sys_UI.genClickSlot=(i8)s; World.Sys_UI.genClickItem=(i16)item; World.Sys_UI.genClickCustom=World.invP1.genInvCustIdx[s]; World.Sys_UI.genClickTime=World.pauseRelativeTime; } return; }
+            World.Sys_UI.genClickSlot = -1; GenInvClick(s); if (dbl && World.Sys_UI.genClickSlot == (i8)s && World.Sys_UI.genClickItem == (i16)item && World.Sys_UI.genClickCustom == World.invP1.genInvCustIdx[s]) GenInvApply(s); else { World.Sys_UI.genClickSlot = (i8)s; World.Sys_UI.genClickItem = (i16)item; World.Sys_UI.genClickCustom = World.invP1.genInvCustIdx[s]; World.Sys_UI.genClickTime = World.pauseRelativeTime; } return; }
         case UI_ID_CMFD_LOG_TABLE_0 ... UI_ID_CMFD_LOG_TABLE_9: UI_LogTableClick((int)(id - UI_ID_CMFD_LOG_TABLE_0)); return;
         case UI_ID_CMFD_LOG_ENTRY_0 ... UI_ID_CMFD_LOG_ENTRY_14: UI_LogEntryClick((int)(id - UI_ID_CMFD_LOG_ENTRY_0)); return;
         case UI_ID_CMFD_LOG_MORE: UI_LogMore(); return;
@@ -1064,7 +1059,7 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_CMFD_EMAIL_ENTRY_0 ... UI_ID_CMFD_EMAIL_ENTRY_14: UI_EmailEntryClick((int)(id - UI_ID_CMFD_EMAIL_ENTRY_0)); return;
         case UI_ID_CMFD_DATA_ENTRY_0 ... UI_ID_CMFD_DATA_ENTRY_12: UI_DataEntryClick((int)(id - UI_ID_CMFD_DATA_ENTRY_0)); return;
         case UI_ID_CMFD_NOTE_TOGGLE_0 ... UI_ID_CMFD_NOTE_TOGGLE_17: UI_NoteToggleClick((int)(id - UI_ID_CMFD_NOTE_TOGGLE_0)); return;
-        case UI_ID_CMFD_EDIT_ROW_0 ... UI_ID_CMFD_EDIT_ROW_14: { u8 slot = (u8)(id - UI_ID_CMFD_EDIT_ROW_0); if (EditLightSelIsActive()) { if (slot>=LF_LAST) return; LightFieldValueText(slot,editModeLightSelection,editFieldBuffer,40); editFieldSlot=slot; editFieldEditing=true; return; } if (!EditSelIsActive()) return; EditFieldValueText(slot,editModeSelection,editFieldBuffer,40); editFieldSlot=slot; editFieldEditing=true; return; }
+        case UI_ID_CMFD_EDIT_ROW_0 ... UI_ID_CMFD_EDIT_ROW_14: { u8 slot = (u8)(id - UI_ID_CMFD_EDIT_ROW_0); if (EditLightSelIsActive()) { if (slot>=LF_LAST) return; LightFieldValueText(slot,editModeLightSelection,editFieldBuffer,40); editFieldSlot=slot; editFieldEditing=true; return; } if (!EditSelIsActive()) return; EditFieldValueText(slot,editModeSelection,editFieldBuffer,40); editFieldSlot = slot; editFieldEditing = true; return; }
         case UI_ID_CMFD_EDIT_LIGHT_TYPE: LightTypeCycle(); return;
         case UI_ID_CMFD_EDIT_LIGHT_DIR_N ... UI_ID_CMFD_EDIT_LIGHT_DIR_DN: LightDirSet((u8)(id-UI_ID_CMFD_EDIT_LIGHT_DIR_N)); return;
         case UI_ID_LMFD_TAB_WEAPON ... UI_ID_LMFD_TAB_DATA: MFD_SelectTab((u8)(rh?2:1),(u8)(id-UI_ID_LMFD_TAB_WEAPON+1),true); return;
@@ -1147,36 +1142,33 @@ static void RenderUI() {
         if (!Cheats.noHUD) {
             for(u16 i=INSTS_1ST_IDX;i<World.instCount;++i){/*TargetID*/
                 Entity* e = &World.instances[i]; if (!IdxIsNPC(e->index)) { continue; }
-                V3 tpos = World.position[i]; tpos.y += 1.0f;
-                i16 textIdx = TargetIDGetText(i); bool tid = TargetIDShouldRender(i), hw = (World.invP1.hasHardware&HW_TID) != 0; float targetRange = V3_Dist(tpos,World.position[PLAYER1]); if (!tid || !TargetIDInPlayerPVS(i)) { continue; }
-                float sx, sy;
-                if (!WorldToScreenPoint(V3_AsubB(tpos,World.position[PLAYER1]),&sx,&sy)) { continue; }
-                float imgSz = vclamp(128.0f * (7.68f / vmax(targetRange,0.25f)), 24.0f, 640.0f), imgHalf=imgSz*0.5f;
-                if (tid && hw) { RenderUIImage((i16)(sx - imgHalf),(i16)sy,(i16)(imgSz * 1.2f),(i16)(imgSz * 1.38f),1051); }
+                V3 tpos = World.position[i]; tpos.y += 1.0f; i16 textIdx = TargetIDGetText(i); bool tid = TargetIDShouldRender(i), hw = (World.invP1.hasHardware&HW_TID) != 0; float targetRange = V3_Dist(tpos,World.position[PLAYER1]); if (!tid || !TargetIDInPlayerPVS(i)) { continue; }
+                float sx,sy; if (!WorldToScreenPoint(V3_AsubB(tpos,World.position[PLAYER1]),&sx,&sy)) { continue; }
+                float imgSz = vclamp(128.0f * (7.68f / vmax(targetRange,0.25f)), 24.0f, 640.0f), imgHalf=imgSz*0.5f; if (tid && hw) { RenderUIImage((i16)(sx - imgHalf),(i16)sy,(i16)(imgSz * 1.2f),(i16)(imgSz * 1.38f),1051); }
                 char label[192] = {0}; size_t used = 0; u8 ver = World.invP1.hwVers[HW_TID_IDX]; float range = targetRange;
                 const char* attitude = (e->entflags & EF_ASLEEP) ? Sys_Text.stringTable[519] : (e->currentState == AIState_Run || e->currentState == AIState_Attack1 || e->currentState == AIState_Attack2 || e->currentState == AIState_Attack3 || e->currentState == AIState_Pain) ? Sys_Text.stringTable[518] : Sys_Text.stringTable[516];
                 const char* status = textIdx >= 0 ? Sys_Text.stringTable[textIdx] : attitude;
                 if(tid&&hw&&textIdx != 511) { /*Two lines, e.g.: "SERV-BOT 4" then "20, 6.3M, Idle". The number is this NPC's 1-based index within its own type.*/
-                    if (ver > 1)                                 used += (size_t)sFormat(label + used, sizeof(label) - used, "%s %u",             npcTable[e->index-419].name, e->npcNumber);
-                    if (ver > 2 && used < sizeof(label))         used += (size_t)sFormat(label + used, sizeof(label) - used, "%s%.0f, %.1fM, %s", used ? "\n" : "", e->health, range, status);
-                    if (!used&&textIdx >= 512 && textIdx <= 515) used += (size_t)sFormat(label + used, sizeof(label) - used, "%s",                status); /*Damage status with v0 hardware*/
-                } else if (textIdx >= 0)                         used += (size_t)sFormat(label + used, sizeof(label) - used, "%s",                status); /*NO DAMAGE always shows, regardless of hardware*/
-                if (label[0]) { float textY = sy - 64.0f + vclamp(0.6f * 64.0f * (7.68f / vmax(targetRange, 0.25f) - 1.0f), -128.0f, 96.0f); RenderText3DC((V3){sx, textY, 0.0f}, T_YELLOW, FONT_NORMAL, 0.8f, label); }
+                    if (ver > 1)                                 used += (size_t)sFormat(label + used,sizeof(label) - used,"%s %u",            npcTable[e->index-419].name,e->npcNumber);
+                    if (ver > 2 && used < sizeof(label))         used += (size_t)sFormat(label + used,sizeof(label) - used,"%s%.0f, %.1fM, %s",used ? "\n" : "",(double)e->health,(double)range,status);
+                    if (!used&&textIdx >= 512 && textIdx <= 515) used += (size_t)sFormat(label + used,sizeof(label) - used,"%s",               status); /*Damage status with v0 hardware*/
+                } else if (textIdx >= 0)                         used += (size_t)sFormat(label + used,sizeof(label) - used,"%s",               status); /*NO DAMAGE always shows, regardless of hardware*/
+                if (label[0]) { float textY = sy - 64.0f + vclamp(0.6f * 64.0f * (7.68f / vmax(targetRange,0.25f) - 1.0f),-128.0f,96.0f); RenderText3DC((V3){sx,textY,0.0f},T_YELLOW,FONT_NORMAL,0.8f,label); }
             }
             bool cyber = World.curLev == LEVEL_CYBERSPACE;
             if (cyber) { World.Sys_UI.mfdTab[0] = 4; World.Sys_UI.mfdSelected[0] = 4; }
-            bool editPanelActive=EditSelIsActive()||EditLightSelIsActive();
+            bool editPanelActive = EditSelIsActive() || EditLightSelIsActive();
             if (!editPanelActive) { TickBar(false); if (!cyber) TickBar(true); }
             if (!cyber) HardwareButtons();
             UIRImg(UI_ID_HUD_SHOOTMODE,667,0,32,32,1020);
             if (World.pauseRelativeTime <= World.Sys_UI.shieldAnimationFinished) {
-                float t = vclamp((float)(World.pauseRelativeTime - World.Sys_UI.shieldAnimationStarted),0.0f,1.2f);
+                float t = vclamp(World.pauseRelativeTime - World.Sys_UI.shieldAnimationStarted,0.0f,1.2f);
                 if (World.Sys_UI.shieldAnimationIsActivate) { float upY = 384.0f + (0.0f - 384.0f) * t; float dnY = 384.0f + (768.0f - 384.0f) * t; RenderUIImage(0, (i16)(upY + 40 - 80.0f), 1366, 160, 1076); RenderUIImageExtended(0, (i16)(dnY - 40 - 80.0f), 1366, 160, 1076, 3.14159265f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f); }
                 else                                        { float upY = 0.0f + (384.0f - 0.0f) * t;   float dnY = 768.0f + (384.0f - 768.0f) * t; RenderUIImage(0, (i16)(upY + 0 - 80.0f), 1366, 160, 1076);  RenderUIImageExtended(0, (i16)(dnY - 0 - 80.0f), 1366, 160, 1076, 3.14159265f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f);  }
             }
-            for (u8 i=0;i<10;++i) if (World.Sys_UI.tWrnFinished[i]>World.pauseRelativeTime) {
+            for (u8 i=0;i<10;++i) if (World.Sys_UI.tWrnFinished[i] > World.pauseRelativeTime) {
                 char flt[6]; if (World.Sys_UI.tWrnTextIdx[i]==185) sFormat(flt,6,"%.1f",(double)World.instances[PLAYER1].radiation);
-                RenderTextL(340,72+i*18,World.Sys_UI.tWrnColorIdx[i],FONT_NORMAL,0.8f,"%s%s%s",Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx[i]],World.Sys_UI.tWrnTextIdx[i]==185?flt:World.Sys_UI.tWrnTextIdx2[i]>=0?Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx2[i]]:"",World.Sys_UI.tWrnTextIdx3[i]>=0?Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx3[i]]:"");
+                RenderTextL(340,72 + i*18,World.Sys_UI.tWrnColorIdx[i],FONT_NORMAL,0.8f,"%s%s%s",Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx[i]],World.Sys_UI.tWrnTextIdx[i] == 185 ? flt : World.Sys_UI.tWrnTextIdx2[i] >= 0 ? Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx2[i]] : "",World.Sys_UI.tWrnTextIdx3[i] >= 0 ? Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx3[i]] : "");
             }
             if (!editPanelActive && !World.Sys_UI.fullMapOpen[0] && !World.Sys_UI.fullMapOpen[1]) { if (cyber) { CenterMFD(); } else { SideMFD(false); CenterMFD(); SideMFD(true); } } else if (World.Sys_UI.fullMapOpen[0] || World.Sys_UI.fullMapOpen[1]) { AutomapBlitFullToUI(); UIRImg(UI_ID_FULLMAP_CLOSE,(i16)((UI_W-146)/2),706,146,28,1087); RenderTextL(610,710,T_YELLOW,FONT_NORMAL,0.8,"CLOSE"); }
             if(World.diffMis>=3){
@@ -1213,41 +1205,41 @@ static void RenderUI() {
             RenderTextL(1270,78,T_WHITE,FONT_NORMAL,0.8,"0"); RenderTextL(1308,78,T_WHITE,FONT_NORMAL,0.8,"0"); RenderSearchFX();
         }
         if (EditSelIsActive() || EditLightSelIsActive()) {
-            const bool isObj = EditSelIsActive(); u16 sel = isObj ? editModeSelection : editModeLightSelection; float sx, sy; V3 worldPos = isObj ? World.position[sel] : World.lights[sel].pos; if (WorldToScreenPoint(V3_AsubB(worldPos, World.position[PLAYER1]), &sx, &sy)) { RenderUIImage((i16)(sx - 24.0f), (i16)(sy - 24.0f), 48, 48, 1051); }
-            RenderUIImage(966, 84, 400, 600, 1025); RenderTextL(982, 104, T_YELLOW, FONT_NORMAL, 1.0f, isObj ? "EDIT OBJECT #%u" : "EDIT LIGHT #%u", sel); char v[40];
-            if (isObj) { Entity* e = &World.instances[sel]; sFormat(v, 40, "%u", e->index); RenderTextL(982, 132, T_GREEN, FONT_NORMAL, 1.0f, "const index"); } else { Light* L = &World.lights[sel]; sFormat(v, 40, "0x%x %s", L->lflags, (L->lflags & LIGHTON) ? "on" : "off"); RenderTextL(982, 132, T_GREEN, FONT_NORMAL, 1.0f, "flags"); }
-            RenderTextL(1108, 132, T_GREEN, FONT_NORMAL, 1.0f, "%s", v);
+            const bool isObj = EditSelIsActive(); u16 sel = isObj ? editModeSelection : editModeLightSelection; float sx, sy; V3 worldPos = isObj ? World.position[sel] : World.lights[sel].pos; if (WorldToScreenPoint(V3_AsubB(worldPos,World.position[PLAYER1]),&sx,&sy)) { RenderUIImage((i16)(sx - 24.0f),(i16)(sy - 24.0f),48,48,1051); }
+            RenderUIImage(966,84,400,600,1025); RenderTextL(982,104,T_YELLOW,FONT_NORMAL,1.0f,isObj ? "EDIT OBJECT #%u" : "EDIT LIGHT #%u",sel); char v[40];
+            if (isObj) { Entity* e = &World.instances[sel]; sFormat(v,40,"%u",e->index); RenderTextL(982,132,T_GREEN,FONT_NORMAL,1.0f,"const index"); } else { Light* L = &World.lights[sel]; sFormat(v,40,"0x%x %s",L->lflags,(L->lflags & LIGHTON) ? "on" : "off"); RenderTextL(982,132,T_GREEN,FONT_NORMAL,1.0f,"flags"); }
+            RenderTextL(1108,132,T_GREEN,FONT_NORMAL,1.0f,"%s",v);
             bool caretOn = ((u32)(get_time() * 2.0f) & 1) != 0; const int last = isObj ? EF_LAST : LF_LAST;
             for (int i = 0; i < last; ++i) {
                 u8 slot = (u8)i; i16 y = efRowY[i]; char v2[40]; if (isObj) { EditFieldValueText(slot,sel,v2,40); } else { LightFieldValueText(slot,sel,v2,40); }
                 bool editingThis = editFieldEditing && editFieldSlot == slot; RenderTextL(982, y, editingThis ? T_RED : T_GREEN, FONT_NORMAL, 1.0f, "%s", isObj ? efRowLabel[i] : lfRowLabel[i]);
-                if (editingThis) { char buf[44]; sFormat(buf,44,"%s%s",editFieldBuffer,caretOn ? "|" : ""); RenderTextL(1108,y,T_RED,FONT_NORMAL,1.0f,"%s",buf); } else { float w = MeasureLineAdvance(v,FONT_NORMAL); UIR(UI_ID_CMFD_EDIT_ROW_0 + i, 1108, y, (i16)w, 26); bool h = UIOver(UI_ID_CMFD_EDIT_ROW_0 + i); u32 c = h ? T_YELLOW : (isObj ? (i < EF_TEX ? T_WHITE : T_GREEN) : T_WHITE); RenderTextL(1108,y,c,FONT_NORMAL,1.0f,"%s",v); }
+                if (editingThis) { char buf[44]; sFormat(buf,44,"%s%s",editFieldBuffer,caretOn ? "|" : ""); RenderTextL(1108,y,T_RED,FONT_NORMAL,1.0f,"%s",buf); } else { float w = MeasureLineAdvance(v,FONT_NORMAL); UIR(UI_ID_CMFD_EDIT_ROW_0 + i,1108,y,(i16)w,26); bool h = UIOver(UI_ID_CMFD_EDIT_ROW_0 + i); u32 c = h ? T_YELLOW : (isObj ? (i < EF_TEX ? T_WHITE : T_GREEN) : T_WHITE); RenderTextL(1108,y,c,FONT_NORMAL,1.0f,"%s",v); }
             }
-            if (editFieldEditing && Sys_Input.scrollDelta != 0.0f) { EditFieldStep((float)Sys_Input.scrollDelta); Sys_Input.scrollDelta = 0.0f; } 
-            if (isObj) { if (sel == World.weaponVModelIndex) { Entity* e = &World.instances[sel]; int wep16 = Get16WeaponIndexFromConstIndex(e->index); if (wep16 >= 0 && wep16 < 16) { V3 offs = vWepOfs[wep16]; offs.y += wfx.reloadContainerPos.y; RenderTextL(982, 580, T_GREEN, FONT_NORMAL, 1.0f, "vm offset"); RenderTextL(1108, 580, T_YELLOW, FONT_NORMAL, 1.0f, "%.5f %.5f %.5f", offs.x, offs.y, offs.z); } } }
+            if (editFieldEditing && Sys_Input.scrollDelta != 0.0) { EditFieldStep((float)Sys_Input.scrollDelta); Sys_Input.scrollDelta = 0.0; } 
+            if (isObj) { if (sel == World.weaponVModelIndex) { Entity* e = &World.instances[sel]; int wep16 = Get16WeaponIndexFromConstIndex(e->index); if (wep16 >= 0 && wep16 < 16) { V3 offs = vWepOfs[wep16]; offs.y += wfx.reloadContainerPos.y; RenderTextL(982,580,T_GREEN,FONT_NORMAL,1.0f,"vm offset"); RenderTextL(1108,580,T_YELLOW,FONT_NORMAL,1.0f,"%.5f %.5f %.5f",(double)offs.x,(double)offs.y,(double)offs.z); } } }
             else {
-                Light* L = &World.lights[sel]; RenderTextL(982, 596, T_GREEN, FONT_NORMAL, 1.0f, "type"); UIRImg(UI_ID_CMFD_EDIT_LIGHT_TYPE, 1108, 596, 120, 28, 1087); bool hov = UIOver(UI_ID_CMFD_EDIT_LIGHT_TYPE); RenderTextC(1108 + 60, 602, hov ? T_YELLOW : T_GREEN, FONT_NORMAL, 0.8f, "%s",(L->lflags & LSPOT) ? "spot" : "point"); static const char* lfDirLbl[6] = {"N", "E", "S", "W", "Up", "Dn"};
-                for (int d = 0; d < 6; ++d) { i16 bx = (i16)(982 + d * 36); u32 bid = UI_ID_CMFD_EDIT_LIGHT_DIR_N + d; UIRImg(bid, bx, 644, 28, 28, 1087); hov = UIOver(bid); RenderTextC(bx + 14, 650, hov ? T_YELLOW : (LightDirIs((u8)d) ? T_YELLOW : T_GREEN),FONT_NORMAL, 0.8f, "%s", lfDirLbl[d]); }
+                Light* L = &World.lights[sel]; RenderTextL(982,596,T_GREEN,FONT_NORMAL,1.0f,"type"); UIRImg(UI_ID_CMFD_EDIT_LIGHT_TYPE,1108,596,120,28,1087); bool hov = UIOver(UI_ID_CMFD_EDIT_LIGHT_TYPE); RenderTextC(1108 + 60,602,hov ? T_YELLOW : T_GREEN,FONT_NORMAL,0.8f,"%s",(L->lflags & LSPOT) ? "spot" : "point"); static const char* lfDirLbl[6] = {"N","E","S","W","Up","Dn"};
+                for (int d = 0; d < 6; ++d) { i16 bx = (i16)(982 + d * 36); u32 bid = UI_ID_CMFD_EDIT_LIGHT_DIR_N + d; UIRImg(bid,bx,644,28,28,1087); hov = UIOver(bid); RenderTextC(bx + 14,650,hov ? T_YELLOW : (LightDirIs((u8)d) ? T_YELLOW : T_GREEN),FONT_NORMAL,0.8f,"%s",lfDirLbl[d]); }
             }
         }
     }
     if (World.Sys_UI.vmailActive) {
         u8 clip=(u8)(World.Sys_UI.vmailActive-1);
-        if (World.Sys_UI.vmailFrameFinished < World.pauseRelativeTime && World.Sys_UI.vmailFrame < vmailEndFrames[clip]) { if (World.Sys_UI.vmailFrame == (vmailStartFrames[clip]+11)) play_wav("hud/vmailalert", AppliedFXVol(1.0f), (V3){0}, false); World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; World.Sys_UI.vmailFrame++; if (World.Sys_UI.vmailFrame > vmailEndFrames[clip]) World.Sys_UI.vmailFrame = vmailEndFrames[clip]; }
+        if (World.Sys_UI.vmailFrameFinished < World.pauseRelativeTime && World.Sys_UI.vmailFrame < vmailEndFrames[clip]) { if (World.Sys_UI.vmailFrame == (vmailStartFrames[clip]+11)) play_wav("hud/vmailalert", AppliedFXVol(1.0f), (V3){0}, false); World.Sys_UI.vmailFrameFinished = World.pauseRelativeTime + 0.1f; World.Sys_UI.vmailFrame++; if (World.Sys_UI.vmailFrame > vmailEndFrames[clip]) World.Sys_UI.vmailFrame = vmailEndFrames[clip]; }
         u32 want = World.Sys_UI.vmailFrame, nxt = VideoPeekFrame(want); QueueVideoFrame(want,false);; if (nxt != 0xFFFFFFFFu) QueueVideoFrame(nxt,true);
         u32 heldMail = VideoFrameTexIndex(want); if (heldMail != 0xFFFFFFFFu) UIRImg(UI_ID_VMAIL_VIEWER,283,134,800,400,heldMail); SideMFD(false); CenterMFD(); SideMFD(true); /*Draw the email sender stats and text*/
     }
     if (Cheats.consoleActive) RenderTextL(16,0,T_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);
-    if (World.statusTextDecayFinished > World.current_time) RenderTextC(683,164,T_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
-    if (World.invP1.ressurectingFinished > World.pauseRelativeTime) { double el = World.pauseRelativeTime - (World.invP1.ressurectingFinished - 3.0); static const float resDelay[8] = {0.2f,0.4f,0.5f,0.7f,0.8f,0.9f,1.0f,1.4f}; static const i16 resY[8] = {9,30,30,52,52,74,74,94}; if (el < 2.0) { for (int i = 0; i < 8; ++i) { if (el >= resDelay[i]) RenderTextL(38,resY[i],T_GREEN,FONT_NORMAL,1.8f,"%s",Sys_Text.stringTable[860 + i]); } } }
-    if (Cheats.showLocation) RenderTextL(16, 90, T_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f, Cursor: %d, %d  dx:%d dy:%d",World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z,World.rotation[PLAYER1].x,World.rotation[PLAYER1].y,World.rotation[PLAYER1].z,World.rotation[PLAYER1].w,World.cursorPos_x,World.cursorPos_y,World.currentMouse_dx,World.currentMouse_dy);
+    if (World.statusTextDecayFinished > (float)World.current_time) RenderTextC(683,164,T_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
+    if (World.invP1.ressurectingFinished > World.pauseRelativeTime) { float el = World.pauseRelativeTime - (World.invP1.ressurectingFinished - 3.0f); static const float resDelay[8] = {0.2f,0.4f,0.5f,0.7f,0.8f,0.9f,1.0f,1.4f}; static const i16 resY[8] = {9,30,30,52,52,74,74,94}; if (el < 2.0f) { for (int i = 0; i < 8; ++i) { if (el >= resDelay[i]) RenderTextL(38,resY[i],T_GREEN,FONT_NORMAL,1.8f,"%s",Sys_Text.stringTable[860 + i]); } } }
+    if (Cheats.showLocation) RenderTextL(16, 90, T_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f, Cursor: %d, %d  dx:%d dy:%d",(double)World.position[PLAYER1].x,(double)World.position[PLAYER1].y,(double)World.position[PLAYER1].z,(double)World.rotation[PLAYER1].x,(double)World.rotation[PLAYER1].y,(double)World.rotation[PLAYER1].z,(double)World.rotation[PLAYER1].w,World.cursorPos_x,World.cursorPos_y,World.currentMouse_dx,World.currentMouse_dy);
     if (Cheats.showFPS) {
-        double time_now = get_time(); World.thisFrameTime = (time_now - World.last_time) * 1000.0; World.last_time = time_now; World.cpuFrameTime = World.cpuTime * 1000.0; u8 timingColor = (time_now - World.current_time) > (World.thisFrameTime - 0.2) ? T_RED : T_WHITE;
+        double time_now = get_timed(); World.thisFrameTime = (time_now - World.last_time) * 1000.0; World.last_time = time_now; World.cpuFrameTime = World.cpuTime * 1000.0; u8 timingColor = (time_now - World.current_time) > (World.thisFrameTime - 0.2) ? T_RED : T_WHITE;
         static double avg; avg += (World.cpuFrameTime - avg) * (1.0 / 60.0/*frame "taps"*/);
         RenderTextL(16 + 110,72,timingColor,FONT_NORMAL,1.0f,"CPU avg %.2f",avg); RenderTextL(16,72,timingColor,FONT_NORMAL,1.0f,"ms: %.2f",World.thisFrameTime); RenderTextL(16 + 260,72,T_WHITE,FONT_NORMAL,1.0f,"(FPS:%d),Drawcalls:%d [G:%d UI:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u",globalframesPerLastSecond,drawCalls,drawCallsNormal,uiDrawCalls,shadDrawCalls,vertsRendered,Cheats.editMode,World.menuActive,World.paused);
         RenderTextL(16,108,T_WHITE,FONT_NORMAL,1.0f,"GPU ms::All:%.2f, Shad:%.2f, Pre:%.2f, Main:%.2f, SSR:%.2f, Comp:%.2f",World.gpuFrameMs,World.gpuShadowMs,World.gpuPreMs,World.gpuMainMs,World.gpuSsrMs,World.gpuCompMs);
         RenderTextL(16,126,T_WHITE,FONT_NORMAL,1.0f,"CPU ms::Shad:%.3f, Phys:%.3f, Subs:%u, Rend:%.3f, Pre Phys:%.3f, Logic:%.3f, Ray:%.3f(%u)",shadowTime * 1000,physTime * 1000,World.substeps,renderTime * 1000,prePhys * 1000,gameTime * 1000,raycastMs * 1000,raycastCalls);
-        RenderTextL(16,144,T_WHITE,FONT_NORMAL,1.0f,"Test Edx: %u, Time Elapsed: %.3f, Fatigue: %.2f, Sprinting: %u, Reverb: %u, Making Noise: %u, Grounded: %u",editModeTestEntityDefinition,World.pauseRelativeTime - game_actual_start_time,World.invP1.fatigue,GetKey(9)/*Sprint is held*/,World.invP1.inReverbZone,World.invP1.makingNoise,(World.instances[PLAYER1].entflags & EF_GROUNDED) > 0);
+        RenderTextL(16,144,T_WHITE,FONT_NORMAL,1.0f,"Test Edx: %u, Time Elapsed: %.3f, Fatigue: %.2f, Sprinting: %u, Reverb: %u, Making Noise: %u, Grounded: %u",editModeTestEntityDefinition,(double)World.pauseRelativeTime - game_actual_start_time,(double)World.invP1.fatigue,GetKey(9)/*Sprint is held*/,World.invP1.inReverbZone,World.invP1.makingNoise,(World.instances[PLAYER1].entflags & EF_GROUNDED) > 0);
     }
     bool p = (World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused; if (p || !Cheats.noHUD) RenderUIImage(p?World.cursorPos_x-20:663,p?World.cursorPos_y-20:364,40,40,GetCursorTexture()); 
     if(World.invP1.grenActive && World.invP1.holdingObject && !World.menuActive && !World.paused && !Cheats.noHUD) { RenderTextL((World.inventoryMode ? World.cursorPos_x : 683) + 26,(World.inventoryMode ? World.cursorPos_y : 384) - 8,T_YELLOW,FONT_NORMAL,0.8f,"Live"); }

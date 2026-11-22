@@ -3,8 +3,8 @@
 #include "credits.h"
 #include "Shaders/shaders.h"
 GlobalContext World = {0}; // Full game state
-double game_start_time,game_actual_start_time,shadowTime,physTime,renderTime,prePhys,gameTime,raycastMs,last_mouse_x,last_mouse_y,healFlashFinished,chargeFlashFinished;
-float rasterPerspectiveProjection[16],modelMatrices[INSTANCE_CNT*16],*world_from_mdl = modelMatrices,modelBounds[MAX_MDLS],**physPos,lightView[MAX_SHADOWMAPS][6][4][4],lightViewProj[MAX_SHADOWMAPS][6][16],shadowmapsPerspectiveProjection[16],sunShadowMatrix[16],berserkSeedTime,cyberStaticAlpha;
+double game_start_time,game_actual_start_time,shadowTime,physTime,renderTime,prePhys,gameTime,raycastMs,last_mouse_x,last_mouse_y;
+float rasterPerspectiveProjection[16],modelMatrices[INSTANCE_CNT*16],*world_from_mdl = modelMatrices,modelBounds[MAX_MDLS],**physPos,lightView[MAX_SHADOWMAPS][6][4][4],lightViewProj[MAX_SHADOWMAPS][6][16],shadowmapsPerspectiveProjection[16],sunShadowMatrix[16],berserkSeedTime,cyberStaticAlpha,healFlashFinished,chargeFlashFinished;
 static float shakeAmp = 0.15f,amMapScaleX,amMapScaleY,amMapOffsetX;
 size_t scratch_peak,cvxAdjOffsetBytes[MAX_UNIQUE_CVX_MESHES],cvxAdjListBytes[MAX_UNIQUE_CVX_MESHES];
 static u32 globalframesPerLastSecond,inputImageID,inputUIID,inputDepthID,inputSpecID,inputNormalID,outputImageID,gBufferFBO,uiSP,depthPrepassSP,chunkSP,chunkVAO,matricesBufferID,ssrSP,rtSP,rtCopySP,imageBlitSP,quadVAO,quadVBO,rtInstanceInfoID,rtCellCountsID,rtCellListsID,rtGeomID,rtOrderBufID,gpuQ[5][5],wireVertCount,raycastPickMode;
@@ -20,7 +20,7 @@ bool doubleSidedTexture[MAXTEX],transparentTexture[MAXTEX],shadowBuffersCreated,
 typedef struct WSWin WSWin; static WSWin* window; typedef struct WSCtx WSCtx; typedef struct WSLib WSLib; typedef struct WSMon WSMon; static WSLib WinSys; typedef void (*WSP)(void);
 void ConsoleEmulator(i32),EditFieldKey(i32),SaveNameEntry(i32),KeycodeEntryKey(i32 keycode),CycleWeaponSlot(int),CloseFullmap(),UI_AutomapClick(bool,int),UpdateScreenSize(i32,i32),SaveConfig(),InputWindowFocus(i32),InputKey(char*,int,int),InputMouseClick(char*,int,int),InputCursorPos(double*,double*,double,double),InputMonitor(WSMon*,int,int),ComputeWindowPlacement(int,int*,int*),SaveGame(u8,const char*),LoadGame(u8),ApplyPlayerMovements(float),NewGame(),
      HwToggle(u8),MFD_ResetGeneral(),PSys_Render(float*,V3,V3,V3,V3,u32,float,float,float,float),MissionTimerInit(),AddHardwareToInventory(int,int),mp3_clear(),AddDoorPortal(u16,u16),MdlSwapWindowDisposeData(u16),LoadModels(),LoadTextures(),InitAudio(),Physics(float),UpdateAnims(),UpdateAudio(),AudioUpdateMix(),PSys_Update(float),BioMonitorUpdate(),MenuGoBack(),DebugRAMActual(const char*),DebugRAMPeak(),GenInvClick(i32),GenInvApply(i32),VaporizeClick(),
-     BiomonitorBlitToUI(),LoadTextForLanguage(u8),LoadLogTextForLanguage(u8),SaveGame(u8,const char*),LoadGame(u8),WeaponFireStartWeaponDip(float),RemoveWeapon(i32),ActualChangeAmmoType(),OverloadButtonAction(),ReloadSecret(bool),Unload(bool),PlayLog(int),CheckForUnreadLogs(),UseTargets(u16,u16),UseCyberspaceItemByIndex(int);;
+     BiomonitorBlitToUI(),LoadTextForLanguage(u8),LoadLogTextForLanguage(u8),SaveGame(u8,const char*),LoadGame(u8),WeaponFireStartWeaponDip(float),ActualChangeAmmoType(),OverloadButtonAction(),ReloadSecret(bool),Unload(bool),PlayLog(int),CheckForUnreadLogs(),UseTargets(u16,u16),UseCyberspaceItemByIndex(int);;
 bool PlayerInElevatorCell(),FindElevatorKeypadPos(u8,V3*),ReadSaveSlotName(u8,char*,size_t),MdlIsWinMemberSet(u16,u8),VidMenuKeyArmed(),GeneralInvCanUse(i32),GeneralInvCanVaporize(i32),GenInvTake(i32),InventoryHasAccessCard(AccCardType);
 i32 s2i32(const char*),GeneralInvItem(i32);
 u16 GetItemFrobTexture(u16);
@@ -86,7 +86,7 @@ void DrawAngularVelocity(u16 i) {
     typedef struct WGLContext { void* dc; void* handle; int interval; } WGLContext;
     PFN_wglGetCurrentDC wglGetCurrentDC; PFN_CC wglCreateContext; PFN_wglGetCurrentContext wglGetCurrentContext; PFN_wglMakeCurrent wglMakeCurrent; PFN_wglGetProcAddress wglGetProcAddress; PFN_GPFAIVA GPFAivARB; PFN_SWE wglSwapIntervalEXT;
     typedef struct WSWinWin32 { void* handle; bool frameAction; int lastCurX,lastCurY; } WSWinWin32;    typedef struct{int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits; uintptr_t handle;} FBC;
-    typedef struct WSLibWin32 { HINSTANCE instance; void* helperWindowHandle; u16 helperWindowClass,mainWindowClass; short int keycodes[512]; double restoreCurPosX,restoreCurPosY; WSWin *disabledCursorWindow, *capturedCursorWindow; struct { HINSTANCE instance; PFN_DwmIsCompositionEnabled IsCompositionEnabled; PFN_DwmFlush Flush; } dwmapi; struct { HINSTANCE instance; PFN_RtlVerifyVersionInfo RtlVerifyVersionInfo; } ntdll; } WSLibWin32;
+    typedef struct WSLibWin32 { HINSTANCE instance; void* helperWindowHandle; u16 helperWindowClass,mainWindowClass; i16 keycodes[512]; double restoreCurPosX,restoreCurPosY; WSWin *disabledCursorWindow, *capturedCursorWindow; struct { HINSTANCE instance; PFN_DwmIsCompositionEnabled IsCompositionEnabled; PFN_DwmFlush Flush; } dwmapi; struct { HINSTANCE instance; PFN_RtlVerifyVersionInfo RtlVerifyVersionInfo; } ntdll; } WSLibWin32;
     typedef struct WSMonWin32 { void* handle; u16 adapterName[32],displayName[32]; int isPrimary; } WSMonWin32;    typedef struct _DISPLAY_DEVICEW { u32 cb; u16 DeviceName[32],DeviceString[128]; u32 StateFlags; u8 _p[256]; } DISPLAY_DEVICEW;    typedef struct { u16 nSize,nVersion; u32 dwFlags; u8 _p[32]; } PIXELFORMATDESCRIPTOR;
     typedef struct { u32 bV5Size; i32 bV5Width,bV5Height; u16 bV5Planes,bV5BitCount; u32 bV5Compression; u8 _p[20]; u32 bV5RedMask,bV5GreenMask,bV5BlueMask,bV5AlphaMask; u8 _p2[52]; } BITMAPV5HEADER;
     DLL_IMP void* WINAPI CreateIconIndirect(ICONINFO*);                       DLL_IMP void* WINAPI GetDC(void*); DLL_IMP i32 WINAPI GetModuleHandleExW(u32,const u16*,HINSTANCE*); DLL_IMP int WINAPI ReleaseDC(void*,void*); DLL_IMP i32 WINAPI SetCursorPos(int,int); DLL_IMP void* WINAPI SetCursor(void*); DLL_IMP i32 WINAPI GetCursorPos(POINT*);
@@ -247,7 +247,7 @@ void DrawAngularVelocity(u16 i) {
     typedef GLXWindow(*GLX_CWP)(Display*,GLXFBConfig,XID,const int*); typedef GLXContext(*GLX_CCAA)(Display*,GLXFBConfig,GLXContext,Bool,const int*); typedef struct WSCtxGLX { GLXContext handle; GLXWindow window; } WSCtxGLX;
     typedef struct WSLibGLX { void* handle; GLX_CFBCP ChooseFBConfigs; GLX_MCP MakeCurrent; GLX_SBP SwapBuffers; GLX_GVFFBCP GetVisualFromFBConfig; GLX_CWP CreateWindow; GLX_GPAP GetProcAddress; GLX_SIEP SwapIntervalEXT; GLX_CCAA CreateContextAttribsARB; } WSLibGLX;
     typedef struct WSWinX11 { XID colormap; XID handle,parent; int width,height,xpos,ypos,lastCurX,lastCurY,warpCursorPosX,warpCursorPosY; } WSWinX11;
-    typedef struct WSLibX11 { Display* display; int screen; XID root; XID hiddenCursorHandle; XContext context; short int keycodes[256]; double restoreCurPosX, restoreCurPosY; WSWin* disabledCursorWindow; Atom NET_SUPPORTED,WM_PROTOCOLS,WM_DELETE_WINDOW,NWM_NAME,NWM_ICON,NWM_PING,NWM_WINDOW_TYPE,NWM_WINDOW_TYPE_NORMAL,NWM_STATE,NWM_STATE_FULLSCREEN,NET_ACTIVE_WINDOW,MOTIF_WM_HINTS,UTF8_STRING;
+    typedef struct WSLibX11 { Display* display; int screen; XID root; XID hiddenCursorHandle; XContext context; i16 keycodes[256]; double restoreCurPosX, restoreCurPosY; WSWin* disabledCursorWindow; Atom NET_SUPPORTED,WM_PROTOCOLS,WM_DELETE_WINDOW,NWM_NAME,NWM_ICON,NWM_PING,NWM_WINDOW_TYPE,NWM_WINDOW_TYPE_NORMAL,NWM_STATE,NWM_STATE_FULLSCREEN,NET_ACTIVE_WINDOW,MOTIF_WM_HINTS,UTF8_STRING;
                               struct { void* handle; PFN_XAllocSizeHints AllocSizeHints; PFN_XChangeProperty ChangeProperty; PFN_XCheckTypedWindowEvent CheckTypedWindowEvent; PFN_XCreateColormap CreateColormap; PFN_XCreateWindow CreateWindow; PFN_XDefineCursor DefineCursor;
                               PFN_XDisplayKeycodes DisplayKeycodes; PFN_XFilterEvent FilterEvent; PFN_XFindContext FindContext; PFN_XFree Free; PFN_XGetKeyboardMapping GetKeyboardMapping; PFN_XGetWMNormalHints GetWMNormalHints;
                               PFN_XGetWindowAttributes GetWindowAttributes; PFN_XGetWindowProperty GetWindowProperty; PFN_XGrabPointer GrabPointer; PFN_XInternAtom InternAtom; PFN_XMapWindow MapWindow; PFN_XMoveResizeWindow MoveResizeWindow; PFN_XMoveWindow MoveWindow; PFN_XPending Pending; 
@@ -291,7 +291,7 @@ void DrawAngularVelocity(u16 i) {
             case 4: case 5: {
                 const int b = e->xbutton.button; const int a = (e->type == 4) ? INPUT_PRESS : INPUT_RELEASE;
                 if (a == INPUT_PRESS && WinSys.x11.disabledCursorWindow != w) { disableCursor(w); } // Explicitly require a click to lock the mouse
-                if (b == 1) InputMouseClick(w->mouseButtons,MOUSE_BUTTON_LEFT,a); else if (b == 2) InputMouseClick(w->mouseButtons,MOUSE_BUTTON_MIDDLE,a); else if (b == 3) InputMouseClick(w->mouseButtons,MOUSE_BUTTON_RIGHT,a); else if (a == INPUT_PRESS && b == 4) Sys_Input.scrollDelta += 1.0f; else if (a == INPUT_PRESS && b == 5) Sys_Input.scrollDelta -= 1.0f; else if (b > 7) InputMouseClick(w->mouseButtons,b - 5,a); return; }
+                if (b == 1) InputMouseClick(w->mouseButtons,MOUSE_BUTTON_LEFT,a); else if (b == 2) InputMouseClick(w->mouseButtons,MOUSE_BUTTON_MIDDLE,a); else if (b == 3) InputMouseClick(w->mouseButtons,MOUSE_BUTTON_RIGHT,a); else if (a == INPUT_PRESS && b == 4) Sys_Input.scrollDelta += 1.0; else if (a == INPUT_PRESS && b == 5) Sys_Input.scrollDelta -= 1.0; else if (b > 7) InputMouseClick(w->mouseButtons,b - 5,a); return; }
             case 7: { const int x=e->xcrossing.x,y=e->xcrossing.y; InputCursorPos(&w->virtualCursorPosX,&w->virtualCursorPosY,x,y); w->x11.lastCurX=x; w->x11.lastCurY=y; return; }
             case 6/*MotionNotify*/: { 
                 const int x=e->xmotion.x, y=e->xmotion.y;
@@ -314,7 +314,7 @@ void DrawAngularVelocity(u16 i) {
         int fx,fy,fw,fh; GetMonitorFullarea(m,&fx,&fy,&fw,&fh); *x=fx; *y=fy; *w=fw; *h=fh; if(!WinSys.x11.display){return;} Atom waA=WinSys.x11.xlib.InternAtom(WinSys.x11.display,"_NET_WORKAREA",0), cdA=WinSys.x11.xlib.InternAtom(WinSys.x11.display,"_NET_CURRENT_DESKTOP",0); u8* raw=0; u64 desk=0; u8* draw=0;
         if(WinSysGetWindowPropertyX11(WinSys.x11.root,cdA,6,(u8**)&draw)>=1){ desk=(u64)(*(long*)draw); WinSys.x11.xlib.Free(draw); } if(WinSysGetWindowPropertyX11(WinSys.x11.root,waA,6,(u8**)&raw)>=(desk+1)*4){ long* v=(long*)raw; int ax=(int)v[desk*4+0],ay=(int)v[desk*4+1],aw=(int)v[desk*4+2],ah=(int)v[desk*4+3]; int l=vmax(fx,ax),t=vmax(fy,ay),r=vmin(fx+fw,ax+aw),b=vmin(fy+fh,ay+ah); if(r>l&&b>t){*x=l;*y=t;*w=r-l;*h=b-t;} WinSys.x11.xlib.Free(raw); }
     }
-    static int translateKeySyms(const KeySym* k, int w) {
+    static i16 translateKeySyms(const KeySym* k, int w) {
         if (w > 1) { if (k[1] >= 0xffb0 && k[1] <= 0xffb9) return KEY_KP_0 + (k[1] - 0xffb0); switch (k[1]) { case 0xffac: case 0xffae: return KEY_KP_DECIMAL; case 0xffbd:return KEY_KP_EQUAL; case 0xff8d:return KEY_KP_ENTER; } } KeySym c = k[0]; if(c >= 0x61 && c <= 0x7a){return KEY_A + (c - 0x61);} if(c >= 0x30 && c <= 0x39){return KEY_0 + (c - 0x30);} if(c >= 0xffbe && c <= 0xffd6){return KEY_F1 + (c - 0xffbe);}
         if(c >= 0xff95 && c <= 0xff9f){static const int o[] = {KEY_KP_7,KEY_KP_4,KEY_KP_8,KEY_KP_6,KEY_KP_2,KEY_KP_9,KEY_KP_3,KEY_KP_1,-1,KEY_KP_0,KEY_KP_DECIMAL }; int r = o[c - 0xff95]; if(r != -1) return r;} 
         switch (c) {
@@ -434,7 +434,7 @@ void ChangeFullScreenWindowed(bool adjustToFit) {
     } UpdateScreenSize(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
 }
 void CycleToNextMonitor() {
-    static double monitorSwitchTime = 0.0; if (get_time() < monitorSwitchTime) {return;} monitorSwitchTime = get_time() + 0.5; Sys_Settings.CurrentMonitor++; if(Sys_Settings.CurrentMonitor>=WinSys.monitorCount)Sys_Settings.CurrentMonitor=0; SaveConfig(); DualLog("CycleToNextMonitor cur:%u\n",Sys_Settings.CurrentMonitor);
+    static double monitorSwitchTime = 0.0; if (get_timed() < monitorSwitchTime) {return;} monitorSwitchTime = get_timed() + 0.5; Sys_Settings.CurrentMonitor++; if(Sys_Settings.CurrentMonitor>=WinSys.monitorCount)Sys_Settings.CurrentMonitor=0; SaveConfig(); DualLog("CycleToNextMonitor cur:%u\n",Sys_Settings.CurrentMonitor);
     if (Sys_Settings.Fullscreen) { WSMon* m = WinSys.monitors[Sys_Settings.CurrentMonitor]; int x,y,w,h; GetMonitorFullarea(m,&x,&y,&w,&h); SetWindowMonitor(x,y,w,h); Sys_Settings.ScreenWidth=w; Sys_Settings.ScreenHeight=h; } else { GatherResolutionModesFor(Sys_Settings.CurrentMonitor); ApplyStagedWindowedSizeOn(Sys_Settings.CurrentMonitor); }
 }
 // Input and Configuration System for Config.ini, keyboard and mouse support.
@@ -452,7 +452,7 @@ void TextEntry(i32 k) {
 }
 extern bool editFieldEditing,enteringSaveName; extern float cyberWallFade[INSTANCE_CNT];
 void GoIntoGame() {
-    NewGame(); mp3_clear(); DualLog("Player named \"%s\" started the game!\n", World.playerName); game_actual_start_time = get_time();
+    NewGame(); mp3_clear(); DualLog("Player named \"%s\" started the game!\n", World.playerName); game_actual_start_time = get_timed();
     DualLog("Entity counts::0:%4u|1:%4u|2:%4u|3:%4u|4:%4u|5:%4u|6:%4u|7:%4u|8:%4u|9:%4u|10:%4u|11:%4u|12:%4u|13:%4u\n Light counts::0:%4u|1:%4u|2:%4u|3:%4u|4:%4u|5:%4u|6:%4u|7:%4u|8:%4u|9:%4u|10:%4u|11:%4u|12:%4u|13:%4u\n",World.levelInstCount[0],World.levelInstCount[1],World.levelInstCount[2],World.levelInstCount[3],World.levelInstCount[4],
     World.levelInstCount[5],World.levelInstCount[6],World.levelInstCount[7],World.levelInstCount[8],World.levelInstCount[9],World.levelInstCount[10],World.levelInstCount[11],World.levelInstCount[12],World.levelInstCount[13],World.levelLoadedLights[0],World.levelLoadedLights[1],World.levelLoadedLights[2],World.levelLoadedLights[3],
     World.levelLoadedLights[4],World.levelLoadedLights[5],World.levelLoadedLights[6],World.levelLoadedLights[7],World.levelLoadedLights[8],World.levelLoadedLights[9],World.levelLoadedLights[10],World.levelLoadedLights[11],World.levelLoadedLights[12],World.levelLoadedLights[13]);
@@ -474,7 +474,7 @@ void InputCursorPos(double* x, double* y, double xpos, double ypos) {
     World.currentMouse_dx += (i32)(xpos - last_mouse_x); World.currentMouse_dy += (i32)(ypos - last_mouse_y); last_mouse_x = xpos; last_mouse_y = ypos;
     if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused) {/*Uses UI baseline resolution 1366x768*/ i32 newX = vclampi(World.cursorPos_x + World.currentMouse_dx,0,UI_W); if (newX != World.cursorPos_x) {mouseMovementThisFrame = true;} World.cursorPos_x = newX; i32 newY = vclampi(World.cursorPos_y + World.currentMouse_dy,0,UI_H); if (newY != World.cursorPos_y) {mouseMovementThisFrame = true;} World.cursorPos_y = newY;}
 }
-bool GetKeyRiseEdgeOrHeld(int sI, bool onRise) { i32 i = Sys_Settings.InputCodeSettings[sI]; if (i == 127) {return !uiWheelBlocked && Sys_Input.scrollDelta > 0;} if (i == 128) {return !uiWheelBlocked && Sys_Input.scrollDelta < 0;} KeyState* k = GetCodeMapping(sI); return onRise ? k->pressed : k->down; }
+bool GetKeyRiseEdgeOrHeld(int sI, bool onRise) { i32 i = Sys_Settings.InputCodeSettings[sI]; if (i == 127) {return !uiWheelBlocked && Sys_Input.scrollDelta > 0.0;} if (i == 128) {return !uiWheelBlocked && Sys_Input.scrollDelta < 0.0;} KeyState* k = GetCodeMapping(sI); return onRise ? k->pressed : k->down; }
 bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
 bool GetKeyPressed(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
 void ForceShootMode() { if (Sys_Settings.NoShootMode){ return; } if (World.inventoryMode) { World.cursorPos_x = 663; World.cursorPos_y = 364; ignore_next_mouse_delta = true; } World.Sys_UI.mouseClickHeldOverGUI=World.inventoryMode = false; CloseFullmap(); World.Sys_UI.vmailActive = 0; }
@@ -483,7 +483,7 @@ void ToggleInventoryMode() { if (World.inventoryMode) { ForceShootMode();} else 
 void ToggleConsole() { static bool imWasActPrior = false; editFieldEditing = false; if (!Cheats.consoleActive) {imWasActPrior = World.inventoryMode;} Cheats.consoleActive = !Cheats.consoleActive; World.paused = !World.paused; if (Cheats.consoleActive) { World.inventoryMode = true; } else if (!imWasActPrior && World.inventoryMode) {ForceShootMode();} }
 void InputProcessing() {
     for (int i=0;i<MAX_MOUSE_BUTTONS;++i) { if(!Sys_Input.mouseButtons[i].down){uiMouseCaptured &= ~(1u<<i);} }
-    mouseMovementThisFrame = false; Sys_Input.scrollDelta = 0.0f; PollEvents(); f7StepEdge = Cheats.stepmode && Sys_Input.keyStates[KEY_F7].down && !f7DownLatch; f7DownLatch = Sys_Input.keyStates[KEY_F7].down; World.Sys_UI.mouseClickHeldOverGUI = false; uiWheelBlocked = window_has_focus && UIInteractions(); World.uiIsBlocking = uiWheelBlocked;
+    mouseMovementThisFrame = false; Sys_Input.scrollDelta = 0.0; PollEvents(); f7StepEdge = Cheats.stepmode && Sys_Input.keyStates[KEY_F7].down && !f7DownLatch; f7DownLatch = Sys_Input.keyStates[KEY_F7].down; World.Sys_UI.mouseClickHeldOverGUI = false; uiWheelBlocked = window_has_focus && UIInteractions(); World.uiIsBlocking = uiWheelBlocked;
     for (int i=0;i<MAX_MOUSE_BUTTONS;++i) if (uiWheelBlocked && Sys_Input.mouseButtons[i].pressed) uiMouseCaptured|=1u<<i;
     if (window_has_focus) {
         UI_ProcessNavigation();
@@ -491,8 +491,8 @@ void InputProcessing() {
             bool foundValidDynamic = false; i8 dir = GetKey(9)/*Sprint is held*/ ? -1 : 1; while (!foundValidDynamic) { editModeTestEntityDefinition += dir; if (GetKey(9)/*Sprint is held*/ ? (editModeTestEntityDefinition < 307) : (editModeTestEntityDefinition > 767)) editModeTestEntityDefinition = GetKey(9)/*Sprint is held*/ ? 767 : 307; if (IdxIsDynamicObject(editModeTestEntityDefinition)) foundValidDynamic = true; }
         }
         if (Sys_Input.keyStates[KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn;
-        if (Sys_Input.keyStates[KEY_F6].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F6].pressed = false; if (!World.menuActive) { bool wasPaused=World.paused; World.paused=false; SaveGame(7,"quicksave"); if (wasPaused) World.paused=true; } return; }
-        if (Sys_Input.keyStates[KEY_F9].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F9].pressed = false; LoadGame(7); return; }
+        if (Sys_Input.keyStates[KEY_F6].pressed && (get_time() - World.justSavedTimeStamp) > 0.2f) { Sys_Input.keyStates[KEY_F6].pressed = false; if (!World.menuActive) { bool wasPaused=World.paused; World.paused=false; SaveGame(7,"quicksave"); if (wasPaused) World.paused=true; } return; }
+        if (Sys_Input.keyStates[KEY_F9].pressed && (get_time() - World.justSavedTimeStamp) > 0.2f) { Sys_Input.keyStates[KEY_F9].pressed = false; LoadGame(7); return; }
         if (GetKeyPressed(41)/*Console`~*/ && !rebindCaptureActive) ToggleConsole();
         if (GetKeyPressed(25)/*Menu*/ && !World.menuActive && !editFieldEditing) { World.paused = !World.paused; return; }
         if (GetKeyPressed(25)/*Menu*/ && World.menuActive && !rebindCaptureActive && VidMenuKeyArmed()) { MenuGoBack(); return; }
@@ -504,11 +504,15 @@ void InputProcessing() {
         if (GetKeyPressed(17)/*   Lantern*/) HwToggle(2);/*hwBtns[2]=HW_LAN, sOn/sOff 78*/
         if (GetKeyPressed(19)/*  Infrared*/) HwToggle(4);/*hwBtns[4]=HW_INF, sOn/sOff 98/82*/
         if (GetKeyPressed(15)/*Biomonitor*/) HwToggle(0);/*hwBtns[0]=HW_BIO; no-op while Cheats.showFPS, which holds the biomonitor on for the frame-time graphs*/
-        if (GetKeyPressed(16)/*Sensaroung*/) { if (!(World.invP1.hasHardware & HW_SNS) || World.invP1.energy<=0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { play_wav((World.invP1.hardwareIsActive&HW_SNS) ? "hud/deactivate" : "hud/sensaround",AppliedFXVol(1.0f),(V3){0},false); World.invP1.hardwareIsActive ^= HW_SNS; } }
-        if (GetKeyPressed(18)/*    Shield*/) { if (!(World.invP1.hasHardware & HW_SHD) || World.invP1.energy<=0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { bool on = (World.invP1.hardwareIsActive & HW_SHD) != 0; play_wav(on ? "hud/shield_off" : "hud/shield_on",AppliedFXVol(1.0f),(V3){0},false); World.invP1.hardwareIsActive ^= HW_SHD; World.Sys_UI.shieldAnimationIsActivate = !on; World.Sys_UI.shieldAnimationStarted = World.pauseRelativeTime; World.Sys_UI.shieldAnimationFinished = World.pauseRelativeTime + (World.Sys_UI.shieldAnimationIsActivate ? 1.0 : 1.167); } }
+        if (GetKeyPressed(16)/*Sensaroung*/) { if (!(World.invP1.hasHardware & HW_SNS) || World.invP1.energy <= 0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { play_wav((World.invP1.hardwareIsActive&HW_SNS) ? "hud/deactivate" : "hud/sensaround",AppliedFXVol(1.0f),(V3){0},false); World.invP1.hardwareIsActive ^= HW_SNS; } }
+        if (GetKeyPressed(18)/*    Shield*/) {
+            if (!(World.invP1.hasHardware & HW_SHD) || World.invP1.energy <= 0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]);
+            else { bool on = (World.invP1.hardwareIsActive & HW_SHD) != 0; play_wav(on ? "hud/shield_off" : "hud/shield_on",AppliedFXVol(1.0f),(V3){0},false); World.invP1.hardwareIsActive ^= HW_SHD; World.Sys_UI.shieldAnimationIsActivate = !on; World.Sys_UI.shieldAnimationStarted = World.pauseRelativeTime; World.Sys_UI.shieldAnimationFinished = World.pauseRelativeTime + (World.Sys_UI.shieldAnimationIsActivate ? 1.0f : 1.167f); }
+        }
         if (GetKeyPressed(20)/*     Email*/) {
             if (World.invP1.hasHardware & HW_ERD) {
-                World.invP1.hardwareIsActive|=HW_ERD; MFD_ResetGeneral(); World.Sys_UI.mfdTab[0]=5; World.Sys_UI.mfdTab[1]=2; World.Sys_UI.mfdItemReader[0]=true; World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS; World.Sys_UI.MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened; if (World.Sys_UI.MFD_MediaTab>MM_NOTES || (World.Sys_UI.MFD_MediaTab==MM_NOTES && !World.diffMis)) World.Sys_UI.MFD_MediaTab=MM_LOG_TABLE; play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0},false);
+                World.invP1.hardwareIsActive|=HW_ERD; MFD_ResetGeneral(); World.Sys_UI.mfdTab[0]=5; World.Sys_UI.mfdTab[1]=2; World.Sys_UI.mfdItemReader[0]=true; World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS; World.Sys_UI.MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened;
+                if (World.Sys_UI.MFD_MediaTab>MM_NOTES || (World.Sys_UI.MFD_MediaTab==MM_NOTES && !World.diffMis)) World.Sys_UI.MFD_MediaTab=MM_LOG_TABLE; play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0},false);
             }
         }
         if (GetKeyPressed(21)/*  Booster*/) { if (!(World.invP1.hasHardware & HW_BST) || (World.invP1.energy <= 0.0f && World.invP1.hwVersSetting[HW_BST_IDX] >= 1)) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); /*Power supply exhausted.*/ } else { play_wav("hud/activate",AppliedFXVol(1.0f),(V3){0},false); World.invP1.hardwareIsActive ^= HW_BST; } }
@@ -556,12 +560,12 @@ void SaveConfig() {
 }
 #include "audio.c"
 // Biomonitor Graph and Text displays.
-typedef struct { double beatFinished,ticksFinished[3],tickFinished; float heartRate,max[3],min[3],ecgValue,ergValue,chiValue,beatShift; u16 header; u8 rings[3][BIOM_GRAPH_W]; Color backgroundColor,ergColor,chiColor,ecgColor; int ymax,currentIndex[3]; } BioMonitorSystem;
+typedef struct { float beatFinished,ticksFinished[3],tickFinished; float heartRate,max[3],min[3],ecgValue,ergValue,chiValue,beatShift; u16 header; u8 rings[3][BIOM_GRAPH_W]; Color backgroundColor,ergColor,chiColor,ecgColor; int ymax,currentIndex[3]; } BioMonitorSystem;
 BioMonitorSystem bioMonitor; static u8 biomPx[BIOM_GRAPH_W*BIOM_GRAPH_H*4]; extern u32 biomTexId, biomFBO;
 INLINE void biomPutPx(int x,int y,Color c){ u8* p=&biomPx[((u32)y*BIOM_GRAPH_W+(u32)x)*4]; p[0]=(u8)(vclamp(c.r,0.0f,1.0f)*255.0f); p[1]=(u8)(vclamp(c.g,0.0f,1.0f)*255.0f); p[2]=(u8)(vclamp(c.b,0.0f,1.0f)*255.0f); p[3]=(u8)(vclamp(c.a,0.0f,1.0f)*255.0f); }
 void BiomonitorBlitToUI() { if(!(World.invP1.hardwareIsActive & HW_BIO)){return;} glBindFramebuffer(GL_READ_FRAMEBUFFER,biomFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO); int x0=4,y0=UI_H-(41+BIOM_GRAPH_H),x1=4+BIOM_GRAPH_W,y1=UI_H-41; glBlitFramebuffer(0,0,BIOM_GRAPH_W,BIOM_GRAPH_H, x0,y0,x1,y1, GL_COLOR_BUFFER_BIT,GL_LINEAR); glBindFramebuffer(GL_READ_FRAMEBUFFER,uiFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO); }
 void BioMonitorClearGraphs() {
-    bioMonitor.ymax = (BIOM_GRAPH_H - 1); bioMonitor.beatFinished=World.pauseRelativeTime; bioMonitor.ticksFinished[0]=World.pauseRelativeTime + 0.0211f; bioMonitor.ticksFinished[1]=World.pauseRelativeTime + 0.05f; bioMonitor.ticksFinished[2]=World.pauseRelativeTime + 0.0104f; bioMonitor.tickFinished=World.pauseRelativeTime + 0.02f;
+    bioMonitor.ymax = (BIOM_GRAPH_H - 1); bioMonitor.beatFinished = World.pauseRelativeTime; bioMonitor.ticksFinished[0] = World.pauseRelativeTime + 0.0211f; bioMonitor.ticksFinished[1] = World.pauseRelativeTime + 0.05f; bioMonitor.ticksFinished[2] = World.pauseRelativeTime + 0.0104f; bioMonitor.tickFinished = World.pauseRelativeTime + 0.02f;
     bioMonitor.currentIndex[0]=(int)(BIOM_GRAPH_W * random_range(0.0f,1.0f)); bioMonitor.currentIndex[1]=(int)(BIOM_GRAPH_W * random_range(0.0f,1.0f)); bioMonitor.currentIndex[2]=(int)(BIOM_GRAPH_W * random_range(0.0f,1.0f)); mset(bioMonitor.rings,0,sizeof(bioMonitor.rings));
 }
 void BioMonitorAlignCursors() { BioMonitorClearGraphs(); int idx=(int)(BIOM_GRAPH_W * random_range(0.0f,1.0f)); bioMonitor.currentIndex[0]=bioMonitor.currentIndex[1]=bioMonitor.currentIndex[2]=idx; }
@@ -574,11 +578,11 @@ void BioMonitorUpdate() {
     bioMonitor.header = 526; if (bioMonitor.beatFinished < World.pauseRelativeTime) bioMonitor.heartRate = vfloor((70.0f + ((World.invP1.fatigue / 100.0f) * 110.0f)) * random_range(0.95f,1.05f));
     static const float beatThresh=0.1f, beatVariation=0.05f;
     /*Energy Usage / showFPS: GPU ms*/ bioMonitor.ergValue = Cheats.showFPS ? biomMsToGraph(BIOM_ERG,World.gpuFrameMs,33.0f) : vclamp((World.invP1.drainJPM / 255.0f),0.0f,1.0f);
-    /*Chi Brain Waves / showFPS: CPU ms*/ float brainFactor = 0.15f; if (World.invP1.geniusFinished > World.pauseRelativeTime) brainFactor = 0.35f + random_range(-0.3f,0.3f); if(Cheats.showFPS){bioMonitor.chiValue=biomMsToGraph(BIOM_CHI,World.cpuFrameTime,33.0f);}else{bioMonitor.chiValue=(float)(vsinf(World.pauseRelativeTime * 10.0 * (double)brainFactor));}
+    /*Chi Brain Waves / showFPS: CPU ms*/ float brainFactor = 0.15f; if (World.invP1.geniusFinished > World.pauseRelativeTime) brainFactor = 0.35f + random_range(-0.3f,0.3f); if (Cheats.showFPS) { bioMonitor.chiValue = biomMsToGraph(BIOM_CHI,World.cpuFrameTime,33.0f); } else { bioMonitor.chiValue = (float)(vsinf(World.pauseRelativeTime * 10.0F * brainFactor)); }
     /*ECG: Create shifted sine wave for heart beat.  Apply percent fatigued to 200bpm max heart rate with baseline 50bpm.  showFPS overrides with total frame ms.*/ if (Cheats.showFPS) { bioMonitor.ecgValue = biomMsToGraph(BIOM_ECG,World.thisFrameTime,16.6666f); }
     else { float fatigueFactor = ((World.invP1.fatigue / 100.0f) * 120.0f) + 20.0f; fatigueFactor = fatigueFactor / 60.0f;
-    if (bioMonitor.beatFinished < World.pauseRelativeTime) bioMonitor.beatFinished = World.pauseRelativeTime + (1.0 / (double)fatigueFactor);
-    bioMonitor.beatShift = (bioMonitor.beatFinished - World.pauseRelativeTime) / (1.0 / (double)fatigueFactor);
+    if (bioMonitor.beatFinished < World.pauseRelativeTime) bioMonitor.beatFinished = World.pauseRelativeTime + (1.0f / fatigueFactor);
+    bioMonitor.beatShift = (bioMonitor.beatFinished - World.pauseRelativeTime) / (1.0f / fatigueFactor);
     if (bioMonitor.beatShift > 0.94f) bioMonitor.ecgValue = vsinf(bioMonitor.beatShift * 35.0f); else bioMonitor.ecgValue = 0.0f;
     if (bioMonitor.ecgValue > beatThresh || bioMonitor.ecgValue < (beatThresh * -1.0f)) bioMonitor.ecgValue += random_range(-beatVariation,beatVariation); }
     if (Cheats.showFPS) {
@@ -587,7 +591,7 @@ void BioMonitorUpdate() {
         if (bioMonitor.ticksFinished[2] < World.pauseRelativeTime) { bioMonitor.ticksFinished[2] = World.pauseRelativeTime + 0.0104f; Push(2,bioMonitor.ecgValue); IncrementGraph(2); }
     } else {
         if (bioMonitor.ticksFinished[0] < World.pauseRelativeTime) { bioMonitor.ticksFinished[0] = World.pauseRelativeTime + 0.0211f; Push(0,bioMonitor.ergValue); IncrementGraph(0); Push(0,bioMonitor.ergValue); IncrementGraph(0); Push(0,bioMonitor.ergValue); }
-        if (bioMonitor.ticksFinished[1] < World.pauseRelativeTime) { bioMonitor.ticksFinished[1] = World.pauseRelativeTime + 0.05f; Push(1,bioMonitor.chiValue); IncrementGraph(1); Push(1,bioMonitor.chiValue); IncrementGraph(1); Push(1,bioMonitor.chiValue); IncrementGraph(1); Push(1,bioMonitor.chiValue); }
+        if (bioMonitor.ticksFinished[1] < World.pauseRelativeTime) { bioMonitor.ticksFinished[1] = World.pauseRelativeTime + 0.0500f; Push(1,bioMonitor.chiValue); IncrementGraph(1); Push(1,bioMonitor.chiValue); IncrementGraph(1); Push(1,bioMonitor.chiValue); IncrementGraph(1); Push(1,bioMonitor.chiValue); }
         if (bioMonitor.ticksFinished[2] < World.pauseRelativeTime) { bioMonitor.ticksFinished[2] = World.pauseRelativeTime + 0.0104f; Push(2,bioMonitor.ecgValue); IncrementGraph(2); Push(2,bioMonitor.ecgValue); }
     }
     mset(biomPx,0,sizeof(biomPx)); const float fade[3]={200,180,275},invFade[3]={1.0f/200,1.0f/180,1.0f/275}; Color colors[3]={bioMonitor.ergColor,bioMonitor.chiColor,bioMonitor.ecgColor};
@@ -749,7 +753,7 @@ float BvhRayAABBHit(V3 o, V3 d, V3 a, V3 b, float m) {
 static u16 rayCellHeads[ARRSIZE],rayNext[INSTANCE_CNT]; static u32 rayGridFrame=U32_MAX;
 INLINE void RayGridRebuild() { rayGridFrame = globalframe; for (u32 c=0;c<ARRSIZE;++c) { rayCellHeads[c] = INSTANCE_CNT; } for (u16 i=0;i<World.instCount;++i){ u16 c=(u16)World.instances[i].cellIndex; if (c>=ARRSIZE){ c = (u16)PosGetCellCoords(World.position[i].x, World.position[i].z); } rayNext[i] = rayCellHeads[c]; rayCellHeads[c] = i; } }
 RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
-    double rStart = get_time(); const float maxDistSq = maxDist * maxDist; dir = V3_Normalize(dir); RaycastHit result = {.hit = false,.distance = maxDist,.point = origin,.normal = dir,.hitInstanceIndex = INSTANCE_CNT}; if (unlikely(rayGridFrame != globalframe)) { RayGridRebuild(); }
+    double rStart = get_timed(); const float maxDistSq = maxDist * maxDist; dir = V3_Normalize(dir); RaycastHit result = {.hit = false,.distance = maxDist,.point = origin,.normal = dir,.hitInstanceIndex = INSTANCE_CNT}; if (unlikely(rayGridFrame != globalframe)) { RayGridRebuild(); }
     float wx = World.worldMin_x[World.curLev], wz = World.worldMin_z[World.curLev], ex = origin.x + dir.x*maxDist, ez = origin.z + dir.z*maxDist;
     float xA = vmin(origin.x, ex) - 24.0f, xB = vmax(origin.x, ex) + 24.0f, zA = vmin(origin.z, ez) - 24.0f, zB = vmax(origin.z, ez) + 24.0f;
     i32 b0x = (i32)vfloor((xA - wx + CELLXHALF) / CELLSZ), b1x = (i32)vfloor((xB - wx + CELLXHALF) / CELLSZ), b0z = (i32)vfloor((zA - wz + CELLXHALF) / CELLSZ), b1z = (i32)vfloor((zB - wz + CELLXHALF) / CELLSZ);
@@ -800,21 +804,21 @@ RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
             }
         }
     }
-    raycastMs += get_time() - rStart;
+    raycastMs += get_timed() - rStart;
     raycastCalls++;
     return result;
 }
 RaycastHit RaycastEditPick(V3 origin, V3 dir, float maxDist, u32 layerMask) { raycastPickMode = 1; RaycastHit h = Raycast(origin, dir, maxDist, layerMask); if (!h.hit) { raycastPickMode = 2; h = Raycast(origin, dir, maxDist, layerMask); } raycastPickMode = 0; return h; }
 // Credits Sys
 char creditStats[4096];
-INLINE float GetScore(float stupid, bool isFinal) { float v=(float)(World.kills + World.cyberkills); if (isFinal) {v -= vmin(World.ressurections*10.0f,v*0.666f);} float s=vfloor((float)World.pauseRelativeTime / 3600.0f), score=v*10000.0f; score -= vmin(score*0.666f,s*100.0f); score *= (stupid + 1.0f) / 37.0f; if (stupid > 35.0f) {score += 2222222.0f;} return vfloor(score); }
-INLINE void DecomposeTime(double t, u32* h, u32* m, double* s) { double tb = vfloor(t / 3600.0); *h = (u32)tb; t -= tb * 3600.0; tb = vfloor(t / 60.0); *m = (u32)tb; *s = t - tb * 60.0; }
+INLINE float GetScore(float stupid, bool isFinal) { float v=(float)(World.kills + World.cyberkills); if (isFinal) {v -= vmin(World.ressurections*10.0f,v*0.666f);} float s=vfloor(World.pauseRelativeTime / 3600.0f), score=v*10000.0f; score -= vmin(score*0.666f,s*100.0f); score *= (stupid + 1.0f) / 37.0f; if (stupid > 35.0f) {score += 2222222.0f;} return vfloor(score); }
+INLINE void DecomposeTime(float t, u32* h, u32* m, float* s) { float tb = vfloor(t / 3600.0f); *h = (u32)tb; t -= tb * 3600.0f; tb = vfloor(t / 60.0f); *m = (u32)tb; *s = t - tb * 60.0f; }
 INLINE void CreditsStats() {
-    size_t off = 0; u32 h,m; double s; off += sFormat(creditStats + off, sizeof(creditStats)-off,"============================================================================\nCITADEL\n============================================================================\nCONGRATULATIONS %s\n",World.playerName);
-    DecomposeTime(World.pauseRelativeTime,&h,&m,&s); off += sFormat(creditStats + off, sizeof(creditStats)-off,"Straight Time: %uh %um %.3fs\n",h,m,s); DecomposeTime(World.absoluteTime,&h,&m,&s);      off += sFormat(creditStats + off,sizeof(creditStats)-off,"Total Time (with reload from deaths): %uh %um %.3fs\n",h,m,s);
+    size_t off = 0; u32 h,m; float s; off += sFormat(creditStats + off, sizeof(creditStats)-off,"============================================================================\nCITADEL\n============================================================================\nCONGRATULATIONS %s\n",World.playerName);
+    DecomposeTime(World.pauseRelativeTime,&h,&m,&s); off += sFormat(creditStats + off, sizeof(creditStats)-off,"Straight Time: %uh %um %.3fs\n",h,m,(double)s); DecomposeTime(World.absoluteTime,&h,&m,&s);      off += sFormat(creditStats + off,sizeof(creditStats)-off,"Total Time (with reload from deaths): %uh %um %.3fs\n",h,m,(double)s);
     float stupid = ((float)(World.diffCbt * World.diffCbt)) + ((float)(World.diffPuz * World.diffPuz)) + ((float)(World.diffMis * World.diffMis)) + ((float)(World.diffCyb * World.diffCyb)); u32 finalSubscore = GetScore(stupid,false), finalScore = (u32)GetScore(stupid,true);
     off += sFormat(creditStats + off,sizeof(creditStats)-off,"Kills: %u\nKills in Cyberspace: %u\nScoreSubtotal: %u\nDeaths: %u\nRessurections: %u\n",World.kills,World.cyberkills,(u32)finalSubscore,World.deaths,World.ressurections); off += sFormat(creditStats + off,sizeof(creditStats)-off,"Combat: %u | Puzzle: %u | Mission: %u | Cyber: %u\n",World.diffCbt,World.diffPuz,World.diffMis,World.diffCyb);
-    off+=sFormat(creditStats+off,sizeof(creditStats)-off,"Difficulty Index: %.2f\nFinal Score: %u\n\n",stupid,finalScore); off+=sFormat(creditStats+off,sizeof(creditStats)-off,"Shots Fired: %u\nGrenades Thrown: %u\n",World.shotsFired,World.grenadesThrown); off+=sFormat(creditStats+off,sizeof(creditStats)-off,"Damage Dealt: %f\nDamage Received: %f\nSaves Scummed: %u\n\nClick to continue...\n",World.damageDealt,World.damageReceived,World.savesScummed);
+    off+=sFormat(creditStats+off,sizeof(creditStats)-off,"Difficulty Index: %.2f\nFinal Score: %u\n\n",(double)stupid,(double)finalScore); off+=sFormat(creditStats+off,sizeof(creditStats)-off,"Shots Fired: %u\nGrenades Thrown: %u\n",World.shotsFired,World.grenadesThrown); off+=sFormat(creditStats+off,sizeof(creditStats)-off,"Damage Dealt: %f\nDamage Received: %f\nSaves Scummed: %u\n\nClick to continue...\n",(double)World.damageDealt,(double)World.damageReceived,World.savesScummed);
 }
 // Rendering Sys
 INLINE void ShaderError(u32 s, const char* name) { char er[4096]; glGetShaderInfoLog(s,4096,NULL,er); DualLogError("%s Comp Fail: %s\n",name,er); OS_Exit(1); }
@@ -856,9 +860,9 @@ __attribute__((noinline)) void RenderUIImageExtended(i16 x, i16 y, i16 width, i1
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 __attribute__((noinline)) void RenderUIImage(i16 x, i16 y, i16 width, i16 height, u32 texIndex) { RenderUIImageExtended(x,y,width,height,texIndex,0.0f,0.5f,0.5f,1.0f,1.0f,1.0f); }
-void RenderLoading(const char * restrict text) { glBindFramebuffer(GL_FRAMEBUFFER, 0); glClear(GL_COLOR_BUFFER_BIT); glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight); RenderTextC(683, 384, T_WHITE, FONT_NORMAL, 1, text); window->context.swapBuffers(window); }
-void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp) { if (*id == 0) { glGenTextures(1, id); } glBindTexture(GL_TEXTURE_2D,*id); glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, bmp); glTexParameteri(GL_TEXTURE_2D, 0x2801/*GL_TEXTURE_MIN_FILTER*/, filt); glTexParameteri(GL_TEXTURE_2D, 0x2800/*GL_TEXTURE_MAG_FILTER*/, filt); }
-void AddCamView(V3 p, Quaternion r, u8 fv, u16 w, u16 h, float nr, float fr) { if(camViewCount >= 64) { DualLogWarn("Too many cam views!  Skipped at %f %f %f\n",p.x,p.y,p.z); return; } camViews[camViewCount] = (CamView){p, r, fv, w, h, nr, fr, World.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f, false}; GenerateAndBindTexture(&camViewTextures[camViewCount], GL_RGBA8, w, h, GL_RGBA,GL_UNSIGNED_BYTE, 0x2600/*GL_NEAREST*/, NULL); camViewCount++; }
+void RenderLoading(const char * restrict text) { glBindFramebuffer(GL_FRAMEBUFFER, 0); glClear(GL_COLOR_BUFFER_BIT); glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight); RenderTextC(683,384,T_WHITE,FONT_NORMAL,1,text); window->context.swapBuffers(window); }
+void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp) { if (*id == 0) { glGenTextures(1, id); } glBindTexture(GL_TEXTURE_2D,*id); glTexImage2D(GL_TEXTURE_2D,0,internalFormat,width,height,0,format,type,bmp); glTexParameteri(GL_TEXTURE_2D,0x2801/*GL_TEXTURE_MIN_FILTER*/,filt); glTexParameteri(GL_TEXTURE_2D,0x2800/*GL_TEXTURE_MAG_FILTER*/,filt); }
+void AddCamView(V3 p, Quaternion r, u8 fv, u16 w, u16 h, float nr, float fr) { if(camViewCount >= 64) { DualLogWarn("Too many cam views!  Skipped at %f %f %f\n",(double)p.x,(double)p.y,(double)p.z); return; } camViews[camViewCount] = (CamView){p,r,fv,w,h,nr,fr,(World.pauseRelativeTime + ((float)camViewCount * 0.05f) + 0.5f),false}; GenerateAndBindTexture(&camViewTextures[camViewCount],GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL); camViewCount++; }
 void UpdateScreenSize(i32 width, i32 height) {
     u16 w = Sys_Settings.ScreenWidth = vmax(vmin((u16)width,7680u),320u), h = Sys_Settings.ScreenHeight = vmax(vmin((u16)height,4320u),200u); /*Cap at minimum Quake resolution and maximum 8k.*/
     glViewport(0,0,w,h);
@@ -1038,12 +1042,15 @@ static bool amReveal() {
     for (int dz=-r;dz<=r;++dz) for (int dx=-r;dx<=r;++dx) {int cx=pcx+dx,cz=pcz+dz; if(cx<0||cx>63||cz<0||cz>63){continue;} float wx=World.worldMin_x[lev]+cx*CELLSZ-p.x,wz=World.worldMin_z[lev]+cz*CELLSZ-p.z; if(wx*wx+wz*wz>(30.0f * 30.0f)){continue;} u32 cell=(u32)cz*64+(u32)cx; if(!(gridCellStates[cell]&CELL_OPEN)){continue;} if(!World.automapExplored[lev][cell]){ World.automapExplored[lev][cell]=1; changed=true; } } return changed;
 }
 static u32 amDoorHash() {u32 h=0; for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {Entity* e=&World.instances[i]; if(IdxIsDoor(e->index)){h=h*31u+(u32)(i*7u+(u32)e->doorState);}} return h;}
-void AutomapNewGame() {mset(World.automapExplored,0,sizeof(World.automapExplored)); World.automapZoom=0; World.automapNextRaster=0.0; amBuiltLev=255; amBuiltPX=1000000000000000000000000000000.0f; amBuiltPZ=1000000000000000000000000000000.0f;}
+void AutomapNewGame() {mset(World.automapExplored,0,sizeof(World.automapExplored)); World.automapZoom=0; World.automapNextRaster = 0.0f; amBuiltLev=255; amBuiltPX=1000000000000000000000000000000.0f; amBuiltPZ=1000000000000000000000000000000.0f;}
 void AutomapOnLoad() { amBuiltLev=255; World.automapNextRaster=0.0; amBuiltPX=1000000000000000000000000000000.0f; amBuiltPZ=1000000000000000000000000000000.0f; }/*force re-raster from loaded FoW*/
 void AutomapTick() {
-    if (World.menuActive) { return; } u8 lev=World.curLev; if(lev>=LEVEL_CYBERSPACE){return;} bool fowChanged=amReveal(); u32 dh=amDoorHash(); double now=get_time(); V3 tpp=World.position[PLAYER1]; V3 tpf=World.instances[PLAYER1].forward; bool full=World.Sys_UI.fullMapOpen[0] || World.Sys_UI.fullMapOpen[1]; u8 renderZoom=full ? 2 : World.automapZoom; int drawH=full?AM_FULL_H:AM_H; float wpp=((float)(16<<renderZoom)*CELLSZ)/(float)drawH;/*world/px*/ float mdx=tpp.x-amBuiltPX,mdz=tpp.z-amBuiltPZ,me=(0.25f*wpp)*(0.25f*wpp); float fdx=tpf.x-amBuiltFX,fdz=tpf.z-amBuiltFZ;
+    if (World.menuActive) { return; } u8 lev=World.curLev; if(lev>=LEVEL_CYBERSPACE){return;} bool fowChanged=amReveal(); u32 dh=amDoorHash(); float now = (float)World.current_time; V3 tpp = World.position[PLAYER1]; V3 tpf=World.instances[PLAYER1].forward; bool full=World.Sys_UI.fullMapOpen[0] || World.Sys_UI.fullMapOpen[1]; u8 renderZoom=full ? 2 : World.automapZoom; int drawH=full?AM_FULL_H:AM_H; float wpp=((float)(16<<renderZoom)*CELLSZ)/(float)drawH;/*world/px*/ float mdx=tpp.x-amBuiltPX,mdz=tpp.z-amBuiltPZ,me=(0.25f*wpp)*(0.25f*wpp); float fdx=tpf.x-amBuiltFX,fdz=tpf.z-amBuiltFZ;
     bool moved=(mdx*mdx+mdz*mdz)>me || (fdx*fdx+fdz*fdz)>0.000001f; static u8 amBuiltZoom = 255;
-    if(fowChanged || moved || dh!=amBuiltDoorHash || lev!=amBuiltLev || renderZoom!=amBuiltZoom || full!=amBuiltFull || now>=World.automapNextRaster){amRaster(renderZoom,full); amBuiltLev=lev; amBuiltDoorHash=dh; amBuiltZoom=renderZoom; amBuiltFull=full; amBuiltPX=tpp.x; amBuiltPZ=tpp.z; amBuiltFX=tpf.x; amBuiltFZ=tpf.z; int nav=amNavVer(); World.automapNextRaster=now+(nav>2?0:(nav>1?0.1:0.2)); glBindTexture(GL_TEXTURE_2D,full?amFullTexId:amTexId); glTexSubImage2D(GL_TEXTURE_2D,0,0,0,full?AM_FULL_W:AM_W,full?AM_FULL_H:AM_H,GL_RGBA,GL_UNSIGNED_BYTE,full?amFullPx:amPx);}
+    if(fowChanged || moved || dh!=amBuiltDoorHash || lev!=amBuiltLev || renderZoom!=amBuiltZoom || full!=amBuiltFull || now >= World.automapNextRaster) {
+        amRaster(renderZoom,full); amBuiltLev = lev; amBuiltDoorHash = dh; amBuiltZoom = renderZoom; amBuiltFull = full; amBuiltPX = tpp.x; amBuiltPZ = tpp.z; amBuiltFX = tpf.x; amBuiltFZ = tpf.z; int nav = amNavVer(); World.automapNextRaster = now + (nav > 2 ? 0 : (nav > 1 ? 0.1f : 0.2f));
+        glBindTexture(GL_TEXTURE_2D,full ? amFullTexId : amTexId); glTexSubImage2D(GL_TEXTURE_2D,0,0,0,full ? AM_FULL_W : AM_W,full ? AM_FULL_H : AM_H,GL_RGBA,GL_UNSIGNED_BYTE,full ? amFullPx : amPx);
+    }
 }
 void AutomapBlitFullToUI() {
     if (Cheats.noHUD || World.curLev>=LEVEL_CYBERSPACE || (!World.Sys_UI.fullMapOpen[0] && !World.Sys_UI.fullMapOpen[1])) { return; }
@@ -1060,17 +1067,17 @@ void UpdateLights() {
         for (int k=0;k<World.lanimCount;++k) { // Just lerps/flickers in intensity; lanims is a compact list of the level's animated lights
             LightAnimation* la=&World.lanims[k]; int i=World.lanimLightIdx[k];
             if (!(World.lights[i].lflags & LIGHTON)) { World.lights[i].intensity = 0.0f; continue; }
-            if (la->lerpTime < (float)World.pauseRelativeTime) {
+            if (la->lerpTime < World.pauseRelativeTime) {
                 World.lights[i].intensity = la->lerpUp ? World.lights[i].maxIntensity : World.lights[i].minIntensity;/*Pick target to lerp towards*/
                 la->lerpUp = !la->lerpUp; la->currentStep++;
                 if (la->currentStep >= la->numIntervalSteps) { la->currentStep = 0; /*Wrap and start over continuous looping*/ }
                 la->lerpStepTime = la->intervalSteps[la->currentStep];
-                la->lerpTime = (float)World.pauseRelativeTime + la->lerpStepTime;
-                la->lerpStartTime = (float)World.pauseRelativeTime;
+                la->lerpTime = World.pauseRelativeTime + la->lerpStepTime;
+                la->lerpStartTime = World.pauseRelativeTime;
             } else if (World.lights[i].lflags & LERPON) {
                 if (la->currentStep < la->numLerpSteps) {
                     if (la->stepIsLerping[la->currentStep]) {
-                        la->lerpValue = ((float)World.pauseRelativeTime - la->lerpStartTime) / (la->lerpTime - la->lerpStartTime); /*percent towards goal time*/
+                        la->lerpValue = (World.pauseRelativeTime - la->lerpStartTime) / (la->lerpTime - la->lerpStartTime); /*percent towards goal time*/
                         float lerpVal = la->lerpUp ? la->lerpValue : (1.0f - la->lerpValue);
                         la->lerpValue = World.lights[i].minIntensity + ((World.lights[i].maxIntensity - World.lights[i].minIntensity) * lerpVal);
                         World.lights[i].intensity = la->lerpValue;
@@ -1085,7 +1092,7 @@ void UpdateLights() {
 }
 // Shadowmapping
 typedef struct {float depth; u16 index; } DepthSort;
-INLINE bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &World.instances[i]; return e->texIndex >= texCnt || !(e->entflags & EF_ACTIVE) || e->index >= MAX_ENTITIES || (e->modelIndex >= MAX_MDLS && !Cheats.showPhys) || otherCondition; }
+INLINE bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &World.instances[i]; return e->texIndex >= texCnt || !(e->entflags & EF_ACTIVE) || e->index >= MAX_ENTS || (e->modelIndex >= MAX_MDLS && !Cheats.showPhys) || otherCondition; }
 static u32 curIboDrawOfs = 0; static bool mdlFallbackLogged[MAX_MDLS];
 static u16 MdlBind(u16 modelType) {
     if (modelType >= mdlsCnt || mdlVboOfs[modelType] == 0xFFFFFFFFu) { if (modelType < mdlsCnt && (modelVertexCounts[modelType] == 0)) { curIboDrawOfs = 0; return modelType; } if (modelType < MAX_MDLS && !mdlFallbackLogged[modelType]) { mdlFallbackLogged[modelType] = true; DualLogError("Model %u not resident!\n",modelType); } modelType = 178; if (modelType >= mdlsCnt || mdlVboOfs[modelType] == 0xFFFFFFFFu) { curIboDrawOfs = 0; return modelType; } }
@@ -1130,7 +1137,7 @@ static u16 AddShadMsh(SortedMesh *sm, u16 i, float *ps, u32 *is, bool *moved, u8
     return 0u;
 }
 __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps() {
-    double shadowStartTime = get_time(); V3 playerPos=World.position[PLAYER1], pf=World.instances[PLAYER1].forward; u16 numCandidates=0; i32 numCasters=0;
+    double shadowStartTime = get_timed(); V3 playerPos=World.position[PLAYER1], pf=World.instances[PLAYER1].forward; u16 numCandidates=0; i32 numCasters=0;
     for (u16 i = 0; i < World.loadedLights; ++i) {
         if (unlikely(!(World.lights[i].lflags & SHADON) || !(World.lights[i].lflags & LIGHTON))) { continue; }
         V3 lightPos = World.lights[i].pos; float intensity = World.lights[i].maxIntensity; if (unlikely(intensity < 0.1f)) { continue; }
@@ -1147,7 +1154,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps() {
         candidates[numCandidates++] = i; if (numCandidates >= MAX_SHADOWMAPS) break;
     }
     for (u16 i=0;i<World.loadedLights;++i) { shadowmapIndirectionList[i] = (shadowSlot[i] != U16_MAX) ? (u32)shadowSlot[i] : LIGHT_CNT; }
-    if (numCandidates == 0) { glBindBuffer(GL_SSBO, shadowMapsIndirectionID); glBufferSubData(GL_SSBO, 0, World.loadedLights*sizeof(u32), shadowmapIndirectionList); shadowTime = get_time() - shadowStartTime; return; }
+    if (numCandidates == 0) { glBindBuffer(GL_SSBO, shadowMapsIndirectionID); glBufferSubData(GL_SSBO, 0, World.loadedLights*sizeof(u32), shadowmapIndirectionList); shadowTime = get_timed() - shadowStartTime; return; }
     u16 unslotted=0;
     for (u16 c=0;c<numCandidates;++c) { if (shadowSlot[candidates[c]]==U16_MAX) { ++unslotted; } }
     if (shadowNextSlot+unslotted > MAX_SHADOWMAPS) { mset(shadowSlot, 0xFF, sizeof(shadowSlot)); mset(shadowFaces, 0, sizeof(shadowFaces)); shadowNextSlot = 0; }
@@ -1253,10 +1260,10 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps() {
             shadowIdSum[lightIdx]=idSum;
             shadowFaces[lightIdx] = contentDirty ? faceMask : (u8)(shadowFaces[lightIdx] | faceMask);
         } shadowmapIndirectionList[lightIdx]=slot;
-    } glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight); glBindBuffer(GL_SSBO, shadowMapsIndirectionID); glBufferSubData(GL_SSBO, 0, World.loadedLights * sizeof(u32), shadowmapIndirectionList); shadowTime = get_time() - shadowStartTime;
+    } glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight); glBindBuffer(GL_SSBO, shadowMapsIndirectionID); glBufferSubData(GL_SSBO, 0, World.loadedLights * sizeof(u32), shadowmapIndirectionList); shadowTime = get_timed() - shadowStartTime;
 }
 float sunYawCur = 0.0f;
-V3 SunDirection() { double yawRaw = World.pauseRelativeTime * 0.1 * skyRotateSpeeds[Cheats.dizzyLevel]; sunYawCur = (float)(yawRaw - 6.283185307179586 * (double)((long long)(yawRaw * 0.15915494309189535))); /*1/TAU = 0.15915494309189535; trunc floor for the always-positive monotonic phase*/ float c = vcosf(sunYawCur), s = vsinf(sunYawCur); V3 b = {0.0f, 0.1f, 0.99498743f}; return V3_Normalize((V3){b.x*c - b.z*s, b.y, b.x*s + b.z*c}); }
+V3 SunDirection() { float yawRaw = World.pauseRelativeTime * 0.1f * skyRotateSpeeds[Cheats.dizzyLevel]; sunYawCur = (float)(yawRaw - 6.283185307179586f * (float)((long long)(yawRaw * 0.15915494309189535f/*1/TAU*/))); float c = vcosf((float)sunYawCur), s = vsinf((float)sunYawCur); V3 b = {0.0f,0.1f,0.99498743f}; return V3_Normalize((V3){b.x*c - b.z*s, b.y, b.x*s + b.z*c}); }
 void InitSunShadowmap() {
     i32 prevUnit=0; glGetIntegerv(GL_ACTIVE_TEXTURE,&prevUnit); glActiveTexture(GL_TEXTURE10);
     glGenTextures(1,&sunShadowTex); glBindTexture(GL_TEXTURE_2D,sunShadowTex);
@@ -1314,7 +1321,7 @@ void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT,
     }
     if (Cheats.showPhys) { if (World.col[i] == CT_BOX) { DrawBoxColliderColored(i,ColliderColor(i)); } else if (World.col[i] == CT_SPH) { DrawSphereCollider(i); } else if (World.col[i] == CT_CVX || World.col[i] == CT_MSH) { DrawMeshCollider(i); } else if (World.col[i] == CT_CAP) { DrawCapsuleCollider(i); }    DrawAngularVelocity(i); }
     if (e->modelIndex < MAX_MDLS) {
-        float redTint = 0.0f, rimStrength = 0.0f; if (e->deathAnimationActive && e->index == 433) { float elapsed = vmax((float)(World.pauseRelativeTime - (double)e->deathAnimationStart),0.0f); u32 tick = (u32)(elapsed / 0.05f); redTint = elapsed < 0.35f ? 0.5f * vmin((float)tick, 6.0f) : 0.0f; rimStrength = vmax(0.0f, 1.0f - ((float)tick * 15.0f / 255.0f)); } glUniform2f(33, redTint, rimStrength); // Set Hopper death glow effect strength.
+        float redTint = 0.0f, rimStrength = 0.0f; if (e->deathAnimationActive && e->index == 433) { float elapsed = vmax(World.pauseRelativeTime - e->deathAnimationStart,0.0f); u32 tick = (u32)(elapsed / 0.05f); redTint = elapsed < 0.35f ? 0.5f * vmin((float)tick,6.0f) : 0.0f; rimStrength = vmax(0.0f,1.0f - ((float)tick * 15.0f / 255.0f)); } glUniform2f(33,redTint,rimStrength); // Set Hopper death glow effect strength.
         glUniform1ui(17,tex==316?1u:0u);
         glUniform1ui(25,constIndex);
         float vol = (constIndex == 21 || constIndex == 22) ? vmax(0.02f, cyberWallFade[i]) : 0.0f; if (*curV != vol) { *curV = vol; glUniform1f(27, vol); }
@@ -1344,7 +1351,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u16 swidth, sheight; float sfov, snear, sfar;
     if (camView) { CamView* cv = &camViews[camViewIdx]; swidth  = cv->width;                sheight = cv->height;                sfov = (float)cv->fov;          snear = cv->near; sfar = cv->far; }
     else         {                                      swidth  = Sys_Settings.ScreenWidth; sheight = Sys_Settings.ScreenHeight; sfov = (float)Sys_Settings.FOV; snear = 0.02f;    sfar = World.farPlane[World.curLev]; }
-    float shakeOffset = (World.shakeFinished > World.pauseRelativeTime) ? (shakeAmp * vcosf((float)(World.pauseRelativeTime * 20.0f))) * (World.shakeFinished - World.pauseRelativeTime) : 0.0f;
+    float shakeOffset = (World.shakeFinished > World.pauseRelativeTime) ? (shakeAmp * vcosf(World.pauseRelativeTime * 20.0f)) * (World.shakeFinished - World.pauseRelativeTime) : 0.0f;
     Quaternion cameraRotation=World.rotation[PLAYER1]; if (shakeOffset!=0.0f && World.curLev!=LEVEL_CYBERSPACE) quat_from_yaw_pitch_roll(&cameraRotation,World.cam_yaw+shakeOffset,World.cam_pitch+shakeOffset*0.5f,World.cam_roll);
     V3 playerPos = World.position[PLAYER1]; float px = playerPos.x, py = playerPos.y, pz = playerPos.z, aspect3D = (float)swidth / (float)sheight, view[16], viewProj[16], invViewRot[9], invViewProj[16]; // Camera projection
     { float f = vcot(sfov * PI / 360.0f); float* m = rasterPerspectiveProjection; m[0]=f / aspect3D; m[1]=0.0f; m[2]=0.0f; m[3]=0.0f; m[4]=0.0f; m[5]=f; m[6]=0.0f; m[7]=0.0f; m[8]=0.0f; m[9]=0.0f; m[10]= -(sfar + snear) / (sfar - snear); m[11]=-1.0f; m[12]=0.0f; m[13]=0.0f; m[14]=-2.0f*sfar*snear / (sfar - snear); m[15]=0.0f;
@@ -1358,7 +1365,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     if (likely(Sys_Settings.Shadows > 0u) && !camView) { glDisable(GL_DEPTH_TEST); RenderShadowmaps(); glEnable(GL_DEPTH_TEST); if (sunActive) { RenderSunShadowmap(); } }
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
     glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][1]);
-    double rendStart = get_time();
+    double rendStart = get_timed();
     UpdateLights(); // This is where the voxels get updated!
     if (unlikely(clearRenderTargetsOnNextFrame)) { clearRenderTargetsOnNextFrame = false; ClearAll(); }
     glViewport(0, 0, swidth, sheight);
@@ -1378,10 +1385,10 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         float radius = (e->modelIndex < MAX_MDLS ? modelBounds[e->modelIndex] : 0.0f) * 2.0f * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
         if (!SphereInFrustum(playerFrustumPlanes,World.position[i],radius)) { continue; }
         if (IdxIsPortalBlockingDoor(e->index)) { /*Extra checks only needed for opaque portal blocking doors.*/
-            if (!(gridCellStates[e->cellIndex] & CELL_VISIBLE) && !NeighborhoodInPVS(e->cellX,e->cellZ,2u) /*!in pvs*/) { continue; }
+            if (!(gridCellStates[e->cellIndex] & CELL_VISIBLE) && !NeighborhoodInPVS(e->cellX,e->cellZ,2u)/*!in pvs*/) { continue; }
         } else {
             if (((gridCellStates[e->cellIndex] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN)){ continue; }
-            if (!(gridCellStates[e->cellIndex] & CELL_OPEN) && distSqrd >= 943.7184f) { continue; /*30.72 * 30.72, 12 cells*/ }
+            if (!(gridCellStates[e->cellIndex] & CELL_OPEN) && distSqrd >= 943.7184f/*30.72 * 30.72, 12 cells*/) { continue; }
         }
         if (World.instances[i].camView != 255) camViews[World.instances[i].camView].visible = true;
         if (transparentTexture[World.instances[i].texIndex]) { if (tcnt < INSTANCE_CNT) { tmpTransparent[tcnt].index = i; tmpTransparent[tcnt].depth = distSqrd; tcnt++; } } else { visibleInstances[opaqueCount].index = i; visibleInstances[opaqueCount].depth = distSqrd; opaqueCount++; }
@@ -1409,10 +1416,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
              if (unlikely(doubleSidedTexture[tex] || World.scale[i].x<0.0f || World.scale[i].y<0.0f || World.scale[i].z<0.0f)) { glDisable(GL_CULL_FACE);  glEnable(GL_BLEND); } /*Doublesided (incl. transparent doublesided, e.g. cyberspace panels)*/
         else if (unlikely(transparentTexture[tex]))                                                                            {  glEnable(GL_CULL_FACE);  glEnable(GL_BLEND); } /*Transparents (with sort)*/
         else                                                                                                                   {  glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } /*Opaque*/
-        currentModelType=GetAndBindModel(i,currentModelType);
-        if (tex != currentTexIndex) { currentTexIndex=tex; glUniform1ui(3,(u32)tex); }
-        u32 vertCount = modelTriangleCounts[currentModelType] * 3;
-        glDrawElements(0x4/*GL_TRIANGLES*/, vertCount, GL_UNSIGNED_SHORT, (void*)(uintptr_t)curIboDrawOfs); drawCalls++; vertsRendered += vertCount;
+        currentModelType=GetAndBindModel(i,currentModelType); if (tex != currentTexIndex) { currentTexIndex=tex; glUniform1ui(3,(u32)tex); } u32 vertCount = modelTriangleCounts[currentModelType] * 3; glDrawElements(0x4/*GL_TRIANGLES*/,(i32)vertCount,GL_UNSIGNED_SHORT,(void*)(uintptr_t)curIboDrawOfs); drawCalls++; vertsRendered += vertCount;
     }
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
     glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][2]);
@@ -1491,10 +1495,10 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         }
     }
     if(unlikely(camView)) { glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); i32 cw = vmin((i32)swidth,(i32)vmin(Sys_Settings.ScreenWidth,camViews[camViewIdx].width)),ch=vmin((i32)sheight,(i32)vmin(Sys_Settings.ScreenHeight,camViews[camViewIdx].height)); glCopyImageSubData(inputImageID,GL_TEXTURE_2D,0,0,0,0,camViewTextures[camViewIdx],GL_TEXTURE_2D,0,0,0,0,cw,ch,1); return; } // <<<<<<<<<<<<< CAM VIEW BARRIER
-    PSys_Render(viewProj, playerPos,(V3){invViewRot[0], invViewRot[1], invViewRot[2]}, (V3){invViewRot[3], invViewRot[4], invViewRot[5]}, (V3){-invViewRot[6], -invViewRot[7], -invViewRot[8]}, inputDepthID, snear, sfar, (float)swidth, (float)sheight);
-    if (wireVertCount) { glBindBuffer(GL_ARRAY_BUFFER,wireLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,wireVertCount*sizeof(WireVrt),wireVerts); glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glEnable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE); glBindVertexArray(wireLinesVAO); glDrawArrays(0x4/*GL_TRIANGLES*/,0,wireVertCount); drawCalls++; vertsRendered += wireVertCount; wireVertCount = 0; glEnable(GL_CULL_FACE); }
-    if (Cheats.editMode) { /*Point-light range spheres, editmode only.*/ for (u16 i = 0; i < World.loadedLights; ++i) { Light* L = &World.lights[i]; DrawSphereWireframe(i == editModeLightSelection ? (Color){1.0f,0.5f,0.5f,1.0f} : (Color){0.9216f,0.9176f,0.7725f,1.0f}, (ShapeSphere){L->pos, 0.02 * L->range}); } }
-    if(unlikely(World.lineVertCnt > 0)) { glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,World.lineVertCnt * sizeof(WireVrt),lineVerts); glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glLineWidth(1.0f); glDisable(GL_DEPTH_TEST); glBindVertexArray(debugLinesVAO); glDrawArrays(0x1/*GL_LINES*/,0,World.lineVertCnt); drawCalls++; vertsRendered += World.lineVertCnt; World.lineVertCnt = 0; glEnable(GL_DEPTH_TEST); }
+    PSys_Render(viewProj,playerPos,(V3){invViewRot[0],invViewRot[1],invViewRot[2]},(V3){invViewRot[3],invViewRot[4],invViewRot[5]},(V3){-invViewRot[6],-invViewRot[7],-invViewRot[8]},inputDepthID,snear,sfar,(float)swidth,(float)sheight);
+    if (wireVertCount) { glBindBuffer(GL_ARRAY_BUFFER,wireLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,wireVertCount*sizeof(WireVrt),wireVerts); glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glEnable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE); glBindVertexArray(wireLinesVAO); glDrawArrays(0x4/*GL_TRIANGLES*/,0,(i32)wireVertCount); drawCalls++; vertsRendered += wireVertCount; wireVertCount = 0; glEnable(GL_CULL_FACE); }
+    if (Cheats.editMode) { /*Point-light range spheres, editmode only.*/ for (u16 i=0;i<World.loadedLights;++i) { Light* L = &World.lights[i]; DrawSphereWireframe(i == editModeLightSelection ? (Color){1.0f,0.5f,0.5f,1.0f} : (Color){0.9216f,0.9176f,0.7725f,1.0f},(ShapeSphere){L->pos,0.02f * L->range}); } }
+    if(unlikely(World.lineVertCnt > 0)) { glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,World.lineVertCnt * sizeof(WireVrt),lineVerts); glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glLineWidth(1.0f); glDisable(GL_DEPTH_TEST); glBindVertexArray(debugLinesVAO); glDrawArrays(0x1/*GL_LINES*/,0,(i32)World.lineVertCnt); drawCalls++; vertsRendered += World.lineVertCnt; World.lineVertCnt = 0; glEnable(GL_DEPTH_TEST); }
     glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D,inputDepthID); glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][3]);    
     if (Sys_Settings.Reflections==1u || Sys_Settings.Reflections==2u) {
         bool rt=Sys_Settings.Reflections==2u;
@@ -1506,22 +1510,22 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     }
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);  /*DIAG: RT pass ends here*/ glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][4]);
     glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glClearColor(0,0,0,0); glClear(GL_COLOR_BUFFER_BIT); glViewport(0,0,UI_W,UI_H); glDisable(GL_CULL_FACE); glEnable(GL_BLEND);
-    renderTime = get_time() - rendStart; 
+    renderTime = get_timed() - rendStart; 
     RenderUI();
     glBindFramebuffer(GL_FRAMEBUFFER,0); glViewport(0,0,swidth,sheight);
     glUseProgram(imageBlitSP);
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,inputImageID); glUniform1i(4,4); // outputImage texture sampler2D, don't remember why when active texture is texture 0. meh.... oh maybe to not read and write same binding?
     glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D,inputUIID);    glUniform1i(31,1);
     glUniform1i(32,3); glUniformMatrix4fv(33,1,0,invViewProj);
-    double berserkTimeRemainingNormalized = World.invP1.berserkFinished > 0.0001 ? (World.invP1.berserkFinished - World.pauseRelativeTime) / 20.0 : 0.0;
-    if (World.invP1.berserkFinished < World.pauseRelativeTime && World.invP1.berserkFinished > 0.0001) { World.invP1.berserkFinished = berserkTimeRemainingNormalized = 0.0; }
+    float berserkTimeRemainingNormalized = World.invP1.berserkFinished > 0.0001f ? (World.invP1.berserkFinished - World.pauseRelativeTime) / 20.0f : 0.0f;
+    if (World.invP1.berserkFinished < World.pauseRelativeTime && World.invP1.berserkFinished > 0.0001f) { World.invP1.berserkFinished = berserkTimeRemainingNormalized = 0.0f; }
     glUniform1ui(5,Sys_Settings.Reflections); glUniform1ui(6,Sys_Settings.FXAA); glUniform1f(14,Sys_Settings.FOV); glUniform1ui(22,Sys_Settings.Shadows); glUniform1ui(11,Sys_Settings.Brightness);
     glUniform1f(16,aspect3D);
     glUniform1f(9,(float)berserkTimeRemainingNormalized);
     glUniform1f(10,berserkSeedTime);
     glUniform3f(12,deg2rad(World.cam_yaw), deg2rad(World.cam_pitch), deg2rad(World.cam_roll));
     glUniform3f(13,px,py,pz);
-    glUniform1f(15,(float)World.pauseRelativeTime * 0.1f);
+    glUniform1f(15,World.pauseRelativeTime * 0.1f);
     SunDirection(); glUniform1f(30,sunYawCur); /*Sky yaw phase from the SAME float the sun shadow direction uses, so the skybox sun and the chunk shadow rotation are locked together and smooth (SunDirection() is pure + cheap; also refreshes it when shadows are disabled and the shadow pass never ran this frame)*/
     glUniform1ui(17,(gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || World.curLev == LEVEL_CYBERSPACE);
     glUniform1ui(18,(gridCellStates[playerCellIdx] & CELL_SEES_SUN) && World.curLev != LEVEL_CYBERSPACE);
@@ -1555,9 +1559,9 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
 }
 void RenderCameraViews() { /*Render in-world camera views.  Pops player position to elsewhere, renders to tiny fbo, pops player back.*/
     if (unlikely(World.paused || World.menuActive || camViewCount == 0 || World.curLev >= LEVEL_CYBERSPACE)) { return; }
-    V3 tempPlayerPos = World.position[PLAYER1]; Quaternion tempPlayerRot = World.rotation[PLAYER1]; // Store player position.
-    for (int cm=0;cm<camViewCount;++cm) { if (camViews[cm].finished < World.pauseRelativeTime && camViews[cm].visible) { camViews[cm].finished = World.pauseRelativeTime + 0.5f; World.position[PLAYER1] = camViews[cm].position; World.rotation[PLAYER1] = camViews[cm].rotation; CullCore(); Render(true/*camview*/, cm); } }
-    World.position[PLAYER1] = tempPlayerPos; World.rotation[PLAYER1] = tempPlayerRot; // Restore player position.
+    V3 tempPlayerPos = World.position[PLAYER1]; Quaternion tempPlayerRot = World.rotation[PLAYER1];/*Store player position.*/
+    for (u8 cm=0;cm<camViewCount;++cm) { if (camViews[cm].finished < World.pauseRelativeTime && camViews[cm].visible) { camViews[cm].finished = World.pauseRelativeTime + 0.5f; World.position[PLAYER1] = camViews[cm].position; World.rotation[PLAYER1] = camViews[cm].rotation; CullCore(); Render(true,cm); } }
+    World.position[PLAYER1] = tempPlayerPos; World.rotation[PLAYER1] = tempPlayerRot;/*Restore player position.*/
 }
 static void SetRTInstance(u32 i, u32 model, u32 tex, u32 glow, u32 active, float sx, float sy, float sz) {
     bool ok = (active != 0u) && (model < mdlsCnt) && (rtModelInfo[model].nodeBase != 0xFFFFFFFFu) && (sx > 1e-4f) && (sy > 1e-4f) && (sz > 1e-4f);
@@ -1586,11 +1590,12 @@ void UpdateInstanceMatrix4x4s() {
             u16 mi = World.instances[i].modelIndex; if ((instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && World.instances[i].lodIndex < mdlsCnt) mi = World.instances[i].lodIndex;
             SetRTInstance(i, (mi < mdlsCnt) ? mi : 0xFFFFFFFFu, World.instances[i].texIndex, World.instances[i].glowIndex, (World.instances[i].entflags & EF_ACTIVE) ? 1u : 0u, vabs(World.scale[i].x), vabs(World.scale[i].y), vabs(World.scale[i].z));
             InstanceRTInfo* cur = &rtInstanceInfo[i], *prev = &rtPrevInfo[i];
-            if (cur->geom[0]!=prev->geom[0] || cur->geom[1]!=prev->geom[1] || cur->geom[2]!=prev->geom[2] || cur->geom[3]!=prev->geom[3] || cur->info[0]!=prev->info[0] || cur->info[1]!=prev->info[1] || cur->info[2]!=prev->info[2] || cur->info[3]!=prev->info[3] || cur->iscl2[0]!=prev->iscl2[0] || cur->iscl2[1]!=prev->iscl2[1] || cur->iscl2[2]!=prev->iscl2[2] || cur->iscl2[3]!=prev->iscl2[3]) {
+            if (cur->geom[0] != prev->geom[0] || cur->geom[1] != prev->geom[1] || cur->geom[2] != prev->geom[2] || cur->geom[3] != prev->geom[3] || cur->info[0] != prev->info[0] || cur->info[1] != prev->info[1] || cur->info[2] != prev->info[2] || cur->info[3] != prev->info[3]
+                || vabs(cur->iscl2[0] - prev->iscl2[0]) > 0.000001f || vabs(cur->iscl2[1] - prev->iscl2[1]) > 0.000001f || vabs(cur->iscl2[2] - prev->iscl2[2]) > 0.000001f || vabs(cur->iscl2[3] - prev->iscl2[3]) > 0.000001f) {
                 if (chFirst == INSTANCE_CNT) chFirst = i; chLast = i; mcpy(prev, cur, sizeof(InstanceRTInfo));
             }
         }
-        if (chFirst != INSTANCE_CNT) { glBindBuffer(GL_SSBO, rtInstanceInfoID); glBufferSubData(GL_SSBO, (size_t)chFirst * sizeof(InstanceRTInfo), (size_t)(chLast - chFirst + 1u) * sizeof(InstanceRTInfo), rtInstanceInfo + chFirst); }
+        if (chFirst != INSTANCE_CNT) { glBindBuffer(GL_SSBO,rtInstanceInfoID); glBufferSubData(GL_SSBO,(intptr_t)((size_t)chFirst * sizeof(InstanceRTInfo)),(intptr_t)((size_t)(chLast - chFirst + 1u) * sizeof(InstanceRTInfo)),rtInstanceInfo + chFirst); }
         glBindBuffer(GL_SSBO,rtCellCountsID); glBufferData(GL_SSBO,ARRSIZE * sizeof(u16),NULL,GL_DYNAMIC_DRAW);                glBufferSubData(GL_SSBO,0,ARRSIZE * sizeof(u16),cellCounts);
         glBindBuffer(GL_SSBO,rtCellListsID);  glBufferData(GL_SSBO,(size_t)ARRSIZE * 128u * sizeof(u16),NULL,GL_DYNAMIC_DRAW); glBufferSubData(GL_SSBO,0,(size_t)ARRSIZE * 128u * sizeof(u16),cellLists);
     }
@@ -1628,7 +1633,7 @@ void MdlBuildLevelConvexAdjacency(u8 lev) {
     }
 }
 __attribute__((cold)) void NewGame() { // Reset World States
-    double newGamePrepStart = get_time();
+    double newGamePrepStart = get_timed();
     CloseSearch();
     World.Sys_UI=(SystemUI){.MFD_MediaTab=MM_LOG_TABLE,.MFD_ReaderView=MFD_READER_CONTENTS,.mfdSelected={1,1,1},.mfdReturnTab={1,1,1},.lastAutomapSideRH=true,.genClickSlot=-1,.genClickItem=-1,.genClickCustom=U16_MAX,.linkedElevatorDoor=U16_MAX,.tetheredPGP=U16_MAX,.tetheredPWP=U16_MAX,.tetheredSearchable=U16_MAX,.tetheredKeypadElevator=U16_MAX,.tetheredKeypadKeycode=U16_MAX,.keycodeHuns=-1,.keycodeTens=-1,.keycodeOnes=-1,.keycodeEntry=-1,
                             .logReaderPage=-1,.mg_current=-1,.pw_selectedWire=-1};
@@ -1637,7 +1642,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     for (int i=0;i<MAX_LEVELS;++i) { World.worldMin_x[i] = levMins[i].x; World.worldMin_z[i] = levMins[i].y; World.voxMinCtrX[i] = World.worldMin_x[i] + (VOXEL_SIZE * 0.5f); World.voxMinCtrZ[i] = World.worldMin_z[i] + (VOXEL_SIZE * 0.5f); World.farPlane[i] = lFars[i]; World.fogColor[i] = fogLUT[i]; World.fogColor[i].a *= 3.8f; }
     World.curLev = 0; World.col[0] = CT_NONE;
     currentMenuItem = currentMenuTab = 0; currentMenuPage = MPG_FRONT;
-    World.current_time = newGamePrepStart; World.pauseRelativeTime = World.last_physics_time = 0.0; World.dt = 0.0166666666f;
+    World.current_time = newGamePrepStart; World.pauseRelativeTime = World.last_physics_time = 0.0f; World.dt = 0.0166666666f;
     mset(World.instances,0,3 * sizeof(Entity));
     World.instances[PLAYER1].index = 767;
     World.layer[PLAYER1] = L_Player; World.scale[PLAYER1] = (V3){1.0f,1.0f,1.0f}; World.rotation[PLAYER1] = (Quaternion){0.0f,0.7071f,0.0f,0.7071f}; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
@@ -1645,15 +1650,15 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.col[PLAYER1] = CT_CAP; World.colliderCenter[PLAYER1].y = -PLYR_CAM_OFS_Y; World.colliderSize[PLAYER1] = (V3){0.48f,2.0f,1.0f}; World.velocity[PLAYER1] = (V3){0.0f,0.0f,0.0f};
     World.cam_yaw = 90.0f; World.cam_pitch = World.cam_roll = World.invP1.leanTarget = 0.0f; World.instances[PLAYER1].hasGrav = true;
     World.instances[PLAYER1].health = 211.0f; World.instances[PLAYER1].cyberHealth = 255.0f; World.instances[PLAYER1].bloodType = BloodType_Red;
-    World.invP1.noiseFinished = World.pauseRelativeTime; World.invP1.energy = 54.0f; World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1 + (double)random_range(0.5f,1.0f);
-    for (int i=0;i<12;++i) { World.invP1.hardwareInvReferenceIndex[i] = 21 + i; } World.invP1.hardwareInvReferenceIndex[12] = World.invP1.hardwareInvReferenceIndex[13] = 0;
+    World.invP1.noiseFinished = World.pauseRelativeTime; World.invP1.energy = 54.0f; World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1f + random_range(0.5f,1.0f);
+    for (u16 i=0;i<12;++i) { World.invP1.hardwareInvReferenceIndex[i] = 21 + i; } World.invP1.hardwareInvReferenceIndex[12] = World.invP1.hardwareInvReferenceIndex[13] = 0;
     World.invP1.genInvIdxRef[0] = 81; // Hardcoded lookup indices into the Const main table.
     for (int i=1;i<HW_COUNT;i++) World.invP1.genInvIdxRef[i] = -1; // Skips 0th index on purpose as it always holds access cards "item".
     for (int i=0;i<HW_COUNT;++i) World.invP1.hwVers[i] = World.invP1.hwVersSetting[i] = 0;
     World.invP1.nitroTimeSetting = 7.0; World.invP1.earthShakerTimeSetting = 10.0; World.invP1.lastAddedIndex = -1; World.invP1.hasNewEmail = World.invP1.hasNewNotes = World.invP1.isPulserNotDrill = true;
     MissionTimerInit();
     for (int i=0;i<7;++i) World.invP1.wepInvIndices[i] = World.invP1.wepInvAmIndices[i] = -1;
-    World.invP1.justFired = (World.pauseRelativeTime - 31.0); /*Set >30s before pauseRelativeTime to not immediately play action music.*/ World.invP1.painSoundFinished = World.invP1.radSoundFinished = World.invP1.ressurectingFinished = World.pauseRelativeTime;
+    World.invP1.justFired = (World.pauseRelativeTime - 31.0f); /*Set >30s before pauseRelativeTime to not immediately play action music.*/ World.invP1.painSoundFinished = World.invP1.radSoundFinished = World.invP1.ressurectingFinished = World.pauseRelativeTime;
     World.invP1.mediFinished = World.invP1.reflexFinishedTime = World.invP1.sightFinishedTime = -1.0; World.invP1.mediPatchPulseFinished = 0.0; World.invP1.mediPatchPulseCount = 0; World.invP1.berserkIncrement = World.invP1.patchActive = 0; World.invP1.staminupActive = World.geniusActive = World.invP1.inReverbZone = false;
     World.Sys_UI.lastMultiMediaTabOpened = MM_EMAIL_TABLE; World.Sys_UI.tickFinished = World.current_time + 0.1 + (double)random_range(0.0f,1.0f);
     World.timeScale = 1.0; World.inventoryMode = Sys_Settings.NoShootMode; World.gameFinished = World.creditsActive = World.decoyActive = false; World.decoyInstance = U16_MAX; World.damageDealt = World.damageReceived = 0.0f;
@@ -1667,7 +1672,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     mset(World.levCamDestroyedCnt,0,sizeof(World.levCamDestroyedCnt)); mset(World.levSmNodeDestroyedCnt,0,sizeof(World.levSmNodeDestroyedCnt)); mset(World.levNodeDestroyedCnt,0,sizeof(World.levNodeDestroyedCnt));
     for (u32 u = 0; u < uniqueCvxMeshCount; ++u) { if (cvxAdjOffsets[u]) { OS_Free(cvxAdjOffsets[u], cvxAdjOffsetBytes[u]); cvxAdjOffsets[u] = 0; cvxAdjOffsetBytes[u] = 0; } if (cvxAdjLists[u]) { OS_Free(cvxAdjLists[u], cvxAdjListBytes[u]); cvxAdjLists[u] = 0; cvxAdjListBytes[u] = 0; } }
     uniqueCvxMeshCount = 0; numActivePortals = 0; cullVisibilityValid = false; mset(World.physSleep, 0, sizeof(World.physSleep));
-    DualLog(" prep...............................................................took %.6f secs\n",get_time() - newGamePrepStart);
+    DualLog(" prep...............................................................took %.6f secs\n",get_timed() - newGamePrepStart);
     LoadAllLevels();
     for (u8 lev=0;lev<MAX_LEVELS;++lev) { /*Done after levels are loaded to remove difficulty related items.*/
         u8 entryLevel = World.curLev; if (entryLevel != lev) SetLevelPointers(lev);
@@ -1677,15 +1682,15 @@ __attribute__((cold)) void NewGame() { // Reset World States
     LoadModels();
     LoadLevel(1/*medical*/,(V3){10.52f, -43.792f + 0.84f, 20.2908f});
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { if (IdxIsPortalBlockingDoor(World.instances[i].index)) { AddDoorPortal(World.instances[i].index,i); } }
-    double newGameCvxStart = get_time();
+    double newGameCvxStart = get_timed();
     World.invP1.currentCrouchRatio = 1.0f;
     for (u32 m=0; m<mdlsCnt; ++m) { if (mdlPersistentSet[m]) continue; if (World.curLev < MAX_LEVELS && MdlIsWinMemberSet((u16)m,World.curLev)) continue; if (physPos[m] || modelTriangles[m] || modelVertexCounts[m]) { MdlSwapWindowDisposeData((u16)m); } }
     World.lev1SecCode = World.lev2SecCode = World.lev3SecCode = World.lev4SecCode = World.lev5SecCode = World.lev6SecCode = -1; World.missionBits = 0;
     AutomapNewGame();
     firstFrameMouselook = true; // Prevent jumps after cursor is centered once menu turned off.
-    DualLog("Convex mesh and automap init........................................................took %.6f secs\n",get_time() - newGameCvxStart);
+    DualLog("Convex mesh and automap init........................................................took %.6f secs\n",get_timed() - newGameCvxStart);
 }
-void* OS_AllocScratch(size_t amount) { size_t aligned = (amount + 15) & ~(size_t)15; u8* p = (u8*)__atomic_fetch_add(&scratch_cur,aligned,__ATOMIC_RELAXED); if (p + aligned > scratch_end) { DualLogError("Scratch ovr!\n"); OS_Exit(1); } size_t used = (size_t)((p + aligned) - scratch_base),peak;  do { peak = scratch_peak; } while (used > peak && !__atomic_compare_exchange_n(&scratch_peak,&peak,used,false,__ATOMIC_RELAXED,__ATOMIC_RELAXED)); return p; }
+void* OS_AllocScratch(size_t amount) { size_t aligned = (amount + 15) & ~(size_t)15; u8* p = (u8*)__atomic_fetch_add(&scratch_cur,(long)aligned,__ATOMIC_RELAXED); if (p + aligned > scratch_end) { DualLogError("Scratch ovr!\n"); OS_Exit(1); } size_t used = (size_t)((p + aligned) - scratch_base),peak;  do { peak = scratch_peak; } while (used > peak && !__atomic_compare_exchange_n(&scratch_peak,&peak,used,false,__ATOMIC_RELAXED,__ATOMIC_RELAXED)); return p; }
 void OS_FreeInitPhase() { scratch_cur=scratch_base; mset(scratch_cur,0,scratch_peak); }
 static void* InitFontAtlasses_Thread(void* arg) { (void)arg; InitFontAtlasses(); return NULL; }
 static bool rtAccelBuilt = false;
@@ -1705,7 +1710,7 @@ void EnsureReflectionResources() {
     if (Sys_Settings.Reflections >= 1u && outputImageID == 0) { GenerateAndBindTexture(&outputImageID,GL_RGBA8,Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES,Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL); glBindImageTexture(4,outputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); glActiveTexture(GL_TEXTURE4); glBindTexture(GL_TEXTURE_2D,outputImageID); }
     if (Sys_Settings.Reflections == 2u && !rtAccelBuilt) {
         if (!modelVBO || !mdlsCnt) { return; }
-        double startTime = get_time();
+        double startTime = get_timed();
         RenderLoading("Loading raytracing data...");
         u32 nodeWords = rtCapNodeWords, triWords = rtCapTriWords; u32 triSec = (nodeWords + 3u) & ~3u; rtTriSec = triSec; u32 totalWords = triSec + ((triWords + 3u) & ~3u); size_t geomBytes = (size_t)totalWords * sizeof(u32); u32 nodeOff = 0, triOff = 0, orderAcc = 0;
         for (u32 m=0; m<mdlsCnt; ++m) {
@@ -1713,21 +1718,20 @@ void EnsureReflectionResources() {
             rtModelInfo[m].orderBase = (orderAcc + 1u) & ~1u; orderAcc = rtModelInfo[m].orderBase + modelBVHTriOrderCounts[m]; rtModelInfo[m].nodeBase = nodeOff * 4u; rtModelInfo[m].triBase = triSec + triOff * 2u; rtModelInfo[m].vtxBase = mdlVboOfs[m] / VRT_ATT_SZ; rtModelInfo[m].uvBase = 0; nodeOff += modelBVHNodeCounts[m]; triOff += modelBVHTriOrderCounts[m];
         }
         rtGeomID = MakeSSBO(&rtGeomID, 16, geomBytes, NULL, GL_STATIC_DRAW);
-        u32* nodes = (u32*)((u8*)glMapBufferRange(GL_SSBO,0,(size_t)rtPersistNodeWords * sizeof(u32),0x2/*GL_MAP_WRITE_BIT*/|0x4/*GL_MAP_INVALIDATE_RANGE_BIT*/));
+        u32* nodes = (u32*)glMapBufferRange(GL_SSBO,0,(size_t)rtPersistNodeWords * sizeof(u32),0x2/*GL_MAP_WRITE_BIT*/|0x4/*GL_MAP_INVALIDATE_RANGE_BIT*/);
         for (u32 m=0; m<mdlsCnt; ++m) { if (rtModelInfo[m].nodeBase != 0xFFFFFFFFu) RtWriteModelNodes(nodes, rtModelInfo[m].nodeBase, rtModelInfo[m].triBase, (u16)m); }
         glUnmapBuffer(GL_SSBO);
-        u16* orderAll = (u16*)OS_Alloc((size_t)rtCapOrderU16 * sizeof(u16));
-        u32 orderFill = 0;
+        u16* orderAll = (u16*)OS_Alloc((size_t)rtCapOrderU16 * sizeof(u16)); u32 orderFill = 0;
         for (u32 m=0; m<mdlsCnt; ++m) { if (rtModelInfo[m].nodeBase == 0xFFFFFFFFu) { continue; } u32 ob = orderFill; if (orderFill & 1u) ++ob; rtModelInfo[m].orderBase = ob; mcpy(orderAll + ob, modelBVHTriOrder[m], (size_t)modelBVHTriOrderCounts[m] * sizeof(u16)); orderFill = ob + modelBVHTriOrderCounts[m]; }
         orderAll[orderFill] = orderAll[orderFill + 1] = 0;
         glUseProgram(rtCopySP);
-        if (rtOrderBufID == 0) { rtOrderBufID = MakeSSBO(&rtOrderBufID, 19, (size_t)rtCapOrderU16 * sizeof(u16), orderAll, GL_STATIC_DRAW); } else { glBindBuffer(GL_SSBO, rtOrderBufID); glBindBufferBase(GL_SSBO, 19, rtOrderBufID); glBufferSubData(GL_SSBO, 0, (size_t)((size_t)(orderFill + 2u) * sizeof(u16)), orderAll); } /*re-enable path (should only happen if the first build ran before pools existed)*/
+        if (rtOrderBufID == 0) { rtOrderBufID = MakeSSBO(&rtOrderBufID,19,(size_t)rtCapOrderU16 * sizeof(u16),orderAll,GL_STATIC_DRAW); } else { glBindBuffer(GL_SSBO,rtOrderBufID); glBindBufferBase(GL_SSBO,19,rtOrderBufID); glBufferSubData(GL_SSBO,0,(intptr_t)((size_t)(orderFill + 2u) * sizeof(u16)),orderAll); /*re-enable path (should only happen if the first build ran before pools existed)*/}
         OS_Free(orderAll, (size_t)rtCapOrderU16 * sizeof(u16));
-        for (u32 m=0; m<mdlsCnt; ++m) { if (rtModelInfo[m].nodeBase != 0xFFFFFFFFu) RtDispatchModelCopy((u16)m); }
-        rtInstanceInfoID = MakeSSBO(&rtInstanceInfoID, 21, (size_t)INSTANCE_CNT * sizeof(InstanceRTInfo), NULL, GL_DYNAMIC_DRAW);
-        rtCellCountsID   = MakeSSBO(&rtCellCountsID,   23, (size_t)ARRSIZE * sizeof(u16), NULL, GL_DYNAMIC_DRAW);
-        rtCellListsID    = MakeSSBO(&rtCellListsID,    24, (size_t)ARRSIZE * 128 * sizeof(u16), NULL, GL_DYNAMIC_DRAW);
-        rtAccelBuilt = true; RtSwapPatchModels(); DualLog("Raytraced reflections upload........................................................took %.6f secs\n",get_time() - startTime);
+        for (u32 m=0; m<mdlsCnt; ++m) { if (rtModelInfo[m].nodeBase != 0xFFFFFFFFu) { RtDispatchModelCopy((u16)m); } }
+        rtInstanceInfoID = MakeSSBO(&rtInstanceInfoID,21,(size_t)INSTANCE_CNT * sizeof(InstanceRTInfo),NULL,GL_DYNAMIC_DRAW);
+        rtCellCountsID   = MakeSSBO(&rtCellCountsID,  23,(size_t)ARRSIZE * sizeof(u16),NULL,GL_DYNAMIC_DRAW);
+        rtCellListsID    = MakeSSBO(&rtCellListsID,   24,(size_t)ARRSIZE * 128 * sizeof(u16),NULL,GL_DYNAMIC_DRAW);
+        rtAccelBuilt = true; RtSwapPatchModels(); DualLog("Raytraced reflections upload........................................................took %.6f secs\n",get_timed() - startTime);
     }
 }
 void RtSwapPatchModels() {
@@ -1745,23 +1749,22 @@ void RtSwapPatchModels() {
     for (u32 m=0; m<mdlsCnt; ++m) { if (mdlPersistentSet[m] || rtPatchStamp[m] || rtModelInfo[m].nodeBase == 0xFFFFFFFFu) continue; rtModelInfo[m].nodeBase = 0xFFFFFFFFu; rtModelInfo[m].triBase = rtModelInfo[m].vtxBase = rtModelInfo[m].uvBase = 0; rtModelInfo[m].orderBase = 0; }
     if (lev >= MAX_LEVELS || !patchCnt) return;    
     if (rtCapNodeWords > rtPersistNodeWords) {
-        glBindBuffer(GL_SSBO, rtGeomID); u32* nodes = (u32*)((u8*)glMapBufferRange(GL_SSBO,(intptr_t)(rtPersistNodeWords * 4u),(size_t)((size_t)(rtCapNodeWords - rtPersistNodeWords) * sizeof(u32)),0x2/*GL_MAP_WRITE_BIT*/|0x4/*GL_MAP_INVALIDATE_RANGE_BIT*/|0x20/*GL_MAP_UNSYNCHRONIZED_BIT*/));
+        glBindBuffer(GL_SSBO,rtGeomID); u32* nodes = (u32*)glMapBufferRange(GL_SSBO,(intptr_t)(rtPersistNodeWords * 4u),(size_t)((size_t)(rtCapNodeWords - rtPersistNodeWords) * sizeof(u32)),0x2/*GL_MAP_WRITE_BIT*/|0x4/*GL_MAP_INVALIDATE_RANGE_BIT*/|0x20/*GL_MAP_UNSYNCHRONIZED_BIT*/);
         u32 winNodeBase0 = rtPersistNodeWords / 4u; if (nodes) { for (u32 k=0;k<patchCnt;++k) { u16 m = rtPatchList[k]; if (rtPatchStamp[m] == 2) RtWriteModelNodes(nodes, rtModelInfo[m].nodeBase - winNodeBase0, rtModelInfo[m].triBase, m); } glUnmapBuffer(GL_SSBO); }
     }
     u32 winOrderBytes = (rtCapOrderU16 - rtPersistOrderU16) * 2u;
     u16* orderStaging = OS_Alloc(winOrderBytes); mset(orderStaging,0,(size_t)winOrderBytes);
     for (u32 k=0;k<patchCnt;++k) { u16 m = rtPatchList[k]; if (rtPatchStamp[m] != 2) continue; u32 w = rtModelInfo[m].orderBase - rtPersistOrderU16; mcpy(orderStaging + w, modelBVHTriOrder[m], (size_t)modelBVHTriOrderCounts[m] * sizeof(u16)); }
-    glBindBuffer(GL_SSBO, rtOrderBufID); glBufferSubData(GL_SSBO, (intptr_t)((size_t)rtPersistOrderU16 * 2u), (size_t)winOrderBytes, orderStaging);
+    glBindBuffer(GL_SSBO,rtOrderBufID); glBufferSubData(GL_SSBO,(intptr_t)((size_t)rtPersistOrderU16 * 2u),(intptr_t)(size_t)winOrderBytes,orderStaging);
     OS_Free(orderStaging,winOrderBytes);
     glUseProgram(rtCopySP); glBindBufferBase(GL_SSBO,19,rtOrderBufID); glBindBuffer(GL_SSBO,rtGeomID); glBindBufferBase(GL_SSBO,16,rtGeomID);
     for (u32 k=0;k<patchCnt;++k) { u16 m = rtPatchList[k]; if (rtPatchStamp[m] == 2) RtDispatchModelCopy(m); }
     glFinish();
 }
-char* data_parser_trim(char* s) { while(cEmpty((u8)*s)){s++;} if (*s == 0){return s;} char* e=s + slen(s) - 1; while(e > s && cEmpty((u8)*e)){e--;} e[1]=0; return s; }
+char* data_parser_trim(char* s) { while(cEmpty((char)*s)){s++;} if (*s == 0){return s;} char* e=s + slen(s) - 1; while(e > s && cEmpty((char)*e)){e--;} e[1]=0; return s; }
 char* sUpToEndLine(char* buf, int sz, FHandle fd){if(sz<=1 || buf == NULL){return NULL;} char* p=buf; int rem=sz-1; static int pos=0,end=0; static char b[4096]; while(rem > 0){if(pos>=end){long n=OS_Read(fd,b,sizeof(b)); if(n <= 0){if(p==buf){return NULL;} goto done;} pos=0; end=(int)n;} while(rem>0 && pos<end){char c=b[pos++]; *p++=c; rem--; if(c=='\n'){goto done;}}} done:*p='\0'; return buf;} // fgets replacement, not thread safe but no multithreading
 void InitalizeEnvironment() {
-    game_start_time = get_time();
-    random_range_rng = (u32)game_start_time;
+    game_start_time = get_timed(); random_range_rng = (u32)game_start_time;
     console_log_file = OS_OpenWriteonly("./voxen.log");
     DualLog("=========== Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed ===========\nGame: Citadel, the System Shock (1994) Fan Remake                                1/03/2013 - 11/5/2026\nOpenGL 4.3+, libc 2.7(Linux) / none(Windows), depdendencies: ALSA/WASAPI, X11/GDI, dlopen+dlsym / none\n");
     scratch_base = OS_Alloc(SCRATCH_ARENA_SIZE); scratch_cur = scratch_base; scratch_end = scratch_base + SCRATCH_ARENA_SIZE; /*Temporary scratch arena for all initializations.*/
@@ -1787,7 +1790,7 @@ void InitalizeEnvironment() {
         #undef X
         WinSys.x11.randr.SelectInput(WinSys.x11.display,WinSys.x11.root,4);
         void* xcurhandle = dlopen("libXcursor.so.1",2); PFN_XCIC ImageCreate = (PFN_XCIC)PlatformGetModuleSymbol(xcurhandle,"XcursorImageCreate"); PFN_XCID ImageDestroy = (PFN_XCID)PlatformGetModuleSymbol(xcurhandle,"XcursorImageDestroy"); PFN_XCILC ImageLoadCursor = (PFN_XCILC)PlatformGetModuleSymbol(xcurhandle,"XcursorImageLoadCursor");
-        int sMin,sMax; mset(WinSys.x11.keycodes,-1,sizeof(WinSys.x11.keycodes)); WinSys.x11.xlib.DisplayKeycodes(WinSys.x11.display,&sMin,&sMax); int wk; KeySym* k = WinSys.x11.xlib.GetKeyboardMapping(WinSys.x11.display,sMin,sMax - sMin + 1,&wk); for (int s=sMin;s<=sMax;s++) { WinSys.x11.keycodes[s] = translateKeySyms(&k[(s - sMin) * wk],wk); } WinSys.x11.xlib.Free(k); // Create key tables.
+        int sMin,sMax,wk; mset(WinSys.x11.keycodes,-1,sizeof(WinSys.x11.keycodes)); WinSys.x11.xlib.DisplayKeycodes(WinSys.x11.display,&sMin,&sMax); KeySym* k = WinSys.x11.xlib.GetKeyboardMapping(WinSys.x11.display,(KeyCode)sMin,sMax - sMin + 1,&wk); for (int s=sMin;s<=sMax;s++) { WinSys.x11.keycodes[s] = translateKeySyms(&k[(s - sMin) * wk],wk); } WinSys.x11.xlib.Free(k); // Create key tables.
         #define IA(n) WinSys.x11.xlib.InternAtom(WinSys.x11.display,n,0)
             WinSys.x11.UTF8_STRING=IA("UTF8_STRING"); WinSys.x11.WM_PROTOCOLS=IA("WM_PROTOCOLS"); WinSys.x11.WM_DELETE_WINDOW=IA("WM_DELETE_WINDOW"); WinSys.x11.NET_SUPPORTED =IA("_NET_SUPPORTED"); WinSys.x11.NWM_ICON=IA("_NET_WM_ICON"); WinSys.x11.NWM_PING=IA("_NET_WM_PING"); WinSys.x11.NWM_NAME=IA("_NET_WM_NAME"); WinSys.x11.MOTIF_WM_HINTS=IA("_MOTIF_WM_HINTS");
         #undef IA
@@ -1797,7 +1800,7 @@ void InitalizeEnvironment() {
         #undef GA
         if (sa) { WinSys.x11.xlib.Free(sa); } XcursorImage* native = ImageCreate(16,16); mset(native->pixels,0,256*sizeof(XcursorUInt)); native->xhot=native->yhot = 0; WinSys.x11.hiddenCursorHandle = ImageLoadCursor(WinSys.x11.display,native); ImageDestroy(native); PollMonitors();
     #endif
-    threadCnt = vclampi(OS_GetNumThreads(),1,32); World.diffCbt = World.diffCyb = World.diffPuz = World.diffMis = 2; /*Default difficulties of normal*/ World.cursorPos_x = 680; World.cursorPos_y = 384; /*Internal mouse cursor representation (separate from OS cursor) starts at center*/;
+    threadCnt = (u32)vclampi(OS_GetNumThreads(),1,32); World.diffCbt = World.diffCyb = World.diffPuz = World.diffMis = 2; /*Default difficulties of normal*/ World.cursorPos_x = 680; World.cursorPos_y = 384; /*Internal mouse cursor representation (separate from OS cursor) starts at center*/;
     FHandle f = OS_OpenReadonly("./Data/Config.ini"); char line[512]; // Load Config.ini
     while (sUpToEndLine(line,sizeof(line),f)) {
         char* s = data_parser_trim(line); if (*s == 0 || (s[0] == '/' && s[1] == '/')) { continue; } char* eq = StringFindFirstCharWithin(s, '='); if (!eq) { continue; } *eq = 0; char *key = data_parser_trim(s), *val = data_parser_trim(eq + 1);
@@ -1817,8 +1820,8 @@ void InitalizeEnvironment() {
     window = VCreateWindow(w,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); PlaceWindowOnMonitor((int)Sys_Settings.CurrentMonitor); window->context.makeCurrent(window); ((WSWin*)window)->context.swapBuffers(((WSWin*)window)); SetGLContext_GetFunctionPointers();
     i32 major = 0, minor = 0; glGetIntegerv(0x821B/*GL_MAJOR_VERSION*/,&major); glGetIntegerv(0x821C/*GL_MINOR_VERSION*/,&minor); if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); }
     glBlendFuncSeparate(0x302/*GL_SRC_ALPHA*/,0x303/*GL_ONE_MINUS_SRC_ALPHA*/,1,0x303/*GL_ONE_MINUS_SRC_ALPHA*/); glClearColor(0,0,0,1);
-    DualLog("Window creation and GL context......................................................took %.6f secs\n",get_time() - game_start_time);
-    double initShadersStart = get_time();
+    DualLog("Window creation and GL context......................................................took %.6f secs\n",get_timed() - game_start_time);
+    double initShadersStart = get_timed();
     CompileShaders();
     u32 tvaos[5],tvbos[5]; glGenVertexArrays(5,tvaos); glGenBuffers(5,tvbos); quadVAO=tvaos[0]; quadVBO=tvbos[0]; chunkVAO=tvaos[1]; textVAO=tvaos[2]; textVBO=tvbos[2]; debugLinesVAO=tvaos[3]; debugLinesVBO=tvbos[3]; wireLinesVAO=tvaos[4]; wireLinesVBO=tvbos[4]; 
     float quadBlit_vertices[] = {1.0f,-1.0f,1.0f,0.0f, 1.0f,1.0f,1.0f,1.0f, -1.0f,1.0f,0.0f,1.0f, -1.0f,-1.0f,0.0f,0.0f}; // 4 verts, 4 floats each x,y,u,v
@@ -1866,8 +1869,8 @@ void InitalizeEnvironment() {
     m[0] = 1.0f; m[1] = 0.0f; m[2] = 0.0f; m[3] = 0.0f; m[4] = 0.0f; m[5] = 1.0f; m[6] = 0.0f; m[7] = 0.0f; m[8] = 0.0f; m[9] = 0.0f; m[10] = -(lightRangeMax + 0.02f) / viewRange; m[11] = -1.0f; m[12] = 0.0f; m[13] = 0.0f; m[14] = -2.0f * lightRangeMax * 0.02f / viewRange; m[15] = 0.0f;
     for (int i=0;i<23;++i) { g_scf_long[0][i] = g_scf_long[2][i] = g_scf_long[4][i] = g_sfc_long_024[i]; }
     glGenFramebuffers(1,&gBufferFBO); ChangeFullScreenWindowed(false); window->context.swapInterval((i32)Sys_Settings.Vsync); 
-    DualLog("GL shaders and buffer setup.........................................................took %.6f secs\n",get_time() - initShadersStart);
-    double initSSBOStart = get_time();
+    DualLog("GL shaders and buffer setup.........................................................took %.6f secs\n",get_timed() - initShadersStart);
+    double initSSBOStart = get_timed();
     glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); u32 drawBuffers[] = {GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1,GL_COLOR_ATTACHMENT2}; glDrawBuffers(3,drawBuffers);
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1}; mcpy(&modelMatrices[0],mat,16 * sizeof(float)); 
     matricesBufferID  = MakeSSBO(&matricesBufferID,1,INSTANCE_CNT*16*sizeof(float),modelMatrices,GL_STATIC_DRAW);
@@ -1887,48 +1890,48 @@ void InitalizeEnvironment() {
     glUseProgram(chunkSP);      glUniform1ui(21, SHADOW_MAP_SIZE); glUniform1f(22, (float)SHADOW_MAP_SIZE); glUniform1ui(23, LIGHT_CNT); glUniform1ui(24, (u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11, SHADOW_MAP_SIZE * SHADOW_MAP_SIZE); glUniform1i(29,6); glUniform1i(31,9); glUniform1i(36,10);
     glUseProgram(ssrSP);        glUniform1i(5,3); glUseProgram(rtSP); glUniform1i(5,3);
     for (int q=0;q<5;++q) { glGenQueries(5,gpuQ[q]); }
-    DualLog("SSBO and shadow buffer setup........................................................took %.6f secs\n",get_time() - initSSBOStart);
+    DualLog("SSBO and shadow buffer setup........................................................took %.6f secs\n",get_timed() - initSSBOStart);
     RenderLoading("Loading textures..."); LoadTextures(); RenderLoading("Loading models..."); ParseAllModels(); bool playIntroAtBoot = !OS_FileExists("./Data/introdone.dat");
     if (playIntroAtBoot) { FHandle introdone=OS_OpenWriteonly("./Data/introdone.dat"); OS_Close(introdone); }
-    double initAmBiomStart = World.absoluteTime = get_time();
+    double initAmBiomStart = World.absoluteTime = get_timed();
     GenerateAndBindTexture(&amTexId,GL_RGBA8,AM_W,AM_H,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL);               glGenFramebuffers(1,&amFBO);     glBindFramebuffer(GL_FRAMEBUFFER,amFBO);     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,amTexId,0);
     GenerateAndBindTexture(&amFullTexId,GL_RGBA8,AM_FULL_W,AM_FULL_H,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL); glGenFramebuffers(1,&amFullFBO); glBindFramebuffer(GL_FRAMEBUFFER,amFullFBO); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,amFullTexId,0);
     GenerateAndBindTexture(&biomTexId,GL_RGBA8,BIOM_GRAPH_W,BIOM_GRAPH_H,GL_RGBA,GL_UNSIGNED_BYTE,GL_LINEAR,NULL);       glGenFramebuffers(1,&biomFBO);   glBindFramebuffer(GL_FRAMEBUFFER,biomFBO); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,biomTexId,0);
-    bioMonitor.beatFinished=get_time() + 0.5; bioMonitor.backgroundColor=(Color){0.2f,0.2f,1.0f,0.01f}; bioMonitor.ergColor=(Color){0,0.5f,1.0f,1.0f}; bioMonitor.chiColor=(Color){.7f,0,1.f,1.f}; bioMonitor.ecgColor=(Color){1.f,0,0,1.f}; bioMonitor.min[BIOM_ERG]=0; bioMonitor.min[BIOM_CHI]=-2.f; bioMonitor.min[BIOM_ECG]=-1.f; bioMonitor.max[BIOM_ERG]=1.f; bioMonitor.max[BIOM_CHI]=2.f; bioMonitor.max[BIOM_ECG]=1.f; BioMonitorClearGraphs();
-    DualLog("Automap and biomonitor buffers......................................................took %.6f secs\n",get_time() - initAmBiomStart);
+    bioMonitor.beatFinished=get_timed() + 0.5; bioMonitor.backgroundColor=(Color){0.2f,0.2f,1.0f,0.01f}; bioMonitor.ergColor=(Color){0,0.5f,1.0f,1.0f}; bioMonitor.chiColor=(Color){.7f,0,1.f,1.f}; bioMonitor.ecgColor=(Color){1.f,0,0,1.f}; bioMonitor.min[BIOM_ERG]=0; bioMonitor.min[BIOM_CHI]=-2.f; bioMonitor.min[BIOM_ECG]=-1.f; bioMonitor.max[BIOM_ERG]=1.f; bioMonitor.max[BIOM_CHI]=2.f; bioMonitor.max[BIOM_ECG]=1.f; BioMonitorClearGraphs();
+    DualLog("Automap and biomonitor buffers......................................................took %.6f secs\n",get_timed() - initAmBiomStart);
     NewGame();
     if (Sys_Settings.Reflections >= 1u) { EnsureReflectionResources(); }
-    double initAudioStart = get_time(); InitAudio(); synth_set_reverb_preset(0); 
+    double initAudioStart = get_timed(); InitAudio(); synth_set_reverb_preset(0); 
     //World.menuActive = true; //COMMENT for immediate into game
     if (playIntroAtBoot && World.menuActive) ChangeMenuPage(MPG_INTRO); else if (World.menuActive) { PlayMenuMusic(); } else { PlayTrack(TT_Walking, MT_Walking); }
-    DualLog("Audio and Menu init.................................................................took %.6f secs\n",get_time() - initAudioStart);
+    DualLog("Audio and Menu init.................................................................took %.6f secs\n",get_timed() - initAudioStart);
     DualLog("Scratch arena total peak: %u MB, ", (u32)(scratch_peak >> 20)); OS_Free(scratch_base,SCRATCH_ARENA_SIZE); // Free the initialization scratch arena.
-    DebugRAMPeak(); DualLog(".......Game Initialization TOTAL %.6f secs\n",get_time() - game_start_time); DebugRAMActual("init");
+    DebugRAMPeak(); DualLog(".......Game Initialization TOTAL %.6f secs\n",get_timed() - game_start_time); DebugRAMActual("init");
 }
-void RessurectionTextUpdate() { static int lastStage = -1; double fin = World.invP1.ressurectingFinished; if (fin <= World.pauseRelativeTime) { lastStage = -1; return; } double el = World.pauseRelativeTime - (fin - 3.0); int stage = (int)(el * 8.0 / 3.0); if (stage < 0) stage = 0; if (stage > 7) stage = 7; if (stage != lastStage) { lastStage = stage; CenterStatusPrint("%s", Sys_Text.stringTable[860 + stage]); } }
+static void RessurectionTextUpdate() { static int lastStage = -1; float fin = World.invP1.ressurectingFinished; if (fin <= World.pauseRelativeTime) { lastStage = -1; return; } float el = World.pauseRelativeTime - (fin - 3.0f); int stage = (int)(el * 8.0f / 3.0f); if (stage < 0) stage = 0; if (stage > 7) stage = 7; if (stage != lastStage) { lastStage = stage; CenterStatusPrint("%s", Sys_Text.stringTable[860 + stage]); } }
 i32 main() {
     InitalizeEnvironment();
     while(1) {
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad,queuedLevelPos); queuedLevelToLoad = 255u; continue; }
-        double curtime = get_time(); raycastCalls = 0; raycastMs = 0.0; World.dt = World.current_time < 0.001f ? 0.000f : vmax(curtime - World.current_time, 0.0); World.absoluteTime += World.dt; World.current_time = curtime;
-        World.painStaticAlpha = vmax(0.0f,World.painStaticAlpha - (float)World.dt * 2.0f);
-        World.empStaticAlpha = vmax(0.0f,World.empStaticAlpha - (float)World.dt * 4.0f);
-        cyberStaticAlpha = vmax(0.0f,cyberStaticAlpha - (float)World.dt * 1.0f);
-        double input_start = get_time(); InputProcessing();/*Before anims and physics to allow them to respond immediately.*/
+        double curtime = get_timed(); raycastCalls = 0; raycastMs = 0.0; World.dt = World.current_time < 0.001 ? 0.000 : vmax(curtime - World.current_time,0.0); World.absoluteTime += (double)World.dt; World.current_time = curtime;
+        World.painStaticAlpha = vmax(0.0f,World.painStaticAlpha - World.dt * 2.0f);
+        World.empStaticAlpha = vmax(0.0f,World.empStaticAlpha - World.dt * 4.0f);
+        cyberStaticAlpha = vmax(0.0f,cyberStaticAlpha - World.dt * 1.0f);
+        double input_start = get_timed(); InputProcessing();/*Before anims and physics to allow them to respond immediately.*/
         bool stepFrame = !Cheats.stepmode || f7StepEdge;
-        if (!World.paused && !World.menuActive && stepFrame) { if (World.pauseRelativeTime < 0.001f) { World.pauseRelativeTime = World.last_physics_time = curtime; } World.pauseRelativeTime += World.dt * World.timeScale; /*Reflex slow-time at 0.25x while the patch is active, mouse-look stays raw*/ }
+        if (!World.paused && !World.menuActive && stepFrame) { if (World.pauseRelativeTime < 0.001f) { World.pauseRelativeTime = World.last_physics_time = (float)curtime; } World.pauseRelativeTime += World.dt * World.timeScale; /*Reflex slow-time at 0.25x while the patch is active, mouse-look stays raw*/ }
         UpdateAnims();/*Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.*/
-        prePhys = get_time() - input_start;
-        if (!World.paused && !World.menuActive && stepFrame) { double ps = get_time(); float dt = (float)vclamp((World.pauseRelativeTime - World.last_physics_time), 0.0005, 0.1); World.last_physics_time = World.pauseRelativeTime; World.dt = dt; Physics(dt); physTime = get_time() - ps; } else physTime=0.0;
-        double gameT_start = get_time(); if (stepFrame) ModUpdate();/*After physics so mod/gamecode can modify velocities before next frame.*/ BioMonitorUpdate(); RessurectionTextUpdate(); if (!World.paused && !World.menuActive && stepFrame){ PSys_Update(World.dt); }/*Particles*/ UpdateAudio();/*Updates states, music triggers, ambients, etc.*/ gameTime = get_time() - gameT_start;
+        prePhys = get_timed() - input_start;
+        if (!World.paused && !World.menuActive && stepFrame) { double ps = get_timed(); float dt = vclamp((World.pauseRelativeTime - World.last_physics_time),0.0005f,0.1f); World.last_physics_time = World.pauseRelativeTime; World.dt = dt; Physics(dt); physTime = get_timed() - ps; } else physTime = 0.0;
+        double gameT_start = get_timed(); if (stepFrame) ModUpdate();/*After physics so mod/gamecode can modify velocities before next frame.*/ BioMonitorUpdate(); RessurectionTextUpdate(); if (!World.paused && !World.menuActive && stepFrame){ PSys_Update(World.dt); }/*Particles*/ UpdateAudio();/*Updates states, music triggers, ambients, etc.*/ gameTime = get_timed() - gameT_start;
         if (likely((!World.paused && !World.menuActive) || Cheats.editMode)) { UpdateWeaponViewModel(); UpdateInstanceMatrix4x4s(); /*Before camviews so camview shadows render same as main pass*/ }
         drawCalls = uiDrawCalls = shadDrawCalls = vertsRendered = 0;
         UpdateSensaroundCamViews(); RenderCameraViews();/*Before main Render() so that tv screens are up to date*/ if(likely(!World.paused && !World.menuActive)) { CullCore(); } /*Before automap and audio update due to audio occlusion and automap FoW discovery*/ AudioUpdateMix();/*Actually mixes all the audio for output.*/ AutomapTick(); MinigameTick();
         Render(false/*!camview*/,0u);
-        if (GetKeyPressed(40)/*Screenshot*/ && World.current_time > World.screenshotTimeout) { Screenshot(); }
+        if (GetKeyPressed(40)/*Screenshot*/ && (float)curtime > World.screenshotTimeout) { Screenshot(); }
         for(i32 i=0;i<MAX_KEYS;++i){ Sys_Input.keyStates[i].pressed = false; } /*Clear input states, can't mset as we want to preserve down(held) state*/
         for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) { Sys_Input.mouseButtons[i].pressed = false; }
-        Sys_Input.scrollDelta = 0.0; World.currentMouse_dx = World.currentMouse_dy = 0; globalframe++; World.cpuTime = get_time() - World.current_time; // Measure time over everything this frame before GPU swap buffers for diagnostic text.
+        Sys_Input.scrollDelta = 0.0; World.currentMouse_dx = World.currentMouse_dy = 0; globalframe++; World.cpuTime = get_timed() - curtime; // Measure time over everything this frame before GPU swap buffers for diagnostic text.
         if (globalframe > 4) {
             u8 r = (gpuQFrame + 1) % 5; u64 v;
             glGetQueryObjectui64v(gpuQ[r][0],0x8866/*GL_QUERY_RESULT*/,&v); World.gpuShadowMs = (double)v * 0.000001; glGetQueryObjectui64v(gpuQ[r][1],0x8866/*GL_QUERY_RESULT*/,&v); World.gpuPreMs = (double)v * 0.000001;

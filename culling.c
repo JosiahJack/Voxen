@@ -5,7 +5,7 @@ u32 gridCellStates[ARRSIZE]; static u32 precomputedVisibleCellsFromHere[524288];
 bool get_cull_bit(const u32* arr, int idx) { return (arr[idx >> 5] >> (idx & 31)) & 1; }
 INLINE void set_cull_bit(u32* arr, int idx, bool val) {u32* w = arr + (idx >> 5); u32 m = 1U << (idx & 31); *w = val ? (*w | m) : (*w & ~m);}
 bool PositionVisibleFromPlayerCell(float x, float z) { return (get_cull_bit(precomputedVisibleCellsFromHere,((playerCellIdx * ARRSIZE)/*cellIdx*/ + PosGetCellCoords(x,z)/*subIdx*/)/*flat_idx*/)); }
-bool XZPairInBounds(i32 x, i32 z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }
+bool XZPairInBounds(u16 x, u16 z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }
 bool NeighborhoodInPVS(u16 x, u16 z, u8 r) { u32 cellIdx=(z*WORLDX)+x; for(int ix=(int)x-r;ix<=(int)x+r;++ix){for(int iz=(int)z-r;iz<=(int)z+r;++iz){if(unlikely(!XZPairInBounds(ix,iz))){continue;} int subIdx=iz*WORLDX + ix; if(get_cull_bit(precomputedVisibleCellsFromHere,cellIdx*ARRSIZE+subIdx)&&(gridCellStates[subIdx]&CELL_VISIBLE))return true;} } return false; }
 static u8* LoadCullPNG(const char* name, int lev) { char p[256]; sFormat(p,sizeof(p),"./Data/%s_%d.png",name,lev); FHandle fd; int size; u8* data=OS_OpenAndAllocateFileBufferReadonly(p,&fd,&size); if (!data || size > 500000) { DualLogError("PNG missing/too-large: %s\n",p); OS_Exit(1); } i32 w,h; u8* pixels = PngLoad(data,size,&w,&h,&png_arena_main); OS_Free(data,size); if (!pixels) { DualLogError("PngLoad failed: %s\n",p); OS_Exit(1); } return pixels; }
 #define PIXEL_IDX(x, z) ((x) + ((WORLDZ - 1 - (z)) * WORLDX)) * 4 // 4 channels, flip z to have desired bottom-left origin 0,0 vs png's top-left
@@ -151,7 +151,7 @@ static void* CullBakeWorker(void* arg) {
 void CullInit() {
     cullVisibilityValid=false;
     if (World.curLev >= LEVEL_CYBERSPACE) { for (u32 i=0;i<ARRSIZE;++i) { gridCellStates[i] = CELL_OPEN|CELL_VISIBLE; } mset(precomputedVisibleCellsFromHere,0xFF,sizeof(precomputedVisibleCellsFromHere)); glBindBuffer(GL_SSBO,cellVisibleDataID); glBufferSubData(GL_SSBO,0,ARRSIZE*sizeof(u32),gridCellStates); return; }
-    double start_time = get_time(); DualLog("Culling ");
+    double start_time = get_timed(); DualLog("Culling ");
     DetermineClosedEdges(); // For each cell, get visibility as though player were there and put into gridCellStates.  Then store the visibility of gridCellStates into the table of all visible cells for that cell at the appropriate offset for looking up later when actually re-assigning gridCellStates from this precalculated visibility state for the particular cell.
     ApplyOpenPortalEdges(); // DetermineClosedEdges() just reset every edge to its static closed state; reopen doors that start open/ajar BEFORE baking the precomputed visibility table below.
     MarkSkyVisibleChunks(); // Before the bake, so the sky bits are final by the time the precomputed table is written.
@@ -176,5 +176,5 @@ void CullInit() {
         }
     }
     playerCellIdx = PosGetCellCoords(World.position[PLAYER1].x,World.position[PLAYER1].z); i32 cellToCellIdx = playerCellIdx * ARRSIZE; for (i32 z=0;z<WORLDZ;++z) { for (i32 x=0;x<WORLDX;++x) { i32 cell = (z * WORLDX) + x; size_t flat = (size_t)(cellToCellIdx + cell); if (get_cull_bit(precomputedVisibleCellsFromHere,flat)) {gridCellStates[cell] |= CELL_VISIBLE;} } }
-    gridCellStates[0] |= CELL_VISIBLE;/* Errors default to 0 so draw them anyways.*/ DualLog("....................................................took %.6f secs\n",get_time() - start_time);
+    gridCellStates[0] |= CELL_VISIBLE;/* Errors default to 0 so draw them anyways.*/ DualLog("....................................................took %.6f secs\n",get_timed() - start_time);
 }

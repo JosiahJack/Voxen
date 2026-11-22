@@ -33,8 +33,9 @@ for s in 'ssr.compute ssrCSSrc' 'rt.compute rtCSSrc' 'rtcopy.compute rtCopyCSSrc
          'chunk_vert.glsl vertSrc' 'chunk_frag.glsl fragSrc' 'ui_vert.glsl vertUISrc' 'ui_frag.glsl fragUISrc' 'text_vert.glsl textVertSrc' 'text_frag.glsl textFragSrc' 'composite_vert.glsl quadVertSrc' 'composite_frag.glsl quadFragSrc' 'shadowmap_vert.glsl shadowmapVertSrc' 'shadowmap_frag.glsl shadowmapFragSrc' \
          'particle_vert.glsl particleVertSrc' 'particle_frag.glsl particleFragSrc' 'trail_vert.glsl trailVertSrc' 'trail_frag.glsl trailFragSrc'; do gh Shaders/${s%% *} "${s#* }"; done
 printf '#include "%s.h"\n' text_{vert,frag}.glsl depth_prepass_vert.glsl depth_prepass.glsl debugunlit_{vert,frag}.glsl chunk_{vert,frag}.glsl ui_{vert,frag}.glsl shadowmap_{vert,frag}.glsl composite_{vert,frag}.glsl particle_{vert,frag}.glsl trail_{vert,frag}.glsl {ssr,rt,rtcopy,voxels}.compute > Shaders/shaders.h
+WARN_CFLAGS="-Wdouble-promotion" #"-Wformat=2 -Wnull-dereference -Wold-style-definition -Wundef -Wpointer-arith -Wcast-align -Wimplicit-int-conversion -Wimplicit-float-conversion -Wsign-conversion -Wconditional-uninitialized -Wloop-analysis -Wfloat-equal -Wbad-function-cast -Wnested-externs"
 COMMON_CFLAGS="-ferror-limit=500 -fvisibility=hidden -pipe -fdata-sections -Wshadow -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -fno-stack-protector -fno-unwind-tables -Wno-format-nonliteral -Wno-implicit-fallthrough -Wno-initializer-overrides -Wno-switch -Wno-int-to-void-pointer-cast -fno-ident -fdeclspec -fomit-frame-pointer -g0 -Wunused -Wno-missing-field-initializers \
-               -Wno-overlength-strings -fno-math-errno -fno-sanitize=all -m64 -Oz -march=haswell -mf16c -mavx -Wbool-conversion -Wno-empty-body -nostdinc -ftrivial-auto-var-init=zero"
+               -Wno-overlength-strings -fno-math-errno -fno-sanitize=undefined -m64 -Oz -march=haswell -mf16c -mavx -Wbool-conversion -Wno-empty-body -nostdinc -ftrivial-auto-var-init=zero -fcolor-diagnostics $WARN_CFLAGS"
 COMMON_LFLAGS="-Wl,-z,relro,-z,now,--gc-sections,--as-needed,--build-id=none"
 [[ $BUILD_MODE == debug ]] && COMMON_CFLAGS+=" -g -O0 -fno-omit-frame-pointer -funwind-tables"
 if [ "$PLATFORM" = "windows" ]; then
@@ -59,7 +60,7 @@ fi
 export TEMP_DIR=temp_build
 BINARY_PDB="${BINARY_PDB:-${BINARY_NAME%.exe}.pdb}"
 SOURCES="voxen.c physics.c entity.c lib.c citadel.c ai.c weapons.c text.c textures.c models.c culling.c particles.c minigames.c"
-printf '%s\n' $SOURCES | xargs -P12 -I{} sh -c '$CC -c "$1" $CFLAGS -o "temp_build/$1.o"' _ {}
+printf '%s\n' $SOURCES | parallel -j12 'script -qefc "$CC -c {} $CFLAGS -o temp_build/{}.o" /dev/null'
 if [ "$BUILD_MODE" = "debug" ] && [ "$PLATFORM" = "windows" ]; then
     MINGW_LIB="${MINGW_LIB:-/usr/x86_64-w64-mingw32/lib}"
     MINGW_GCC_LIB="${MINGW_GCC_LIB:-$(dirname "$(ls /usr/lib/gcc/x86_64-w64-mingw32/*/libgcc.a 2>/dev/null | head -1)" 2>/dev/null)}"
@@ -74,7 +75,7 @@ else
 fi
 $LINKER "$TEMP_DIR"/*.o $LDFLAGS $LINK_OUTPUT
 if ! $IS_CI; then
-    strip --strip-all "$BINARY_NAME"; #upx -qqq --best --lzma "$BINARY_NAME"
+    strip --strip-all "$BINARY_NAME"; upx -qqq --best --lzma "$BINARY_NAME"
     echo "Built engine as game in $(( $(now_ms) - shader_start )) ms"
     if [[ $PLATFORM == windows ]]; then
         wine "./$BINARY_NAME"
@@ -87,3 +88,4 @@ fi
 [[ $BUILD_MODE == debug ]] || rm -f "$BINARY_PDB"
 rm -f Shaders/*.h voxen.upx #Cleanup after quitting. Doesn't affect build timer. Gives me a chance to trivially copy out .o files if I want.
 rm -r temp_build
+rm -r ~/.cache/zig

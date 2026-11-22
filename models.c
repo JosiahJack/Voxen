@@ -16,7 +16,7 @@ typedef struct { u32 base, spanLen; } AnimEntryRef; static AnimEntryRef animNumS
 extern const u16 wepModelIndices[16];
 INLINE void MdlMarkLevel(u16 m, u16 levBit, bool persistForced) { if (m >= mdlsCnt) return; if (persistForced) { mdlPersistentSet[m] = 1; } else { mdlLevelBits[m] |= (u16)levBit; } }
 static void MdlMarkAnimNum(u16 a, u16 levBit, bool persistForced) { if (a >= MAXANIM) return; for (u8 k = 0; k < animNumSpanCnt[a]; ++k) { AnimEntryRef* r = &animNumSpans[a][k]; if (!r->spanLen) { MdlMarkLevel((u16)r->base, levBit, persistForced); continue; } for (u32 m = r->base; m < r->base + r->spanLen && m < mdlsCnt; ++m) { MdlMarkLevel((u16)m, levBit, persistForced); } } }
-static void MdlCloseConst(u16 c, u16 levBit, bool persistForced) { if (c >= MAX_ENTITIES) return; const EPerms* ed = &EDefs[c]; if (ed->modelIndex < mdlsCnt) MdlMarkLevel(ed->modelIndex, levBit, persistForced); if (ed->colMeshIndex < mdlsCnt) MdlMarkLevel(ed->colMeshIndex, levBit, persistForced); if (EntIsLodCardConst(c)) MdlMarkLevel(178, levBit, persistForced); if (!persistForced) MdlMarkAnimNum(ed->animationNum, levBit, false); }
+static void MdlCloseConst(u16 c, u16 levBit, bool persistForced) { if (c >= MAX_ENTS) return; const EPerms* ed = &EDefs[c]; if (ed->modelIndex < mdlsCnt) MdlMarkLevel(ed->modelIndex, levBit, persistForced); if (ed->colMeshIndex < mdlsCnt) MdlMarkLevel(ed->colMeshIndex, levBit, persistForced); if (EntIsLodCardConst(c)) MdlMarkLevel(178, levBit, persistForced); if (!persistForced) MdlMarkAnimNum(ed->animationNum, levBit, false); }
 INLINE void MdlScanConstVal(const char* v, const char* ln, u32 lnN, u16 levBit) { if (*v == '-') return; MdlCloseConst(parse_numberu16(v, ln, lnN), levBit, false); }
 bool MdlIsWinMemberSet(u16 m, u8 lev) { if (mdlPersistentSet[m] || lev >= MAX_LEVELS) return false; u16 lb = (u16)(1u << lev); if (mdlIsAnimFrame[m]) return (mdlLevelBits[m] & lb) != 0; return mdlLevelBits[m] == lb; }
 static const u16 mdlRegRanges[7][2] = {{307,406},{417,417},{419,447},{458,463},{471,476},{496,514},{768,855}};
@@ -58,7 +58,6 @@ static void DeriveResidentModelSets(const ModelData* entries, u32 count) {
     MdlMarkAnimNum(49, 0, true); MdlMarkAnimNum(50, 0, true);
     if (mdlsCnt > 178) { MdlMarkLevel(178, 0, true); } if (mdlsCnt > 7488) { MdlMarkLevel(7488, 0, true); }
     for (u32 m=0; m<mdlsCnt; ++m) { u16 bits = mdlLevelBits[m]; u8 lvlCnt = (u8)__builtin_popcount(bits); if (bits && lvlCnt >= 2 && !mdlIsAnimFrame[m]) { mdlPersistentSet[m] = 1; } else if (!bits && m < count && entries[m].index != U16_MAX && !entries[m].animated) { mdlPersistentSet[m] = 1; } }
-    for (u8 lev=0; lev<MAX_LEVELS; ++lev) { for (u32 m=0; m<mdlsCnt; ++m) { MdlIsWinMemberSet((u16)m, lev); } }
 }
 INLINE u32 MdlVbBytesRaw(u16 m) { return rtSrcVertCounts ? (u32)((size_t)rtSrcVertCounts[m]*VRT_ATT_SZ) : 0; }
 INLINE u32 MdlIbBytesRaw(u16 m) { return (u32)modelTriangleCounts[m]*6u + 4u; }
@@ -733,12 +732,12 @@ void LoadPerLevelModels(u8 lev) {
     for (u32 k=0;k<ic;++k) incStamp[incList[k]] = 1;
     for (u32 m=0; m<mdlsCnt; ++m) { bool inc = incStamp[m] != 0; bool outg = anyOut && MdlIsWinMemberSet((u16)m, mdlSwapLev); if (!inc && !outg) continue; if (physPos[m] || modelTriangles[m] || modelVertexCounts[m]) { MdlSwapWindowDisposeData((u16)m); } mdlVboOfs[m] = mdlIboOfs[m] = 0xFFFFFFFFu; }
     if (incList) OS_Free(incList, incCnt*sizeof(u16));
-    if (incCnt) { u32 winVB = mdlPoolVbBytes - mdlSwapVboBase, winIB = mdlPoolIbBytes - mdlSwapIboBase; double startSwapTime = get_time(); MdlLoadSet s = {lo,hi,incStamp,1,winVB,winIB,NULL,NULL}; MdlLoadModelSet(&s); DualLog("Loading models for lev %u, count %u ...............................................took %.6f secs\n",lev,incCnt,get_time() - startSwapTime); }
+    if (incCnt) { u32 winVB = mdlPoolVbBytes - mdlSwapVboBase, winIB = mdlPoolIbBytes - mdlSwapIboBase; double startSwapTime = get_timed(); MdlLoadSet s = {lo,hi,incStamp,1,winVB,winIB,NULL,NULL}; MdlLoadModelSet(&s); DualLog("Loading models for lev %u, count %u ...............................................took %.6f secs\n",lev,incCnt,get_timed() - startSwapTime); }
     mdlSwapLev = lev;
     RtSwapPatchModels();
 }
 void ParseAllModels(void) {
-    double startParseTime = get_time();
+    double startParseTime = get_timed();
     ModelDataParser mp = {0}; ParseModelData(&mp,MAX_MDLS,"./Data/models.txt");
     u32 maxid = 0, totalActual = 0;
     for (u32 i=0;i<mp.count;++i) { if (mp.entries[i].index == U16_MAX){continue;} totalActual++; if (mp.entries[i].index > maxid) { maxid = mp.entries[i].index; } if (mp.entries[i].animated && IsGLBSourcePath(mp.entries[i].path)) { u32 blockMax = mp.entries[i].index + (mp.entries[i].frameCount > 0 ? (mp.entries[i].frameCount - 1) : 0); if(blockMax > maxid) { maxid=blockMax; } } }
@@ -761,12 +760,12 @@ void ParseAllModels(void) {
     MdlLoadModelSet(&s);
     u32 metaV = 0, metaT = 0; for (u32 m=0;m<mdlsCnt;++m) { metaV += mdlMetaVertCounts[m]; metaT += mdlMetaTriCounts[m]; }
     OS_FreeInitPhase();
-    DualLog(" total verts: %u, tris: %u...................took %.6f secs\n", metaV, metaT, get_time() - startParseTime);
+    DualLog(" total verts: %u, tris: %u...................took %.6f secs\n", metaV, metaT, get_timed() - startParseTime);
 }
 void LoadModels() {
     static bool mdlPersistentsLoaded = false;
     if (mdlPersistentsLoaded) return;
-    double startModelTime = get_time();
+    double startModelTime = get_timed();
     u32 lo = mdlsCnt, hi = 0, pstCnt = 0;
     for (u32 m=0; m<mdlsCnt; ++m) { if (mdlPersistentSet[m]) { ++pstCnt; if (m < lo) lo = m; if (m > hi) hi = m; } }
     DualLog("Loading   models ( %d persistent) ",pstCnt);
@@ -807,7 +806,7 @@ void LoadModels() {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
     for (u32 m=0; m<mdlsCnt; ++m) { if (mdlPstHalfV[m]) OS_Free(mdlPstHalfV[m], (size_t)rtSrcVertCounts[m]*VRT_ATT_SZ); if (mdlPstTri[m]) OS_Free(mdlPstTri[m], (size_t)modelTriangleCounts[m]*6+4); }
     OS_Free(mdlPstHalfV, mdlsCnt*sizeof(void*)); OS_Free(mdlPstTri, mdlsCnt*sizeof(void*)); mdlPstHalfV = NULL; mdlPstTri = NULL;
-    DualLog(" vertices: %u, tris: %u..................took %.6f secs\n", tv, tt, get_time() - startModelTime);
+    DualLog(" vertices: %u, tris: %u..................took %.6f secs\n", tv, tt, get_timed() - startModelTime);
     mdlPersistentsLoaded = true;
 }
 AnimationClip mdlAnimClips[MAXANIM][MAX_ANIMCLIPS] = { // speed, frameStart, frameEnd, frameStartModelIndex, framerate
@@ -849,16 +848,16 @@ void PortalCulling(); bool ToggleDoorPortal(u32,u16,u16);
 void ChangeAnim(Entity* e, u8 c) { if (e->animationNum >= MAXANIM || c >= MAX_ANIMCLIPS) return; AnimationClip* clip=&mdlAnimClips[e->animationNum][c]; if (clip->framerate <= 0 || clip->speed <= 0 || e->clip == c) return; e->clip=c; e->frame=clip->frameStart; e->modelIndex=clip->frameStartModelIndex; e->currentFrameFinished=0.0; }
 extern WeaponFireCtx wfx; void PlaySparkSound(V3);
 void UpdateAnims(void) {
-    if (World.paused || World.menuActive){return;} static double lastPauseTime=0; if(lastPauseTime == 0.0){lastPauseTime=World.pauseRelativeTime;} double animDT=World.pauseRelativeTime-lastPauseTime; lastPauseTime=World.pauseRelativeTime; if(animDT > 0.1){animDT=0.1;} if(animDT <= 0.0){return;} bool portalsNeedUpdated=false; u8 animTest=Cheats.animTest;
+    if (World.paused || World.menuActive) { return; } static float lastPauseTime = 0.0f; if (lastPauseTime == 0.0f) { lastPauseTime = World.pauseRelativeTime; } float  animDT = (float)(World.pauseRelativeTime - lastPauseTime); lastPauseTime = World.pauseRelativeTime; if (animDT > 0.1f) { animDT = 0.1f; } if (animDT <= 0.0f) { return; } bool portalsNeedUpdated = false; u8 animTest = Cheats.animTest;
     for (u16 i = INSTS_1ST_IDX; i < INSTANCE_CNT; ++i) {
         if (i == World.weaponVModelIndex) continue; Entity* e = &World.instances[i]; if (e->modelIndex >= MAX_MDLS || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAXANIM || e->ajar) continue;
         if (animTest == 1) {
-            u8 validClips[MAX_ANIMCLIPS], numValid=0, targetClipIdx=0; double totalDuration = 0.0; for (u8 c = 0; c < MAX_ANIMCLIPS; ++c) { AnimationClip* test = &mdlAnimClips[e->animationNum][c]; if (test->framerate > 0 && test->speed > 0) { validClips[numValid++] = c; double dur = (double)(test->frameEnd - test->frameStart + 1) / ((double)test->framerate * test->speed); totalDuration += dur; } }
+            u8 validClips[MAX_ANIMCLIPS], numValid = 0, targetClipIdx = 0; float totalDuration = 0.0f; for (u8 c=0;c<MAX_ANIMCLIPS;++c) { AnimationClip* test = &mdlAnimClips[e->animationNum][c]; if (test->framerate > 0 && test->speed > 0) { validClips[numValid++] = c; float dur = (float)(test->frameEnd - test->frameStart + 1) / ((float)test->framerate * test->speed); totalDuration += dur; } }
             if (numValid == 0) { continue; }
-            e->currentFrameFinished += animDT; while (e->currentFrameFinished >= totalDuration) { e->currentFrameFinished -= totalDuration; } if (e->currentFrameFinished < 0.0) { e->currentFrameFinished = 0.0; } double t = e->currentFrameFinished, clipStartTime = 0.0;
+            e->currentFrameFinished += animDT; while (e->currentFrameFinished >= totalDuration) { e->currentFrameFinished -= totalDuration; } if (e->currentFrameFinished < 0.0f) { e->currentFrameFinished = 0.0f; } float t = e->currentFrameFinished, clipStartTime = 0.0f;
             AnimationClip* activeClip = &mdlAnimClips[e->animationNum][validClips[0]];
-            for (u8 j=0;j<numValid;++j) { activeClip=&mdlAnimClips[e->animationNum][validClips[j]]; double activeDur = (double)(activeClip->frameEnd - activeClip->frameStart + 1) / ((double)activeClip->framerate * activeClip->speed); if (t<clipStartTime + activeDur) { targetClipIdx = j; break; }  clipStartTime += activeDur; if (j==numValid - 1) { targetClipIdx = j; t = clipStartTime; } }
-            u32 frameCount = activeClip->frameEnd - activeClip->frameStart + 1, frameOffset = (u32)((t - clipStartTime) / (1.0 / ((double)activeClip->framerate * activeClip->speed)));
+            for (u8 j=0;j<numValid;++j) { activeClip=&mdlAnimClips[e->animationNum][validClips[j]]; float activeDur = (float)(activeClip->frameEnd - activeClip->frameStart + 1) / ((float)activeClip->framerate * activeClip->speed); if (t < clipStartTime + activeDur) { targetClipIdx = j; break; }  clipStartTime += activeDur; if (j==numValid - 1) { targetClipIdx = j; t = clipStartTime; } }
+            u32 frameCount = activeClip->frameEnd - activeClip->frameStart + 1, frameOffset = (u32)((t - clipStartTime) / (1.0f / ((float)activeClip->framerate * activeClip->speed)));
             if (frameOffset >= frameCount) frameOffset = frameCount - 1;
             u32 newFrame = activeClip->frameStart + frameOffset;
             u16 newModel = activeClip->frameStartModelIndex + frameOffset;
@@ -880,15 +879,27 @@ void UpdateAnims(void) {
             }
         }
         if (animTest || e->clip >= MAX_ANIMCLIPS){continue;}
-        AnimationClip* clip = (AnimationClip*)&mdlAnimClips[e->animationNum][e->clip]; if(e->entflags & EF_ASLEEP){e->modelIndex=clip->frameStartModelIndex; continue;} if (clip->framerate <= 0 || clip->speed <= 0) continue; e->currentFrameFinished += animDT * clip->speed; double timePerFrame = 1.0 / clip->framerate;
+        AnimationClip* clip = (AnimationClip*)&mdlAnimClips[e->animationNum][e->clip]; if(e->entflags & EF_ASLEEP){e->modelIndex=clip->frameStartModelIndex; continue;} if (clip->framerate <= 0 || clip->speed <= 0) continue; e->currentFrameFinished += animDT * clip->speed; float timePerFrame = 1.0f / (float)clip->framerate;
         if (e->currentFrameFinished >= timePerFrame) {
             u32 framesToAdvance = (u32)(e->currentFrameFinished / timePerFrame), frameCount = clip->frameEnd - clip->frameStart + 1; u16 prevFrame = e->frame;
-            e->currentFrameFinished -= (double)framesToAdvance * timePerFrame; e->frame = clip->frameStart + ((e->frame - clip->frameStart + framesToAdvance) % frameCount); e->modelIndex = clip->frameStartModelIndex + (e->frame - clip->frameStart);
+            e->currentFrameFinished -= (float)framesToAdvance * timePerFrame; e->frame = clip->frameStart + ((e->frame - clip->frameStart + framesToAdvance) % frameCount); e->modelIndex = clip->frameStartModelIndex + (e->frame - clip->frameStart);
             if (IdxIsDoor(e->index) && (e->clip == A_OPENING || e->clip == A_CLOSING) && (u32)prevFrame - clip->frameStart + framesToAdvance >= frameCount) { e->frame = clip->frameEnd; e->modelIndex = clip->frameStartModelIndex + (clip->frameEnd - clip->frameStart); }
             if (e->frame != prevFrame) e->animFinished = World.current_time;
-            if (e->index == 585 && e->frame == 16) { /*prop_sparkingwire sparks effects*/ V3 sparkPos = V3Add(World.position[i],(V3){0.0f,-0.88f * World.scale[i].y,0.0f}); PlaySparkSound(sparkPos); SpawnImpactParticleForPrefab(729,sparkPos,(V3){0.0f,1.0f,0.0f}); ai_effect_flash(sparkPos,(Color3){0.9f,0.8f,0.6f},2.84f,4.0f,0.2f); }
+            if (e->index == 585 && e->frame == 16) { /*prop_sparkingwire sparks effects*/ V3 sparkPos = V3Add(World.position[i],(V3){0.0f,-0.88f * World.scale[i].y,0.0f}); PlaySparkSound(sparkPos); SpawnImpPart(729,sparkPos,(V3){0.0f,1.0f,0.0f}); ai_effect_flash(sparkPos,(Color3){0.9f,0.8f,0.6f},2.84f,4.0f,0.2); }
             if (IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, mdlAnimClips[e->animationNum][A_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;
         }
     } if (portalsNeedUpdated){PortalCulling();}
-    if (World.weaponVModelIndex > 0 && World.weaponVModelIndex < INSTANCE_CNT) { Entity* e = &World.instances[World.weaponVModelIndex]; if (e->animationNum < MAXANIM && e->clip < MAX_ANIMCLIPS) { AnimationClip* clip = &mdlAnimClips[e->animationNum][e->clip]; if (clip->framerate > 0 && clip->speed > 0) { e->currentFrameFinished += animDT * clip->speed; double timePerFrame = 1.0 / clip->framerate; if (e->currentFrameFinished >= timePerFrame) { u32 framesToAdvance = (u32)(e->currentFrameFinished / timePerFrame), frameCount = clip->frameEnd - clip->frameStart + 1; e->currentFrameFinished -= (double)framesToAdvance * timePerFrame; u32 offset = (e->frame >= clip->frameStart && e->frame <= clip->frameEnd) ? (e->frame - clip->frameStart) : 0; offset += framesToAdvance; if (offset >= frameCount) { if (e->clip == A_IDLE) { offset = frameCount - 1; e->frame = clip->frameStart + offset; e->modelIndex = clip->frameStartModelIndex + offset; } else { AnimationClip* idle = &mdlAnimClips[e->animationNum][A_IDLE]; e->clip = A_IDLE; e->frame = idle->frameStart; e->modelIndex = idle->frameStartModelIndex; e->currentFrameFinished = 0.0; } } else { e->frame = clip->frameStart + offset; e->modelIndex = clip->frameStartModelIndex + offset; } } } } int curWep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); if (wfx.pendingMeleeFinished > 0.0 && World.pauseRelativeTime >= wfx.pendingMeleeFinished && (curWep16 == 5 || curWep16 == 6)) { e->animationNum = (curWep16 == 5) ? 50 : 49; e->clip = A_IDLE; e->frame = mdlAnimClips[e->animationNum][A_IDLE].frameStart; e->modelIndex = mdlAnimClips[e->animationNum][A_IDLE].frameStartModelIndex; e->currentFrameFinished = 0.0; } }
+    if (World.weaponVModelIndex > 0 && World.weaponVModelIndex < INSTANCE_CNT) {
+        Entity* e = &World.instances[World.weaponVModelIndex]; if (e->animationNum < MAXANIM && e->clip < MAX_ANIMCLIPS) { AnimationClip* clip = &mdlAnimClips[e->animationNum][e->clip];
+            if (clip->framerate > 0 && clip->speed > 0) {
+                e->currentFrameFinished += animDT * clip->speed; float timePerFrame = 1.0f / (float)clip->framerate;
+                if (e->currentFrameFinished >= timePerFrame) {
+                    u32 framesToAdvance = (u32)(e->currentFrameFinished / timePerFrame), frameCount = clip->frameEnd - clip->frameStart + 1; e->currentFrameFinished -= (float)framesToAdvance * timePerFrame;
+                    u32 offset = (e->frame >= clip->frameStart && e->frame <= clip->frameEnd) ? (e->frame - clip->frameStart) : 0; offset += framesToAdvance;
+                    if (offset >= frameCount) { if (e->clip == A_IDLE) { offset = frameCount - 1; e->frame = clip->frameStart + offset; e->modelIndex = clip->frameStartModelIndex + offset; } else { AnimationClip* idle = &mdlAnimClips[e->animationNum][A_IDLE]; e->clip = A_IDLE; e->frame = idle->frameStart; e->modelIndex = idle->frameStartModelIndex; e->currentFrameFinished = 0.0f; } }
+                    else { e->frame = clip->frameStart + offset; e->modelIndex = clip->frameStartModelIndex + offset; }
+                }
+            }
+        } int curWep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); if (wfx.pendingMeleeFinished > 0.0f && World.pauseRelativeTime >= wfx.pendingMeleeFinished && (curWep16 == 5 || curWep16 == 6)) { e->animationNum = (curWep16 == 5) ? 50 : 49; e->clip = A_IDLE; e->frame = mdlAnimClips[e->animationNum][A_IDLE].frameStart; e->modelIndex = mdlAnimClips[e->animationNum][A_IDLE].frameStartModelIndex; e->currentFrameFinished = 0.0f; }
+    }
 }

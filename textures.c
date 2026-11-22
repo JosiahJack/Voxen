@@ -188,7 +188,7 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
 void SetWindowIcon(const WinSysIcon*);
 static bool is_vid_path(const char* p){ return sFindSub(p,"AAIntro")||sFindSub(p,"AAOutro")||sFindSub(p,"AADeath")||sFindSub(p,"VMail"); }
 void LoadTextures() {
-    double start_time = get_time(); texCnt = totalPixels = totalPaletteColors = 0u; TextureDataParser texture_parser; if (unlikely(!ParseTextureData(&texture_parser, MAXTEX, "./Data/textures.txt"))) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
+    double start_time = get_timed(); texCnt = totalPixels = totalPaletteColors = 0u; TextureDataParser texture_parser; if (unlikely(!ParseTextureData(&texture_parser, MAXTEX, "./Data/textures.txt"))) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
     i32 maxIndex = -1; for (u32 k=0;k<texture_parser.count;++k) { if (texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != U16_MAX) { maxIndex = texture_parser.entries[k].index; } }
     texCnt = (u16)(maxIndex + 1);
     g_vidFrameMap=OS_Alloc(texCnt*sizeof(u16)); mset(g_vidFrameMap,0,texCnt*sizeof(u16));
@@ -245,7 +245,7 @@ void LoadTextures() {
     OS_Free(arena, arena_size);
     png_arena_main.base = NULL;
     OS_FreeInitPhase();
-    DualLog("took %.6f secs\n", get_time() - start_time);
+    DualLog("took %.6f secs\n", get_timed() - start_time);
 }
 const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS] = {
     /*0*/{(const u16[]){1310,1311,1312,1313,1313,1312,1311,1310},8,NULL,0,"Bridge11",0.35f},    /*1*/{(const u16[]){1115,1116},2,(const u16[]){1117,1118},2,"BrokenClock",0.5f},    /*2*/{(const u16[]){1124,1125,1126,1127,1128,1129,1130},7,(const u16[]){1131,1132,1133,1134,1135,1136,1137,1138},8,"EnergMine",0.35f},
@@ -275,7 +275,7 @@ void TextureSequenceUpdate(u16 self) {
     Entity* e = &World.instances[self];
     if (e->texAnimClip >= NUM_TEXTURE_CLIPS) { e->textureAnimating = false; }
     else {
-        const TextureAnimClip* clip = &textureAnimClips[e->texAnimClip]; bool stopAtDie = e->texAnimStopsAtDie && e->health <= 0.0f; e->tickFinished = World.pauseRelativeTime+clip->period;
+        const TextureAnimClip* clip = &textureAnimClips[e->texAnimClip]; bool stopAtDie = e->texAnimStopsAtDie && e->health <= 0.0f; e->tickFinished = World.pauseRelativeTime + clip->period;
              if (e->texAnimRandom && (!stopAtDie)) { e->texFrame = random_range_u32(0,clip->length-1); if (clip->glowLength) { e->texGlowFrame=random_range_u32(0,clip->glowLength-1); } }
         else if (e->texAnimInReverse) { if (stopAtDie) { if (e->texFrame > 0) e->texFrame--; } else e->texFrame = (e->texFrame == 0) ? clip->length-1 : e->texFrame-1; if (clip->glowLength) { e->texGlowFrame = (e->texGlowFrame == 0) ? clip->glowLength - 1 : e->texGlowFrame - 1;} }
         else { if (stopAtDie) { if (e->texFrame < clip->length - 1) { e->texFrame++; } } else e->texFrame = (e->texFrame+1) % clip->length; if (clip->glowLength) { e->texGlowFrame = (e->texGlowFrame + 1) % clip->glowLength;} }

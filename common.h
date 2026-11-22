@@ -11,6 +11,7 @@ typedef u8 bool; enum { false = 0, true = 1 };
 enum{U16_MAX=65535,U32_MAX=0xFFFFFFFFU,U64_MAX=0xFFFFFFFFFFFFFFFFULL};
 typedef __builtin_va_list va_list;
 extern size_t g_mmap_live; /* diagnostics (lib.c): live bytes from OS_AllocateRAM */
+extern double game_start_time;
 typedef struct { float r,g,b; } Color3;    typedef struct { float r,g,b,a; } Color;    typedef struct { float x,y; } V2;    typedef struct { float x,y,z; } V3;    typedef struct { float x,y,z,w; } Quaternion;    typedef struct { bool hit; V3 point, normal; float pen; } Overlap;    typedef struct { V3 mn,mx; u16 triStart; u16 triCount; i32 children[8]; } BvhNode;
 typedef u8 ColliderType;
 typedef int (*cmpfun)(const void*,const void*),(*cmpfun_r)(const void*,const void*,void*);
@@ -66,7 +67,8 @@ void DualLogError(const char*, ...), DualLog(const char*, ...), DualLogWarn(cons
     i32 __stdcall SwitchToThread();
     INLINE void OS_FutexWait(u32* a, u32 expect) { while (__atomic_load_n(a,__ATOMIC_ACQUIRE)==expect) SwitchToThread(); } /* no futex on Win32: yield to a runnable thread instead of burning the core */
     INLINE void OS_FutexWakeAll(u32* a) { (void)a; }
-    INLINE double get_time() { static LARGE_INTEGER frequency,counter; static i32 init=0; if (!init) { QueryPerformanceFrequency(&frequency); init=1; } QueryPerformanceCounter(&counter); return (double)counter.QuadPart / frequency.QuadPart; }
+    INLINE double get_timed() { static LARGE_INTEGER frequency,counter; static i32 init = 0; if (!init) { QueryPerformanceFrequency(&frequency); init=1; } QueryPerformanceCounter(&counter); return          (double)counter.QuadPart / frequency.QuadPart;                     }
+    INLINE  float  get_time() { static LARGE_INTEGER frequency,counter; static i32 init = 0; if (!init) { QueryPerformanceFrequency(&frequency); init=1; } QueryPerformanceCounter(&counter); return (float)(((double)counter.QuadPart / frequency.QuadPart) - game_start_time); }
 #else
     #define INVALID_FHANDLE -1
     typedef struct __attribute__((aligned(16))) OS_ThreadHead { void(*trampoline)(struct OS_ThreadHead*),*(*fn)(void*),*arg; int join_futex,_pad; } OS_ThreadHead;
@@ -75,11 +77,11 @@ void DualLogError(const char*, ...), DualLog(const char*, ...), DualLogWarn(cons
     INLINE long OS_Read(FHandle f,void*b,size_t c){long r=0; __asm__ __volatile__("syscall":"+a"(r):"D"(f),"S"(b),"d"(c):"rcx","r11","memory"); return r; }
     INLINE __attribute__((noreturn)) void OS_Exit(i64 exitCode){long r=231; __asm__ __volatile__("syscall":"+a"(r):"D"(exitCode):"rcx","r11","memory"); __builtin_unreachable(); }
     INLINE void OS_Close(FHandle fd){if(fd!=INVALID_FHANDLE){long r=3; __asm__ __volatile__("syscall":"+a"(r):"D"(fd):"rcx","r11","memory");}} // Only really needed to prevent hitting a 1024 file descriptor limit.
-    INLINE long OS_Open(const char* path, i32 flags, i32 mode) { long r = 2; __asm__ __volatile__("syscall":"+a"(r):"D"(path),"S"((long)flags),"d"((long)mode):"rcx","r11","memory"); return r; }
+    INLINE FHandle  OS_Open(const char* path, i32 flags, i32 mode) { long r = 2; __asm__ __volatile__("syscall":"+a"(r):"D"(path),"S"((long)flags),"d"((long)mode):"rcx","r11","memory"); return (FHandle)r; }
     INLINE void* OS_AllocateRAM(size_t len, i32 prot, i32 flags, FHandle fd) { long r=9; register int r10 __asm__("r10")=flags; register int r8 __asm__("r8")=fd; register long r9 __asm__("r9")=0; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL),"S"(len),"d"(prot),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); if((void*)r != (void*)-1) __atomic_add_fetch(&g_mmap_live,len,__ATOMIC_RELAXED); return (void*)r; }
-    INLINE FHandle OS_OpenReadonly(const char* path) { FHandle f=OS_Open(path,0,0); return f < 0 ? DualLogError("Could not open file %s for reading\n",path), -1 : f; }
-    INLINE FHandle OS_OpenWriteonly(const char* path) { FHandle f=OS_Open(path,1|64|512,420); return f < 0 ? DualLogError("Failed to open %s for writing\n",path),-1 : f; }
-    INLINE bool OS_FileExists(const char* path) { FHandle f=OS_Open(path,0,0); if (f < 0) return false; OS_Close(f); return true; }
+    INLINE FHandle OS_OpenReadonly(const char* path) { FHandle f = OS_Open(path,0,0); return f < 0 ? DualLogError("Could not open file %s for reading\n",path), -1 : f; }
+    INLINE FHandle OS_OpenWriteonly(const char* path) { FHandle f = OS_Open(path,1|64|512,420); return f < 0 ? DualLogError("Failed to open %s for writing\n",path),-1 : f; }
+    INLINE bool OS_FileExists(const char* path) { FHandle f = OS_Open(path,0,0); if (f < 0) return false; OS_Close(f); return true; }
     INLINE int OS_FileSize(FHandle f) { long r=5,s[18]; __asm__ __volatile__("syscall":"+a"(r):"D"(f),"S"(s):"rcx","r11","memory"); return (int)s[6]; }
     INLINE void* OS_AllocateFileBackedRAMReadonly(size_t s, FHandle fd, char* path) { if (s > (64u*1024u*1024u)) { DualLogError("File too large to map: %s (%u bytes)\n",path,(u32)s); return NULL; } void* r=OS_AllocateRAM(s,1,2,fd); return r==(void*)-1 ? DualLogError("Failed to allocate %s\n",path),NULL : r; }
     INLINE long OS_Seek(FHandle fd, i64 ofs, int whence /* forth and forsooth pray tell*/) { i64 r = 8; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(ofs),"d"(whence):"rcx","r11","memory"); return r; }
@@ -90,15 +92,16 @@ void DualLogError(const char*, ...), DualLog(const char*, ...), DualLogWarn(cons
     INLINE long syscall6(long n, long a, long b, long c, long d, long e, long f) { register long r=n; register long r10 __asm__("r10") = d; register long r8  __asm__("r8")  = e; register long r9  __asm__("r9")  = f; __asm__ __volatile__("syscall":"+a"(r):"D"(a),"S"(b),"d"(c),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); return r; }
     __attribute__((naked)) static long OS_CloneSyscall(struct OS_ThreadHead* stack) { __asm__ volatile ("mov %%rdi, %%rsi\nmov $0x50f00, %%edi\nmov $56, %%eax\nsyscall\nmov  %%rsp, %%rdi\nret\n":::"rax","rcx","rsi","rdi","r11","memory"); }
     __attribute__((noreturn)) static void thrtramp(struct OS_ThreadHead* head) { void*(*fn)(void*)=head->fn; void*arg=head->arg; int*futex=&head->join_futex; fn(arg); __asm__ volatile ("movl $1, %%eax\n\txchgl %%eax, (%0)\n\tmov %0, %%rdi\n\tmov $1, %%esi\n\tmov $1, %%edx\n\tmov $202, %%eax\n\tsyscall\n\tmov $60, %%eax\n\txor %%edi, %%edi\n\tsyscall\n" :: "r"(futex) : "rax","rcx","rsi","rdi","rdx","r11","memory"); __builtin_unreachable(); }
-    INLINE int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) { void* b = OS_AllocateRAM(THRSTACKSZ,0x1|0x2,0x2|0x20,INVALID_FHANDLE); struct OS_ThreadHead* head = (struct OS_ThreadHead*)((char*)b + THRSTACKSZ) - 1; head->trampoline = thrtramp; head->fn=fn; head->arg=arg; head->join_futex=0; head->_pad=0; long tid = OS_CloneSyscall(head); if(tid < 0){OS_Free(b,THRSTACKSZ); return (int)tid;} out->head = head; out->stack_base = b; return 0; }
+    INLINE int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) { void* b = OS_AllocateRAM(THRSTACKSZ,0x1|0x2,0x2|0x20,INVALID_FHANDLE); struct OS_ThreadHead* head = (struct OS_ThreadHead*)((uintptr_t)b + THRSTACKSZ - sizeof(struct OS_ThreadHead)); head->trampoline = thrtramp; head->fn = fn; head->arg = arg; head->join_futex = 0; head->_pad = 0; long tid = OS_CloneSyscall(head); if (tid < 0) { OS_Free(b,THRSTACKSZ); return (int)tid; } out->head = head; out->stack_base = b; return 0; }
     INLINE void OS_ThreadJoin(OS_Thread* t) { int v; while ((v = __atomic_load_n(&t->head->join_futex, __ATOMIC_SEQ_CST)) == 0) SYSCALL4(202, &t->head->join_futex, 0 /*FUTEX_WAIT*/, v, 0); OS_Free(t->stack_base,THRSTACKSZ); t->head = NULL; t->stack_base = NULL; }
     INLINE void OS_FutexWait(u32* a, u32 expect) { while (__atomic_load_n(a,__ATOMIC_ACQUIRE)==expect) SYSCALL4(202, a, 0 /*FUTEX_WAIT*/, expect, 0); }
     INLINE void OS_FutexWakeAll(u32* a) { SYSCALL4(202, a, 1 /*FUTEX_WAKE*/, 0x7fffffff, 0); }
-    INLINE double get_time() { struct {i64 s,ns;} ts; i64 ret; __asm__ __volatile__("syscall":"=a"(ret):"a"(228),"D"(1),"S"(&ts):"rcx","r11","memory"); if (ret != 0) {return 0.0;} return (double)ts.s + (double)ts.ns * 0.000000001; } // Full time in seconds, 1 for MONOTONIC, Note that using clock_gettime wasn't any better for performance.
+    INLINE double get_timed() { struct {i64 s,ns;} ts; i64 ret; __asm__ __volatile__("syscall":"=a"(ret):"a"(228),"D"(1),"S"(&ts):"rcx","r11","memory"); if (ret != 0) {return 0.0;} return          (double)ts.s + (double)ts.ns * 0.000000001;                     } // Full time in seconds, 1 for MONOTONIC, Note that using clock_gettime wasn't any better for performance.
+    INLINE  float  get_time() { struct {i64 s,ns;} ts; i64 ret; __asm__ __volatile__("syscall":"=a"(ret):"a"(228),"D"(1),"S"(&ts):"rcx","r11","memory"); if (ret != 0) {return 0.0;} return (float)(((double)ts.s + (double)ts.ns * 0.000000001) - game_start_time); }
 #endif 
 INLINE void* OS_Alloc(size_t amount) { return OS_AllocateRAM(amount,0x1|0x2,0x2|0x20,INVALID_FHANDLE); }
 INLINE void OS_Write(FHandle f,const void* buf, size_t s, const char* p) { size_t total=0; while(total < s) { i64 w=OS_RawWrite(f,(const char*)buf + total,s - total); if(w < 0) { DualLogError("Write error to %s: %s[%d]\n",p,w,(i32)-w); OS_Exit(1); } total += (size_t)w; } }
-INLINE void* OS_OpenAndAllocateFileBufferReadonly(const char* p,FHandle* f,int* s) {void* r;return((*f=OS_OpenReadonly(p))==(FHandle)-1)?*s=0,(void*)0:((*s=OS_FileSize(*f))<=0)?DualLogError("Skipping empty:%s\n",p),OS_Close(*f),OS_Exit(1),NULL:(r=OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p))?(OS_Close(*f),r):(*s=0,NULL);}
+INLINE void* OS_OpenAndAllocateFileBufferReadonly(const char* p, FHandle* f, i32* s) { void* r; return((*f = OS_OpenReadonly(p)) == (FHandle)-1) ? *s = 0, (void*)0 : ((*s = OS_FileSize(*f)) <= 0) ? DualLogError("Skipping empty:%s\n",p), OS_Close(*f), OS_Exit(1), NULL : (r = OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p)) ? (OS_Close(*f),r) : (*s = 0, NULL); }
 INLINE void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (mcpy(n,old,olds),OS_Free(old,olds),n) : 0; }
 static const Quaternion QUAT_IDENTITY=(Quaternion){0.0f,0.0f,0.0f,1.0f};
 typedef struct { V3 point; V3 normal; float distance; u16 hitInstanceIndex; bool hit;} RaycastHit;
@@ -107,12 +110,12 @@ typedef struct { float speed; u16 frameStart, frameEnd, frameStartModelIndex; u8
 typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation;
 enum {/*Initialization*/ SCRATCH_ARENA_SIZE = 96468992 /*92mb*/,
       /*Culling*/WORLDX = 64, WORLDZ = 64,/*64x64x18*/ VOXELS_PER_CELLSIDE = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELLSIDE), VOXELS_Z = (WORLDZ * VOXELS_PER_CELLSIDE), VOXEL_COUNT = (VOXELS_X * VOXELS_Z), MAX_PORTALS = 50/*max 49 on lev 7*/, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128,
-      /*Entity Management*/ MAX_LEVELS = 14, LEVEL_CYBERSPACE = 13, MAX_ENTITIES = 863, INSTANCE_CNT = 8704, MAX_LEVEL_PARTICLES = 128, WORLD = 0, PLAYER1 = 1, INSTS_1ST_IDX = 2, NUM_AI_TYPES = 29, MAX_IO_NAMES = 416, FW_MAX_CHILDREN = 42 /*max is 41 chunks (lev 9 func_wall)*/, FW_POOL_MAX = 512, MAX_ELEV_DESTS_PER_LEVEL = 8, SAVE_VERSION = 26,
+      /*Entity Management*/ MAX_LEVELS = 14, LEVEL_CYBERSPACE = 13, MAX_ENTS = 863, INSTANCE_CNT = 8704, MAX_LEVEL_PARTICLES = 128, WORLD = 0, PLAYER1 = 1, INSTS_1ST_IDX = 2, NUM_AI_TYPES = 29, MAX_IO_NAMES = 416, FW_MAX_CHILDREN = 42 /*max is 41 chunks (lev 9 func_wall)*/, FW_POOL_MAX = 512, MAX_ELEV_DESTS_PER_LEVEL = 8, SAVE_VERSION = 26,
       /*Lights*/ LIGHT_CNT = 2048, LANIM_MAX = 72/*max 71 (level 5)*/, MAX_LIGHTS_PER_VOXEL = 96, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 128, SUN_SHADOW_SIZE = 4096, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, SHADOW_NEARMESH_MAX = 1024, SC_MAX = (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS),
       /*Models*/ MAX_MDLS = 7490, WELD_HASH_SIZE = 32768, MAX_VERT_ELEMENT_SIZE = 6964, MAX_OUTPUT_VERTS = 22960, VRT_ATT_SZ = 16, CPU_VRT_SZ = 32, MAX_GLB_JOINTS = 96, MAX_GLB_BLOCKS = 60, SUB_MAIN = 32,
       /*Textures*/ MAXTEX = 4096, MAX_TOTAL_PIXELS = 48000000u, MAX_UNIQUE_COLORS = 86000u, TEXHASH_SZ = 1024, NUM_TEXTURE_CLIPS = 49, VIDEO_MAXFRAME = (1280u*720u), VIDEO_RING = 8, PNGFMT_NONE = 0, PNGFMT_SUB = 1, PNGFMT_UP = 2, PNGFMT_AVG = 3, PNGFMT_PAETH = 4, PNGFMT_AVG_1ST = 5,
       /*Animations*/ MAX_ANIMCLIPS = 10, MAXANIM = 59, A_LOOP_ALL = 0, A_IDLE_CLOSED = 0, A_IDLE = 0, A_INACTIVE = 0, A_ATTACK_MISS = 1, A_OPENING = 1, A_WALK = 1, A_ACTIVATE = 1, A_ATTACK_HIT = 2, A_ACTIVATED = 2, A_IDLE_OPEN = 2, A_RUN = 2, A_CLOSING = 3, A_DEACTIVATE = 3, A_ATTACK1 = 3, A_ATTACK2 = 4, A_INSTALL = 4, A_ATTACK3 = 5, A_INSTALLED = 5, A_PAIN = 6, A_PAIN2 = 7, A_PAIN3 = 8, A_DYING = 9,
-      /*Physics*/ CT_NONE = 0, CT_BOX = 1, CT_SPH = 2, CT_CAP = 3, CT_CVX = 4, CT_MSH = 5, MAX_UNIQUE_CVX_MESHES = 5989, BVH_MAX_DEPTH = 6, BVH_LEAF_MAX_TRIS = 8, BVH_MAX_NODES_PER_MDL = 586, BVH_MAX_TRIS_PER_MDL = 8000, MAX_LINEVRTS = 128000, MANIFOLD_MAX = 4, EPA_MAX_FACES = 64, EPA_MAX_VERTS = 128, EPA_MAX_EDGES = EPA_MAX_FACES * 3, GJK_ITER = 32, EPA_ITER = 16, SOLVER_ITER_GLOBAL = 32, MAX_GLOBAL_CONTACTS = 8192,
+      /*Physics*/ CT_NONE = 0, CT_BOX = 1, CT_SPH = 2, CT_CAP = 3, CT_CVX = 4, CT_MSH = 5, MAX_UNIQUE_CVX_MESHES = 5989, BVH_MAX_DEPTH = 6, BVH_LEAF_MAX_TRIS = 8, BVH_MAX_NODES_PER_MDL = 586, BVH_MAX_TRIS_PER_MDL = 8000, MAX_LINEVRTS = 128000, MANI_MAX = 4, EPA_MAX_FACES = 64, EPA_MAX_VERTS = 128, EPA_MAX_EDGES = EPA_MAX_FACES * 3, GJK_ITER = 32, EPA_ITER = 16, SOLVER_ITER_GLOBAL = 32, MAX_GLOBAL_CONTACTS = 8192,
       /*Input*/ MAX_KEYS = 512, MAX_MOUSE_BUTTONS = 8, WS_KEYCOUNT = 349, INPUT_RELEASE = 0, INPUT_PRESS = 1, INPUT_REPEAT = 2, CONFIG_CNT = 73,
       /*Audio*/ MAX_CHANNELS = 128, MAX_SYNTH_VOICES = 16, AUDIO_RATE = 48000, AUDIO_CHANNELS = 2, AUDIO_PERIOD_MS = 10, AUDIO_PERIODS = 4, AUDIO_FRAMES = ((AUDIO_RATE * AUDIO_PERIOD_MS) / 1000), AUDBUF_SIZE = (AUDIO_FRAMES * AUDIO_PERIODS), REV_BUF_LEN = 16384, MAXAMB = 256, FSK_STEP = 0, FSK_JUMP = 1, FSK_LAND = 2,
       /*Text*/ T_BUFFER_SIZE = 4096, MAX_GLYPHS = 4096, LINE_LEN_MAX = 81920, TARG_STRLEN = 38, T_LOGSTR_CNT = 1100, T_LOGSTR_MAX = 1280 * 3, LOGCNT = 134, TEXT_VTX_FLOATS = 65536, T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8, T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_VIDEOTEXT = 13, T_BLUE = 14,
@@ -169,8 +172,7 @@ typedef struct { const u16 *frames; u8 length; const u16 *glowFrames; u8 glowLen
 typedef struct {i32 InputCodeSettings[42]; u16 ScreenWidth,ScreenHeight; bool Fullscreen; u8 FOV,Brightness,FXAA,Shadows,Reflections,Vsync,ModelDetail,GI,SpeakerMode,Reverb,VolumeMaster,VolumeMusic,VolumeMessage,VolumeEffects,Language,DynamicMusic,Footsteps,InvertLook,InvertInventoryCycling,InvCybLook,QuickItemPickup,QuickReloadWeapons,MouseSensitivity,NoShootMode,HeadBob,SSR_RES,CurrentMonitor;} SettingsSystem; extern SettingsSystem Sys_Settings;
 typedef struct { u16 god:1,noclip:1,notarget:1,bottomless:1,superoverride:1,fatigueCheat:1,redbull:1,consoleActive:1,noHUD:1,showLocation:1,showFPS:1,showPhys:1,showNPC:1,editMode:1,stepmode:1; u8 dizzyLevel:2,animTest:2,editSubMode:2; } CheatsSystem; extern CheatsSystem Cheats;
 typedef struct {
-        double vmailFrameFinished,tickFinished,searchFXStartTime[2],genClickTime,tWrnFinished[10],shieldAnimationStarted,shieldAnimationFinished;
-        float searchFXCursorX[2],searchFXCursorY[2];
+        float vmailFrameFinished,tickFinished,searchFXStartTime[2],genClickTime,tWrnFinished[10],shieldAnimationStarted,shieldAnimationFinished,searchFXCursorX[2],searchFXCursorY[2];
         i32 lastMultiMediaTabOpened,tWrnTextIdx[10],tWrnTextIdx2[10],tWrnTextIdx3[10],tWrnColorIdx[10],keycodeEntry,keycodeValue; u16 vmailFrame,linkedElevatorDoor,tetheredPGP,tetheredPWP,tetheredSearchable,tetheredKeypadElevator,tetheredKeypadKeycode,elevButtonSpawnIdx[8],genClickCustom,logReferenceIndex;
         i16 genClickItem, logFolderList[16], logReaderPage; u8 highlightTickCount[4], elevButtonLevelIdx[8], vmailActive, mfdTab[3], MFD_Data, MFD_MediaTab, MFD_ReaderView, mfdSelected[3], mfdReturnTab[3], mfdReturnView[3], mfdItemReader[2], mfdConsumable, pg_type[35], pg_gridType, pg_theme, pg_source, pg_output, pg_width, pg_height, pw_wireColor[7], logFolderCount;
         i8 elevButtonLabelIdx[8], genClickSlot, consumableClickRow, keycodeHuns, keycodeTens, keycodeOnes, pw_curL[7], pw_curR[7], pw_tgtL[7], pw_tgtR[7], pw_selectedWire, mg_current;
@@ -181,36 +183,33 @@ typedef struct {
         V3 objectInUsePos;
 } SystemUI;
 typedef struct { const char* stringTable[T_LOGSTR_CNT]; u16 audioLogImagesRefIndicesLH[LOGCNT],audioLogImagesRefIndicesRH[LOGCNT]; u8 audioLogType[LOGCNT],audioLogLevelFound[LOGCNT]; } TextSystem;     extern TextSystem Sys_Text; extern u32 fontAtlasTex,fontAtlasTexStopD;
-typedef struct { float hitOffset,fireDistance,overheatedPercent,targetY; V3 reloadContainerHome,reloadContainerPos; bool recoiling,pendingMeleeIsRapier,pendingMeleeSilent; RaycastHit tempHit; double pendingMeleeFinished; i32 pendingMeleeWep16; u16 tempHitEnt,pendingMeleeTarget; const char *pendingMeleeHitSnd,*pendingMeleeFleshSnd; } WeaponFireCtx;
+typedef struct { float hitOffset,fireDistance,overheatedPercent,targetY; V3 reloadContainerHome,reloadContainerPos; bool recoiling,pendingMeleeIsRapier,pendingMeleeSilent; RaycastHit tempHit; float pendingMeleeFinished; i32 pendingMeleeWep16; u16 tempHitEnt,pendingMeleeTarget; const char *pendingMeleeHitSnd,*pendingMeleeFleshSnd; } WeaponFireCtx;
 typedef struct { // Hw referenceIndex,ref14Index::Sys 21,0 Nav 22,1 Ere 23,2 Sen 24,3 Trg 25,4 Shi 26,5 Bio 27,6 Lan 28,7 Env 29,8 Boo 30,9 Jum 31,10 Nig 32,11
-    double nitroTimeSetting,earthShakerTimeSetting,justFired,waitTilNextFire,reloadFinished,dropFinished,berserkFinished,berserkIncTime,detoxFinished,geniusFinished,mediFinished,reflexFinishedTime,sightFinishedTime,jumpJetSuckFinished,doubleJumpFinished,noiseFinished,radBleedFinished,leanLTapFinished,leanRTapFinished,sightSideEffectFinishedTime,staminupFinishedTime,turboCyberTime,turboFinished,energyDrainTickFinished,painSoundFinished,radSoundFinished,
-           fatigueBleedoffFinished,fatigueMoveFinished,footstepFinished,rustleFinished,fallPainFinished,ressurectingFinished,mediPatchPulseFinished;
-    float weaponEnergySetting[16], reloadLerpValue, curWepHeat[7], fatigue, energy, currentCrouchRatio, leanTarget, crouchingVelocity, leanVelocity, lastVelY;
-    u32 accessCardOwned, wepAmmo[16], wepAmmoSecondary[16];
-    i32 lastAddedIndex, wepInvIndices[7], wepInvAmIndices[7], hardwareInvCurrent, genInvIdxRef[14], berserkIncrement, mediPatchPulseCount;
-    i16 ladderState, wepCurPending, weaponIndexPending, wepCur;
-    u16 hasHardware, hardwareIsActive, hardwareInvReferenceIndex[HW_COUNT], heldObjectIndex, heldObjectCustIdx, heldAmmo, heldAmmo2, weaponIndex, genInvCustIdx[14], patchActive, drainJPM, grenConstIndex[7];
-    u8 numLogsFromLevel[10], lerpUp, hasSoft, softVersions[7], hasMinigame, numweapons, currentMagazineAmount[7], currentMagazineAmount2[7], hwVers[HW_COUNT], hwVersSetting[HW_COUNT], grenAmmo[7], grenCur, generalInvCurrent, patchCur, patchCounts[7];
-    u8      beepDone:1, hasNewEmail:1, hasNewNotes:1, isPulserNotDrill:1, overloadEnabled:1, recoiling:1,     heldObjectLoadedAlternate:1;
-    u8 holdingObject:1,  grenActive:1,  hasNewLogs:1,    radiationArea:1,    inReverbZone:1, leanResetting:1, wasGrounded:1,               makingNoise:1;
+    float nitroTimeSetting,earthShakerTimeSetting,justFired,waitTilNextFire,reloadFinished,dropFinished,berserkFinished,berserkIncTime,detoxFinished,geniusFinished,mediFinished,reflexFinishedTime,sightFinishedTime,jumpJetSuckFinished,doubleJumpFinished,noiseFinished,radBleedFinished,leanLTapFinished,leanRTapFinished,sightSideEffectFinishedTime,staminupFinishedTime,turboCyberTime,turboFinished,energyDrainTickFinished,painSoundFinished,radSoundFinished,
+          fatigueBleedoffFinished,fatigueMoveFinished,footstepFinished,rustleFinished,fallPainFinished,ressurectingFinished,mediPatchPulseFinished,weaponEnergySetting[16],reloadLerpValue,curWepHeat[7],fatigue,energy,currentCrouchRatio,leanTarget,crouchingVelocity,leanVelocity,lastVelY;
+    u32 accessCardOwned,wepAmmo[16],wepAmmoSecondary[16];
+    i32 lastAddedIndex,wepInvIndices[7],wepInvAmIndices[7],hardwareInvCurrent,genInvIdxRef[14],berserkIncrement,mediPatchPulseCount;
+    i16 ladderState,wepCurPending,weaponIndexPending,wepCur;
+    u16 hasHardware,hardwareIsActive,hardwareInvReferenceIndex[HW_COUNT],heldObjectIndex,heldObjectCustIdx,heldAmmo,heldAmmo2,weaponIndex,genInvCustIdx[14],patchActive,drainJPM,grenConstIndex[7];
+    u8 numLogsFromLevel[10],lerpUp,hasSoft,softVersions[7],hasMinigame,numweapons,currentMagazineAmount[7],currentMagazineAmount2[7],hwVers[HW_COUNT],hwVersSetting[HW_COUNT],grenAmmo[7],grenCur,generalInvCurrent,patchCur,patchCounts[7],beepDone:1,hasNewEmail:1,hasNewNotes:1,isPulserNotDrill:1,overloadEnabled:1,recoiling:1,heldObjectLoadedAlternate:1,holdingObject:1,grenActive:1,hasNewLogs:1,radiationArea:1,inReverbZone:1,leanResetting:1,wasGrounded:1,makingNoise:1/*,:1 free bit*/;
     i8 cyberItemIndex;
-    bool wepLoadedWithAlternate[7], staminupActive, hasLog[134], readLog[134];
+    bool wepLoadedWithAlternate[7],staminupActive,hasLog[134],readLog[134];
 } InventorySystem;
-typedef struct { float damage, penetration, offense, defense, impactVelocity; V3 attacknormal, hitpoint; AttType attackType; u16 owner; bool isOtherNPC, berserkActive; } DamageData;
+typedef struct { float damage,penetration,offense,defense,impactVelocity; V3 attacknormal, hitpoint; AttType attackType; u16 owner; bool isOtherNPC,berserkActive; } DamageData;
 typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData;/*For use with LiveSplit or other future speedrunner utilities for doing speedruns*/
-typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width, height; float near, far, finished; bool visible; } CamView; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
-typedef struct { AttType type; float damage,range,speed,timeToActual,timeBetween,waitMin,waitMax,waitChance,projectileSpeed; bool hasLaser; int projectilePrefab; } NPCAttack;
-typedef struct { const char* name; NPCAttack attack[3]; float health,healthCyb,def; AIMoveType moveType; float yawSpeed,fov,fovStartMovement,distSeeBhnd,sightRange,walkSpeed,runSpeed,attack3Force,attack3Radius,tToPain,tBtwPain,tTillDead,tToChangeEnemy,tIdleSFXMin,tIdleSFXMax; bool explodeOnAttack3; double huntTime; float flightHt; bool flightHtIsPerc,switchMaterialOnDeath; float hearingRange,timeForTranq; bool hops; NPCType type; } NPCTable;
+typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width,height; float near,far,finished; bool visible; } CamView; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
+typedef struct { AttType type; float damage,range,speed,timeToActual,timeBetween,waitMin,waitMax,waitChance,projectileSpeed; bool hasLaser; i32 projectilePrefab; } NPCAttack;
+typedef struct { const char* name; NPCAttack attack[3]; AIMoveType moveType; NPCType type; float health,healthCyb,def,yawSpeed,fov,fovStartMovement,distSeeBhnd,sightRange,walkSpeed,runSpeed,attack3Force,attack3Radius,tToPain,tBtwPain,tTillDead,tToChangeEnemy,tIdleSFXMin,tIdleSFXMax,huntTime,flightHt,hearingRange,timeForTranq; bool explodeOnAttack3,flightHtIsPerc,switchMaterialOnDeath,hops; } NPCTable;
 extern const NPCTable npcTable[NUM_AI_TYPES];
 bool TargetIDShouldRender(u16); bool TargetIDInPlayerPVS(u16); i16 TargetIDGetText(u16);
-typedef struct { u16 level,inst; u8 anchor,align; float lineSp; } DecalStyle;    typedef struct { u16 modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex; float mass; u8 animationNum; ColliderType col; V3 colCtr,colSz; } EPerms;    typedef struct { V3 normal; float d; } FrustumPlane;    typedef struct PngArena { u8*base,*cursor,*end; } PngArena; extern PngArena png_arena_main;    typedef struct { int width,height; u8* pixels; } WinSysIcon;
-typedef struct{bool initialized,active;V2 min,max;double lastLMB,lastRMB;}UIComponent;typedef struct Particle { V3 pos,vel; float age,invLifetime,baseSize,rotation,angularVelocity; u32 color,emitterIndex,trailOwner; u16 flags,textureIndex,animFrame; u8 blendMode; V3 trailSample; u16 trailHead; } Particle; typedef struct { u32 sortKey; u16 index; } PartSortEntry;
+typedef struct { u16 level,inst; u8 anchor,align; float lineSp; } DecalStyle;    typedef struct { u16 modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex; float mass; u8 animationNum; ColliderType col; V3 colCtr,colSz; } EPerms;    typedef struct { V3 normal; float d; } FrustumPlane;    typedef struct PngArena { u8*base,*cursor,*end; } PngArena; extern PngArena png_arena_main;    typedef struct { i32 width,height; u8* pixels; } WinSysIcon;
+typedef struct{bool initialized,active; V2 min,max; float lastLMB,lastRMB; } UIComponent;    typedef struct Particle { V3 pos,vel; float age,invLifetime,baseSize,rotation,angularVelocity; u32 color,emitterIndex,trailOwner; u16 flags,textureIndex,animFrame; u8 blendMode; V3 trailSample; u16 trailHead; } Particle;    typedef struct { u32 sortKey; u16 index; } PartSortEntry;
 typedef struct GpuPartInst { float x,y,z,size; u32 color,data0,data1,pad; } GpuPartInst;    typedef struct TrlSegInst { float p0x,p0y,p0z,padA,p1x,p1y,p1z,padB; float c00x,c00y,c00z,c00w,c01x,c01y,c01z,c01w,c10x,c10y,c10z,c10w,c11x,c11y,c11z,c11w; u32 color0,color1,uvData; float deathTime; float trailWidthStart,trailWidthEnd; u32 chainIndex,trailOwner; } TrlSegInst;    typedef struct { u16 emitters[MAX_LEVEL_PARTICLES],count; } LevelParticles;
 typedef struct PSysDef { V3 pos; const u16* textures; u8 textureCount; float emitRate,duration,sizeMin,sizeMax,speedMin,speedMax,lifetimeMin,lifetimeMax,gravity,animWindow,softness,shapeRadius,shapeAngle; u8 shapeType; Color colStart,colEnd; const Color* rampColors; const float* rampTimes; u8 rampCount; const float *scaleKeys,*scaleTimes; u8 scaleCount; const float *velKeys,*velTimes; u8 velCount; const float *rotKeys,*rotTimes;
                          u8 rotCount; const float *emissKeys,*emissTimes; u8 emissCount; u8 trail; u32 trailTexture; Color trailColorStart,trailColorEnd; float trailLifetime,trailWidthStart,trailWidthEnd,trailVertDist; bool looping; u8 blendMode; bool blendModeOverride; u8 rotationMode,colorMode; u16 burstCount; Quaternion rotation; bool useMesh; } PSysDef;
-typedef struct { double combatImpulseFinished; bool inZone,distortion,cyberTube,elevator,levelEntry; TrackType zoneTrack; MusicType zoneMusic; } MusicSystem;    typedef struct {bool down, pressed;} KeyState;    typedef struct {const char* name; int value;} InputElement;    typedef struct {double scrollDelta; KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS]; bool isCapsLockOn;} InputSystem;
+typedef struct { float combatImpulseFinished; bool inZone,distortion,cyberTube,elevator,levelEntry; TrackType zoneTrack; MusicType zoneMusic; } MusicSystem;    typedef struct {bool down, pressed;} KeyState;    typedef struct {const char* name; i32 value;} InputElement;    typedef struct {double scrollDelta; KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS]; bool isCapsLockOn;} InputSystem;
 typedef /*FAT*/ struct  {
-    u32 entflags,ioflags,ioflagsHi; u16 modelIndex,index,portalIndex,texIndex,glowIndex,specIndex,normIndex,lodIndex,colMeshIndex; u32 deferredIoflags,deferredIoflagsHi; V3 forward,right,lastPosition,targetPosition,startPosition,activatedScale,dir; i32 cellIndex; i16 cellX,cellZ;
+    u32 entflags,ioflags,ioflagsHi; u16 modelIndex,index,portalIndex,texIndex,glowIndex,specIndex,normIndex,lodIndex,colMeshIndex,cellX,cellZ; u32 deferredIoflags,deferredIoflagsHi; V3 forward,right,lastPosition,targetPosition,startPosition,activatedScale,dir; i32 cellIndex;
     float shadRadius,health,cyberHealth,radiation,speed,ajarPercentage,percentMoved,gracePeriodFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime,timeTillEnemyChangeFinished,tTillDeadFinished,timeTillPainFinished,huntFinished,randWaitAtt1Finished,randWaitAtt2Finished,randWaitAtt3Finished,attackFinished,deathBurstFinished,tranquilizeFinished,wanderFinished,timeSinceMovedEnough,posCheckFinished,currentFrameFinished,animFinished,
           animSwapFinished,switchAnimFinished,delay,panelTimer,damage,itemLifeTime,randomMin,randomMax,timeInterval,cyberTimer,intervalFinished,delayFinished,tickFinished,aiThinkFinished,useFinished,waitBefClose,amount,resetTime,minSecurityLevel,rechargeFinished,camStartYAngle,camEndYAngle,camWaitTime,camWaitingFinished,camYaw,camYaw0,timeBeforeLasersOn,force,strength,offStrengthFactor,distancePaddingToTopPoint,initialBurstFinished,justUsed,timerFinished,
           randomItemDropChance[7],reverbMaxDist,deathAnimationStart,minDelayBetweenSpawns,maxDelayBetweenSpawns,allSpawnedResetDelay;
@@ -225,11 +224,12 @@ typedef /*FAT*/ struct  {
     u8 clip,animationNum,texAnimClip,camView,securityThreshold,maxRandomItems,questBitID,questTestMode,attackType,requiredAccessCard,bloodType,doorOpen,fieldColor,trackType,musicType,doorState,currentState,funcState,bodyState;
     i8 wireCurL[7],wireCurR[7];
 } Entity; // phew what a porker of a struct, it's been a eatin!
-INLINE bool Entity_GetGridCell(const Entity* e, int i) { return (bool)((e->gridCellsBits >> i) & 1u); }
-INLINE void Entity_SetGridCell(Entity* e, int i, bool v) { if (v) e->gridCellsBits |= (1ull << i); else e->gridCellsBits &= ~(1ull << i); }
+INLINE bool Entity_GetGridCell(const Entity* e, i32 i) { return (bool)((e->gridCellsBits >> i) & 1u); }
+INLINE void Entity_SetGridCell(Entity* e, i32 i, bool v) { if (v) e->gridCellsBits |= (1ull << i); else e->gridCellsBits &= ~(1ull << i); }
 typedef struct {
-    double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_physics_time,dt,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp,gpuFrameMs,gpuShadowMs,gpuPreMs,gpuMainMs,gpuSsrMs,gpuCompMs,automapNextRaster;
-    float farPlane[MAX_LEVELS],damageDealt,damageReceived,timeScale,worldMin_x[MAX_LEVELS],worldMin_z[MAX_LEVELS],voxMinCtrX[MAX_LEVELS],voxMinCtrZ[MAX_LEVELS],misTimerFinished,misTimerT,painStaticAlpha,empStaticAlpha,levelRadius[MAX_LEVELS][INSTANCE_CNT],levelInvInertiaTensor[MAX_LEVELS][INSTANCE_CNT][6],*radius,(*invInertiaTensor)[6],cam_pitch,cam_yaw,cam_roll;
+    double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,last_time,current_time,absoluteTime,gpuFrameMs,gpuShadowMs,gpuPreMs,gpuMainMs,gpuSsrMs,gpuCompMs;
+    float pauseRelativeTime,last_physics_time,dt,farPlane[MAX_LEVELS],damageDealt,damageReceived,timeScale,shakeFinished,screenshotTimeout,statusTextDecayFinished,worldMin_x[MAX_LEVELS],worldMin_z[MAX_LEVELS],voxMinCtrX[MAX_LEVELS],voxMinCtrZ[MAX_LEVELS],misTimerFinished,misTimerT,painStaticAlpha,empStaticAlpha,levelRadius[MAX_LEVELS][INSTANCE_CNT],levelInvInertiaTensor[MAX_LEVELS][INSTANCE_CNT][6],*radius,(*invInertiaTensor)[6],cam_pitch,cam_yaw,cam_roll,
+          lerpStartTime,justSavedTimeStamp,automapNextRaster,debugLineFinished,ladderSFXFinished;
     u32 lastFrameSecCount,lineVertCnt,shotsFired,grenadesThrown,savesScummed,levelLayer[MAX_LEVELS][INSTANCE_CNT],missionBits,*layer,targetIOActivatorIoflags,targetIOActivatorIoflagsHi;
     u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount,shields[4],weaponVModelIndex,levelWepVModel[MAX_LEVELS],TeleportTouch_allTeleportTouches[8],levelInstCount[MAX_LEVELS],levelLoadedLights[MAX_LEVELS],editTextInstanceIndex,misTimerMission,levelLightTargetnames[MAX_LEVELS][LIGHT_CNT],*lightTargetnames,loadedLights,decoyInstance,*lanimLightIdx,levelLAnimLightIdx[MAX_LEVELS][LANIM_MAX];
     i32 fogFac,cursorPos_x,cursorPos_y,currentMouse_dx,currentMouse_dy;
@@ -242,9 +242,8 @@ typedef struct {
     InventorySystem invP1; SystemUI Sys_UI; MusicSystem Sys_Music; Entity levInstances[MAX_LEVELS][INSTANCE_CNT],*instances; UIComponent uiComponents[MAX_UI_ELEMENTS]; ColliderType levCol[MAX_LEVELS][INSTANCE_CNT],*col; Quaternion levRot[MAX_LEVELS][INSTANCE_CNT],*rotation; Light levLights[MAX_LEVELS][LIGHT_CNT],*lights; LightAnimation levLAnims[MAX_LEVELS][LANIM_MAX],*lanims; Color fogColor[MAX_LEVELS]; LevelParticles levParticles[MAX_LEVELS],*particles;
     char playerName[27]; const char *audiologNames[LOGCNT],*audiologSubjects[LOGCNT],*audiologSenders[LOGCNT],*audioLogSpeech2Text[LOGCNT];
 } GlobalContext; // Savable complete game state data
-extern GlobalContext World;    extern InputSystem Sys_Input;    extern DecalStyle decalStyles[DECAL_STYLE_MAX];    extern AnimationClip mdlAnimClips[MAXANIM][MAX_ANIMCLIPS];    extern BvhNode** modelBVHNodes;    extern FHandle console_log_file;    extern EPerms EDefs[MAX_ENTITIES];    extern FrustumPlane playerFrustumPlanes[6];    extern const PSysDef particleTypeDefs[192];    extern WeaponFireCtx wfx;
-extern double healFlashFinished,chargeFlashFinished;
-extern float modelMatrices[INSTANCE_CNT*16],**physPos,*world_from_mdl,modelBounds[MAX_MDLS],berserkSeedTime,cyberStaticAlpha;
+extern GlobalContext World;    extern InputSystem Sys_Input;    extern DecalStyle decalStyles[DECAL_STYLE_MAX];    extern AnimationClip mdlAnimClips[MAXANIM][MAX_ANIMCLIPS];    extern BvhNode** modelBVHNodes;    extern FHandle console_log_file;    extern EPerms EDefs[MAX_ENTS];    extern FrustumPlane playerFrustumPlanes[6];    extern const PSysDef particleTypeDefs[192];    extern WeaponFireCtx wfx;
+extern float healFlashFinished,chargeFlashFinished,modelMatrices[INSTANCE_CNT*16],**physPos,*world_from_mdl,modelBounds[MAX_MDLS],berserkSeedTime,cyberStaticAlpha;
 extern u32 modelVertexCounts[MAX_MDLS],uniqueCvxMeshCount,globalframe,*physVertCounts,modelVBO,modelIBO,drawCalls,vertsRendered,voxelUpdateSP,lightsID,cellVisibleDataID,colorBufferID,texPalID,textureOffsetsID,textureSizesID,texPalOfsID,threadCnt,shadowmapIndirectionList[LIGHT_CNT],*cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES],*rtSrcVertCounts,mdlVboOfs[MAX_MDLS],mdlIboOfs[MAX_MDLS],rtCapNodeWords,rtCapTriWords,rtCapOrderU16,rtPersistNodeWords,rtPersistTriWords,
            rtPersistOrderU16,modelBVHTriOrderCounts[MAX_MDLS],textDecalVBO[MAX_LEVELS][INSTANCE_CNT],textDecalVertexCount[MAX_LEVELS][INSTANCE_CNT],gridCellStates[ARRSIZE],random_range_rng,camViewTextures[64],uiFBO;
 extern u16 **modelBVHTriOrder,mdlsCnt,modelTriangleCounts[MAX_MDLS],**modelTriangles,*cvxAdjLists[MAX_UNIQUE_CVX_MESHES],cvxAdjStart[MAX_UNIQUE_CVX_MESHES],playerCellIdx,texCnt,cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX],uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES],**physTris,modelBVHNodeCounts[MAX_MDLS],headmountedLanternLight,decTxtLevel[DECAL_INLINE_TEXT_MAX],decTxtInst[DECAL_INLINE_TEXT_MAX],decTxtCount,decStyleCnt,fwParentOf[INSTANCE_CNT];
@@ -259,28 +258,28 @@ extern V3 modelMin[MAX_MDLS],modelMax[MAX_MDLS],cyberSpaceEntryLocations[8],ress
 #define vmax(a,b) ((a) > (b) ? (a) : (b))
 #define vclamp(x,a,b) vmin(vmax(x,a),b)
 #define vsqrtf(x) __builtin_sqrtf(x)
+#define vfloor(x) (((x) == (long long)(x)) ? (x) : (((x) < 0) ? ((long long)(x) - 1) : (long long)(x)))
+#define vceil(x)  (((x) == (long long)(x)) ? (x) : (((x) > 0) ? ((long long)(x) + 1) : (long long)(x)))
 INLINE float vinvsqtf(float v) { __m128 x = (__m128){v,0.0f,0.0f,0.0f}; __m128 r=__builtin_ia32_rsqrtss(x); float y = r[0]; float x2 = v * 0.5f; return y * (1.5f - x2 * y * y); }
-INLINE float vfloor(float x) { return __builtin_floorf(x); }
-INLINE float vceil(float x) { return __builtin_ceilf(x); }
 INLINE float vsinf(float x) { x -= TAU * vfloor(x * (1.0f / TAU)); if (x > PI) { x -= TAU; } float s = (4/PI)*x - (4/(PI*PI))*x*vabs(x); return 0.225f*(s*vabs(s) - s) + s; }
 INLINE float vcosf(float x) { return vsinf(x + 1.57079632f); }
 INLINE float vacosf(float x) { float negate = (x < 0.0f) ? 1.0f : 0.0f; x=vabs(x); float ret=(-0.0187293f*x + 0.0742610f)*x - 0.2121144f; ret=(ret*x + 1.5707288f)*vsqrtf(1.0f - x); ret=ret - 2.0f*negate*ret; return negate*PI + (1.0f - 2.0f*negate) * ret; }
 INLINE float vtan(float x) { return vsinf(x) / vcosf(x); }
 INLINE float vcot(float x) { float x2 = x * x; float t = x + (x2 * x) * 0.33333333f; return 1.0f / t; }
 INLINE float deg2rad(float degrees) { return degrees * (PI / 180.0f); }
-INLINE float vexp2f(float x){float ip=vfloor(x); float fp=x - ip; float p=1.0f + fp*(0.69314718f + fp*(0.24022651f + fp*0.05550411f)); /*poly approx 2^fp on [0,1]*/ int ei=(int)ip + 127; u32 bits=(u32)(ei << 23); union{u32 i; float f;}u={bits}; return u.f*p;}
+INLINE float vexp2f(float x){float ip=vfloor(x); float fp=x - ip; float p=1.0f + fp*(0.69314718f + fp*(0.24022651f + fp*0.05550411f)); /*poly approx 2^fp on [0,1]*/ i32 ei = (i32)ip + 127; u32 bits=(u32)(ei << 23); union{u32 i; float f;}u={bits}; return u.f*p;}
 INLINE float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
-INLINE float vlog2f(float x) { /* assume x > 0 */ union { float f; u32 i; } u = {x}; int e = (int)(u.i >> 23) - 128; u.i = (u.i & 0x007FFFFFu) | 0x3F800000u;/* mantissa in [1,2) */ float m = u.f; float y = ((-1.0f/3.0f)*m + 2.0f)*m - (2.0f/3.0f); return (float)e + y; }
+INLINE float vlog2f(float x) { /* assume x > 0 */ union { float f; u32 i; } u = {x}; i32 e = (i32)(u.i >> 23) - 128; u.i = (u.i & 0x007FFFFFu) | 0x3F800000u;/* mantissa in [1,2) */ float m = u.f; float y = ((-1.0f/3.0f)*m + 2.0f)*m - (2.0f/3.0f); return (float)e + y; }
 INLINE float vpow(float x, float y) { return x <= 0.01f || y <= 0.01f ? 0.0f : vexp2f(y * vlog2f(x)); }
 INLINE i32 vclampi(i32 val, i32 min, i32 max) { return (val > max) ? max : ((val < min) ? min : val); }
-INLINE float vround(float val) { return (val >= 0.0f) ? (float)(int)(val + 0.5f) : (float)(int)(val - 0.5f); }
+INLINE float vround(float val) { return (val >= 0.0f) ? (float)(i32)(val + 0.5f) : (float)(i32)(val - 0.5f); }
 INLINE V3 V3Add(V3 a, V3 b) { return (V3){a.x + b.x, a.y + b.y, a.z + b.z}; }
 INLINE V3 V3_AsubB(V3 a, V3 b) { return (V3){a.x - b.x, a.y - b.y, a.z - b.z}; }
 INLINE V3 V3_ScaleByF(V3 v, float s) { return (V3){v.x * s, v.y * s, v.z * s}; }
 INLINE V3 mul_v3_v3_elementwise(V3 v, V3 w) { return (V3){v.x * w.x, v.y * w.y, v.z * w.z}; }
 INLINE float dot(float x1, float y1, float z1, float x2, float y2, float z2) { return x1*x2 + y1*y2 + z1*z2; }
 INLINE float V3_dot(V3 a, V3 b) { return dot(a.x,a.y,a.z, b.x,b.y,b.z); }
-INLINE bool SphereInFrustum(FrustumPlane* ps, V3 c, float radius) { for (int i=0;i<6;++i) { if ((V3_dot(ps[i].normal,c) + ps[i].d) < -radius) return false; } return true; }
+INLINE bool SphereInFrustum(FrustumPlane* ps, V3 c, float radius) { for (i32 i=0;i<6;++i) { if ((V3_dot(ps[i].normal,c) + ps[i].d) < -radius) return false; } return true; }
 INLINE float V3_Mag(const V3 v) { return vsqrtf(V3_dot(v,v)); }
 INLINE float V3_SqDist(V3 a, V3 b) { V3 d = V3_AsubB(a,b); return V3_dot(d,d); }
 INLINE float V3_Dist(V3 a, V3 b) { return V3_Mag(V3_AsubB(a,b)); }
@@ -291,17 +290,17 @@ INLINE V3 quat_rot_v3(Quaternion q, V3 v) {float x=q.x,y=q.y,z=q.z,w=q.w; float 
 INLINE Quaternion QuatFromToRotation(V3 from,V3 to) { V3 f=V3_Normalize(from),t=V3_Normalize(to); float d=V3_dot(f,t); if (d > 0.999999f) return QUAT_IDENTITY; if (d < -0.999999f) { V3 ax=V3_Cross((V3){1.0f,0.0f,0.0f},f); if (V3_Mag(ax) < 0.000001f) ax=V3_Cross((V3){0.0f,1.0f,0.0f},f); ax=V3_Normalize(ax); return (Quaternion){ax.x,ax.y,ax.z,0.0f}; } V3 ax=V3_Cross(f,t); float s=vsqrtf((1.0f+d)*2.0f), invs=1.0f/s; return (Quaternion){ax.x*invs,ax.y*invs,ax.z*invs,s*0.5f}; }
 // Game Typechecks (what, it's simple, don't hate it, just does the thing)
 INLINE bool IdxIsPortalBlockingDoor(u16 entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }/*All doors except see-through doors.*/
-INLINE bool IdxInBounds(int c) { return (c >= 0 && c <= 858); } 
-INLINE bool IdxIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; }
-INLINE bool IdxIsGib(int c) { return (c >= 768 && c <= 855); }
-INLINE bool IdxIsDoor(int c) { return (c >= 496 && c < 515); }
-INLINE bool IdxIsLayerDoor(int c) { return c==497||c==500||c==502; }
-INLINE bool IdxIsNPC(int c) { return (c >= 419 && c <= 447); }
-INLINE bool IdxIsCorpse(int c) { return (c >= 465 && c < 472); }
+INLINE bool IdxInBounds(i32 c) { return (c >= 0 && c <= 858); } 
+INLINE bool IdxIsGeometry(i32 c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; }
+INLINE bool IdxIsGib(i32 c) { return (c >= 768 && c <= 855); }
+INLINE bool IdxIsDoor(i32 c) { return (c >= 496 && c < 515); }
+INLINE bool IdxIsLayerDoor(i32 c) { return c==497||c==500||c==502; }
+INLINE bool IdxIsNPC(i32 c) { return (c >= 419 && c <= 447); }
+INLINE bool IdxIsCorpse(i32 c) { return (c >= 465 && c < 472); }
 INLINE bool IsDamageable(const Entity* e) { return IdxIsNPC(e->index) || e->health > 0.0f || e->cyberHealth > 0.0f || e->index == 553u; }
-INLINE bool IdxIsHardware(int c) { return (c >= 328) && (c <= 339); }     INLINE bool IdxIsAmbient(int c) { return (c >= 621 && c <= 655); }
-INLINE bool IdxIsButtonSwitch(int c) { return ((c >= 688 && c <= 692) || c == 694 || c == 695); }
-INLINE bool IdxIsSearchable(int c) { return ((c >= 464 && c <= 476) || c == 530 || c == 531); }
+INLINE bool IdxIsHardware(i32 c) { return (c >= 328) && (c <= 339); }     INLINE bool IdxIsAmbient(i32 c) { return (c >= 621 && c <= 655); }
+INLINE bool IdxIsButtonSwitch(i32 c) { return ((c >= 688 && c <= 692) || c == 694 || c == 695); }
+INLINE bool IdxIsSearchable(i32 c) { return ((c >= 464 && c <= 476) || c == 530 || c == 531); }
 INLINE bool IdxIsUsableObject(u16 c) { return ((c >= 307 && c <= 404) || c == 417); }
 INLINE bool IdxIsAccessCard(u16 c) { return (c == 341 || c == 388 || (c >= 390 && c <= 398) || c == 417); }
 INLINE bool IdxIsGenericItem(u16 c) { return (c >= 307 && c <= 312) || c == 340 || c == 342 || (c >= 359 && c <= 365) || c == 368 || c == 369 || c == 371 || (c >= 399 && c <= 401); }
@@ -309,13 +308,13 @@ INLINE bool IdxIsDynamicObject(u16 c) { return (c >= 307 && c <= 406) || c == 41
 INLINE bool ai_has_search_collider(u16 npcID) { return npcID < 64 && (0xB3E3D6ULL >> npcID) & 1u; }
 INLINE bool InstIsFuncWallChild(u32 inst) { u16 p=(inst<(u32)INSTANCE_CNT)?fwParentOf[inst]:0; return p!=0 && p<World.instCount && World.instances[p].index==517; }
 INLINE bool EntIdxIsValid(u16 idx) { return idx != 0 && idx < World.instCount; }
-INLINE bool IdxIsWeapon(int c) { return (c >= 343 && c <= 358); }
-INLINE int Get16WeaponIndexFromConstIndex(int i) { return (i >= 343 && i <= 358) ? (i - 343) : -1; }
-INLINE bool IdxIsAudioLog(int c) { return c == 313; }
+INLINE bool IdxIsWeapon(i32 c) { return (c >= 343 && c <= 358); }
+INLINE i32 Get16WeaponIndexFromConstIndex(i32 i) { return (i >= 343 && i <= 358) ? (i - 343) : -1; }
+INLINE bool IdxIsAudioLog(i32 c) { return c == 313; }
 INLINE float UsableOrDef(float cur, float def){u32 c=*(u32*)&cur,d=*(u32*)&def; u32 m = 0 - ((c >> 31) | ((c & 0x7FFFFFFF) == 0)); u32 r = (m & d) | (~m & c); return *(float*)&r; }
-INLINE int UseableFromConst(int c){return c>=307?c-307:c;}
-INLINE int ItemStringIdx(int c){return UseableFromConst(c)+326;}
-INLINE bool CurrentWeaponUsesEnergy() { int i = World.invP1.weaponIndex; return i==344 || i==347 || i==353 || i==357 || i==358; }
+INLINE i32 UseableFromConst(i32 c){return c>=307?c-307:c;}
+INLINE i32 ItemStringIdx(i32 c){return UseableFromConst(c)+326;}
+INLINE bool CurrentWeaponUsesEnergy() { i32 i = World.invP1.weaponIndex; return i==344 || i==347 || i==353 || i==357 || i==358; }
 INLINE u16 GetImpactType(u16 instanceIdx){ switch(World.instances[instanceIdx].bloodType){ case BloodType_None: return 729; case BloodType_Red: return 721; case BloodType_Yellow: return 723; case BloodType_Green: return 722; case BloodType_Robot: return 730; case BloodType_Leaf: return 756; case BloodType_Mutation: return 757; case BloodType_GrayMutation: return 758; } return 729; }
 INLINE void HealthManagerHealingBed(u16 playerIdx, float amount) { Entity* p = &World.instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
 INLINE u16 PGThemeOffset(HUDColor t){ return t==HUDColor_Red||t==HUDColor_Green ? 1u : t==HUDColor_Orange||t==HUDColor_Purple ? 2u : t==HUDColor_Yellow||t==HUDColor_Blue ? 3u : 0u; }
@@ -355,21 +354,20 @@ extern FGL_U2F glUniform2f;      extern FGL_U1F glUniform1f;       extern FGL_U1
 extern FGL_U4F glUniform4f;      extern FGL_BT glBindTexture;      extern FGL_GERR glGetError;           extern FGL_GVA glGenVertexArrays; extern FGL_VAF glVertexAttribFormat;       extern FGL_VAB glVertexAttribBinding;     extern FGL_BVB glBindVertexBuffer; extern FGL_BSD glBufferSubData; extern FGL_UM4FV glUniformMatrix4fv; extern FGL_DM glDepthMask;     extern FGL_DF glDepthFunc;        extern FGL_D glDisable;
 extern FGL_LW glLineWidth;       extern FGL_TPFV glTexParameterfv; extern FGL_DAI glDrawArraysInstanced; extern FGL_RP glReadPixels;       extern FGL_EVAA glEnableVertexAttribArray; extern FGL_GTKP glGetTexLevelParameteriv;
 extern FGL_F glFinish; extern FGL_BBB glBindBufferBase; extern FGL_BB glBlendFunc; extern FGL_CLBSD glClearBufferSubData; extern FGL_CISD glCopyImageSubData; extern FGL_CPIV glGetBufferParameteriv; extern FGL_GBSD glGetBufferSubData; extern FGL_GB glDeleteBuffers; extern FGL_BBR glBindBufferRange;
-void SpawnBeamTrail(u16,V3,V3,Color),ProjectileEffectImpactOnCollision(u16,u16,V3,V3),ProjectileEffectImpactInitAfterLoad(u16),SpawnProjectileImpactParticles(u16,V3,V3),DrawSphereWireframe(Color,ShapeSphere),BioMonitorClearGraphs(),synth_set_reverb_preset(u16),PSysClearLevel(u8),PlayTrack(TrackType,MusicType),AutomapOnLoad(),ApplyImpactForceSphere(DamageData*,V3,float,float),UseTargets(u16,u16),AddForce(u16,V3,bool),
-     TriggerTrippedUpdate(u16),CyberItemOnTriggerEnter(u16,u16),CenterStatusPrint(const char * restrict fmt,...),GameEndSequence(),GameDeathSequence(),play_wav(const char*,float,V3,bool),play_wav_ext(const char*,float,V3,bool,float),play_message(const char*),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),ScreenShake(),TakeEnergy(float),CreateTargetIDInstance(float,u16,float),LoadAllLevels(),
-     DrawLine(V3,V3,Color),ForceInventoryMode(),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),LoadTextForLanguage(u8),RenderTextL(i16,i16,u32,u8,float,const char* restrict,...),RenderTextC(i16,i16,u32,u8,float,const char* restrict,...),RenderText3DC(V3,u32,u8,float,const char* restrict,...),BuildTextDecalMeshes(),CullCore(),PngArenaInit(PngArena*),
-     ChangeAnim(Entity*,u8),ForceDoorPortalOpen(u16),QuestBitSet(u8),QuestBitClear(u8),QuestBitToggle(u8),CenterStatusPrint(const char* restrict, ...),Screenshot(),qsort_new(void*,size_t,size_t,cmpfun),scpy_to_a_from_b(char*,const char*,size_t),sCpy2aSubFromb(char*,size_t,const char*,size_t),UI_PuzzleGridClose(),UI_BlockedClose(),PGEvalPuzzle(),*mcpy(void*,const void*,size_t),*mset(void*,i32,size_t),*OS_AllocScratch(size_t),OS_FreeInitPhase(),
-     ai_effect_flash(V3,Color3,float,float,double),GenerateAndBindTexture(u32*,i32,i32,i32,u32,u32,i32,u8*),EnsureReflectionResources(),QueueVideoFrame(u32,bool),QueueVideoFrame(u32,bool),ParseAllModels(),LoadModels(),LoadPerLevelModels(u8),RtSwapPatchModels(),MdlBuildLevelConvexAdjacency(u8),MinigameInit(),MinigameTick(),Mg15Reset(),Mg15Click(bool,int,int),MgBlitToUI(bool),MgViewRect(bool,int*,int*,int*,int*),Font0CacheBuild(const u16*,u32);
-const u8* CpuResidentPixels(u16,int*,int*);
-int Font0CacheGet(u32,const u8**,int*,int*,float*,float*,float*);
+void SpawnBeamTrail(u16,V3,V3,Color),ProjectileEffectImpactOnCollision(u16,u16,V3,V3),ProjectileEffectImpactInitAfterLoad(u16),SpawnProjectileImpactParticles(u16,V3,V3),DrawSphereWireframe(Color,ShapeSphere),BioMonitorClearGraphs(),synth_set_reverb_preset(u16),PSysClearLevel(u8),PlayTrack(TrackType,MusicType),AutomapOnLoad(),ApplyImpactForceSphere(DamageData*,V3,float,float),UseTargets(u16,u16),AddForce(u16,V3,bool),TriggerTrippedUpdate(u16),
+     CyberItemOnTriggerEnter(u16,u16),CenterStatusPrint(const char * restrict fmt,...),GameEndSequence(),GameDeathSequence(),play_wav(const char*,float,V3,bool),play_wav_ext(const char*,float,V3,bool,float),play_message(const char*),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),ScreenShake(),TakeEnergy(float),CreateTargetIDInstance(float,u16,float),LoadAllLevels(),DrawLine(V3,V3,Color),ForceInventoryMode(),
+     UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),LoadTextForLanguage(u8),RenderTextL(i16,i16,u32,u8,float,const char* restrict,...),RenderTextC(i16,i16,u32,u8,float,const char* restrict,...),RenderText3DC(V3,u32,u8,float,const char* restrict,...),BuildTextDecalMeshes(),CullCore(),PngArenaInit(PngArena*),ChangeAnim(Entity*,u8),ForceDoorPortalOpen(u16),QuestBitSet(u8),
+     QuestBitClear(u8),QuestBitToggle(u8),CenterStatusPrint(const char* restrict, ...),Screenshot(),qsort_new(void*,size_t,size_t,cmpfun),scpy_to_a_from_b(char*,const char*,size_t),sCpy2aSubFromb(char*,size_t,const char*,size_t),UI_PuzzleGridClose(),UI_BlockedClose(),PGEvalPuzzle(),*mcpy(void*,const void*,size_t),*mset(void*,i32,size_t),*OS_AllocScratch(size_t),OS_FreeInitPhase(),ai_effect_flash(V3,Color3,float,float,float),
+     GenerateAndBindTexture(u32*,i32,i32,i32,u32,u32,i32,u8*),EnsureReflectionResources(),QueueVideoFrame(u32,bool),QueueVideoFrame(u32,bool),ParseAllModels(),LoadModels(),LoadPerLevelModels(u8),RtSwapPatchModels(),MdlBuildLevelConvexAdjacency(u8),MinigameInit(),MinigameTick(),Mg15Reset(),Mg15Click(bool,i32,i32),MgBlitToUI(bool),MgViewRect(bool,i32*,i32*,i32*,i32*),Font0CacheBuild(const u16*,u32);
+const u8* CpuResidentPixels(u16,i32*,i32*);
+i32 Font0CacheGet(u32,const u8**,i32*,i32*,float*,float*,float*);
 float Tranquilize(u16,float,bool),TakeDamage(u16,DamageData),MeasureLineAdvance(const char*,u8),random_range(float,float);
-size_t slen(const char*);
+size_t slen(const char*); 
 u32 parse_numberu32(const char*, const char*,u32),random_range_u32(u32,u32),VideoFrameTexIndex(u32),VideoPeekFrame(u32);
-i32 sFormatV(char*,size_t,const char*,va_list),sFormat(char*,size_t,const char*,...),PosGetCellCoordX(float),PosGetCellCoordZ(float),PosGetCellCoords(float,float),sCompUpToLen(const char*, const char*,size_t);
-u16 parse_numberu16(const char*, const char*,u32),AddInstance(u16,V3),SpawnDynamicObject(i32),DoorFrameFromProgress(AnimationClip,float),PSysAddInternal(const PSysDef*,u16,u16),EditModePickLight(V3,V3,float,float*);
+i32 sFormatV(char*,size_t,const char*,va_list),sFormat(char*,size_t,const char*,...),sCompUpToLen(const char*, const char*,size_t);
+u16 parse_numberu16(const char*, const char*,u32),PosGetCellCoordX(float),PosGetCellCoordZ(float),PosGetCellCoords(float,float),AddInstance(u16,V3),SpawnDynamicObject(i32),DoorFrameFromProgress(AnimationClip,float),PSysAddInternal(const PSysDef*,u16,u16),EditModePickLight(V3,V3,float,float*);
 u8 parse_numberu8(const char*, const char*,u32),GetCurrentLevelSecurity(),*PngLoad(const u8*,i32,i32*,i32*,PngArena*),random_range_u8(u8,u8);
-bool parse_bool(const char*, const char*,u32),CapsuleTouchesOBB(V3,float,ShapeBox),AreaHasClearance(ShapeCapsule,ShapeCapsule,float,u32,u16),PositionVisibleFromPlayerCell(float,float),FrobHeldItemIntoPanel(V3,V3,V3),HudHeatTickOn(i32),QuestBitIsSet(u8),PlayerIsMoving(),NeighborhoodInPVS(u16,u16,u8),AICheckPain(u16),HasHealth(u16),GetKey(i32),GetKeyPressed(int),cEmpty(const char),sEqual(const char*,const char*),SpawnImpactParticleForPrefab(u16,V3,V3),
-     EntIsLodCardConst(u16);
+bool parse_bool(const char*, const char*,u32),CapsuleTouchesOBB(V3,float,ShapeBox),AreaHasClearance(ShapeCapsule,ShapeCapsule,float,u32,u16),PositionVisibleFromPlayerCell(float,float),FrobHeldItemIntoPanel(V3,V3,V3),HudHeatTickOn(i32),QuestBitIsSet(u8),PlayerIsMoving(),NeighborhoodInPVS(u16,u16,u8),AICheckPain(u16),HasHealth(u16),GetKey(i32),GetKeyPressed(i32),cEmpty(const char),sEqual(const char*,const char*),SpawnImpPart(u16,V3,V3),EntIsLodCardConst(u16);
 char *StringFindFirstCharWithin(const char*,char),*sFindSub(const char*,const char*),*StringFindFirstCharWithin(const char*,char);
-const char *StringFindLastChar(const char*,const char),*FsSound(FootStepType,int);
-RaycastHit Raycast(V3,V3,float,u32);    RaycastHit RaycastEditPick(V3,V3,float,u32);    V3 ScreenPointToRay(V3,V3),ScreenPointToRayPixels(V3,V3,float,float);    ShapeBox Entity_GetBox(u16);    ShapeCapsule Entity_GetCap(u16);    ShapeSphere Entity_GetSph(u16);    FootStepType GetFootstepTypeForPrefab(i32);    PSysDef* PSysTypeGet(u16);    Quaternion quat_look_rotation(V3,V3);
+const char *StringFindLastChar(const char*,const char),*FsSound(FootStepType,i32);
+RaycastHit Raycast(V3,V3,float,u32),RaycastEditPick(V3,V3,float,u32);    V3 ScreenPointToRay(V3,V3),ScreenPointToRayPixels(V3,V3,float,float);    ShapeBox Entity_GetBox(u16);    ShapeCapsule Entity_GetCap(u16);    ShapeSphere Entity_GetSph(u16);    FootStepType GetFootstepTypeForPrefab(i32);    PSysDef* PSysTypeGet(u16);    Quaternion quat_look_rotation(V3,V3);

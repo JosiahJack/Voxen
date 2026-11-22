@@ -5,8 +5,8 @@
 u16 teleportDestinations[MAX_LEVELS][8]; static bool teleportDestinationsInitialized; u16 elevatorDestinations[MAX_LEVELS][MAX_ELEV_DESTS_PER_LEVEL]; u8 elevatorDestCounts[MAX_LEVELS]; Quaternion quat_from_axis_angle(V3,float);
 void TextureSequenceInit(u16,char*),AddCamView(V3,Quaternion,u8,u16,u16,float,float),GravityLiftSyncAllVisuals(void);
 static Entity* entsFromFile; static V3 *posFromFile, *scaleFromFile; static Quaternion *rotationFromFile; static Light *lightsFromFile; static LightAnimation *lanimsFromFile; static V3 *colCtrFromFile = NULL, *colSzFromFile = NULL; static bool alreadyReadLightOnOnce[LIGHT_CNT] = {0}; u8 sensaroundCamViewCenter = 255, sensaroundCamViewLeft = 255, sensaroundCamViewRight = 255; // HUD sensaround cam view indices, assigned during level load
-EPerms EDefs[MAX_ENTITIES] = { /*EPerms struct order: modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex,mass,animationNum,col,colCtr,colSz*/
-[0 ... (MAX_ENTITIES - 1)]={MAX_MDLS,MAX_MDLS,0,0,0,0,0,MAXANIM,0,{0},{0}},
+EPerms EDefs[MAX_ENTS] = { /*EPerms struct order: modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex,mass,animationNum,col,colCtr,colSz*/
+[0 ... (MAX_ENTS - 1)]={MAX_MDLS,MAX_MDLS,0,0,0,0,0,MAXANIM,0,{0},{0}},
 /*0 chunk_black*/                   [0]={178,0,0,0,0,0,0,MAXANIM,0,{0},{0}},                                    /*1 chunk_blocker*/                 [1]={178,0,1230,0,1230,160,0,MAXANIM,0,{0},{0}},                                      /*2 chunk_bridg1_1*/                [2]={661,0,44,0,0,43,0,MAXANIM,0,{0},{0}},
 /*3 chunk_bridg1_1flipx*/           [3]={667,0,44,0,0,0,0,MAXANIM,0,{0},{0}},                                   /*4 chunk_bridg1_2*/                [4]={662,0,45,0,0,0,0,MAXANIM,0,{0},{0}},                                   /*5 chunk_bridg1_3*/                [5]={20,0,47,0,0,0,0,MAXANIM,0,{0},{0}},
 /*6 chunk_bridg1_3_slice45*/        [6]={21,0,47,0,0,0,0,MAXANIM,CT_MSH,{0},{0}},                               /*7 chunk_bridg1_3flipx*/           [7]={663,0,47,0,0,0,0,MAXANIM,0,{0},{0}},                                   /*8 chunk_bridg1_4*/                [8]={22,0,48,0,0,0,0,MAXANIM,0,{0},{0}},
@@ -349,9 +349,9 @@ static const PrefabConst prefabConsts[] = {
     {/*478*/{0},                 50.0f, BloodType_Robot},        /*sec_cpunode*/            {/*479*/{0},                   35.0f, BloodType_Robot},        /*sec_cpunode_small*/         {/*525*/{0},               200.0f, BloodType_Robot},        /*prop_console01*/
     {/*526*/{0},                200.0f, BloodType_Robot},        /*prop_console02*/         {/*553*/{0.5f,0.5f,0.5f},       0.0f, BloodType_None},         /*prop_cyber_decoy*/
 };
-static const PrefabConst* PrefabConstFor(u16 entIdx) { static const u8 slot[MAX_ENTITIES] = {[279]=1,[424]=2,[430]=3,[431]=4,[433]=5,[439]=6,[441]=7,[444]=8,[445]=9,[446]=10,[458]=11,[459]=12,[460]=13,[464]=14,[465]=15,[466]=16,[467]=17,[468]=18,[469]=19,[470]=20,[471]=21,[472]=22,[473]=23,[474]=24,[475]=25,[476]=26,[477]=27,[478]=28,[479]=29,[525]=30,[526]=31,[553]=32}; u8 k = slot[entIdx]; return k ? &prefabConsts[k-1] : 0; }
+static const PrefabConst* PrefabConstFor(u16 entIdx) { static const u8 slot[MAX_ENTS] = {[279]=1,[424]=2,[430]=3,[431]=4,[433]=5,[439]=6,[441]=7,[444]=8,[445]=9,[446]=10,[458]=11,[459]=12,[460]=13,[464]=14,[465]=15,[466]=16,[467]=17,[468]=18,[469]=19,[470]=20,[471]=21,[472]=22,[473]=23,[474]=24,[475]=25,[476]=26,[477]=27,[478]=28,[479]=29,[525]=30,[526]=31,[553]=32}; u8 k = slot[entIdx]; return k ? &prefabConsts[k-1] : 0; }
 __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
-    if (entIdx >= MAX_ENTITIES) { DualLogWarn("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTITIES); return WORLD; } if (World.instCount >= INSTANCE_CNT) { DualLogWarn("\nToo many instances while adding entity %u, max instance count is %u, skipped\n", entIdx, INSTANCE_CNT); return WORLD; }
+    if (entIdx >= MAX_ENTS) { DualLogWarn("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTS); return WORLD; } if (World.instCount >= INSTANCE_CNT) { DualLogWarn("\nToo many instances while adding entity %u, max instance count is %u, skipped\n", entIdx, INSTANCE_CNT); return WORLD; }
     u16 i = World.instCount; mset(&World.instances[i],0,sizeof(Entity)); World.instances[i].entflags = EF_ACTIVE; World.layer[i] = L_Default; World.instances[i].camView = 255; World.instances[i].modelIndex = World.instances[i].lodIndex = World.instances[i].colMeshIndex = MAX_MDLS; World.velocity[i] = (V3){0}; World.angularVelocity[i] = (V3){0}; World.physSleep[i] = 0; World.invTnsrValid[i] = false; World.rotation[i] = (Quaternion){.w=1.0f};
     World.scale[i].x = World.scale[i].y = World.scale[i].z = 1.0f;
     for (u8 slot=0;slot<4;++slot) { World.instances[i].contents[slot] = World.instances[i].custIdx[slot] = -1; }
@@ -662,7 +662,7 @@ void LoadLevelMod(u8 lev) {
 #undef KEY_EQ
 void ButtonSwitchInitAfterLoad(u16),GrenadeInit(u16),FuncWallShiftChildren(u16,V3),RenderLoading(const char* restrict),ResetLevelAudio(),CullInit(),mp3_clear(),ComputeConvexMeshInertiaTensor(u16),CyberMineInitBeforeLoad(u16);
 void func_forcebridge(u16 i) {
-    World.instances[i].tickFinished = World.pauseRelativeTime + 0.05f + (double)random_range(0.0f,1.0f); World.instances[i].lerping = true;
+    World.instances[i].tickFinished = World.pauseRelativeTime + 0.05f + random_range(0.0f,1.0f); World.instances[i].lerping = true;
     if (World.instances[i].activatedScale.x <= 0.02f) { World.instances[i].activatedScale.x = 2.56f; } if (World.instances[i].activatedScale.y <= 0.02f) { World.instances[i].activatedScale.y = 0.08f; } if (World.instances[i].activatedScale.z <= 0.02f) { World.instances[i].activatedScale.z = 2.56f; }
     if (!World.instances[i].active) { World.instances[i].modelIndex = MAX_MDLS; World.col[i] = CT_NONE; } static const u16 textures[]={38,40,39,41,198}; u32 color=World.instances[i].fieldColor; if (color<sizeof(textures)/sizeof(textures[0])) World.instances[i].texIndex=textures[color];
 }
@@ -670,12 +670,12 @@ void FuncWallInitAfterLoad(u16 i) {
     Entity* e = &World.instances[i]; V3 prev = World.position[i]; float dd = V3_Dist(e->startPosition,e->targetPosition), f = 0; if (e->funcState >= FStat_AjarMovingTarget) { f = e->ajarPercentage; } else if (e->funcState == FStat_AjarMovingStart ) { f = 1.0f - e->ajarPercentage; }
     f = vclamp(f,0.0f,1.0f); V3 np = (dd > 0.0001f) ? V3Add(e->startPosition,V3_ScaleByF(V3_AsubB(e->targetPosition,e->startPosition),f)) : e->startPosition; World.position[i]=np; if ((u8)e->funcState <= FStat_MovingTarget) { e->funcState = FStat_Start; e->percentMoved = 0.0f; } FuncWallShiftChildren(i,V3_AsubB(np,prev));
 }
-void LogicTimerInitBeforeLoad(u16 i) { Entity* e = &World.instances[i]; if (e->timeInterval <= 0.0f) { e->timeInterval = 0.35f; } if (e->randomMin <= 0.0f) { e->randomMin = 5.0f; } if (e->randomMax <= 0.0f) { e->randomMax = 10.0f; } e->intervalFinished = World.pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval); }
+void LogicTimerInitBeforeLoad(u16 i) { Entity* e = &World.instances[i]; if (e->timeInterval <= 0.0f) { e->timeInterval = 0.35f; } if (e->randomMin <= 0.0f) { e->randomMin = 5.0f; } if (e->randomMax <= 0.0f) { e->randomMax = 10.0f; } e->intervalFinished = World.pauseRelativeTime + (e->useRandomTimes ? random_range(e->randomMin,e->randomMax) : e->timeInterval); }
 u16 DoorFrameFromProgress(AnimationClip c, float t) { if(c.frameEnd <= c.frameStart){return c.frameStart;} u16 span = c.frameEnd - c.frameStart; return (u16)(c.frameStart + (u16)(vclamp(t,0.0f,1.0f) * (float)span + 0.5f)); }
 extern u32 levelCamViewTextures[14][64]; extern u16 npcCountInWorldPerType[NUM_AI_TYPES]; extern i16 targetIDText[INSTANCE_CNT]; extern double targetIDTextFinished[INSTANCE_CNT],targetIDAttachedFinished[INSTANCE_CNT]; extern bool targetIDAttached[INSTANCE_CNT]; extern CamView camViews[64],levelCamViews[14][64]; extern u8 levelCamViewCount[14];
 void PSysAddLevelLoops() { for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { u16 type; switch (World.instances[i].index) { case 720: type = 7; break; case 733: type = 45; break; case 734: type = 47; break; default: continue; } const PSysDef *preset = PSysTypeGet(type); if (!preset) continue; PSysDef def = *preset; def.pos = World.position[i]; def.rotation = World.rotation[i]; PSysAddInternal(&def,U16_MAX,U16_MAX); } }
 void LoadAllLevels() {
-    double start_time = get_time(); RenderLoading("Loading level data..."); World.levelCurrentlyLoading = true; ioNameCount=1; ioNames[0][0]='\0';
+    double start_time = get_timed(); RenderLoading("Loading level data..."); World.levelCurrentlyLoading = true; ioNameCount=1; ioNames[0][0]='\0';
     size_t larsz = INSTANCE_CNT*sizeof(Entity) + INSTANCE_CNT*sizeof(V3) + INSTANCE_CNT*sizeof(V3) + INSTANCE_CNT*sizeof(Quaternion) + INSTANCE_CNT*sizeof(V3) + INSTANCE_CNT*sizeof(V3) + LIGHT_CNT*sizeof(Light) + LIGHT_CNT*sizeof(LightAnimation); entsFromFile = OS_Alloc(larsz);
     posFromFile = (void*)entsFromFile + INSTANCE_CNT*sizeof(Entity); scaleFromFile = (void*)posFromFile + INSTANCE_CNT*sizeof(V3); rotationFromFile = (void*)scaleFromFile + INSTANCE_CNT*sizeof(V3); colCtrFromFile = (void*)rotationFromFile + INSTANCE_CNT*sizeof(Quaternion); colSzFromFile = (void*)colCtrFromFile + INSTANCE_CNT*sizeof(V3); lightsFromFile = (void*)colSzFromFile + INSTANCE_CNT*sizeof(V3); lanimsFromFile = (void*)lightsFromFile + LIGHT_CNT*sizeof(Light);
     for (u8 i=0;i<8;++i) { World.TeleportTouch_allTeleportTouches[i] = U16_MAX; }
@@ -726,7 +726,7 @@ void LoadAllLevels() {
                     e->generationDone = true;
                 }
             } else switch (constIndex) {
-                case 21: case 22: e->tickFinished = World.pauseRelativeTime + 2.0; e->animSwapFinished = 0.0; break; // chunk_cyberpanel, chunk_cyberpanel_slice45
+                case 21: case 22: e->tickFinished = World.pauseRelativeTime + 2.0f; e->animSwapFinished = 0.0f; break; // chunk_cyberpanel, chunk_cyberpanel_slice45
                 case 515: func_forcebridge(i); break;
                 case 716: World.layer[i] = L_Trigger; break; // fx_reverbzone
                 case 697: World.layer[i] = L_NPCClip; break; // clip_npc
@@ -748,7 +748,7 @@ void LoadAllLevels() {
     }
     OS_Free(entsFromFile,larsz);
     BuildTextDecalMeshes();
-    DualLog("Load all levels.....................................................................took %.6f secs\n",get_time() - start_time);
+    DualLog("Load all levels.....................................................................took %.6f secs\n",get_timed() - start_time);
 }
 void CyberTimerReset(u16,int); extern u8 cyberGolBuilt;
 void LoadLevelSetup(u8 lev) {
@@ -772,15 +772,15 @@ void LoadLevel(u8 curlevel, V3 pos) {
     if (World.curLev != curlevel) { CopyPlayerState(World.curLev,curlevel); PSysClearLevel(World.curLev); World.curLev = curlevel; SetLevelPointers(curlevel); }
     for (u16 i = PLAYER1; i < World.instCount; ++i) ComputeConvexMeshInertiaTensor(i);
     LoadLevelSetup(curlevel);
-    ResetLevelAudio(); mp3_clear(); World.Sys_Music.levelEntry = true; World.Sys_Music.inZone = World.Sys_Music.cyberTube = false; World.Sys_Music.combatImpulseFinished = get_time(); World.Sys_Music.combatImpulseFinished += 5.0;
+    ResetLevelAudio(); mp3_clear(); World.Sys_Music.levelEntry = true; World.Sys_Music.inZone = World.Sys_Music.cyberTube = false; World.Sys_Music.combatImpulseFinished = get_time(); World.Sys_Music.combatImpulseFinished += 5.0f;
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { Entity* e = &World.instances[i]; if (IdxIsNPC(e->index) && e->enemy == PLAYER1) { e->enemy = WORLD; } if (World.diffCbt == 0 && IdxIsNPC(e->index)) { if (e->entflags & EF_ACT_AS_CORPSE_ONLY) { e->health = 0.0f; e->cyberHealth = 0.0f; } else { e->health = 1.0f; if (npcTable[e->index - 419].type == NPCType_Cyber) { e->cyberHealth = 1.0f; } } } }
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { Entity* e = &World.instances[i]; if (e->index != 702) continue; u16 n = e->numberToSpawn; if (World.diffCbt == 1) { n = (u16)(n / 2); } else if (World.diffCbt == 3) { n = (u16)(n + n / 2); } else if (World.diffCbt > 3) { n = (u16)(n * 5); } e->numberToSpawn = (n < 1) ? 1 : n; e->delayFinished = World.pauseRelativeTime; }
     World.levelCurrentlyLoading = false;
     World.position[PLAYER1] = pos; World.velocity[PLAYER1] = (V3){0.0f,0.0f,0.0f};
-    World.invP1.lastVelY = 0.0f; World.invP1.wasGrounded = true; World.invP1.ladderState = 0; World.invP1.noiseFinished=World.pauseRelativeTime - 1.0;
+    World.invP1.lastVelY = 0.0f; World.invP1.wasGrounded = true; World.invP1.ladderState = 0; World.invP1.noiseFinished=World.pauseRelativeTime - 1.0f;
     if (curlevel == LEVEL_CYBERSPACE) {
         World.cybRecallPnt = World.position[PLAYER1]; World.col[PLAYER1] = CT_SPH; World.colliderSize[PLAYER1] = (V3){0.48f,0.48f,0.48f}; World.colliderCenter[PLAYER1] = (V3){0.0f,0.0f,0.0f}; World.radius[PLAYER1] = 0.48f; World.instances[PLAYER1].hasGrav = false; if (prevLevel != LEVEL_CYBERSPACE) { play_wav("hud/cyber",AppliedFXVol(1.0f),(V3){0},false); CyberTimerReset(PLAYER1,World.diffCyb); cyberGolBuilt = 0; cyberStaticAlpha = 1.0f;
-        World.instances[PLAYER1].timerFinished = World.pauseRelativeTime + 1.0; }
+        World.instances[PLAYER1].timerFinished = World.pauseRelativeTime + 1.0f; }
     } else {
         World.col[PLAYER1] = CT_CAP; World.colliderSize[PLAYER1] = (V3){0.48f,2.0f * World.invP1.currentCrouchRatio,1.0f}; World.colliderCenter[PLAYER1].y = -PLYR_CAM_OFS_Y + (2.0f - World.colliderSize[PLAYER1].y) * 0.5f; World.instances[PLAYER1].hasGrav = true;
         if (prevLevel == LEVEL_CYBERSPACE) { V3 cyberFwd = quat_rot_v3(World.rotation[PLAYER1],(V3){0.0f,0.0f,1.0f}); float yawDeg = __builtin_atan2f(cyberFwd.x,cyberFwd.z) * (180.0f / 3.14159265f); float halfYaw = deg2rad(yawDeg) * 0.5f; World.rotation[PLAYER1] = (Quaternion){0.0f,vsinf(halfYaw),0.0f,vcosf(halfYaw)}; World.cam_yaw = yawDeg < 0.0f ? yawDeg + 360.0f : yawDeg; World.cam_pitch = World.cam_roll = 0.0f; World.invP1.leanTarget = 0.0f; }

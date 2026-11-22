@@ -1,23 +1,20 @@
 // physics.c - The Jack Physics Engine, By W. Josiah Jack MIT-0 -- full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
 #include "common.h"
-u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX]; static u16 triggerVolumes[128]; static u16 numTriggers; extern double game_actual_start_time; static bool ladderWalkOff = false; static float ladderTopY = 0.0f; static double ladderSFXFinished = 0.0;
+u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX]; static u16 triggerVolumes[128]; static u16 numTriggers; extern double game_actual_start_time; static bool ladderWalkOff = false; static float ladderTopY = 0.0f;
 static const float PHY_EPSILON=0.0001f,PHY_NEARNUFF=0.001f,MAX_SPEED=17.0f/*m/s fastest is railgun given 5.0 impulse w/ 0.3 mass=5.0/0.3 */,MAX_STEP_SIZE=(0.12f / MAX_SPEED),MAX_ANGULAR_SPEED=8.0f/*arbitrary*/,MANIFOLD_TIE_MARGIN=0.008f,MANIFOLD_ALIGN_THRESHOLD=0.8f,MAX_BIAS_SPEED=2.0f,WALK_SPEED=5.7f,PLAYER_MAX_CYBER_SPEED=10.0f,CROUCH_SPEED=2.5f,PLAYER_MAX_PRONE_SPEED=1.6f,PLAYER_BOOSTER_SPEED_BOOST=1.2f,PLAYER_CROUCH_RATIO=0.63f,
-                   PLAYER_PRONE_RATIO=0.32f,WALK_SPEED_ACCEL=3.0f,BOOST_ACCEL=1.0f,SKATE_SLIDE=5.0f,SKATE_SPEED=1.1f;
+                   PLAYER_PRONE_RATIO=0.32f,WALK_SPEED_ACCEL=3.0f,BOOST_ACCEL=1.0f;
 void DrawSphereContact(V3,float),BiomonitorEnergyPulse(float),DrawBoxColliderColored(u16,Color),DrawCapsuleCollider(u16);
 float TakeDamage(u16,DamageData);
-typedef struct { V3 v[4]; V3 wA[4]; i32 n; } Simplex3D;
-typedef struct { V3 point; float pen; } ManifoldPt;
-typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
-typedef struct { u16 a,b; Manifold m; V3 rA[MANIFOLD_MAX],rB[MANIFOLD_MAX]; float targetVn[MANIFOLD_MAX],accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],invSumN[MANIFOLD_MAX]; float Ka[3][3],Kb[3][3]; float invMassA,invMassB; bool bStatic,canRotateA,canRotateB; } SolverContact;
+typedef struct { V3 v[4]; V3 wA[4]; i32 n; } Simplex3D;    typedef struct { V3 point; float pen; } ManifoldPt;    typedef struct { V3 normal; ManifoldPt p[MANI_MAX]; i32 n; float maxPen; } Manifold;    typedef struct { u16 a,b; Manifold m; V3 rA[MANI_MAX],rB[MANI_MAX]; float targetVn[MANI_MAX],accumN[MANI_MAX],accumT[MANI_MAX],invSumN[MANI_MAX]; float Ka[3][3],Kb[3][3]; float invMassA,invMassB; bool bStatic,canRotateA,canRotateB; } SolverContact;
+typedef struct { u16 a,b; u8 n; V3 pt[MANI_MAX],normal; float accumN[MANI_MAX],accumT[MANI_MAX],pen[MANI_MAX],dt; u8 votes; V3 challN,posA,posB; u32 frame; } WarmPair;
 static SolverContact gContacts[MAX_GLOBAL_CONTACTS]; static u32 gContactCount; static float posBudget[INSTANCE_CNT]; static u16 dynamicEntities[512],dynamicEntityCount; static u8 grenadeImpactQueued[INSTANCE_CNT],projImpQueued[INSTANCE_CNT],projectileContactThisFrame[INSTANCE_CNT]; static u16 projImpTarg[INSTANCE_CNT]; static V3 projImpPt[INSTANCE_CNT],projImpNor[INSTANCE_CNT]; static float nextCapacityWarn[5]; static u16 gravityLiftWasInside[INSTANCE_CNT],gravityLiftTouched[INSTANCE_CNT],gravityLiftTopSupport[INSTANCE_CNT],teleportWasTouching,teleportTouched; static u8 gravityLiftOverlapLevel=255;
-typedef struct { u16 a,b; u8 n; V3 pt[MANIFOLD_MAX],normal; float accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],pen[MANIFOLD_MAX],dt; u8 votes; V3 challN,posA,posB; u32 frame; } WarmPair;
 static WarmPair gWarmPairs[2048]; static u8 gWarmPairLevel=255;
 void WarmPairsClear(void) { mset(gWarmPairs,0,sizeof(gWarmPairs)); gWarmPairLevel = World.curLev; }
 INLINE u32 WarmPairHash(u16 a,u16 b) { return ((u32)a*40503u ^ (u32)b*69621u) & (2047u); }
 INLINE WarmPair* WarmPairProbe(u16 a,u16 b) { u32 h=WarmPairHash(a,b); for (u32 p=0;p<8;++p) { WarmPair* wp=&gWarmPairs[(h+p)&(2047u)]; if (!wp->n || (wp->a==a&&wp->b==b)) return wp; } return &gWarmPairs[h]; }
 INLINE bool WarmPairSkip(u16 a,u16 b) { return (a==PLAYER1 || b==PLAYER1 || IdxIsNPC(World.instances[a].index) || IdxIsNPC(World.instances[b].index)); }
 static void WarmPairRestore(u16 a,u16 b,const Manifold *m,float dtsub,float *accumN,float *accumT) {
-    if (WarmPairSkip(a,b)) return; WarmPair *wp=WarmPairProbe(a,b); if (!wp->n || wp->a!=a || wp->b!=b) return; if ((u32)(globalframe-wp->frame) > 2u) return; if (V3_dot(m->normal,wp->normal) < 0.8f) return; float scale=vclamp(dtsub/vmax(wp->dt,PHY_EPSILON),0.25f,4.0f); bool used[MANIFOLD_MAX]={false};
+    if (WarmPairSkip(a,b)) return; WarmPair *wp=WarmPairProbe(a,b); if (!wp->n || wp->a!=a || wp->b!=b) return; if ((u32)(globalframe-wp->frame) > 2u) return; if (V3_dot(m->normal,wp->normal) < 0.8f) return; float scale=vclamp(dtsub/vmax(wp->dt,PHY_EPSILON),0.25f,4.0f); bool used[MANI_MAX]={false};
     for (int i=0;i<m->n;++i) { int best=-1; float bestD2=0.0025f; for (int j=0;j<wp->n;++j) { if (used[j]) continue; V3 dv=V3_AsubB(m->p[i].point,wp->pt[j]); float d2=V3_dot(dv,dv); if (d2<bestD2){bestD2=d2;best=j;} } if (best<0){accumN[i]=0.0f;accumT[i]=0.0f;continue;} used[best]=true; accumN[i]=wp->accumN[best]*scale; accumT[i]=wp->accumT[best]*scale; }
 }
 static void WarmPairSave(u16 a,u16 b,const Manifold *m,float dtsub,const float *accumN,const float *accumT) { if (WarmPairSkip(a,b)) return; WarmPair *wp=WarmPairProbe(a,b); wp->a=a; wp->b=b; wp->n=(u8)m->n; wp->normal=m->normal; wp->dt=dtsub; wp->frame=globalframe; for (int i=0;i<m->n;++i) { wp->pt[i]=m->p[i].point; wp->accumN[i]=accumN[i]; wp->accumT[i]=accumT[i]; wp->pen[i]=m->p[i].pen; } wp->posA=World.position[a]; wp->posB=World.position[b]; }
@@ -26,10 +23,10 @@ static void WarmPairGovern(u16 a,u16 b,Manifold *m) {
     if (V3_dot(World.velocity[a],World.velocity[a]) > 0.0225f || V3_dot(World.velocity[b],World.velocity[b]) > 0.0225f || V3_dot(World.angularVelocity[a],World.angularVelocity[a]) > 0.09f || V3_dot(World.angularVelocity[b],World.angularVelocity[b]) > 0.09f) { wp->votes=0; return; }
     V3 relMove=V3_AsubB(V3_AsubB(World.position[a],wp->posA),V3_AsubB(World.position[b],wp->posB)); float alongN=V3_dot(wp->normal,relMove); if ((m->n > 0) && V3_dot(m->normal,wp->normal) >= MANIFOLD_ALIGN_THRESHOLD) { wp->votes=0; return; } 
     if (m->n > 0) { if (V3_dot(m->normal,wp->challN) >= MANIFOLD_ALIGN_THRESHOLD) wp->votes++; else { wp->votes++; wp->challN=m->normal; } if (wp->votes >= 3) { wp->votes=0; return; } } else { bool separated=true; for (int i=0;i<wp->n;++i) { if (wp->pen[i]-alongN >= -0.01f) { separated=false; break; } } if (separated) { wp->votes=0; return; } }
-    int cnt=wp->n; if (cnt>MANIFOLD_MAX) cnt=MANIFOLD_MAX; m->n=(i32)cnt; m->normal=wp->normal; m->maxPen=0.0f; for (int i=0;i<cnt;++i) { float pen=wp->pen[i]-alongN; if (pen<0.0f) pen=0.0f; m->p[i].point=wp->pt[i]; m->p[i].pen=pen; if (pen>m->maxPen) m->maxPen=pen; }
+    int cnt=wp->n; if (cnt>MANI_MAX) cnt=MANI_MAX; m->n=(i32)cnt; m->normal=wp->normal; m->maxPen=0.0f; for (int i=0;i<cnt;++i) { float pen=wp->pen[i]-alongN; if (pen<0.0f) pen=0.0f; m->p[i].point=wp->pt[i]; m->p[i].pen=pen; if (pen>m->maxPen) m->maxPen=pen; }
 }
-static void WarnPhysicsCapacity(u8 kind,const char* message){if(kind<5&&World.pauseRelativeTime>=nextCapacityWarn[kind]){DualLogWarn("%s\n",message);nextCapacityWarn[kind]=World.pauseRelativeTime+5.0f;}}
-INLINE bool AnimWaking(u16 j) { if(j == PLAYER1){return false;} u16 an = World.instances[j].animationNum; if (!((an == 0 || an == 1 || (an >= 4 && an <= 20) || (an >= 43 && an <= 45) || an == 47 || an == 48) && an < MAXANIM && World.instances[j].clip < MAX_ANIMCLIPS)) return false; u8 fr = mdlAnimClips[an][World.instances[j].clip].framerate; return fr > 0 && (World.current_time - World.instances[j].animFinished) * (double)fr < 1.0; }
+static void WarnPhysicsCapacity(u8 kind,const char* message) { if (kind < 5 && World.pauseRelativeTime >= nextCapacityWarn[kind]) { DualLogWarn("%s\n",message); nextCapacityWarn[kind] = World.pauseRelativeTime + 5.0f; } }
+INLINE bool AnimWaking(u16 j) { if(j == PLAYER1){return false;} u16 an = World.instances[j].animationNum; if (!((an == 0 || an == 1 || (an >= 4 && an <= 20) || (an >= 43 && an <= 45) || an == 47 || an == 48) && an < MAXANIM && World.instances[j].clip < MAX_ANIMCLIPS)) return false; u8 fr = mdlAnimClips[an][World.instances[j].clip].framerate; return fr > 0 && (World.current_time - (double)World.instances[j].animFinished) * (double)fr < 1.0; }
 void AddForce(u16 i, V3 f, bool imp) { if(imp){World.velocity[i]=V3Add(World.velocity[i],V3_ScaleByF(f,1.0f/vmax(EntMass(i),0.001f)));}else{World.instances[i].accumulatedForce=V3Add(World.instances[i].accumulatedForce,f);} World.physSleep[i]=false; }
 // Trigger System
 void AddAccessCardToInventory(int index); void UseTargets(u16 activator, u16 targetIdx); void GrenadeOnCollision(u16 self);
@@ -58,9 +55,9 @@ void CyberMineInitBeforeLoad(u16 self) { Entity* e=&World.instances[self]; e->da
 extern u16 teleportDestinations[MAX_LEVELS][8];
 void TeleportTouchOnTriggerEnter(u16 self, u16 o) {
     Entity *e = &World.instances[self], *player = &World.instances[PLAYER1]; if (!e->touchEnabled || o!=PLAYER1 || player->health <= 0.0f || e->justUsed >= World.pauseRelativeTime) return; u16 dest = World.curLev < MAX_LEVELS && e->targetDestinationID < 8 ? teleportDestinations[World.curLev][e->targetDestinationID] : U16_MAX; if (dest >= World.instCount || World.instances[dest].index != 703) return;
-    World.position[PLAYER1] = World.position[dest]; World.instances[dest].justUsed = World.pauseRelativeTime+1.0; play_wav("misc/teleport", AppliedFXVol(1.0f), World.position[dest], false);
+    World.position[PLAYER1] = World.position[dest]; World.instances[dest].justUsed = World.pauseRelativeTime + 1.0f; play_wav("misc/teleport",AppliedFXVol(1.0f),World.position[dest],false);
 }
-void TriggerDelayedTarget(u16 self) { Entity* e=&World.instances[self]; u16 act=e->recentMostActivator; e->delayFinished = World.pauseRelativeTime + e->delay; e->deferredIoflags = World.targetIOActive ? World.targetIOActivatorIoflags : (act<World.instCount?World.instances[act].ioflags:0u); e->deferredIoflagsHi = World.targetIOActive ? World.targetIOActivatorIoflagsHi : (act<World.instCount?World.instances[act].ioflagsHi:0u); }
+void TriggerDelayedTarget(u16 self) { Entity* e = &World.instances[self]; u16 act = e->recentMostActivator; e->delayFinished = World.pauseRelativeTime + e->delay; e->deferredIoflags = World.targetIOActive ? World.targetIOActivatorIoflags : (act < World.instCount ? World.instances[act].ioflags : 0u); e->deferredIoflagsHi = World.targetIOActive ? World.targetIOActivatorIoflagsHi : (act < World.instCount ? World.instances[act].ioflagsHi : 0u); }
 void TriggerTriggerTripped(u16 self, u16 other) { Entity* e=&World.instances[self]; if(other != PLAYER1 || (World.instances[self].allDone && World.instances[self].onlyOnce)) return; e->recentMostActivator=other; if(e->onlyOnce){e->allDone=true;} if(e->delay <= 0.0f){UseTargets(self,World.instances[self].targetIdx);}else{TriggerDelayedTarget(self);} }
 static float GravityLiftTopY(u16 liftIdx) { ShapeBox box=Entity_GetBox(liftIdx); V3 up=quat_rot_v3(box.rot,(V3){0,1,0}); float extent=vabs(up.x)*box.hExt.x+vabs(up.y)*box.hExt.y+vabs(up.z)*box.hExt.z; return box.ctr.y+extent; }
 static float GravityLiftBodyBottomY(u16 body) { if(World.col[body]==CT_CAP){ShapeCapsule cap=Entity_GetCap(body);return cap.base.y-cap.rad;} return World.position[body].y-(World.colliderSize[body].y*0.5f*vabs(World.scale[body].y)); }
@@ -78,19 +75,19 @@ static void GravityLiftApplyTopSupport(u16 body) {
     if(gravityLiftTouched[body]!=marker)AddForce(body,(V3){0.0f,GravityLiftTopControlForce(body,gap),0.0f},false);
 }
 void trigger_gravitylift_touch(u16 self, u16 other, bool entering) {
-    Entity *lift=&World.instances[self]; if(entering)lift->initialBurstFinished=World.pauseRelativeTime+1.0f;
-    float forceY=0.0f,gravityAccel=GravityLiftGravityAccel(other),mass=vmax(EntMass(other),0.001f);
-    if(other==PLAYER1)flag_set(&World.instances[other].entflags,EF_GRAVLIFT,true);
-    bool initialBurst=entering||lift->initialBurstFinished>World.pauseRelativeTime,jumpingFromTop=false;
-    if(lift->active){
-        float bottomY=GravityLiftBodyBottomY(other),topY=GravityLiftTopY(self),gap=topY-bottomY,velY=World.velocity[other].y;
-        float stopDist=velY>0.0f ? (velY*velY)/(2.0f*16.0f) : 0.0f;
-        if(gap<=vmax(lift->distancePaddingToTopPoint,stopDist+0.20f)){
-            bool topContact=other==PLAYER1&&World.col[other]==CT_CAP&&gap<=0.08f&&gap>=-0.12f,topJumpZone = other == PLAYER1 && World.col[other] == CT_CAP && gap <= vmax(lift->distancePaddingToTopPoint, 0.12f) && gap >= -0.12f;
-            if(other==PLAYER1){
-                if(topJumpZone && GetKeyPressed(4)/*Jump*/){gravityLiftTopSupport[other]=0;flag_set(&World.instances[other].entflags,EF_GROUNDED,true);jumpingFromTop=true;}
-                else if (topContact && vabs(velY) < 0.75f) { flag_set(&World.instances[other].entflags, EF_GROUNDED, true); gravityLiftTopSupport[other] = (u16)(self + 1u); }
-                else if (World.col[other] == CT_CAP) gravityLiftTopSupport[other] = (u16)(self + 1u);
+    Entity *lift = &World.instances[self]; if (entering) lift->initialBurstFinished = World.pauseRelativeTime + 1.0f;
+    float forceY = 0.0f, gravityAccel = GravityLiftGravityAccel(other), mass = vmax(EntMass(other),0.001f);
+    if (other == PLAYER1) flag_set(&World.instances[other].entflags,EF_GRAVLIFT,true);
+    bool initialBurst = entering || lift->initialBurstFinished > World.pauseRelativeTime, jumpingFromTop = false;
+    if (lift->active) {
+        float bottomY = GravityLiftBodyBottomY(other), topY = GravityLiftTopY(self), gap = topY - bottomY, velY = World.velocity[other].y;
+        float stopDist = velY > 0.0f ? (velY*velY) / (2.0f * 16.0f) : 0.0f;
+        if (gap<=vmax(lift->distancePaddingToTopPoint,stopDist + 0.20f)) {
+            bool topContact = other == PLAYER1 && World.col[other] == CT_CAP&&gap <= 0.08f && gap >= -0.12f,topJumpZone = other == PLAYER1 && World.col[other] == CT_CAP && gap <= vmax(lift->distancePaddingToTopPoint, 0.12f) && gap >= -0.12f;
+            if (other==PLAYER1) {
+                     if (topJumpZone && GetKeyPressed(4)/*Jump*/) { gravityLiftTopSupport[other] = 0; flag_set(&World.instances[other].entflags,EF_GROUNDED,true); jumpingFromTop = true; }
+                else if (topContact && vabs(velY) < 0.75f) { flag_set(&World.instances[other].entflags,EF_GROUNDED,true); gravityLiftTopSupport[other] = (u16)(self + 1u); }
+                else if (World.col[other] == CT_CAP) { gravityLiftTopSupport[other] = (u16)(self + 1u); }
             }
             if (!jumpingFromTop) forceY = GravityLiftTopControlForce(other, gap);
         } else if (initialBurst) { forceY = (lift->strength*EntMass(other) - velY) * 2.0f; }
@@ -197,7 +194,7 @@ INLINE Manifold BoxBox(ShapeBox a, ShapeBox b) {
     } // Sutherland-Hodgman clipping against the 4 side planes of the reference face
     CLIP_PLANE(r1, 1.0f) CLIP_PLANE(r1, -1.0f) CLIP_PLANE(r2, 1.0f) CLIP_PLANE(r2, -1.0f)
     float refPlaneDist = V3_dot(refNormal, refCenter); // Keep points that are behind the reference face
-    for (int i=0; i<clipCount; ++i) { float dist = V3_dot(refNormal, clipped[i]) - refPlaneDist; if (dist <= 0.001f) { bool isDup = false; for(int k=0; k<m.n; ++k) { V3 diff = V3_AsubB(clipped[i], m.p[k].point); if (V3_dot(diff, diff) < 0.00001f) { isDup = true; break; } } if (!isDup && m.n < MANIFOLD_MAX) { m.p[m.n].point=clipped[i]; float pen=-dist; if(pen < 0){pen=0;} m.p[m.n].pen=pen; if (pen > m.maxPen){m.maxPen=pen;} m.n++; } }}
+    for (int i=0; i<clipCount; ++i) { float dist = V3_dot(refNormal, clipped[i]) - refPlaneDist; if (dist <= 0.001f) { bool isDup = false; for(int k=0; k<m.n; ++k) { V3 diff = V3_AsubB(clipped[i], m.p[k].point); if (V3_dot(diff, diff) < 0.00001f) { isDup = true; break; } } if (!isDup && m.n < MANI_MAX) { m.p[m.n].point=clipped[i]; float pen=-dist; if(pen < 0){pen=0;} m.p[m.n].pen=pen; if (pen > m.maxPen){m.maxPen=pen;} m.n++; } }}
     if (m.n == 0) { m.n = 1; m.p[0].point = V3Add(refCenter, V3_ScaleByF(refNormal, 0.01f)); m.p[0].pen = minOverlap; m.maxPen = minOverlap; } return m;
 }
 V3 MvVert(const float* M, V3 v) { return (V3){ M[0]*v.x + M[4]*v.y + M[8]*v.z  + M[12], M[1]*v.x + M[5]*v.y + M[9]*v.z  + M[13], M[2]*v.x + M[6]*v.y + M[10]*v.z + M[14] }; }
@@ -263,7 +260,7 @@ static Manifold RunEPA(const SupportCtx* ctx, EPAState* epa) {
 }
 static Manifold RunGjkEpa(SupportCtx* ctx) { Manifold m={0}; GJKResult gjk=RunGJK(ctx,GJK_ITER); if(!gjk.hit)return m; if(gjk.s.n<4) RunGJKFallback(ctx,&gjk.s); if(gjk.s.n<4)return m; EPAState epa; SeedEPA(&epa,&gjk.s); return RunEPA(ctx,&epa); }
 static void PrimitiveCvxFillPoints(Manifold* m, u16 prim, u16 hullMesh, const float* hullMx) {
-    if (m->n >= MANIFOLD_MAX || m->maxPen <= 0.0f || World.col[prim] != CT_BOX || hullMesh >= MAX_MDLS || !modelVertexCounts[hullMesh] || !physPos[hullMesh]) { return; }
+    if (m->n >= MANI_MAX || m->maxPen <= 0.0f || World.col[prim] != CT_BOX || hullMesh >= MAX_MDLS || !modelVertexCounts[hullMesh] || !physPos[hullMesh]) { return; }
     ShapeBox box=Entity_GetBox(prim);
     V3 axx=quat_rot_v3(box.rot,(V3){1.0f,0.0f,0.0f}), ayy=quat_rot_v3(box.rot,(V3){0.0f,1.0f,0.0f}), azz=quat_rot_v3(box.rot,(V3){0.0f,0.0f,1.0f});
     V3 hx=V3_ScaleByF(axx,box.hExt.x), hy=V3_ScaleByF(ayy,box.hExt.y), hz=V3_ScaleByF(azz,box.hExt.z);
@@ -289,17 +286,17 @@ static void PrimitiveCvxFillPoints(Manifold* m, u16 prim, u16 hullMesh, const fl
             fpB.mx.x=vmax(fpB.mx.x,w.x); fpB.mx.y=vmax(fpB.mx.y,w.y); fpB.mx.z=vmax(fpB.mx.z,w.z); } }
     float spB=vmax(0.02f,vmax(vabs(hx.x)+vabs(hy.x)+vabs(hz.x),vmax(vabs(hx.y)+vabs(hy.y)+vabs(hz.y),vabs(hx.z)+vabs(hy.z)+vabs(hz.z)))*0.15f);/*box world span*0.15, BoxMsh recipe*/
     float spu=vmax(0.02f,vmin(spH,spB));
-    for (int pass=0;pass<2 && m->n<MANIFOLD_MAX;++pass) {
+    for (int pass=0;pass<2 && m->n<MANI_MAX;++pass) {
         if (pass==0) {
             if (!haveB) continue;
-            for (u32 i=0;i<hn && m->n<MANIFOLD_MAX;++i) {
+            for (u32 i=0;i<hn && m->n<MANI_MAX;++i) {
                 V3 w=MvVert(hullMx,MeshVert(hullMesh,i));
                 float d=V3_dot(n,w)-pd; if (vabs(d)>ttH) continue; float ptPen=bd-d; if (ptPen<=0.0f) continue; if (w.x<fpB.mn.x-spu || w.x>fpB.mx.x+spu || w.y<fpB.mn.y-spu || w.y>fpB.mx.y+spu || w.z<fpB.mn.z-spu || w.z>fpB.mx.z+spu) continue;
                 bool isDup=false; for (int k=0;k<m->n;++k){V3 diff=V3_AsubB(w,m->p[k].point); if(V3_dot(diff,diff)<spu*spu){isDup=true;break;}} if (!isDup) m->p[m->n++]=(ManifoldPt){w,ptPen};
             }
         } else {
             if (!haveH) continue;
-            for (int i=0;i<8 && m->n<MANIFOLD_MAX;++i) {
+            for (int i=0;i<8 && m->n<MANI_MAX;++i) {
                 V3 w=bv[i];
                 float d=V3_dot(n,w)-pd; if (vabs(d)>ttB) continue; float ptPen=bd-d; if (ptPen<=0.0f) continue; if (w.x<fpH.mn.x-spu || w.x>fpH.mx.x+spu || w.y<fpH.mn.y-spu || w.y>fpH.mx.y+spu || w.z<fpH.mn.z-spu || w.z>fpH.mx.z+spu) continue;
                 bool isDup=false; for (int k=0;k<m->n;++k){V3 diff=V3_AsubB(w,m->p[k].point); if(V3_dot(diff,diff)<spu*spu){isDup=true;break;}} if (!isDup) m->p[m->n++]=(ManifoldPt){w,ptPen};
@@ -328,17 +325,17 @@ void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
         float align=V3_dot(tN,best->normal);
         if (align>MANIFOLD_ALIGN_THRESHOLD) {
             bool better=(tD>best->maxPen+MANIFOLD_TIE_MARGIN) || (vabs(tD-best->maxPen)<=MANIFOLD_TIE_MARGIN && V3_dot(tN,(V3){0,1,0})>V3_dot(best->normal,(V3){0,1,0})); if (better){ best->normal=tN; best->maxPen=tD; ctx->bestTa=ta; ctx->bestTb=tb; ctx->bestTc=tc; ctx->bestTriN=tN; ctx->bestTriD=tD; ctx->bestDeepPoint=deepPoint; ctx->haveBestTri=true; }
-            bool spread=true; for (int k=0;k<best->n;++k){V3 dv=V3_AsubB(deepPoint,best->p[k].point); if(V3_dot(dv,dv)<ctx->spreadEps*ctx->spreadEps){spread=false; if(tD>best->p[k].pen)best->p[k].pen=tD; break;}} if (spread&&best->n<MANIFOLD_MAX)best->p[best->n++]=(ManifoldPt){deepPoint,tD};
+            bool spread=true; for (int k=0;k<best->n;++k){V3 dv=V3_AsubB(deepPoint,best->p[k].point); if(V3_dot(dv,dv)<ctx->spreadEps*ctx->spreadEps){spread=false; if(tD>best->p[k].pen)best->p[k].pen=tD; break;}} if (spread&&best->n<MANI_MAX)best->p[best->n++]=(ManifoldPt){deepPoint,tD};
         } else if (tD>best->maxPen+MANIFOLD_TIE_MARGIN){ best->n=0; best->normal=tN; best->maxPen=tD; best->p[best->n++]=(ManifoldPt){deepPoint,tD}; ctx->bestTa=ta; ctx->bestTb=tb; ctx->bestTc=tc; ctx->bestTriN=tN; ctx->bestTriD=tD; ctx->bestDeepPoint=deepPoint; ctx->haveBestTri=true; }
     }
 }
 void CvxMshFillExtraPoints(CvxMshCtx* ctx) {
-    Manifold* best=&ctx->best; if(!ctx->haveBestTri||best->n==0||best->n>=MANIFOLD_MAX)return; u32 hn=ctx->boxV ? ctx->boxN : modelVertexCounts[ctx->hullMesh]; if(!hn)return; V3 ta=ctx->bestTa,tN=ctx->bestTriN; V3 triEdge1=V3_AsubB(ctx->bestTb,ta),triEdge2=V3_AsubB(ctx->bestTc,ta); float planeDist=V3_dot(tN,ctx->bestDeepPoint),tD=ctx->bestTriD; float d00=V3_dot(triEdge1,triEdge1),d01=V3_dot(triEdge1,triEdge2),d11=V3_dot(triEdge2,triEdge2),denom=d00*d11-d01*d01; bool validTri=vabs(denom)>PHY_EPSILON;
-    for (u32 i=0;i<hn && best->n<MANIFOLD_MAX;++i) {
+    Manifold* best=&ctx->best; if(!ctx->haveBestTri||best->n==0||best->n>=MANI_MAX)return; u32 hn=ctx->boxV ? ctx->boxN : modelVertexCounts[ctx->hullMesh]; if(!hn)return; V3 ta=ctx->bestTa,tN=ctx->bestTriN; V3 triEdge1=V3_AsubB(ctx->bestTb,ta),triEdge2=V3_AsubB(ctx->bestTc,ta); float planeDist=V3_dot(tN,ctx->bestDeepPoint),tD=ctx->bestTriD; float d00=V3_dot(triEdge1,triEdge1),d01=V3_dot(triEdge1,triEdge2),d11=V3_dot(triEdge2,triEdge2),denom=d00*d11-d01*d01; bool validTri=vabs(denom)>PHY_EPSILON;
+    for (u32 i=0;i<hn && best->n<MANI_MAX;++i) {
         V3 pt=ctx->boxV ? ctx->boxV[i] : MvVert(ctx->hullMx,MeshVert(ctx->hullMesh,i)); float distToPlane=V3_dot(tN,pt)-planeDist;
         if (vabs(distToPlane)<ctx->thicknessTolerance) {
             bool insideTri=false; if (validTri){V3 projPt=V3_AsubB(pt,V3_ScaleByF(tN,distToPlane)), v2=V3_AsubB(projPt,ta); float d20=V3_dot(v2,triEdge1), d21=V3_dot(v2,triEdge2), v=(d11*d20-d01*d21)/denom, w=(d00*d21-d01*d20)/denom, u=1.0f-v-w; if(u>=-0.02f&&v>=-0.02f&&w>=-0.02f)insideTri=true;}
-            if (insideTri){ float ptPen=tD-distToPlane; if(ptPen>0.0f){ bool isDup=false; for(int k=0;k<best->n;++k){V3 diff=V3_AsubB(pt,best->p[k].point); if(V3_dot(diff,diff)<ctx->spreadEps*ctx->spreadEps){isDup=true;break;}} if(!isDup&&best->n<MANIFOLD_MAX)best->p[best->n++]=(ManifoldPt){pt,ptPen}; } }
+            if (insideTri){ float ptPen=tD-distToPlane; if(ptPen>0.0f){ bool isDup=false; for(int k=0;k<best->n;++k){V3 diff=V3_AsubB(pt,best->p[k].point); if(V3_dot(diff,diff)<ctx->spreadEps*ctx->spreadEps){isDup=true;break;}} if(!isDup&&best->n<MANI_MAX)best->p[best->n++]=(ManifoldPt){pt,ptPen}; } }
         }
     }
 }
@@ -367,7 +364,7 @@ static Manifold BoxMsh(ShapeBox box, u16 triMesh, const float* triMx) {
     ctx.boxV=bv; ctx.boxN=8; if (BvhHasBVH(triMesh)) { BvhWalkAABB_CvxTri(triMesh,triMx,ctx.hb,&ctx); } else { u32 triCount=modelTriangleCounts[triMesh]; for(u32 ti=0;ti<triCount;++ti){V3 ta,tb,tc; MeshTri(triMesh,ti,triMx,&ta,&tb,&tc); CvxTriTest(&ctx,ta,tb,tc);} } CvxMshFillExtraPoints(&ctx); if(ctx.best.n) ctx.best.normal=V3_ScaleByF(ctx.best.normal,-1.f); return ctx.best;
 }
 static void CvxCvxFillPoints(Manifold* m, const SupportCtx* ctx) {
-    if (m->n >= MANIFOLD_MAX || m->maxPen <= 0.0f) return;
+    if (m->n >= MANI_MAX || m->maxPen <= 0.0f) return;
     u16 mA=ctx->meshA, mB=ctx->meshB; if (mA>=MAX_MDLS || mB>=MAX_MDLS) return;
     u32 hn[2]={(u32)modelVertexCounts[mA],(u32)modelVertexCounts[mB]};
     if (!hn[0] || !hn[1] || !physPos[mA] || !physPos[mB]) return;
@@ -388,9 +385,9 @@ static void CvxCvxFillPoints(Manifold* m, const SupportCtx* ctx) {
         V3 ext=V3_AsubB(full.mx,full.mn); sp[side]=vmax(0.02f,vmax(ext.x,vmax(ext.y,ext.z))*0.15f);
     }
     float spu=vmax(0.02f,vmin(sp[0],sp[1]));
-    for (int pass=0;pass<2 && m->n<MANIFOLD_MAX;++pass) {
+    for (int pass=0;pass<2 && m->n<MANI_MAX;++pass) {
         int own=pass, oth=pass^1; if (!haveFp[oth]) continue;
-        for (u32 i=0;i<hn[own] && m->n<MANIFOLD_MAX;++i) {
+        for (u32 i=0;i<hn[own] && m->n<MANI_MAX;++i) {
             V3 w=MvVert(hmx[own],MeshVert(hmesh[own],i)); float d=V3_dot(n,w)-planeDist; if (vabs(d)>tt[own]) continue; float ptPen=bd-d; if (ptPen<=0.0f) continue; if (w.x<fp[oth].mn.x-spu || w.x>fp[oth].mx.x+spu || w.y<fp[oth].mn.y-spu || w.y>fp[oth].mx.y+spu || w.z<fp[oth].mn.z-spu || w.z>fp[oth].mx.z+spu) continue;
             bool isDup=false; for (int k=0;k<m->n;++k){V3 diff=V3_AsubB(w,m->p[k].point); if(V3_dot(diff,diff)<spu*spu){isDup=true;break;}} if (!isDup) m->p[m->n++]=(ManifoldPt){w,ptPen};
         }
@@ -453,14 +450,16 @@ void PrepareSolverContact(u16 a, u16 b, const Manifold *m, float dt, float dtsub
         if (!sc->bStatic) { World.velocity[b] = V3_AsubB(World.velocity[b], V3_ScaleByF(imp, sc->invMassB)); if (sc->canRotateB) World.angularVelocity[b] = V3_AsubB(World.angularVelocity[b], M33_v(sc->Kb, V3_Cross(sc->rB[i], imp))); }          
     }
 }
-static void EntityColliderMatrixNow(u16 i, float M[16]){Quaternion q=World.rotation[i]; V3 sx=V3_ScaleByF(quat_rot_v3(q,(V3){1,0,0}),World.scale[i].x); V3 sy=V3_ScaleByF(quat_rot_v3(q,(V3){0,1,0}),World.scale[i].y); V3 sz=V3_ScaleByF(quat_rot_v3(q,(V3){0,0,1}),World.scale[i].z); V3 p=World.position[i]; M[0]=sx.x; M[1]=sx.y; M[2]=sx.z; M[3]=0.0f; M[4]=sy.x; M[5]=sy.y; M[6]=sy.z; M[7]=0.0f; M[8]=sz.x; M[9]=sz.y; M[10]=sz.z; M[11]=0.0f; M[12]=p.x; M[13]=p.y; M[14]=p.z; M[15]=1.0f;}
-bool CapsuleTouchesOBB(V3 pt, float radius, ShapeBox box) {V3 d=V3_AsubB(pt,box.ctr); V3 ax=quat_rot_v3(box.rot,(V3){1,0,0}), ay=quat_rot_v3(box.rot,(V3){0,1,0}), az=quat_rot_v3(box.rot,(V3){0,0,1}); float lx=V3_dot(d,ax),ly=V3_dot(d,ay),lz=V3_dot(d,az); float cx=vclamp(lx,-box.hExt.x,box.hExt.x),cy=vclamp(ly,-box.hExt.y,box.hExt.y),cz=vclamp(lz,-box.hExt.z,box.hExt.z); float dx=lx-cx, dy=ly-cy, dz=lz-cz; return (dx*dx+dy*dy+dz*dz)<=radius*radius;}
+static void EntityColliderMatrixNow(u16 i, float M[16]) {
+    Quaternion q = World.rotation[i]; V3 sx = V3_ScaleByF(quat_rot_v3(q,(V3){1,0,0}),World.scale[i].x), sy = V3_ScaleByF(quat_rot_v3(q,(V3){0,1,0}),World.scale[i].y), sz = V3_ScaleByF(quat_rot_v3(q,(V3){0,0,1}),World.scale[i].z), p = World.position[i]; M[0] = sx.x; M[1] = sx.y; M[2] = sx.z; M[3] = 0.0f; M[4] = sy.x; M[5] = sy.y; M[6] = sy.z; M[7] = 0.0f; M[8] = sz.x; M[9] = sz.y; M[10] = sz.z; M[11] = 0.0f; M[12] = p.x; M[13] = p.y; M[14] = p.z; M[15] = 1.0f;
+}
+bool CapsuleTouchesOBB(V3 pt, float radius, ShapeBox box) {V3 d=V3_AsubB(pt,box.ctr); V3 ax=quat_rot_v3(box.rot,(V3){1,0,0}), ay=quat_rot_v3(box.rot,(V3){0,1,0}), az=quat_rot_v3(box.rot,(V3){0,0,1}); float lx=V3_dot(d,ax),ly=V3_dot(d,ay),lz=V3_dot(d,az); float cx=vclamp(lx,-box.hExt.x,box.hExt.x),cy=vclamp(ly,-box.hExt.y,box.hExt.y),cz=vclamp(lz,-box.hExt.z,box.hExt.z); float dx = lx - cx, dy = ly - cy, dz = lz - cz; return (dx*dx + dy*dy + dz*dz) <= radius*radius; }
 INLINE int V3_IsSane(V3 v) { union { float f; u32 i; } ux,uy,uz; ux.f = v.x; uy.f = v.y; uz.f = v.z; return !(((ux.i & 0x7FFFFFFF) >= 0x7F800000) | ((uy.i & 0x7FFFFFFF) >= 0x7F800000) | ((uz.i & 0x7FFFFFFF) >= 0x7F800000)); }
 static bool reverbZoneActive; static u16 activeReverbPreset;
-void AppendTextWarning(i32 sidx, i32 sidx2, i32 sidx3, i32 col, i32 id) { World.Sys_UI.tWrnTextIdx[id]=sidx; World.Sys_UI.tWrnTextIdx2[id]=sidx2; World.Sys_UI.tWrnTextIdx3[id]=sidx3; World.Sys_UI.tWrnFinished[id]=World.Sys_UI.tWrnFinished[id] < World.pauseRelativeTime ? World.pauseRelativeTime + 0.1f : World.Sys_UI.tWrnFinished[id] + 0.1f; World.Sys_UI.tWrnColorIdx[id] = col; }
+void AppendTextWarning(i32 sidx, i32 sidx2, i32 sidx3, i32 col, i32 id) { World.Sys_UI.tWrnTextIdx[id] = sidx; World.Sys_UI.tWrnTextIdx2[id] = sidx2; World.Sys_UI.tWrnTextIdx3[id] = sidx3; World.Sys_UI.tWrnFinished[id] = World.Sys_UI.tWrnFinished[id] < World.pauseRelativeTime ? World.pauseRelativeTime + 0.1f : World.Sys_UI.tWrnFinished[id] + 0.1f; World.Sys_UI.tWrnColorIdx[id] = col; }
 u32 PosGetCellCoordsP(i32 cx, i32 cz) { cx=vclampi(cx,0,(WORLDX - 1)); cz=vclampi(cz,0,(WORLDX - 1)); return (u32)cz * WORLDX + (u32)cx; }
 void Physics(float dt) {
-    if (gravityLiftOverlapLevel!=World.curLev) { mset(gravityLiftWasInside,0,sizeof(gravityLiftWasInside)); mset(gravityLiftTopSupport,0,sizeof(gravityLiftTopSupport));teleportWasTouching=0;ladderSFXFinished=0.0;gravityLiftOverlapLevel=World.curLev; }
+    if (gravityLiftOverlapLevel!=World.curLev) { mset(gravityLiftWasInside,0,sizeof(gravityLiftWasInside)); mset(gravityLiftTopSupport,0,sizeof(gravityLiftTopSupport)); teleportWasTouching = 0; World.ladderSFXFinished = 0.0f; gravityLiftOverlapLevel = World.curLev; }
     if (gWarmPairLevel != World.curLev) { mset(gWarmPairs,0,sizeof(gWarmPairs));gWarmPairLevel=World.curLev; mset(World.physQuiet,0,sizeof(u8)*INSTANCE_CNT); }
     mset(grenadeImpactQueued,0,sizeof(grenadeImpactQueued));
     mset(projImpQueued,0,sizeof(projImpQueued));
@@ -563,11 +562,11 @@ void Physics(float dt) {
                     case 598/*trigger_multiple*/: case 600/*trigger_once*/: TriggerTriggerTripped(self,other); break;  case 599/*trigger_music*/:if(other == PLAYER1){TrackType tt=World.instances[self].trackType; MusicType mt=World.instances[self].musicType; World.Sys_Music.inZone=true; World.Sys_Music.elevator=(tt == TT_Elev); World.Sys_Music.distortion=(tt == TT_Distortion); World.Sys_Music.zoneTrack=tt; World.Sys_Music.zoneMusic=mt;} break;
                     case 601/*trigger_radiation*/:if(other == PLAYER1){World.invP1.radiationArea=true;World.instances[PLAYER1].radiation=World.instances[self].radiation;} break; /* radiation bleedoff / amelioration handled in physics update */
                     case 706/*info_elev_destination*/:if(other == PLAYER1){World.Sys_Music.inZone=true; World.Sys_Music.elevator=true; World.Sys_Music.zoneTrack=TT_Elev; World.Sys_Music.zoneMusic=MT_Override;} break; /* elevator shaft: override level music, same path as trigger_music/TT_Elev */
-                    case 746/*weapon_grenadeenergmine_live*/:if(other == PLAYER1){Entity* e746=&World.instances[self]; if(World.pauseRelativeTime >= e746->intervalFinished){TakeEnergy(51.0f); BiomonitorEnergyPulse(51.0f); e746->intervalFinished = World.pauseRelativeTime + 0.1;}} break;
+                    case 746/*weapon_grenadeenergmine_live*/: if(other == PLAYER1) { Entity* e746 = &World.instances[self]; if (World.pauseRelativeTime >= e746->intervalFinished) { TakeEnergy(51.0f); BiomonitorEnergyPulse(51.0f); e746->intervalFinished = World.pauseRelativeTime + 0.1f; } } break;
                 }
             }
         }
-        if(!gravityLiftTouched[PLAYER1])GravityLiftApplyTopSupport(PLAYER1);
+        if (!gravityLiftTouched[PLAYER1]) GravityLiftApplyTopSupport(PLAYER1);
         ladderWalkOff = ladderTouched && (World.position[PLAYER1].y > ladderTopY + 0.48f); if (!ladderTouched) World.invP1.ladderState=0; mcpy(gravityLiftWasInside,gravityLiftTouched,sizeof(gravityLiftWasInside)); teleportWasTouching=teleportTouched;
     }
     activeReverbPreset = 0; reverbZoneActive = false;
@@ -578,9 +577,9 @@ void Physics(float dt) {
     {   const i32 WAKE_CELLS = 2;
         for (u32 i=0;i<World.instCount;++i) {
             if (AnimWaking(i)) flag_set(&World.instances[i].entflags,EF_MOVING,true); u32 ef = World.instances[i].entflags; bool canSleep=(i!=PLAYER1 && IdxIsDynamicObject(World.instances[i].index) && (ef & EF_RIGIDBODY) && (ef & EF_ACTIVE) && World.col[i]!=CT_NONE && EntMass(i) >= 0.001f && !IdxIsNPC(World.instances[i].index)); if(!canSleep){World.physSleep[i]=0;continue;}
-            i32 cx = PosGetCellCoordX(World.position[i].x), cz = PosGetCellCoordZ(World.position[i].z); bool nearAwake = false;
-            for (i32 x=vmax(cx-WAKE_CELLS,0),xe=vmin(cx+WAKE_CELLS,WORLDX-1);x<=xe && !nearAwake;++x)
-              for (i32 z=vmax(cz-WAKE_CELLS,0),ze=vmin(cz+WAKE_CELLS,WORLDX-1);z<=ze && !nearAwake;++z) {
+            u16 cx = PosGetCellCoordX(World.position[i].x), cz = PosGetCellCoordZ(World.position[i].z); bool nearAwake = false;
+            for (i32 x=vmax((i32)cx - WAKE_CELLS,0),xe=vmin((i32)cx + WAKE_CELLS,WORLDX-1);x<=xe && !nearAwake;++x)
+              for (i32 z=vmax((i32)cz - WAKE_CELLS,0),ze=vmin((i32)cz + WAKE_CELLS,WORLDX-1);z<=ze && !nearAwake;++z) {
                 u32 cl = z*WORLDX+x;
                 for (u16 k=0;k<cellCounts[cl];++k) {
                     u16 j = cellLists[cl][k]; if (j==i) continue;
@@ -621,8 +620,8 @@ bool CantStand(u16 playerIdx, float targetHeight) {
 }
 INLINE bool StandBlocked(float targetHeight) { if (!CantStand(PLAYER1, targetHeight)) return false; CenterStatusPrint("%s", Sys_Text.stringTable[targetHeight >= 2.0f ? 187 : 188]); return true; }
 KeyState* GetCodeMapping(int settingIndex);
-bool DoubleTapLeanLeft(void)  { if(!GetKeyPressed(7)){ return false; } if (World.pauseRelativeTime < World.invP1.leanLTapFinished) { World.invP1.leanLTapFinished = 0.0; return true; } World.invP1.leanLTapFinished = World.pauseRelativeTime + 0.5; return false; }
-bool DoubleTapLeanRight(void) { if(!GetKeyPressed(8)){ return false; } if (World.pauseRelativeTime < World.invP1.leanRTapFinished) { World.invP1.leanRTapFinished = 0.0; return true; } World.invP1.leanRTapFinished = World.pauseRelativeTime + 0.5; return false; } 
+bool DoubleTapLeanLeft(void)  { if(!GetKeyPressed(7)){ return false; } if (World.pauseRelativeTime < World.invP1.leanLTapFinished) { World.invP1.leanLTapFinished = 0.0f; return true; } World.invP1.leanLTapFinished = World.pauseRelativeTime + 0.5f; return false; }
+bool DoubleTapLeanRight(void) { if(!GetKeyPressed(8)){ return false; } if (World.pauseRelativeTime < World.invP1.leanRTapFinished) { World.invP1.leanRTapFinished = 0.0f; return true; } World.invP1.leanRTapFinished = World.pauseRelativeTime + 0.5f; return false; } 
 void ApplyPlayerMovements(float dt) {
     Entity *p = &World.instances[PLAYER1]; bool cyber = World.curLev == LEVEL_CYBERSPACE; Quaternion r = World.rotation[PLAYER1]; float leanSpeed = 70.0f, leanMaxAngle = 35.0f; float leanInput = (float)GetKey(7)/*LeanL*/ - (float)GetKey(8)/*LeanR*/; bool doubleTapLean = DoubleTapLeanLeft() || DoubleTapLeanRight(); bool movingForward = GetKey(0)/*Forward*/ > 0.1f, leanRight = leanInput < 0.0f, leanLeft = leanInput > 0.0f;
     if (doubleTapLean) { /*Double-tap lean: initiate smooth reset to upright over 0.2 seconds*/ World.invP1.leanResetting = true; World.invP1.leanVelocity = 0.0f; KeyState *kL = GetCodeMapping(7), *kR = GetCodeMapping(8); kL->pressed = kR->pressed = false; }
@@ -647,7 +646,7 @@ void ApplyPlayerMovements(float dt) {
     bool grounded = !inGravLift && ((p->entflags & EF_GROUNDED) > 0), jumpjettin = ((World.invP1.hasHardware & HW_JET) > 0 && (World.invP1.hardwareIsActive & HW_JET) > 0), onLadder = World.invP1.ladderState > 0, boosterOn = (World.invP1.hasHardware & HW_BST) && (World.invP1.hardwareIsActive & HW_BST);
     bool skatesAct = boosterOn && World.invP1.hwVersSetting[HW_BST_IDX] == 0;
     bool boostAct = boosterOn && !skatesAct && World.invP1.ladderState == 0;
-    if (onLadder && !grounded && !jumpjettin && World.velocity[PLAYER1].y > 0.65f && ladderSFXFinished<World.pauseRelativeTime) { play_wav("player/ladder",AppliedFXVol(0.2f),World.position[PLAYER1],true); ladderSFXFinished = World.pauseRelativeTime + 1.0; }
+    if (onLadder && !grounded && !jumpjettin && World.velocity[PLAYER1].y > 0.65f && World.ladderSFXFinished < World.pauseRelativeTime) { play_wav("player/ladder",AppliedFXVol(0.2f),World.position[PLAYER1],true); World.ladderSFXFinished = World.pauseRelativeTime + 1.0f; }
     if (GetKeyPressed(4)/*Jump*/ && (grounded || inGravLift || onLadder) && !jumpjettin) {
         if (onLadder) { World.invP1.ladderState = 0; onLadder = false; float y2=r.y*r.y, xz=r.x*r.z, wy=r.w*r.y; V3 fwd = V3_Normalize((V3){2.0f*(xz+wy), 2.0f*(r.y*r.z - r.w*r.x), 1.0f - 2.0f*(r.x*r.x + y2)}); World.velocity[PLAYER1] = V3_ScaleByF(fwd,6.0f); }
         else {
@@ -659,36 +658,40 @@ void ApplyPlayerMovements(float dt) {
         }
     }
     if (GetKey(4)/*Jump still held*/ && jumpjettin && World.invP1.energy > 0.0f) {
-        if (World.invP1.doubleJumpFinished > World.pauseRelativeTime) { World.invP1.doubleJumpFinished = 0.0; if (!Cheats.noclip) {World.velocity[PLAYER1] = V3Add(World.velocity[PLAYER1], V3_ScaleByF(p->forward, 1.5f * (4.51f + 0.2f)));}/*1.5x the standard jump, lunges from hardware so no fatigue*/ TakeEnergy(15.0f); }
-        else { if (!Cheats.noclip) {World.velocity[PLAYER1].y += 1.3f;} World.invP1.doubleJumpFinished = World.pauseRelativeTime + 0.5f; if (World.invP1.jumpJetSuckFinished < World.pauseRelativeTime) { World.invP1.jumpJetSuckFinished=World.pauseRelativeTime+1.0f; float energysuck = 11.0f; switch (World.invP1.hwVersSetting[10]) { case 0: energysuck=11.0f; break; case 1:energysuck=26.0f; break; case 2:energysuck=22.0f; break; } TakeEnergy(energysuck); } }
+        if (World.invP1.doubleJumpFinished > World.pauseRelativeTime) { World.invP1.doubleJumpFinished = 0.0f; if (!Cheats.noclip) {World.velocity[PLAYER1] = V3Add(World.velocity[PLAYER1], V3_ScaleByF(p->forward, 1.5f * (4.51f + 0.2f)));}/*1.5x the standard jump, lunges from hardware so no fatigue*/ TakeEnergy(15.0f); }
+        else { if (!Cheats.noclip) {World.velocity[PLAYER1].y += 1.3f;} World.invP1.doubleJumpFinished = World.pauseRelativeTime + 0.5f; if (World.invP1.jumpJetSuckFinished < World.pauseRelativeTime) { World.invP1.jumpJetSuckFinished = World.pauseRelativeTime + 1.0f; float energysuck = 11.0f; switch (World.invP1.hwVersSetting[10]) { case 0: energysuck=11.0f; break; case 1:energysuck=26.0f; break; case 2:energysuck=22.0f; break; } TakeEnergy(energysuck); } }
     }
     float lastRatio = World.invP1.currentCrouchRatio; World.invP1.currentCrouchRatio = smooth_damp(lastRatio,targR,&World.invP1.crouchingVelocity,transitionSec,dt);
     if (World.invP1.currentCrouchRatio >= 1.0f) { World.invP1.currentCrouchRatio = 1.0f; if(p->bodyState == BodyState_StandingUp){p->bodyState=BodyState_Standing;} } else if (p->bodyState == BodyState_CrouchingDown && World.invP1.currentCrouchRatio <= PLAYER_CROUCH_RATIO) { World.invP1.currentCrouchRatio = PLAYER_CROUCH_RATIO; p->bodyState = BodyState_Crouch; }
     else if (p->bodyState == BodyState_ProningUp && World.invP1.currentCrouchRatio >= PLAYER_CROUCH_RATIO) { World.invP1.currentCrouchRatio = PLAYER_CROUCH_RATIO; p->bodyState = BodyState_Crouch; } else if (p->bodyState == BodyState_ProningDown && World.invP1.currentCrouchRatio <= PLAYER_PRONE_RATIO) { World.invP1.currentCrouchRatio = PLAYER_PRONE_RATIO; p->bodyState = BodyState_Prone; }
     if (World.col[PLAYER1] == CT_CAP) { World.colliderSize[PLAYER1].y = 2.0f * World.invP1.currentCrouchRatio; World.colliderCenter[PLAYER1].y =  -PLYR_CAM_OFS_Y + (2.0f - World.colliderSize[PLAYER1].y) * 0.5f; } // Split capsule shape in the middle, camera is thus 0.16 away from top of the capsule ((2 / 2 = 1) - 0.84 which is PLYR_CAM_OFS_Y)
-    float h=(float)GetKey(0)/*Forward*/ - (float)GetKey(2)/*Backpedal*/, s = (float)GetKey(3)/*StrafeR*/ - (float)GetKey(1)/*StrafeL*/, vertInput = Cheats.noclip ? (float)(((Cheats.noclip || World.curLev == LEVEL_CYBERSPACE) && GetKey(38)/*Swim up*/) || GetKey(4)/*Jump still held*/) - (float)((Cheats.noclip || World.curLev == LEVEL_CYBERSPACE) && GetKey(39)/*Swim dn*/) : 0.0;
+    float h=(float)GetKey(0)/*Forward*/ - (float)GetKey(2)/*Backpedal*/, s = (float)GetKey(3)/*StrafeR*/ - (float)GetKey(1)/*StrafeL*/, vertInput = Cheats.noclip ? (float)(((Cheats.noclip || World.curLev == LEVEL_CYBERSPACE) && GetKey(38)/*Swim up*/) || GetKey(4)/*Jump still held*/) - (float)((Cheats.noclip || World.curLev == LEVEL_CYBERSPACE) && GetKey(39)/*Swim dn*/) : 0.0f;
     bool isSprinting = GetKey(9)/*Sprint*/ && (grounded || inGravLift || World.invP1.ladderState > 0 || Cheats.noclip);
-    if(World.invP1.fatigueMoveFinished<World.pauseRelativeTime && (vabs(h)>0.0f || vabs(s)>0.0f) && grounded && (V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1])>0.1f && !Cheats.noclip)&&!boostAct){World.invP1.fatigue+=isSprinting ? 2.85f : 1.0f; World.invP1.fatigueMoveFinished=World.pauseRelativeTime+0.298f;/*Ensure no sync w/ bleedoff*/}
-    if(World.invP1.footstepFinished < World.pauseRelativeTime && (vabs(h) > 0.0f || vabs(s) > 0.0f) && grounded && (PlayerIsMoving() && !Cheats.noclip) && !boostAct){
-        RaycastHit fstep=Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); play_wav(FsSound(fstep.hit ? GetFootstepTypeForPrefab(World.instances[fstep.hitInstanceIndex].index) : FSTP_Concrete,FSK_STEP),AppliedFXVol(random_range(0.4f,0.55f)),World.position[PLAYER1],true); World.invP1.footstepFinished = World.pauseRelativeTime + (isSprinting ? random_range(0.2f,0.3f) : random_range(0.35f,0.65f));
+    if (World.invP1.fatigueMoveFinished < World.pauseRelativeTime && (vabs(h) > 0.0f || vabs(s)>0.0f) && grounded && (V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1]) > 0.1f && !Cheats.noclip)&&!boostAct){World.invP1.fatigue+=isSprinting ? 2.85f : 1.0f; World.invP1.fatigueMoveFinished = World.pauseRelativeTime + 0.298f;/*Ensure no sync w/ bleedoff*/}
+    if (World.invP1.footstepFinished < World.pauseRelativeTime && (vabs(h) > 0.0f || vabs(s) > 0.0f) && grounded && (PlayerIsMoving() && !Cheats.noclip) && !boostAct){
+        RaycastHit fstep = Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); play_wav(FsSound(fstep.hit ? GetFootstepTypeForPrefab(World.instances[fstep.hitInstanceIndex].index) : FSTP_Concrete,FSK_STEP),AppliedFXVol(random_range(0.4f,0.55f)),World.position[PLAYER1],true); World.invP1.footstepFinished = World.pauseRelativeTime + (isSprinting ? random_range(0.2f,0.3f) : random_range(0.35f,0.65f));
     }
-    if (World.invP1.rustleFinished<World.pauseRelativeTime && (vabs(h)>0.0f || vabs(s)>0.0f) && (V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1])>0.1f && !Cheats.noclip) && PlayerIsMoving() && !boostAct) {
-        u32 n = random_range_u32(1,7); if(n==4) n=1; char path[64]; sFormat(path,sizeof(path),"footsteps/Clothes/rustle0%d",(i32)n); play_wav(path,AppliedFXVol(random_range(0.3f,0.5f)), World.position[PLAYER1],true); World.invP1.rustleFinished=World.pauseRelativeTime+(isSprinting ? random_range(0.4f,0.6f) : random_range(0.8f,1.2f));
+    if (World.invP1.rustleFinished<World.pauseRelativeTime && (vabs(h) > 0.0f || vabs(s)>0.0f) && (V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1])>0.1f && !Cheats.noclip) && PlayerIsMoving() && !boostAct) {
+        u32 n = random_range_u32(1,7); if(n==4) n=1; char path[64]; sFormat(path,sizeof(path),"footsteps/Clothes/rustle0%d",(i32)n); play_wav(path,AppliedFXVol(random_range(0.3f,0.5f)),World.position[PLAYER1],true); World.invP1.rustleFinished = World.pauseRelativeTime + (isSprinting ? random_range(0.4f,0.6f) : random_range(0.8f,1.2f));
     }
     float y2=r.y*r.y, xz=r.x*r.z, wy=r.w*r.y; p->forward=V3_Normalize((V3){ 2.0f*(xz + wy),2.0f*(r.y*r.z - r.w*r.x),1.0f - 2.0f*(r.x*r.x + y2) }); p->right=V3_Normalize((V3){ 1.0f - 2.0f*(y2 + r.z*r.z),2.0f*(r.x*r.y + r.w*r.z),2.0f*(xz - wy) });
     V3 inputDir=cyber ? (V3){ p->forward.x*h + p->right.x*s, p->forward.y*h + p->right.y*s, p->forward.z*h + p->right.z*s } : (V3){ p->forward.x*h + p->right.x*s,vertInput,p->forward.z*h + p->right.z*s}; float inputLenSq = V3_dot(inputDir,inputDir); V3 w = (inputLenSq > 0.0001f) ? V3_ScaleByF(inputDir, 1.0f / vsqrtf(inputLenSq)) : (V3){0, 0, 0}; 
     bool isRunning = (inputLenSq > 0.01f); float speedAdjust = 0.0f; bool setSpeedAdjusted = false; if (Cheats.noclip) { speedAdjust = PLAYER_MAX_CYBER_SPEED*(isSprinting ? 2.5f : 1.5f); setSpeedAdjusted = true; } if (World.curLev==LEVEL_CYBERSPACE) { speedAdjust = PLAYER_MAX_CYBER_SPEED; setSpeedAdjusted = true; }
     BodyState b=World.instances[PLAYER1].bodyState; float v=WALK_SPEED; switch(b){ case BodyState_CrouchingDown: case BodyState_Crouch:v=CROUCH_SPEED; break; case BodyState_Prone: case BodyState_ProningDown: case BodyState_ProningUp:v=PLAYER_MAX_PRONE_SPEED; break; default:break; }
     if((isSprinting||boostAct) && isRunning){v=World.invP1.fatigue > 80.0f && !boostAct ? 10.0f : 17.0f; if (b==BodyState_Standing||b==BodyState_Crouch||b==BodyState_CrouchingDown) v-=(WALK_SPEED-CROUCH_SPEED)*1.5f; else if(b==BodyState_Prone||b==BodyState_ProningDown||b==BodyState_ProningUp) v-=(WALK_SPEED-PLAYER_MAX_PRONE_SPEED)*2.f;}
-    float speed = (setSpeedAdjusted ? speedAdjust : (skatesAct ? v*SKATE_SPEED : v) + (boostAct ? PLAYER_BOOSTER_SPEED_BOOST : 0.0f)) + (World.invP1.staminupActive ? 1.0f : 0.0f), accel=World.curLev!=LEVEL_CYBERSPACE ? (skatesAct ? WALK_SPEED_ACCEL/SKATE_SLIDE : (boostAct ? BOOST_ACCEL : WALK_SPEED_ACCEL)) : WALK_SPEED_ACCEL; V3 targetVel = V3_ScaleByF(w,speed); 
+    float speed = (setSpeedAdjusted ? speedAdjust : (skatesAct ? v * 1.1f : v) + (boostAct ? PLAYER_BOOSTER_SPEED_BOOST : 0.0f)) + (World.invP1.staminupActive ? 1.0f : 0.0f), accel=World.curLev!=LEVEL_CYBERSPACE ? (skatesAct ? WALK_SPEED_ACCEL/5.0f : (boostAct ? BOOST_ACCEL : WALK_SPEED_ACCEL)) : WALK_SPEED_ACCEL; V3 targetVel = V3_ScaleByF(w,speed); 
     if (onLadder && !ladderWalkOff) { float climbSpeed = (isSprinting && isRunning) ? 3.0f : 1.3f; targetVel = (V3){p->right.x * s * speed * 0.3f, h * climbSpeed, p->right.z * s * speed * 0.3f}; accel = 5.0f; } else if (!cyber) { if (vabs(vertInput) < 0.001f) { targetVel.y = World.velocity[PLAYER1].y; } }
     V3 dv = V3_AsubB(targetVel, World.velocity[PLAYER1]); dv = (V3){ vclamp(dv.x, -10.0f,10.0f), vclamp(dv.y, -10.0f,10.0f), vclamp(dv.z,-10.0f,10.0f) }; World.velocity[PLAYER1] = V3Add(World.velocity[PLAYER1],V3_ScaleByF(dv,accel*vclamp(dt,0.0005f,0.1f)));
     if (cyber && !Cheats.noclip && World.diffCyb <= 1 && !isRunning && !World.Sys_Music.cyberTube) World.velocity[PLAYER1] = (V3){0.0f,0.0f,0.0f};
-    if (World.invP1.fatigueBleedoffFinished<World.pauseRelativeTime && World.curLev!=LEVEL_CYBERSPACE && !Cheats.noclip){World.invP1.fatigue-=fatigueWane;/*Fatigue bleed off*/ World.invP1.fatigueBleedoffFinished=World.pauseRelativeTime +0.3f;} World.invP1.fatigue=vclamp(World.invP1.fatigue,0.0f,100.0f); if (World.invP1.fatigue > 80.0f){AppendTextWarning(868,-1,-1,T_WHITE,0);/*Fatigue high*/}
+    if (World.invP1.fatigueBleedoffFinished<World.pauseRelativeTime && World.curLev!=LEVEL_CYBERSPACE && !Cheats.noclip){World.invP1.fatigue-=fatigueWane;/*Fatigue bleed off*/ World.invP1.fatigueBleedoffFinished = World.pauseRelativeTime + 0.3f;} World.invP1.fatigue=vclamp(World.invP1.fatigue,0.0f,100.0f); if (World.invP1.fatigue > 80.0f){AppendTextWarning(868,-1,-1,T_WHITE,0);/*Fatigue high*/}
     if (World.invP1.noiseFinished < World.pauseRelativeTime) World.invP1.makingNoise = false;
     if (!cyber && grounded && !World.invP1.wasGrounded) {
         float velChange = vabs(World.invP1.lastVelY - World.velocity[PLAYER1].y);
-        if(velChange>2.0f && World.invP1.noiseFinished<World.pauseRelativeTime){RaycastHit lhit=Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); FootStepType lstp=lhit.hit ? GetFootstepTypeForPrefab(World.instances[lhit.hitInstanceIndex].index) : FSTP_Concrete; play_wav(FsSound(lstp,FSK_LAND),AppliedFXVol(vclamp(velChange/11.72f,0.5f,1.0f)),World.position[PLAYER1],true); World.invP1.makingNoise=true; World.invP1.noiseFinished=World.pauseRelativeTime+0.2f;}
-        if(velChange>=11.72f&&World.invP1.fallPainFinished<World.pauseRelativeTime){World.invP1.fallPainFinished=World.pauseRelativeTime+0.5f; DamageData dd={0}; float falltake=75.f-random_range(0,68.f); if(falltake>World.instances[PLAYER1].health&&falltake-World.instances[PLAYER1].health<5.0f)falltake=World.instances[PLAYER1].health-1.f; dd.damage=falltake; TakeDamage(PLAYER1,dd); World.invP1.makingNoise=true; World.invP1.noiseFinished=World.pauseRelativeTime+0.2f;}
+        if(velChange > 2.0f && World.invP1.noiseFinished < World.pauseRelativeTime) {
+            RaycastHit lhit = Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); FootStepType lstp=lhit.hit ? GetFootstepTypeForPrefab(World.instances[lhit.hitInstanceIndex].index) : FSTP_Concrete; play_wav(FsSound(lstp,FSK_LAND),AppliedFXVol(vclamp(velChange / 11.72f,0.5f,1.0f)),World.position[PLAYER1],true); World.invP1.makingNoise = true; World.invP1.noiseFinished = World.pauseRelativeTime + 0.2f;
+        }
+        if(velChange >= 11.72f && World.invP1.fallPainFinished < World.pauseRelativeTime) {
+            World.invP1.fallPainFinished = World.pauseRelativeTime + 0.5f; DamageData dd = {0}; float falltake = 75.0f - random_range(0,68.0f); if (falltake > World.instances[PLAYER1].health && falltake - World.instances[PLAYER1].health < 5.0f) falltake = World.instances[PLAYER1].health - 1.0f; dd.damage = falltake; TakeDamage(PLAYER1,dd); World.invP1.makingNoise = true; World.invP1.noiseFinished = World.pauseRelativeTime + 0.2f;
+        }
     } World.invP1.wasGrounded=grounded; World.invP1.lastVelY=World.velocity[PLAYER1].y;
 }
