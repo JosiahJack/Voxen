@@ -1913,13 +1913,13 @@ i32 main() {
     InitalizeEnvironment();
     while(1) {
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad,queuedLevelPos); queuedLevelToLoad = 255u; continue; }
-        double curtime = get_timed(); raycastCalls = 0; raycastMs = 0.0; World.dt = World.current_time < 0.001 ? 0.000 : vmax(curtime - World.current_time,0.0); World.absoluteTime += (double)World.dt; World.current_time = curtime;
+        double curtime = get_timed(); float curtimef = get_time(); raycastCalls = 0; raycastMs = 0.0; World.dt = World.current_time < 0.001 ? 0.000 : vmax(curtime - World.current_time,0.0); World.absoluteTime += (double)World.dt; World.current_time = curtime;
         World.painStaticAlpha = vmax(0.0f,World.painStaticAlpha - World.dt * 2.0f);
         World.empStaticAlpha = vmax(0.0f,World.empStaticAlpha - World.dt * 4.0f);
         cyberStaticAlpha = vmax(0.0f,cyberStaticAlpha - World.dt * 1.0f);
         double input_start = get_timed(); InputProcessing();/*Before anims and physics to allow them to respond immediately.*/
         bool stepFrame = !Cheats.stepmode || f7StepEdge;
-        if (!World.paused && !World.menuActive && stepFrame) { if (World.pauseRelativeTime < 0.001f) { World.pauseRelativeTime = World.last_physics_time = (float)curtime; } World.pauseRelativeTime += World.dt * World.timeScale; /*Reflex slow-time at 0.25x while the patch is active, mouse-look stays raw*/ }
+        if (!World.paused && !World.menuActive && stepFrame) { if (World.pauseRelativeTime < 0.001f) { World.pauseRelativeTime = World.last_physics_time = curtimef; } World.pauseRelativeTime += World.dt * World.timeScale; /*Reflex slow-time at 0.25x while the patch is active, mouse-look stays raw*/ }
         UpdateAnims();/*Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.*/
         prePhys = get_timed() - input_start;
         if (!World.paused && !World.menuActive && stepFrame) { double ps = get_timed(); float dt = vclamp((World.pauseRelativeTime - World.last_physics_time),0.0005f,0.1f); World.last_physics_time = World.pauseRelativeTime; World.dt = dt; Physics(dt); physTime = get_timed() - ps; } else physTime = 0.0;
@@ -1928,7 +1928,7 @@ i32 main() {
         drawCalls = uiDrawCalls = shadDrawCalls = vertsRendered = 0;
         UpdateSensaroundCamViews(); RenderCameraViews();/*Before main Render() so that tv screens are up to date*/ if(likely(!World.paused && !World.menuActive)) { CullCore(); } /*Before automap and audio update due to audio occlusion and automap FoW discovery*/ AudioUpdateMix();/*Actually mixes all the audio for output.*/ AutomapTick(); MinigameTick();
         Render(false/*!camview*/,0u);
-        if (GetKeyPressed(40)/*Screenshot*/ && (float)curtime > World.screenshotTimeout) { Screenshot(); }
+        if (GetKeyPressed(40)/*Screenshot*/ && curtimef > World.screenshotTimeout) { Screenshot(); }
         for(i32 i=0;i<MAX_KEYS;++i){ Sys_Input.keyStates[i].pressed = false; } /*Clear input states, can't mset as we want to preserve down(held) state*/
         for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) { Sys_Input.mouseButtons[i].pressed = false; }
         Sys_Input.scrollDelta = 0.0; World.currentMouse_dx = World.currentMouse_dy = 0; globalframe++; World.cpuTime = get_timed() - curtime; // Measure time over everything this frame before GPU swap buffers for diagnostic text.
