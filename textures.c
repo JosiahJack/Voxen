@@ -5,11 +5,7 @@ typedef struct { u16 index; bool transparent, doublesided, cpuresident; u8 blend
 typedef struct { u16 texIdx, w, h; u8* rgba; } CpuResidentEntry;
 static CpuResidentEntry cpuResident[64];
 static u32 cpuResidentCnt = 0;
-const u8* CpuResidentPixels(u16 texIdx, int* w, int* h) {
-    for (u32 i = 0; i < cpuResidentCnt; ++i) if (cpuResident[i].texIdx == texIdx) { *w = cpuResident[i].w; *h = cpuResident[i].h; return cpuResident[i].rgba; }
-    *w = *h = 0;
-    return NULL;
-}
+const u8* CpuResidentPixels(u16 texIdx, int* w, int* h) { for (u32 i = 0; i < cpuResidentCnt; ++i) if (cpuResident[i].texIdx == texIdx) { *w = cpuResident[i].w; *h = cpuResident[i].h; return cpuResident[i].rgba; } *w = *h = 0; return NULL; }
 static u32 g_vidFrameCnt,g_vidPalOffs[VIDEO_RING],g_vidIdxOffs[VIDEO_RING],g_vidTexBase,g_vidReqGen,g_vidReqFrame = 0xFFFFFFFFu,g_vidPreFrame = 0xFFFFFFFFu; static u16 *g_vidFrameMap,g_vidSlotTex[VIDEO_RING]; static VidFrameRec* g_vidFrames; static VidSlot g_vidSlot[VIDEO_RING]; static void* g_vidRingBuf; static i32* g_vidSizesCPU; static PngArena g_vidArena; static OS_Thread g_vidThr;
 static VidFrameRec* vid_find(u32 texIdx) { return texIdx<texCnt && g_vidFrameMap[texIdx] ? &g_vidFrames[g_vidFrameMap[texIdx]-1] : NULL; }
 static const u8 bayer8[64] = { 0,32, 8,40, 2,34,10,42, 48,16,56,24,50,18,58,26, 12,44, 4,36,14,46, 6,38, 60,28,52,20,62,30,54,22, 3,35,11,43, 1,33, 9,41, 51,19,59,27,49,17,57,25, 15,47, 7,39,13,45, 5,37, 63,31,55,23,61,29,53,21};    static u8 first_row_filter[5] = {PNGFMT_NONE, PNGFMT_SUB, PNGFMT_NONE, PNGFMT_AVG_1ST, PNGFMT_SUB};
@@ -25,9 +21,9 @@ static u32 PalettizeRgba(PalScratch* sc, const u32* rgba, u32 w, u32 h, bool dit
     }
     return n;
 }
-static u32 PalettizeImage(PalScratch* sc, const u8* pix, u32 w, u32 h, const u32* srcPal, u32 srcPalSize, bool dither, u8* idx, u32* pal) { if (srcPalSize) { mcpy(idx, pix, w*h); mcpy(pal, srcPal, srcPalSize*sizeof(u32)); return srcPalSize; } return PalettizeRgba(sc, (const u32*)pix, w, h, dither, idx, pal); }
-static u8* LoadPngFile(const char* path, PngArena* a, int* w, int* h, u32* pal, u32* palSize) { FHandle fd; int sz = 0; const char* d = (const char*)OS_OpenAndAllocateFileBufferReadonly(path, &fd, &sz); if (unlikely(!d || sz <= 0)) return NULL; u8* pix = LoadPng((const u8*)d, sz, w, h, a, pal, palSize); OS_Free((void*)d, (size_t)sz); return pix; }
-static u8* RgbaCopy(const u8* pix, const u32* pal, u32 palSize, u32 nP) { /* LE: u32 pal entry == RGBA byte order */ u8* out = (u8*)OS_Alloc(nP * 4); if (palSize) { for (u32 p = 0; p < nP; ++p) ((u32*)out)[p] = pal[pix[p]]; } else mcpy(out, pix, nP * 4); return out; }
+static u32 PalettizeImage(PalScratch* sc, const u8* pix, u32 w, u32 h, const u32* srcPal, u32 srcPalSize, bool dither, u8* idx, u32* pal) { if (srcPalSize) { mcpy(idx,pix,w*h); mcpy(pal,srcPal,srcPalSize*sizeof(u32)); return srcPalSize; } return PalettizeRgba(sc,(const u32*)((const void*)pix),w,h,dither,idx,pal); }
+static u8* LoadPngFile(const char* path, PngArena* a, int* w, int* h, u32* pal, u32* palSize) { FHandle fd; int sz = 0; const char* d = (const char*)OS_OpenAndAllocateFileBufferReadonly(path,&fd,&sz); if (unlikely(!d || sz <= 0)) return NULL; u8* pix = LoadPng((const u8*)d,sz,w,h,a,pal,palSize); OS_Free((void*)d,(size_t)sz); return pix; }
+static u8* RgbaCopy(const u8* pix, const u32* pal, u32 palSize, u32 nP) { /* LE: u32 pal entry == RGBA byte order */ u8* out = (u8*)OS_Alloc(nP * 4); if (palSize) { for (u32 p=0;p<nP;++p) ((u32*)((void*)out))[p] = pal[pix[p]]; } else mcpy(out,pix,nP * 4); return out; }
 static void vid_decode(VidFrameRec* r, VidSlot* s) { int w = 0, h = 0; u32 pngPal[256], pngPalSize = 0; u8* pix = LoadPngFile(r->path,&g_vidArena, &w,&h,pngPal,&pngPalSize); if (likely(pix && w > 0 && h > 0 && (u32)w*h <= VIDEO_MAXFRAME)) { s->palSize = PalettizeImage(vid_palscratch,pix,w,h,pngPal,pngPalSize,true,s->idx,s->pal); s->w = (u32)w; s->h = (u32)h; s->frameTexIdx = r->texIdx; } }
 static void* vid_worker(void* arg) {
     (void)arg; u32 last = 0, lastPri = 0xFFFFFFFFu, lastPre = 0xFFFFFFFFu, slot = 0;
@@ -202,14 +198,11 @@ void LoadTextures() {
     for (int t=0;t<(i32)threadCnt;++t) {OS_ThreadJoin(&workers[t]); }
     totalPixels = totalPaletteColors = 0u; for (u16 i=0;i<texCnt;++i) { if (texResults[i].indices) { totalPixels += (u32)texResults[i].w * texResults[i].h; totalPaletteColors += texResults[i].palSize; } }
     size_t ringpal_size = (size_t)VIDEO_RING * 256 * sizeof(u32), ringidx_size = (size_t)VIDEO_RING * VIDEO_MAXFRAME; size_t offsets_size = (texCnt + VIDEO_RING) * sizeof(u32), palettes_size = totalPaletteColors * sizeof(u32), indices_size = totalPixels; size_t arena_size = offsets_size + palettes_size + indices_size;
-    void* arena = OS_Alloc(arena_size); u8* cur = (u8*)arena;
-    u32* textureOffsets  = (u32*)cur; cur += offsets_size;
-    u32* texturePalettes = (u32*)cur; cur += palettes_size;
-    u8* all_indices = cur;
+    void* arena = OS_Alloc(arena_size); u8* cur = (u8*)arena; u32* textureOffsets  = (u32*)((void*)cur); cur += offsets_size; u32* texturePalettes = (u32*)((void*)cur); cur += palettes_size; u8* all_indices = cur;
     i32* textureSizes          = OS_AllocScratch((texCnt + VIDEO_RING) * 2 * sizeof(i32));
     u32* texturePaletteOffsets = OS_AllocScratch((texCnt + VIDEO_RING) * sizeof(u32));
     g_vidRingBuf = OS_Alloc(ringidx_size + ringpal_size);
-    u32* ringPalettes = (u32*)((u8*)g_vidRingBuf + ringidx_size);
+    u32* ringPalettes = (u32*)((void*)((u8*)g_vidRingBuf + ringidx_size));
     g_vidTexBase = (u32)ringidx_size;                       for (u32 r=0;r<VIDEO_RING;++r) { u16 si = (u16)(texCnt + r); g_vidPalOffs[r] = totalPaletteColors + r*256; g_vidIdxOffs[r] = r * VIDEO_MAXFRAME; textureOffsets[si] = g_vidIdxOffs[r]; texturePaletteOffsets[si] = g_vidPalOffs[r]; textureSizes[si*2] = 0; textureSizes[si*2+1] = 0; g_vidSlotTex[r] = si; }
     g_vidSizesCPU = OS_Alloc(VIDEO_RING * 2 * sizeof(i32)); for (u32 r=0;r<VIDEO_RING;++r) { g_vidSlot[r].idx = (u8*)g_vidRingBuf + (size_t)r*VIDEO_MAXFRAME; g_vidSlot[r].pal = ringPalettes + (size_t)r*256; }
     u32 pixel_base = 0, color_base = 0;

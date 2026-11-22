@@ -1928,7 +1928,7 @@ i32 main() {
         drawCalls = uiDrawCalls = shadDrawCalls = vertsRendered = 0;
         UpdateSensaroundCamViews(); RenderCameraViews();/*Before main Render() so that tv screens are up to date*/ if(likely(!World.paused && !World.menuActive)) { CullCore(); } /*Before automap and audio update due to audio occlusion and automap FoW discovery*/ AudioUpdateMix();/*Actually mixes all the audio for output.*/ AutomapTick(); MinigameTick();
         Render(false/*!camview*/,0u);
-        if (GetKeyPressed(40)/*Screenshot*/ && curtimef > World.screenshotTimeout) { Screenshot(); }
+        if (GetKeyPressed(40)/*Screenshot*/ && curtime > World.screenshotTimeout) { Screenshot(); }
         for(i32 i=0;i<MAX_KEYS;++i){ Sys_Input.keyStates[i].pressed = false; } /*Clear input states, can't mset as we want to preserve down(held) state*/
         for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) { Sys_Input.mouseButtons[i].pressed = false; }
         Sys_Input.scrollDelta = 0.0; World.currentMouse_dx = World.currentMouse_dy = 0; globalframe++; World.cpuTime = get_timed() - curtime; // Measure time over everything this frame before GPU swap buffers for diagnostic text.

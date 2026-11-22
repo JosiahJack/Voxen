@@ -104,7 +104,7 @@ static GlbCell GlbCellInit(const glb_accessor* a) {
 }
 INLINE __attribute__((always_inline)) bool GlbCellGet(const GlbCell* restrict c, size_t i, float* restrict o, size_t es) {
     if (c->cls == 0) { mset(o, 0, es * sizeof(float)); return true; } if (c->cls == 1 || es < c->nc) { return false; }
-    const u8 *e = c->base + c->stride * i, nrm = c->nrm; for (u8 k = 0; k < c->nc; ++k) { const u8* p = e + (size_t)k * c->cs; float r; switch (c->cls) {  case 2: r = *(const float*)p; break; case 3: r = nrm ? (float)*(const u16*)p / 65535.f : (float)*(const u16*)p; break; case 4: r = nrm ? (float)*(const u8*)p / 255.f : (float)*(const u8*)p;  break; default: r = 0.0f; break; } o[k] = r; } return true;
+    const u8 *e = c->base + c->stride * i, nrm = c->nrm; for (u8 k = 0; k < c->nc; ++k) { const void* p = e + (size_t)k * c->cs; float r; switch (c->cls) {  case 2: r = *(const float*)p; break; case 3: r = nrm ? (float)*(const u16*)p / 65535.f : (float)*(const u16*)p; break; case 4: r = nrm ? (float)*(const u8*)p / 255.f : (float)*(const u8*)p;  break; default: r = 0.0f; break; } o[k] = r; } return true;
 }
 INLINE __attribute__((always_inline)) u64 GlbCellGetIdx(const GlbCell* restrict c, size_t i) { if (c->cls == 3) { return *(const u16*)(c->base + c->stride * i); } if (c->cls == 4) { return *(const u8*) (c->base + c->stride * i); } return 0; }
 static const glb_accessor* glb_find_accessor(const glb_primitive* p, glb_attribute_type t, i32 idx) { for(size_t i=0;i<p->attr_count;++i) { const glb_attribute *a = &p->attr[i]; if (a->type == t && a->index == idx) { return a->data; } } return NULL; }
@@ -239,13 +239,13 @@ void glb_parse(i32 tid, const void* d, size_t sz, glb_data** out_data) {
 static void glb_load_buffers(glb_data* data) { if(data->buffers_count&&data->buffers[0].data==NULL&&data->bin){if(data->bin_size<data->buffers[0].size) return; data->buffers[0].data=(void*)data->bin;} }
 typedef struct {u32 idx,key;} TriSort;
 void OptimizeVertexCache(u16* idx, u32 ic, u32 vc, u8* scratch) {
-    if(ic < 3 || !vc){return;}
+    if (ic < 3 || !vc) { return; }
     u32 tc = ic / 3; TriSort* t = (TriSort*)scratch; TriSort* t_tmp = (TriSort*)(scratch + (tc * sizeof(TriSort))); u16* n = (u16*)(scratch + (tc * sizeof(TriSort) * 2));
-    for (u32 i = 0; i < tc; ++i) { u16* p = idx + i * 3; u32 m = p[0] < p[1] ? p[0] : p[1]; m = m < p[2] ? m : p[2]; t[i].idx = i; t[i].key = (u16)m; }
+    for (u32 i=0;i<tc;++i) { u16* p = idx + i * 3; u32 m = p[0] < p[1] ? p[0] : p[1]; m = m < p[2] ? m : p[2]; t[i].idx = i; t[i].key = (u16)m; }
     if (tc >= 2) {
-        u32 b0[256]={0}, b1[256]={0};
+        u32 b0[256] = {0}, b1[256] = {0};
         for (u32 i=0;i<tc;++i) { u16 key = t[i].key; b0[key & 0xFF]++; b1[(key >> 8) & 0xFF]++; }
-        u32 sum0=0, sum1=0;
+        u32 sum0 = 0, sum1 = 0;
         for (u32 i=0;i<256;++i) { u32 t0 = b0[i]; u32 t1 = b1[i]; b0[i] = sum0; b1[i] = sum1; sum0 += t0; sum1 += t1; }
         for (u32 i=0;i<tc;++i) { u32 radix0 =            t[i].key & 0xFF; u32 dest = b0[radix0]++; t_tmp[dest] = t[i]; }
         for (u32 i=0;i<tc;++i) { u32 radix1 = (t_tmp[i].key >> 8) & 0xFF; u32 dest = b1[radix1]++; t[dest] = t_tmp[i]; }

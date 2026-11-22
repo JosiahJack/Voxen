@@ -64,11 +64,11 @@ bool SpawnImpPart(u16 prefab, V3 pos, V3 normal) {
     return true;
 }
 void SpawnBeamTrail(u16 presetType, V3 from, V3 to, Color c) {
-    const PSysDef* preset=PSysTypeGet(presetType); if(!preset)return; V3 delta=V3_AsubB(to,from); float dist=V3_Mag(delta); if(dist<0.01f)return; const int BEAM_SEGS=8; const float life=0.04f, trailLife=0.40f;
-    for (int seg=0; seg<BEAM_SEGS; ++seg) {
+    const PSysDef* preset=PSysTypeGet(presetType); if(!preset)return; V3 delta=V3_AsubB(to,from); float dist=V3_Mag(delta); if(dist<0.01f)return; const i32 BEAM_SEGS=8; const float life=0.04f, trailLife=0.40f;
+    for (i32 seg=0; seg<BEAM_SEGS; ++seg) {
         PSysDef def=*preset; float f0=(float)seg/(float)BEAM_SEGS; V3 segFrom=V3Add(from,V3_ScaleByF(delta,f0));
         def.pos=segFrom; def.rotation=QuatFromToRotation((V3){0,1,0},V3_Normalize(delta)); def.textures=NULL; def.textureCount=0; def.sizeMin=def.sizeMax=0.0f; def.shapeType=3; def.lifetimeMin=def.lifetimeMax=life; def.trailLifetime=trailLife; def.trailWidthStart=def.trailWidthEnd=0.05f; float segDist=dist/(float)BEAM_SEGS; def.speedMin=def.speedMax=segDist*(2.0f/life); def.velKeys=(const float[]){1,0}; def.velTimes=(const float[]){0,1}; def.velCount=2;
-        def.trailColorStart=c; def.trailColorEnd=c; Color colors[16]; for (int i=0;i<16;++i) colors[i]=c; def.rampColors=colors; def.emitRate=0.0f; def.burstCount=1; def.duration=life+0.05f; PSysAddInternal(&def,U16_MAX,U16_MAX);
+        def.trailColorStart=c; def.trailColorEnd=c; Color colors[16]; for (i32 i=0;i<16;++i) colors[i]=c; def.rampColors=colors; def.emitRate=0.0f; def.burstCount=1; def.duration=life+0.05f; PSysAddInternal(&def,U16_MAX,U16_MAX);
     }
 }
 static const struct { u16 proj; u8 type; } projectileImpactTypes[] = { { 481, 177 }/* proj_enemshot2: impact_enemshot2 */, { 482, 169 }, { 482, 170 }/* magpulse: magpulse_center, sparks_spits */, { 483, 171 }, { 483, 182 }/* stungun: stungun_impacts, sparkssmall */, { 484, 172 }, { 484, 173 }, { 484, 174 }, { 484, 175 }/* railgun: root, centerumbra, shockwave, smoke */, { 485, 176 }, { 485, 183 }/* plasma: plasmarifle_hit, sparkssmall */,
@@ -80,23 +80,23 @@ void SpawnProjectileImpactParticles(u16 projectile,V3 pos,V3 normal) {
     PSysDef def = *preset; def.pos = V3Add(pos,V3_ScaleByF(normal,wfx.hitOffset)); def.rotation = QuatFromToRotation((V3){0,1,0},normal); PSysAddInternal(&def,U16_MAX,U16_MAX);
     for (u32 i=0;i<sizeof(projectileImpactTypes)/sizeof(*projectileImpactTypes);++i) { if (projectileImpactTypes[i].proj == projectile && projectileImpactTypes[i].type != type) { const PSysDef* cd=PSysTypeGet(projectileImpactTypes[i].type); if (cd) { PSysDef cdef = *cd; cdef.pos = def.pos; cdef.rotation = def.rotation; PSysAddInternal(&cdef,U16_MAX,U16_MAX); } } }
 }
-static bool DidRayHit(int wep16){wfx.tempHitEnt=0xFFFF;float d=driftForWeapon[wep16];V3 dir=ScreenPointToRayPixels(World.instances[PLAYER1].forward,World.instances[PLAYER1].right,random_range(-d,d),random_range(-d,d));RaycastHit h=Raycast(World.position[PLAYER1],dir,wfx.fireDistance,LMASK_PLAYER_ATTACK);wfx.tempHit=h;if(h.hit){wfx.tempHitEnt=h.hitInstanceIndex;return true;}return false;}
+static bool DidRayHit(i32 wep16){wfx.tempHitEnt=0xFFFF;float d=driftForWeapon[wep16];V3 dir=ScreenPointToRayPixels(World.instances[PLAYER1].forward,World.instances[PLAYER1].right,random_range(-d,d),random_range(-d,d));RaycastHit h=Raycast(World.position[PLAYER1],dir,wfx.fireDistance,LMASK_PLAYER_ATTACK);wfx.tempHit=h;if(h.hit){wfx.tempHitEnt=h.hitInstanceIndex;return true;}return false;}
 static const float bulletHoleSize[6] = {0.06f,0.2f,0.1f,0.04f,0.15f,0.3f};
-void CreateStandardImpactMarks(int wep16) {
+void CreateStandardImpactMarks(i32 wep16) {
     if (!wfx.tempHit.hit) { return; }
     Entity* e = &World.instances[wfx.tempHit.hitInstanceIndex];
     if ((e->entflags & EF_RIGIDBODY) || IdxIsDoor(e->index) || IdxIsNPC(e->index) || e->index==279/*chunk_screen*/ || e->index==477/*sec_camera*/) { return; }
     V3 pos = V3Add(wfx.tempHit.point, V3_ScaleByF(wfx.tempHit.normal, 0.16f));
     u16 hole = wepBHole[wep16]; u16 markInst = SpawnDynamicObject(hole); if (!EntIdxIsValid(markInst)) { return; }
     World.position[markInst] = pos;
-    World.rotation[markInst] = quat_multiply(QuatFromToRotation((V3){0,1,0},V3_ScaleByF(wfx.tempHit.normal,-1.0f)),QuatEulerZ((float)(int)random_range(0.0f,3.99f) * 90.0f));
-    if (hole >= 518 && hole <= 523) World.scale[markInst] = V3_ScaleByF((V3){1,1,1}, bulletHoleSize[hole - 518] / 1.28f);
+    World.rotation[markInst] = quat_multiply(QuatFromToRotation((V3){0.0f,1.0f,0.0f},V3_ScaleByF(wfx.tempHit.normal,-1.0f)),QuatEulerZ((float)random_range_u32(0u,3u) * 90.0f));
+    if (hole >= 518 && hole <= 523) World.scale[markInst] = V3_ScaleByF((V3){1.0f,1.0f,1.0f}, bulletHoleSize[hole - 518] / 1.28f);
 }
 void CreateStandardImpactEffects(){if(wfx.tempHitEnt==0xFFFF)return;u16 ent=wfx.tempHitEnt;if(ent>=World.instCount)return;u16 prefab=GetImpactType(ent);if(prefab==0||prefab>=MAX_ENTS)prefab=731;V3 pos=wfx.tempHit.hit?V3Add(wfx.tempHit.point,V3_ScaleByF(wfx.tempHit.normal,wfx.hitOffset)):World.position[ent];V3 n=wfx.tempHit.hit?wfx.tempHit.normal:(V3){0,1,0};if(SpawnImpPart(prefab,pos,n))return;u16 fx=SpawnDynamicObject(prefab);if(EntIdxIsValid(fx)){World.position[fx]=pos;World.rotation[fx]=QuatFromToRotation((V3){0,1,0},n);}}
-static void CreateBeamImpactEffects(int wep16) { u16 imp = 731u;/*Cyan sparq*/ if (wep16 == 1) { imp = 739u;/*Red laser (blaster)*/ } else if (wep16 == 4) { imp = 740u;/*Yellow laser (ion)*/ } SpawnImpPart(imp,wfx.tempHit.point,wfx.tempHit.normal); u16 fx = SpawnDynamicObject(imp); World.position[fx] = wfx.tempHit.point; World.rotation[fx] = QuatFromToRotation((V3){0,1,0},wfx.tempHit.normal); }
-static void CreateBeamEffects(int wep16) { Color c = (wep16 == 1) ? (Color){1.f,0.18f,0.12f,1.f} : (wep16 == 4) ? (Color){1.f,0.9f,0.15f,1.f} : (Color){0.3f,1.f,1.f,1.f}; V3 p = World.position[PLAYER1]; p.y -= 0.2f; SpawnBeamTrail(166,p,wfx.tempHit.point,c); }
-static float DamageForPower(int w) { if (World.invP1.overloadEnabled) { return damageOverloadForWeapon[w]; } float d = dmgForWep[w],D = dmgForWep2[w],e = energyDrainLowForWeapon[w],E = energyDrainHiForWeapon[w]; float pct = World.invP1.weaponEnergySetting[w]*0.01f; return (pct*(D/E - d/e) + 3.0f)*(pct*(E - e) + e); } // Slope-of-slopes curve: interpolates damage/energy ratio across energy setting, then scales by interpolated energy drain itself.
-void HitScanFire(int wep16) {
+static void CreateBeamImpactEffects(i32 wep16) { u16 imp = 731u;/*Cyan sparq*/ if (wep16 == 1) { imp = 739u;/*Red laser (blaster)*/ } else if (wep16 == 4) { imp = 740u;/*Yellow laser (ion)*/ } SpawnImpPart(imp,wfx.tempHit.point,wfx.tempHit.normal); u16 fx = SpawnDynamicObject(imp); World.position[fx] = wfx.tempHit.point; World.rotation[fx] = QuatFromToRotation((V3){0,1,0},wfx.tempHit.normal); }
+static void CreateBeamEffects(i32 wep16) { Color c = (wep16 == 1) ? (Color){1.f,0.18f,0.12f,1.f} : (wep16 == 4) ? (Color){1.f,0.9f,0.15f,1.f} : (Color){0.3f,1.f,1.f,1.f}; V3 p = World.position[PLAYER1]; p.y -= 0.2f; SpawnBeamTrail(166,p,wfx.tempHit.point,c); }
+static float DamageForPower(i32 w) { if (World.invP1.overloadEnabled) { return damageOverloadForWeapon[w]; } float d = dmgForWep[w],D = dmgForWep2[w],e = energyDrainLowForWeapon[w],E = energyDrainHiForWeapon[w]; float pct = World.invP1.weaponEnergySetting[w]*0.01f; return (pct*(D/E - d/e) + 3.0f)*(pct*(E - e) + e); } // Slope-of-slopes curve: interpolates damage/energy ratio across energy setting, then scales by interpolated energy drain itself.
+void HitScanFire(i32 wep16) {
     u16 ent = wfx.tempHitEnt; bool b = ent != 0xFFFF,isBeam=(wep16 == 1 || wep16 == 4 || wep16 == 14),npc = b && IdxIsNPC(World.instances[ent].index),alt = World.invP1.wepLoadedWithAlternate[World.invP1.wepCur];
     DamageData dd = {.isOtherNPC = npc, .hitpoint = wfx.tempHit.point, .attacknormal = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right), .owner = PLAYER1,.impactVelocity = wep16 == 12 ? 120.0f/*riotgun kicks harder*/ : 80.0f,.attackType=(wep16 == 2 && alt) ? Att_Trnq/*dartgun tranqs*/ : attTypeWep[wep16], .berserkActive = (World.invP1.patchActive & PATCH_BERSERK) != 0 };
     if (isBeam) CreateBeamImpactEffects(wep16); else { CreateStandardImpactEffects(); if (!npc && b && IdxIsGeometry(World.instances[ent].index)) CreateStandardImpactMarks(wep16); }
@@ -107,7 +107,7 @@ void HitScanFire(int wep16) {
 }
 void MeleeHitUpdate() {
     if (wfx.pendingMeleeFinished <= 0.0f || World.pauseRelativeTime < wfx.pendingMeleeFinished) return;
-    wfx.pendingMeleeFinished = 0.0f; int wep16 = wfx.pendingMeleeWep16; u16 targ = wfx.pendingMeleeTarget; if (targ == PLAYER1) return; // can't hit self
+    wfx.pendingMeleeFinished = 0.0f; i32 wep16 = wfx.pendingMeleeWep16; u16 targ = wfx.pendingMeleeTarget; if (targ == PLAYER1) return; // can't hit self
     DamageData dd = {.isOtherNPC = IdxIsNPC(World.instances[targ].index),.attacknormal = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right),.damage = dmgForWep[wep16],.offense = offenseWep[wep16],.penetration = penetrationWep[wep16],.owner = PLAYER1,.attackType = Att_Melee,.berserkActive = (World.invP1.patchActive & PATCH_BERSERK) != 0};
     if (wfx.pendingMeleeIsRapier) { dd.attackType = Att_MlEg; if (World.invP1.energy < 4.0f) dd.damage = dmgForWep[6]; /*low-energy rapier same dmg as a lead pipe*/}
     dd.damage = GetDamageTakeAmount(&dd); wfx.tempHitEnt = targ;

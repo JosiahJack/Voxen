@@ -1,26 +1,26 @@
 // lib.c - LibC replacement functions and other misc helpers.
 #include "common.h"
 typedef u16 u16_u __attribute__((__aligned__(1),__may_alias__));    typedef u32 u32_u __attribute__((__aligned__(1),__may_alias__));    typedef u64 u64_u __attribute__((__aligned__(1),__may_alias__));
-void* mcpy(void *dst,const void *src,size_t n){
+void* mcpy(void *dst, const void *src, size_t n){
     u8 *d=(u8*)dst, *s=(u8*)src; size_t i=0;
     for (;i+128<=n;i+=128) { *(__m256i*)(d+i) = *(__m256i*)(s+i); *(__m256i*)(d + i + 32) = *(__m256i*)(s + i + 32); *(__m256i*)(d + i + 64) = *(__m256i*)(s + i + 64); *(__m256i*)(d + i + 96) = *(__m256i*)(s + i + 96);}
     for (;i+32<=n;i+=32) { *(__m256i*)(d+i) = *(__m256i*)(s+i); } size_t rem=n-i; u8* rd=d+i; u8* rs=s+i;
-         if (rem >= 16) { _mm_storeu_si128((__m128i*)rd,*(__m128i_u*)rs); _mm_storeu_si128((__m128i*)(d + n - 16),*(__m128i_u*)(s + n - 16)); }
+         if (rem >= 16) { _mm_storeu_si128(rd,*(__m128i_u*)rs); _mm_storeu_si128((d + n - 16),*(__m128i_u*)(s + n - 16)); }
     else if (rem >= 8) { *(u64_u*)rd = *(u64_u*)rs; *(u64_u*)(d + n - 8) = *(u64_u*)(s + n - 8); }
     else if (rem >= 4) { *(u32_u*)rd = *(u32_u*)rs; *(u32_u*)(d + n - 4) = *(u32_u*)(s + n - 4); }
     else if (rem >= 2) { *(u16_u*)rd = *(u16_u*)rs; *(u16_u*)(d + n - 2) = *(u16_u*)(s + n - 2); }
     else if (rem == 1) { *rd = *rs;}
     return dst;
 }
-void* mset(void *dst,int c,size_t n){
-    u8 *p=(u8*)dst;size_t i=0; if(n>=32){ __m256i v256=_mm256_set1_epi8_fast((char)c); for(;i+128<=n;i+=128){*(__m256i*)(p+i)=v256;*(__m256i*)(p+i+32)=v256;*(__m256i*)(p+i+64)=v256;*(__m256i*)(p+i+96)=v256;}for(;i+32<=n;i+=32){*(__m256i*)(p+i)=v256;} } size_t rem=n-i;u8* rp=p+i; if(rem>=16){__m128i v128=_mm_set1_epi8_fast((char)c);_mm_storeu_si128((__m128i*)rp,v128);_mm_storeu_si128((__m128i*)(p+n-16),v128);}
+void* mset(void *dst, i32 c, size_t n){
+    u8 *p=(u8*)dst;size_t i=0; if(n>=32){ __m256i v256=_mm256_set1_epi8_fast((char)c); for(;i+128<=n;i+=128){*(__m256i*)(p+i)=v256;*(__m256i*)(p+i+32)=v256;*(__m256i*)(p+i+64)=v256;*(__m256i*)(p+i+96)=v256;}for(;i+32<=n;i+=32){*(__m256i*)(p+i)=v256;} } size_t rem=n-i;u8* rp=p+i; if(rem>=16){__m128i v128=_mm_set1_epi8_fast((char)c);_mm_storeu_si128(rp,v128);_mm_storeu_si128((p+n-16),v128);}
     else if(rem>=8){u64 v64=0x101010101010101ULL*(u8)c;*(u64_u*)rp=v64;*(u64_u*)(p+n-8)=v64;}else if(rem>=4){u32 v32=0x1010101U*(u8)c;*(u32_u*)rp=v32;*(u32_u*)(p+n-4)=v32;}else if(rem>=2){u16 v16=0x101U*(u8)c;*(u16_u*)rp=v16;*(u16_u*)(p+n-2)=v16;}else if(rem==1){*rp=(u8)c;}    return dst;
 }
 size_t slen(const char* s) { if (s == NULL) {return 0;} const char *p=s; while (*(p++)); return (size_t)(p - s - 1); } // strlen replacement
 bool cEmpty(const char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; } // isspace replacement
-i32 s2i32(const char *str){while (cEmpty(*str)){str++;} int sign=1; if(*str=='-'){sign=-1; str++;}else if(*str == '+') {str++;} if(*str<'0' || *str>'9')return 0; i64 result=0; while(*str>='0' && *str<='9'){int digit=*str-'0'; if(result>(2147483647-digit)/10){return (sign==1) ? 2147483647 : -2147483648;} result=result*10+digit; str++;} return (i32)(sign*result);} // atoi replacement, needed separately from fast_atoi for user console input
+i32 s2i32(const char *str){while (cEmpty(*str)){str++;} i32 sign=1; if(*str=='-'){sign=-1; str++;}else if(*str == '+') {str++;} if(*str<'0' || *str>'9')return 0; i64 result=0; while(*str>='0' && *str<='9'){i32 digit=*str-'0'; if(result>(2147483647-digit)/10){return (sign==1) ? 2147483647 : -2147483648;} result=result*10+digit; str++;} return (i32)(sign*result);} // atoi replacement, needed separately from fast_atoi for user console input
 bool sEqual(const char* a, const char* b) { if (!a) a=""; if (!b) b=""; while (*a && *a == *b) { a++; b++; } return *a == *b; } // !strcmp replacement (hated its inverted logic)
-int sCompUpToLen(const char* s1, const char* s2, size_t n) { const u8 *p1 = (const u8*)s1, *p2 = (const u8*)s2; while (n-- > 0) { if (*p1 != *p2) {return (*p1 < *p2) ? -1 : 1;}  if (*p1 == '\0') {break;} p1++; p2++; } return 0; } // !strncmp replacement (yes inverted for sanity)
+i32 sCompUpToLen(const char* s1, const char* s2, size_t n) { const u8 *p1 = (const u8*)s1, *p2 = (const u8*)s2; while (n-- > 0) { if (*p1 != *p2) {return (*p1 < *p2) ? -1 : 1;}  if (*p1 == '\0') {break;} p1++; p2++; } return 0; } // !strncmp replacement (yes inverted for sanity)
 void scpy_to_a_from_b(char* a, const char* b, size_t bufsz) { size_t szb=slen(b); if (szb>=bufsz) { DualLogError("scpy_to_a_from_b: B bigger than buffer\n"); OS_Exit(1); } for(size_t i=0;i<szb;++i){a[i]=b[i];} a[szb] = '\0'; } // strcpy replacement
 __attribute__((noinline)) u32 parse_numberu32(const char* str, const char* line, u32 lineNum) {
     if(str == 0 || *str == '\0'){DualLogError("Invalid from line[%d]: %s\n",lineNum+1,line); return 0;} while(cEmpty(*str)){str++;} if(*str == '+'){str++;} if(*str == '-'){DualLogError("Invalid negative u32(%s) from line[%d]: %s\n",str,lineNum+1,line); return 0;}
@@ -33,28 +33,28 @@ void sCpy2aSubFromb(char* a, size_t subsz, const char* b, size_t bufsz) { if (su
 char* sFindSub(const char* s, const char* sub) { if (sub[0] == '\0') {return (char*)s;} for (size_t i = 0; s[i] != '\0'; ++i) { if (s[i] == sub[0]/*Only look if first matches*/) { size_t si=i, subi=0; while (s[si] != '\0' && sub[subi] != '\0' && s[si] == sub[subi]){si++; subi++;} if(sub[subi] == '\0'){return (char*)&s[i];} } } return NULL;/*No match*/ } // strstr replacement
 const char* StringFindLastChar(const char* str, const char c) { const char* lastSeen = NULL; do { if (*str == c) lastSeen = str; } while (*str++); return lastSeen; } // strrchr replacement
 char* StringFindFirstCharWithin(const char *s, char c) { char* stringwalker = (char*)s; while (*stringwalker != c) { if (!*stringwalker) {return NULL;} stringwalker++; } return stringwalker; } // strchr replacement
-void double2str(char* dest, double value, int decs, size_t bufsz) {
+void double2str(char* dest, double value, i32 decs, size_t bufsz) {
     union { double d; u64 u; } bits; bits.d = value; if (((bits.u & 0x7FF0000000000000ULL) == 0x7FF0000000000000ULL) && ((bits.u & 0xFFFFFFFFFFFFFULL) != 0 || (bits.u >> 63))) { dest[0]='n';dest[1]='a';dest[2]='n';dest[3]='\0'; return; } if (((bits.u & 0x7FF0000000000000ULL) == 0x7FF0000000000000ULL)) { dest[0]='i';dest[1]='n';dest[2]='f';dest[3]='\0'; return; } if (decs < 0 || decs > 9) { DualLogError("double2str: too many decimals\n"); OS_Exit(1); }
-    if (value < 0.0) { if (bufsz < 2) {DualLogError("double2str: buffer too small A\n"); OS_Exit(1);} *dest++ = '-'; bufsz--; value = -value; } double scale=1.0; for (int i=0;i<decs;++i) scale*=10.0;
+    if (value < 0.0) { if (bufsz < 2) {DualLogError("double2str: buffer too small A\n"); OS_Exit(1);} *dest++ = '-'; bufsz--; value = -value; } double scale=1.0; for (i32 i=0;i<decs;++i) scale*=10.0;
     u64 whole=(u64)value,fracs=(u64)((value-whole)*scale+0.5); if (decs && fracs>=(u64)scale) { whole++; fracs-=(u64)scale; }
     char temp[32]; size_t len=0; do { temp[len++]='0'+whole%10; whole/=10; } while (whole); if (len >= bufsz) {DualLogError("double2str: len larger than buffer\n"); OS_Exit(1);}
     for (size_t i = 0; i < len; ++i) {dest[i] = temp[len - 1 - i];} dest += len; bufsz -= len; if(decs == 0) {*dest = '\0'; return;} if(bufsz < 1) {DualLogError("double2str: buffer too small B\n"); OS_Exit(1);}
-    *dest++ = '.'; bufsz--; for (int i = decs - 1; i >= 0; --i) { if (bufsz < 1) {DualLogError("double2str: buffer too small C\n"); OS_Exit(1);} dest[i]='0' + (fracs%10); fracs/=10; } dest[decs] = '\0';
+    *dest++ = '.'; bufsz--; for (i32 i = decs - 1; i >= 0; --i) { if (bufsz < 1) {DualLogError("double2str: buffer too small C\n"); OS_Exit(1);} dest[i]='0' + (fracs%10); fracs/=10; } dest[decs] = '\0';
 }
-int sFormatV(char* buf, size_t bufsz, const char* f, va_list args) {
+i32 sFormatV(char* buf, size_t bufsz, const char* f, va_list args) {
     if(bufsz == 0){return 0;} size_t pos=0;
     while (*f && pos < bufsz - 1) {
         if (*f != '%') { buf[pos++] = *f++; continue; } f++; // skip '%'
-        int width = 0; char padChar = ' '; if (*f == '0') { padChar = '0'; f++; } while (*f >= '0' && *f <= '9') { width = width * 10 + (*f - '0'); f++; } int decimals = 9; if (*f == '.') { f++; if (*f >= '0' && *f <= '9') { decimals = *f - '0'; } f++; }/*0 is a valid precision: %.0f prints just the integer part*/
+        i32 width = 0; char padChar = ' '; if (*f == '0') { padChar = '0'; f++; } while (*f >= '0' && *f <= '9') { width = width * 10 + (*f - '0'); f++; } i32 decimals = 9; if (*f == '.') { f++; if (*f >= '0' && *f <= '9') { decimals = *f - '0'; } f++; }/*0 is a valid precision: %.0f prints just the integer part*/
         switch (*f) {
-            case 'x': case 'u': case 'd': case 'i': { u32 val; int base=*f=='x' ? 16 : 10; char num[32]; int i=0; if (*f=='d' || *f=='i') { int v=__builtin_va_arg(args,int); val=(u32)v; if (v<0) { buf[pos++]='-'; val=-val; } } else val=__builtin_va_arg(args,u32); do { num[i++]="0123456789abcdef"[val%base]; val/=base; } while (val);    while (i<width && pos<bufsz-1) { buf[pos++]=padChar; width--; } while (i-- && pos<bufsz-1) buf[pos++]=num[i]; } break;
-            case 'c': buf[pos++]=(char)__builtin_va_arg(args,int); break;
+            case 'x': case 'u': case 'd': case 'i': { u32 val; i32 base = *f == 'x' ? 16 : 10; char num[32]; i32 i = 0; if (*f == 'd' || *f == 'i') { i32 v=__builtin_va_arg(args,i32); val=(u32)v; if (v<0) { buf[pos++]='-'; val=-val; } } else val=__builtin_va_arg(args,u32); do { num[i++]="0123456789abcdef"[val%base]; val/=base; } while (val);    while (i<width && pos<bufsz-1) { buf[pos++]=padChar; width--; } while (i-- && pos<bufsz-1) buf[pos++]=num[i]; } break;
+            case 'c': buf[pos++]=(char)__builtin_va_arg(args,i32); break;
             case 's': case 'f': { char num[64]; const char* v; if (*f=='s') v=__builtin_va_arg(args,const char*); else { double2str(num,__builtin_va_arg(args,double),decimals,sizeof(num)); v=num; } for (size_t i=0;v && v[i] && pos<bufsz-1;++i) buf[pos++]=v[i]; } break;
             case '%': if (pos < bufsz - 1) buf[pos++] = '%'; break;
         } f++;
-    } buf[pos] = '\0'; return (int)pos;
+    } buf[pos] = '\0'; return (i32)pos;
 }
-int sFormat(char* buffer, size_t bufsz, const char* format, ...) { va_list args; __builtin_va_start(args,format); int ret = sFormatV(buffer,bufsz,format,args); __builtin_va_end(args); return ret; } // snprintf replacement
+i32 sFormat(char* buffer, size_t bufsz, const char* format, ...) { va_list args; __builtin_va_start(args,format); i32 ret = sFormatV(buffer,bufsz,format,args); __builtin_va_end(args); return ret; } // snprintf replacement
 FHandle console_log_file=0;
 static void DualLogMain(bool writeToFileToo, const char *prefix, const char *fmt, va_list args) {
     char buf[4096]; va_list c; __builtin_va_copy(c,args); size_t len=sFormatV(buf,sizeof(buf),fmt,c),prefixLen=slen(prefix); __builtin_va_end(c); bool color=(prefix && prefix[0] == '\033');
@@ -85,7 +85,7 @@ u16 PosGetCellCoordX(float x) { return (u16)vclampi((i32)vfloor((x - World.world
 u16 PosGetCellCoordZ(float z) { return (u16)vclampi((i32)vfloor((z - World.worldMin_z[World.curLev] + CELLXHALF) / CELLSZ),0,(WORLDX - 1)); }
 u16 PosGetCellCoords(float x, float z) { return (u16)((PosGetCellCoordZ(z) * WORLDX) + PosGetCellCoordX(x)); }
 char statusText[T_BUFFER_SIZE];
-void CenterStatusPrint(const char * restrict fmt, ...) { if (!fmt || *fmt == '\0') {return;} va_list args; __builtin_va_start(args, fmt); sFormatV(statusText,T_BUFFER_SIZE,fmt,args); __builtin_va_end(args); DualLog("%s\n",statusText); World.statusTextDecayFinished = get_time() + 3.5f;/*secs decay time before text dissappears.*/ }
+void CenterStatusPrint(const char * restrict fmt, ...) { if (!fmt || *fmt == '\0') {return;} va_list args; __builtin_va_start(args, fmt); sFormatV(statusText,T_BUFFER_SIZE,fmt,args); __builtin_va_end(args); DualLog("%s\n",statusText); World.statusTextDecayFinished = get_timed() + 3.5;/*secs decay time before text dissappears.*/ }
 void BmpWrite(char const *filename, int x, int y, const void *data) {
     FHandle f = OS_OpenWriteonly(filename); if (f == INVALID_FHANDLE) { DualLogError("Failed to open %s for writing\n", filename); return; }
     u32 fileSize = 14 + 108 + (u32)x * y * 4;/*BMP file header (14 bytes)*/ u8 fileHeader[14] = {'B','M',fileSize & 255,(fileSize >> 8) & 255,(fileSize >> 16) & 255,(fileSize >> 24) & 255,0,0,0,0,14 + 108,0,0,0}; u8 infoHeader[108]={0}; *(u32*)(infoHeader+0)=108;/*size*/

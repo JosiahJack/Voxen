@@ -227,8 +227,8 @@ typedef /*FAT*/ struct  {
 INLINE bool Entity_GetGridCell(const Entity* e, i32 i) { return (bool)((e->gridCellsBits >> i) & 1u); }
 INLINE void Entity_SetGridCell(Entity* e, i32 i, bool v) { if (v) e->gridCellsBits |= (1ull << i); else e->gridCellsBits &= ~(1ull << i); }
 typedef struct {
-    double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,last_time,current_time,absoluteTime,gpuFrameMs,gpuShadowMs,gpuPreMs,gpuMainMs,gpuSsrMs,gpuCompMs;
-    float pauseRelativeTime,last_physics_time,dt,farPlane[MAX_LEVELS],damageDealt,damageReceived,timeScale,shakeFinished,screenshotTimeout,statusTextDecayFinished,worldMin_x[MAX_LEVELS],worldMin_z[MAX_LEVELS],voxMinCtrX[MAX_LEVELS],voxMinCtrZ[MAX_LEVELS],misTimerFinished,misTimerT,painStaticAlpha,empStaticAlpha,levelRadius[MAX_LEVELS][INSTANCE_CNT],levelInvInertiaTensor[MAX_LEVELS][INSTANCE_CNT][6],*radius,(*invInertiaTensor)[6],cam_pitch,cam_yaw,cam_roll,
+    double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,last_time,current_time,absoluteTime,gpuFrameMs,gpuShadowMs,gpuPreMs,gpuMainMs,gpuSsrMs,gpuCompMs,statusTextDecayFinished,screenshotTimeout;
+    float pauseRelativeTime,last_physics_time,dt,farPlane[MAX_LEVELS],damageDealt,damageReceived,timeScale,shakeFinished,worldMin_x[MAX_LEVELS],worldMin_z[MAX_LEVELS],voxMinCtrX[MAX_LEVELS],voxMinCtrZ[MAX_LEVELS],misTimerFinished,misTimerT,painStaticAlpha,empStaticAlpha,levelRadius[MAX_LEVELS][INSTANCE_CNT],levelInvInertiaTensor[MAX_LEVELS][INSTANCE_CNT][6],*radius,(*invInertiaTensor)[6],cam_pitch,cam_yaw,cam_roll,
           lerpStartTime,justSavedTimeStamp,automapNextRaster,debugLineFinished,ladderSFXFinished;
     u32 lastFrameSecCount,lineVertCnt,shotsFired,grenadesThrown,savesScummed,levelLayer[MAX_LEVELS][INSTANCE_CNT],missionBits,*layer,targetIOActivatorIoflags,targetIOActivatorIoflagsHi;
     u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount,shields[4],weaponVModelIndex,levelWepVModel[MAX_LEVELS],TeleportTouch_allTeleportTouches[8],levelInstCount[MAX_LEVELS],levelLoadedLights[MAX_LEVELS],editTextInstanceIndex,misTimerMission,levelLightTargetnames[MAX_LEVELS][LIGHT_CNT],*lightTargetnames,loadedLights,decoyInstance,*lanimLightIdx,levelLAnimLightIdx[MAX_LEVELS][LANIM_MAX];
@@ -267,7 +267,7 @@ INLINE float vacosf(float x) { float negate = (x < 0.0f) ? 1.0f : 0.0f; x=vabs(x
 INLINE float vtan(float x) { return vsinf(x) / vcosf(x); }
 INLINE float vcot(float x) { float x2 = x * x; float t = x + (x2 * x) * 0.33333333f; return 1.0f / t; }
 INLINE float deg2rad(float degrees) { return degrees * (PI / 180.0f); }
-INLINE float vexp2f(float x){float ip=vfloor(x); float fp=x - ip; float p=1.0f + fp*(0.69314718f + fp*(0.24022651f + fp*0.05550411f)); /*poly approx 2^fp on [0,1]*/ i32 ei = (i32)ip + 127; u32 bits=(u32)(ei << 23); union{u32 i; float f;}u={bits}; return u.f*p;}
+INLINE float vexp2f(float x){float ip = vfloor(x); float fp=x - ip; float p=1.0f + fp*(0.69314718f + fp*(0.24022651f + fp*0.05550411f)); /*poly approx 2^fp on [0,1]*/ i32 ei = (i32)ip + 127; u32 bits=(u32)(ei << 23); union{u32 i; float f;}u={bits}; return u.f*p;}
 INLINE float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
 INLINE float vlog2f(float x) { /* assume x > 0 */ union { float f; u32 i; } u = {x}; i32 e = (i32)(u.i >> 23) - 128; u.i = (u.i & 0x007FFFFFu) | 0x3F800000u;/* mantissa in [1,2) */ float m = u.f; float y = ((-1.0f/3.0f)*m + 2.0f)*m - (2.0f/3.0f); return (float)e + y; }
 INLINE float vpow(float x, float y) { return x <= 0.01f || y <= 0.01f ? 0.0f : vexp2f(y * vlog2f(x)); }

@@ -323,7 +323,7 @@ void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light* lit, LightAni
         {"range",__builtin_offsetof(Light,range),5,0},{"spotAngle",__builtin_offsetof(Light,spotAng),9,0},{"minIntensity",__builtin_offsetof(Light,minIntensity),12,0},{"maxIntensity",__builtin_offsetof(Light,maxIntensity),12,0},{"color.r",__builtin_offsetof(Light,col.r),7,0},{"color.g",__builtin_offsetof(Light,col.g),7,0},{"color.b",__builtin_offsetof(Light,col.b),7,0}
     };
     int klen=(int)slen(k);/*length is invariant per token (the tokenizer NUL-terminates the key); comparing it first reduces the scan to same-length candidates and bounds the byte compare*/
-    for (int i = 0; i < (int)(sizeof(map)/sizeof(map[0])); i++) {if(klen==map[i].klen && k[0]==map[i].key[0] && sCompUpToLen(k,map[i].key,klen)==0/*0=float,1=u8*/){void* dest=map[i].anim ? (void*)lam : (void*)lit; char* ptr=(char*)dest+map[i].offset; if(map[i].type == 0){*(float*)ptr=parse_float(v,il,ln);}else{*(u8*)ptr=parse_numberu8(v,il,ln);} return;}}
+    for (int i=0;i<(int)(sizeof(map)/sizeof(map[0]));++i) { if (klen == map[i].klen && k[0] == map[i].key[0] && sCompUpToLen(k,map[i].key,klen) == 0/*0=float,1=u8*/){void* dest = map[i].anim ? (void*)lam : (void*)lit; void* ptr = (char*)dest + map[i].offset; if (map[i].type == 0) { *(float*)ptr = parse_float(v,il,ln); } else { *(u8*)ptr = parse_numberu8(v,il,ln); } return; } }
     if (sEqual(k,"intensity")) {lit->intensity = lit->maxIntensity = parse_float(v,il,ln) * 0.35f;}else if(sEqual(k,"type")){flag_set(&lit->lflags, (v[0] == 'S') ? LSPOT : LDIR, true);}else if (sEqual(k,"lightOn") && !alreadyReadLightOnOnce[lIdx]) { alreadyReadLightOnOnce[lIdx] = true; flag_set(&lit->lflags,LIGHTON,parse_bool(v,il,ln)); } else if (sEqual(k,"lerpOn")) {flag_set(&lit->lflags,LERPON,parse_bool(v,il,ln));}
     else if (sEqual(k,"targetname")) {lightTargetnameFile[lIdx] = IOInternName(v);}
 }
@@ -376,7 +376,7 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     if (entIdx == 702 /*logic_spawner*/) { Entity* sm=&World.instances[i]; if (sm->numberToSpawn == 0) sm->numberToSpawn = 1; if (sm->maxDelayBetweenSpawns <= 0.0f) { sm->minDelayBetweenSpawns = 15.0f; sm->maxDelayBetweenSpawns = 45.0f; } if (sm->allSpawnedResetDelay <= 0.0f) sm->allSpawnedResetDelay = 120.0f; }
     if (World.levelCurrentlyLoading) { /*So cheat spawns don't affect the %*/ u8 sl=World.curLev; if (sl<MAX_LEVELS) { u8* dst=entIdx==477?&World.levelCameraCount[sl]:entIdx==478?&World.levelLargeNodeCount[sl]:entIdx==479?&World.levelSmallNodeCount[sl]:0; if (dst && *dst<255) (*dst)++; } }
     World.col[i]=EDefs[entIdx].col; World.colliderCenter[i]=EDefs[entIdx].colCtr; World.colliderSize[i]=EDefs[entIdx].colSz; World.instances[i].hasGrav = (IdxIsDynamicObject(World.instances[i].index) && (entIdx<481 || entIdx>495)); if (IdxIsButtonSwitch(entIdx)) { World.instances[i].lockedMessageLingdex = 193; }
-    if (entIdx < 307 && cardChunk[entIdx]) { World.instances[i].lodIndex = 178;/*card*/ World.col[i]=CT_BOX; World.colliderCenter[i].y=1.32f; World.colliderSize[i]=(V3){2.56f,0.08f,2.56f}; } World.instCount++; return i;
+    if (entIdx < 307 && cardChunk[entIdx]) { World.instances[i].lodIndex = entIdx == 279/*chunk_screen*/ ? 0 : 178;/*card*/ World.col[i]=CT_BOX; World.colliderCenter[i].y=1.32f; World.colliderSize[i]=(V3){2.56f,0.08f,2.56f}; } World.instCount++; return i;
 }
 bool EntIsLodCardConst(u16 entIdx) { return entIdx < 307 && cardChunk[entIdx]; }
 #define KEY_EQ(lit) (keyLen == (int)(sizeof(lit)-1) && sCompUpToLen(key, lit, sizeof(lit)-1) == 0)
@@ -677,7 +677,8 @@ void PSysAddLevelLoops() { for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { u16
 void LoadAllLevels() {
     double start_time = get_timed(); RenderLoading("Loading level data..."); World.levelCurrentlyLoading = true; ioNameCount=1; ioNames[0][0]='\0';
     size_t larsz = INSTANCE_CNT*sizeof(Entity) + INSTANCE_CNT*sizeof(V3) + INSTANCE_CNT*sizeof(V3) + INSTANCE_CNT*sizeof(Quaternion) + INSTANCE_CNT*sizeof(V3) + INSTANCE_CNT*sizeof(V3) + LIGHT_CNT*sizeof(Light) + LIGHT_CNT*sizeof(LightAnimation); entsFromFile = OS_Alloc(larsz);
-    posFromFile = (void*)entsFromFile + INSTANCE_CNT*sizeof(Entity); scaleFromFile = (void*)posFromFile + INSTANCE_CNT*sizeof(V3); rotationFromFile = (void*)scaleFromFile + INSTANCE_CNT*sizeof(V3); colCtrFromFile = (void*)rotationFromFile + INSTANCE_CNT*sizeof(Quaternion); colSzFromFile = (void*)colCtrFromFile + INSTANCE_CNT*sizeof(V3); lightsFromFile = (void*)colSzFromFile + INSTANCE_CNT*sizeof(V3); lanimsFromFile = (void*)lightsFromFile + LIGHT_CNT*sizeof(Light);
+    posFromFile = (void*)((u8*)entsFromFile + INSTANCE_CNT*sizeof(Entity)); scaleFromFile = (void*)((u8*)posFromFile + INSTANCE_CNT*sizeof(V3)); rotationFromFile = (void*)((u8*)scaleFromFile + INSTANCE_CNT*sizeof(V3)); colCtrFromFile = (void*)((u8*)rotationFromFile + INSTANCE_CNT*sizeof(Quaternion)); colSzFromFile = (void*)((u8*)colCtrFromFile + INSTANCE_CNT*sizeof(V3)); lightsFromFile = (void*)((u8*)colSzFromFile + INSTANCE_CNT*sizeof(V3));
+    lanimsFromFile = (void*)((u8*)lightsFromFile + LIGHT_CNT*sizeof(Light));
     for (u8 i=0;i<8;++i) { World.TeleportTouch_allTeleportTouches[i] = U16_MAX; }
     fwPoolUsed = 0;
     for (u8 lev=0;lev<MAX_LEVELS;++lev) {
@@ -772,7 +773,7 @@ void LoadLevel(u8 curlevel, V3 pos) {
     if (World.curLev != curlevel) { CopyPlayerState(World.curLev,curlevel); PSysClearLevel(World.curLev); World.curLev = curlevel; SetLevelPointers(curlevel); }
     for (u16 i = PLAYER1; i < World.instCount; ++i) ComputeConvexMeshInertiaTensor(i);
     LoadLevelSetup(curlevel);
-    ResetLevelAudio(); mp3_clear(); World.Sys_Music.levelEntry = true; World.Sys_Music.inZone = World.Sys_Music.cyberTube = false; World.Sys_Music.combatImpulseFinished = get_time(); World.Sys_Music.combatImpulseFinished += 5.0f;
+    ResetLevelAudio(); mp3_clear(); World.Sys_Music.levelEntry = true; World.Sys_Music.inZone = World.Sys_Music.cyberTube = false; World.Sys_Music.combatImpulseFinished = World.pauseRelativeTime + 5.0f;
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { Entity* e = &World.instances[i]; if (IdxIsNPC(e->index) && e->enemy == PLAYER1) { e->enemy = WORLD; } if (World.diffCbt == 0 && IdxIsNPC(e->index)) { if (e->entflags & EF_ACT_AS_CORPSE_ONLY) { e->health = 0.0f; e->cyberHealth = 0.0f; } else { e->health = 1.0f; if (npcTable[e->index - 419].type == NPCType_Cyber) { e->cyberHealth = 1.0f; } } } }
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { Entity* e = &World.instances[i]; if (e->index != 702) continue; u16 n = e->numberToSpawn; if (World.diffCbt == 1) { n = (u16)(n / 2); } else if (World.diffCbt == 3) { n = (u16)(n + n / 2); } else if (World.diffCbt > 3) { n = (u16)(n * 5); } e->numberToSpawn = (n < 1) ? 1 : n; e->delayFinished = World.pauseRelativeTime; }
     World.levelCurrentlyLoading = false;

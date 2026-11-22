@@ -1230,7 +1230,7 @@ static void RenderUI() {
         u32 heldMail = VideoFrameTexIndex(want); if (heldMail != 0xFFFFFFFFu) UIRImg(UI_ID_VMAIL_VIEWER,283,134,800,400,heldMail); SideMFD(false); CenterMFD(); SideMFD(true); /*Draw the email sender stats and text*/
     }
     if (Cheats.consoleActive) RenderTextL(16,0,T_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);
-    if (World.statusTextDecayFinished > (float)World.current_time) RenderTextC(683,164,T_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
+    if (World.statusTextDecayFinished > World.current_time) RenderTextC(683,164,T_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
     if (World.invP1.ressurectingFinished > World.pauseRelativeTime) { float el = World.pauseRelativeTime - (World.invP1.ressurectingFinished - 3.0f); static const float resDelay[8] = {0.2f,0.4f,0.5f,0.7f,0.8f,0.9f,1.0f,1.4f}; static const i16 resY[8] = {9,30,30,52,52,74,74,94}; if (el < 2.0f) { for (int i = 0; i < 8; ++i) { if (el >= resDelay[i]) RenderTextL(38,resY[i],T_GREEN,FONT_NORMAL,1.8f,"%s",Sys_Text.stringTable[860 + i]); } } }
     if (Cheats.showLocation) RenderTextL(16, 90, T_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f, Cursor: %d, %d  dx:%d dy:%d",(double)World.position[PLAYER1].x,(double)World.position[PLAYER1].y,(double)World.position[PLAYER1].z,(double)World.rotation[PLAYER1].x,(double)World.rotation[PLAYER1].y,(double)World.rotation[PLAYER1].z,(double)World.rotation[PLAYER1].w,World.cursorPos_x,World.cursorPos_y,World.currentMouse_dx,World.currentMouse_dy);
     if (Cheats.showFPS) {
