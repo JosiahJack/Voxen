@@ -43,7 +43,7 @@ void main() {
     vec2 uv = (vec2(spix) + 0.5) / (vec2(screenWidth,screenHeight) * float(SSR_RES)); float depth = textureLod(inputDepthID, uv, 0.0).r; if (depth >= 0.9999) { imageStore(outputImage, pix, vec4(0.0,0.0,0.0,1.0)); return; }
     vec4 w4 = invViewProj * vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0); vec3 worldPos = w4.xyz / w4.w;
     vec3 normal = DecodeOctahedral(imageLoad(inputNormal, spix).rg);
-    vec3 viewDir = normalize(camPos - worldPos), reflectDir = reflect(-viewDir, normal), origin = worldPos + normal * 0.05;
+    vec3 viewDir = normalize(camPos - worldPos), reflectDir = reflect(-viewDir, normal), origin = worldPos + normal * 0.01;
     vec3 invWorldDir = safeRcp(reflectDir); const float maxDist = 32.0, CELL = 2.56, INV_CELL = 0.390625, CELLXHALF = 1.28; float bestDist = 33.0, t = 0.0; vec3 hitWorld = vec3(0.0), bestLocalNormal = vec3(0.0); bool hasHit = false; uint bestInst = 0u, bestIA = 0u, bestIB = 0u, bestIC = 0u; float bestBaryU = 0.0, bestBaryV = 0.0; vec2 gridOrg = worldMin - CELLXHALF;
     ivec2 cellXZ = clamp(ivec2(floor((origin.xz - gridOrg) * INV_CELL)), ivec2(0), ivec2(63)); int cx = cellXZ.x, cz = cellXZ.y;
     int stepX = reflectDir.x > 0.0 ? 1 : (reflectDir.x < 0.0 ? -1 : 0), stepZ = reflectDir.z > 0.0 ? 1 : (reflectDir.z < 0.0 ? -1 : 0);
