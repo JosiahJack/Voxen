@@ -70,7 +70,7 @@ void main() {
                         uvec4 q = rtGeom4[qi];
                         for (uint hh = 0u; hh < 2u; ++hh) {
                             uint wi = (qi << 2u) + (hh << 1u); if (wi < triStart || wi >= wEnd) continue;
-                            uvec2 tv = hh == 0u ? q.xy : q.zw; uint iA = tv.x & 65535u, iB = tv.x >> 16u, iC = tv.y & 65535u; vec3 pa = RtVtxPos(vtxBase,iA), pb = RtVtxPos(vtxBase,iB), pc = RtVtxPos(vtxBase,iC); vec3 e1 = pb - pa, e2 = pc - pa, pv = cross(localDir,e2); float det = dot(e1,pv), ad = abs(det); if (ad < 1e-7) continue;
+                            uvec2 tv = hh == 0u ? q.xy : q.zw; uint iA = tv.x & 65535u, iB = tv.x >> 16u, iC = tv.y & 65535u; vec3 pa = RtVtxPos(vtxBase,iA), pb = RtVtxPos(vtxBase,iB), pc = RtVtxPos(vtxBase,iC); vec3 e1 = pb - pa, e2 = pc - pa, pv = cross(localDir,e2); float det = dot(e1,pv), ad = -det; if (ad < 1e-7) continue;
                             float sg = det < 0.0 ? -1.0 : 1.0; vec3 tvec = localOrigin - pa; float u = dot(tvec,pv) * sg; if (u < 0.0 || u > ad) continue;
                             vec3 qv = cross(tvec,e1); float v = dot(localDir,qv) * sg; if (v < 0.0 || u + v > ad) continue;
                             float tnum = dot(e2,qv) * sg; if (tnum < 1e-4 * ad || tnum >= bestT * ad) continue;
