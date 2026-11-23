@@ -821,7 +821,7 @@ void SaveGame(u8 slot, const char* savename) {
 }
 void WarmPairsClear(void); extern WeaponFireCtx wfx;
 void LoadGame(u8 slot) {
-    if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenReadonly(path); if(fd == (FHandle)-1){return;} SaveHeader header; if (OS_Read(fd,&header,sizeof(SaveHeader)) != sizeof(SaveHeader) || header.magicNumber != 0x56415343) { DualLogError("Corrupted save file header!\n"); OS_Close(fd); return; }
+    if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd = OS_OpenReadonly(path); if(fd == (FHandle)-1){return;} SaveHeader header; if (OS_Read(fd,&header,sizeof(SaveHeader)) != sizeof(SaveHeader) || header.magicNumber != 0x56415343) { DualLogError("Corrupted save file header!\n"); OS_Close(fd); return; }
     if (header.version != SAVE_VERSION || header.uncompSz != sizeof(GlobalContext)) { DualLogError("Save is from an incompatible build (v%u, %u bytes; this build wants v%u, %zu bytes) -- start a new game.\n", header.version, header.uncompSz, (u32)SAVE_VERSION, sizeof(GlobalContext)); OS_Close(fd); return; }
     if (header.compressedSize == 0 || header.compressedSize > GetMaxCompressedSize(header.uncompSz)) { DualLogError("Save has an implausible compressed size (%u bytes) -- treating as corrupt.\n", header.compressedSize); OS_Close(fd); return; }
     u8* b=OS_Alloc(header.compressedSize);
@@ -837,7 +837,7 @@ void LoadGame(u8 slot) {
         } else { DualLogError("Decompression failed! Expected %u bytes, got %u\n",header.uncompSz,(u32)result); OS_Exit(1); }
     } OS_Free(b,header.compressedSize); OS_Close(fd); for (int i=0;i<World.loadedLights;++i) { flag_set(&World.lights[i].lflags,LDIRTY,true); }
 }
-bool ReadSaveSlotName(u8 slot, char* out, size_t cap) {
-    if (slot > 7 || !out || cap == 0) { return false; } char path[]="./Data/sav0.bin"; path[10]=(char)('0'+slot); FHandle fd=OS_OpenReadonly(path); if (fd == (FHandle)-1) { return false; }
+bool ReadSavName(u8 slot, char* out, size_t cap) {
+    if (slot > 7 || !out || cap == 0) { return false; } char path[]="./Data/sav0.bin"; path[10]=(char)('0'+slot); FHandle fd = OS_OpenReadonlySilent(path); if (fd == (FHandle)-1) { return false; }
     SaveHeader header; bool ok = OS_Read(fd,&header,sizeof(SaveHeader))==sizeof(SaveHeader) && header.magicNumber==0x56415343u && header.version==SAVE_VERSION && header.uncompSz==(u32)sizeof(GlobalContext); OS_Close(fd); if (!ok) { return false; } size_t i=0; while (i + 1 < cap && i < sizeof(header.savename) && header.savename[i]!='\0') { out[i]=header.savename[i]; ++i; } out[i]='\0'; return out[0] != '\0';
 }

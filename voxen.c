@@ -4,30 +4,26 @@
 #include "Shaders/shaders.h"
 GlobalContext World = {0}; // Full game state
 double game_start_time,game_actual_start_time,shadowTime,physTime,renderTime,prePhys,gameTime,raycastMs,last_mouse_x,last_mouse_y;
-float rasterPerspectiveProjection[16],modelMatrices[INSTANCE_CNT*16],*world_from_mdl = modelMatrices,modelBounds[MAX_MDLS],**physPos,lightView[MAX_SHADOWMAPS][6][4][4],lightViewProj[MAX_SHADOWMAPS][6][16],shadowmapsPerspectiveProjection[16],sunShadowMatrix[16],berserkSeedTime,cyberStaticAlpha,healFlashFinished,chargeFlashFinished;
-static float shakeAmp = 0.15f,amMapScaleX,amMapScaleY,amMapOffsetX;
 size_t scratch_peak,cvxAdjOffsetBytes[MAX_UNIQUE_CVX_MESHES],cvxAdjListBytes[MAX_UNIQUE_CVX_MESHES];
-static u32 globalframesPerLastSecond,inputImageID,inputUIID,inputDepthID,inputSpecID,inputNormalID,outputImageID,gBufferFBO,uiSP,depthPrepassSP,chunkSP,chunkVAO,matricesBufferID,ssrSP,rtSP,rtCopySP,imageBlitSP,quadVAO,quadVBO,rtInstanceInfoID,rtCellCountsID,rtCellListsID,rtGeomID,rtOrderBufID,gpuQ[5][5],wireVertCount,raycastPickMode;
+float rasterPerspectiveProjection[16],modelMatrices[INSTANCE_CNT*16],*world_from_mdl = modelMatrices,modelBounds[MAX_MDLS],**physPos,lightView[MAX_SHADOWMAPS][6][4][4],lightViewProj[MAX_SHADOWMAPS][6][16],shadowmapsPerspectiveProjection[16],sunShadowMatrix[16],berserkSeedTime,cyberStaticAlpha,healFlashFinished,chargeFlashFinished;    static float shakeAmp = 0.15f,amMapScaleX,amMapScaleY,amMapOffsetX;    extern float reloadTime[16];
+static u32 globalframesPerLastSecond,inputImageID,inputUIID,inputDepthID,inputSpecID,inputNormalID,outputImageID,gBufferFBO,uiSP,depthPrepassSP,chunkSP,chunkVAO,matricesBufferID,ssrSP,rtSP,rtCopySP,imageBlitSP,quadVAO,quadVBO,rtInstanceInfoID,rtCellCountsID,rtCellListsID,rtGeomID,rtOrderBufID,gpuQ[5][5],wireVertCount,raycastPickMode,rebindArmedFrame;
 u32 globalframe,threadCnt = 1,*physVertCounts,*rtSrcVertCounts,uiFBO,textDecalVBO[MAX_LEVELS][INSTANCE_CNT],textSP,textVAO,textVBO,textDecalVertexCount[MAX_LEVELS][INSTANCE_CNT],lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,cellVisibleDataID,shadowmapsSP,shadowMapSSBO,shadowMapsIndirectionID,sunShadowFBO,sunShadowTex,shadowmapIndirectionList[LIGHT_CNT],colorBufferID,texPalID,texPalOfsID,textureOffsetsID,textureSizesID,psysInstancesID,
-    psysTrailsID,psysquadVAO,psysquadVBO,particleSP,trailSP,camViewTextures[64],levelCamViewTextures[14][64],drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal,biomTexId,biomFBO,raycastCalls,debugUnlitSP,debugLinesVAO,debugLinesVBO,wireLinesVAO,wireLinesVBO,uniqueCvxMeshCount = 0;
+    psysTrailsID,psysquadVAO,psysquadVBO,particleSP,trailSP,camViewTextures[64],levelCamViewTextures[14][64],drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal,biomTexId,biomFBO,raycastCalls,debugUnlitSP,debugLinesVAO,debugLinesVBO,wireLinesVAO,wireLinesVBO,uniqueCvxMeshCount = 0;    extern u32 numActivePortals;
 u16 **modelTriangles,modelTriangleCounts[MAX_MDLS],mdlsCnt,**physTris,texCnt,decStyleCnt,decTxtLevel[DECAL_INLINE_TEXT_MAX],decTxtInst[DECAL_INLINE_TEXT_MAX],decTxtCount,uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES];
-extern u32 numActivePortals;
-static u8 currentPlayerNameLength,currentMenuPage,resDropdownCount,resSelectedIdx,gpuQFrame,uiMouseCaptured; extern u8 mdlSwapLev,*fontBmp1,*fontBmp2;
-static i8 currentMenuItem,currentMenuTab, menuItemCount = 4, menuTabCount = 1, resHoverIdx = -1;
-u8 particleBlendTexture[MAXTEX],camViewCount,levelCamViewCount[14],*scratch_base,*scratch_cur,*scratch_end;
-char decTxt[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN];
-bool doubleSidedTexture[MAXTEX],transparentTexture[MAXTEX],shadowBuffersCreated,resDropdownOpen,mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause,fovSliderActive,gammaSliderActive,masterVolumeSliderActive,musicVolumeSliderActive,messageVolumeSliderActive,sfxVolumeSliderActive,mouseSensSliderActive,enteringPlayerName;
-typedef struct WSWin WSWin; static WSWin* window; typedef struct WSCtx WSCtx; typedef struct WSLib WSLib; typedef struct WSMon WSMon; static WSLib WinSys; typedef void (*WSP)(void);
-void ConsoleEmulator(i32),EditFieldKey(i32),SaveNameEntry(i32),KeycodeEntryKey(i32 keycode),CycleWeaponSlot(int),CloseFullmap(),UI_AutomapClick(bool,int),UpdateScreenSize(i32,i32),SaveConfig(),InputWindowFocus(i32),InputKey(char*,int,int),InputMouseClick(char*,int,int),InputCursorPos(double*,double*,double,double),InputMonitor(WSMon*,int,int),ComputeWindowPlacement(int,int*,int*),SaveGame(u8,const char*),LoadGame(u8),ApplyPlayerMovements(float),NewGame(),
-     HwToggle(u8),MFD_ResetGeneral(),PSys_Render(float*,V3,V3,V3,V3,u32,float,float,float,float),MissionTimerInit(),AddHardwareToInventory(int,int),mp3_clear(),AddDoorPortal(u16,u16),MdlSwapWindowDisposeData(u16),LoadModels(),LoadTextures(),InitAudio(),Physics(float),UpdateAnims(),UpdateAudio(),AudioUpdateMix(),PSys_Update(float),BioMonitorUpdate(),MenuGoBack(),DebugRAMActual(const char*),DebugRAMPeak(),GenInvClick(i32),GenInvApply(i32),VaporizeClick(),
-     BiomonitorBlitToUI(),LoadTextForLanguage(u8),LoadLogTextForLanguage(u8),SaveGame(u8,const char*),LoadGame(u8),WeaponFireStartWeaponDip(float),ActualChangeAmmoType(),OverloadButtonAction(),ReloadSecret(bool),Unload(bool),PlayLog(int),CheckForUnreadLogs(),UseTargets(u16,u16),UseCyberspaceItemByIndex(int);;
-bool PlayerInElevatorCell(),FindElevatorKeypadPos(u8,V3*),ReadSaveSlotName(u8,char*,size_t),MdlIsWinMemberSet(u16,u8),VidMenuKeyArmed(),GeneralInvCanUse(i32),GeneralInvCanVaporize(i32),GenInvTake(i32),InventoryHasAccessCard(AccCardType);
+u8 particleBlendTexture[MAXTEX],camViewCount,levelCamViewCount[14],*scratch_base,*scratch_cur,*scratch_end;    static u8 currentPlayerNameLength,curMenuPg,resDropdownCount,resSelectedIdx,gpuQFrame,uiMouseCaptured,saveNameEntryLen;    extern u8 mdlSwapLev,*fontBmp1,*fontBmp2;        static i8 curMenuIt,curMenuTab, menuItemCount = 4, menuTabCount = 1, resHoverIdx = -1, saveSlotEditing = -1, reflHovIdx = -1, rebindRow = -1, softwareInvCurrent = -1;
+char decTxt[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN];    static char saveSlotNames[8][48],saveNameEntry[48];
+bool doubleSidedTexture[MAXTEX],transparentTexture[MAXTEX],shadowBuffersCreated,resDropdownOpen,mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause,fovSliderActive,gammaSliderActive,masterVolumeSliderActive,musicVolumeSliderActive,messageVolumeSliderActive,sfxVolumeSliderActive,mouseSensSliderActive,enteringPlayerName,vidMenuKeyArmed,typingSav;
+static bool reflDropdownOpen,saveSlotUsed[8],uiClickLock,uiClickBlocked;
+typedef struct WSWin WSWin;    typedef struct WSCtx WSCtx;    typedef struct WSLib WSLib;    typedef struct WSMon WSMon; static WSLib WinSys;    typedef void (*WSP)(void);    typedef struct { u32 nodeBase,triBase,vtxBase,uvBase,orderBase; } ModelRTInfo;    typedef struct { u32 geom[4],info[4]; float iscl2[4]; } InstanceRTInfo; static InstanceRTInfo rtInstanceInfo[INSTANCE_CNT];    typedef struct {int w,h;} ResMode; ResMode resModes[16];
+static WSWin* window; static InstanceRTInfo rtPrevInfo[INSTANCE_CNT]; static ModelRTInfo rtModelInfo[MAX_MDLS];
+void ConsoleEmulator(i32),EditFieldKey(i32),CycleWeaponSlot(int),CloseFullmap(),UI_AutomapClick(bool,int),UpdateScreenSize(i32,i32),SaveConfig(),InputWindowFocus(i32),InputKey(char*,int,int),InputMouseClick(char*,int,int),InputCursorPos(double*,double*,double,double),InputMonitor(WSMon*,int,int),ComputeWindowPlacement(int,int*,int*),SaveGame(u8,const char*),LoadGame(u8),ApplyPlayerMovements(float),NewGame(),
+     HwToggle(u8),MFD_ResetGeneral(),PSys_Render(float*,V3,V3,V3,V3,u32,float,float,float,float),MissionTimerInit(),AddHardwareToInventory(int,int),mp3_clear(),AddDoorPortal(u16,u16),MdlSwapWindowDisposeData(u16),LoadModels(),LoadTextures(),InitAudio(),Physics(float),UpdateAnims(),UpdateAudio(),AudioUpdateMix(),ParticlesUpdate(float),BioMonitorUpdate(),MenuGoBack(),DebugRAMActual(const char*),DebugRAMPeak(),BiomonitorBlitToUI(),LoadTextForLanguage(u8),
+     LoadLogTextForLanguage(u8),SaveGame(u8,const char*),LoadGame(u8),WeaponFireStartWeaponDip(float),ActualChangeAmmoType(),ReloadSecret(bool),Unload(bool),PlayLog(int),CheckForUnreadLogs(),UseTargets(u16,u16),UseCyberspaceItemByIndex(int),mp3_clear(),GiveEnergy(float,EnerTyp),GeneralInvRemove(int),UpdateSearchTether(),CloseSearch(),CompleteWeaponChange();
+bool PlayerInElevatorCell(),FindElevatorKeypadPos(u8,V3*),MdlIsWinMemberSet(u16,u8),InventoryHasAccessCard(AccCardType),ReadSavName(u8,char*,size_t),SearchTakeSlot(u8);
 i32 s2i32(const char*),GeneralInvItem(i32);
 u16 GetItemFrobTexture(u16);
-const char* AccessCardCodeForType(AccCardType);    
-typedef struct { u32 nodeBase,triBase,vtxBase,uvBase,orderBase; } ModelRTInfo; typedef struct { u32 geom[4]; u32 info[4]; float iscl2[4]; } InstanceRTInfo; static InstanceRTInfo rtInstanceInfo[INSTANCE_CNT]; static InstanceRTInfo rtPrevInfo[INSTANCE_CNT]; static ModelRTInfo rtModelInfo[MAX_MDLS];
+const char* AccessCardCodeForType(AccCardType);
 V3 modelMin[MAX_MDLS],modelMax[MAX_MDLS],sunDirection={0.0f,1.0f,0.0f},debugWepOffset; FrustumPlane lightFrustumPlanes[MAX_SHADOWMAPS][6][6],playerFrustumPlanes[6],sunShadowFrustum[6]; DecalStyle decalStyles[DECAL_STYLE_MAX]; CamView camViews[64],levelCamViews[14][64];
-typedef struct {int w,h;} ResMode; ResMode resModes[16];
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
     .InputCodeSettings = { 5,/*Fwd=F*/      0,/*Strf L=A*/   18,/*Backpedal=S*/ 3,/*Strf R=D*/ 100,/*Jump=SPACE*/        2,/*Crouch=C*/        23,/*Prone=X*/   16,/*Lean L=Q*/       4,/*Lean Right=E*/ 45,/*Sprint=LSHIFT*/ 38,/*Turn L=LARROW*/ 39,/*Turn Right=RARROW*/ 36,/*Look Up=UARROW*/ 37,/*Look Down=DARROW*/ 20,/*Recent Log=U*/ 26,/*Biomonitor=1*/ 27,/*Sensaround=2*/ 28,/*Lantern=3*/ 29,/*Shield=4*/     30,/*Infrared=5*/      31,/*Email=6*/
                           32,/*Booster=7*/ 33,/*Jumpjets=8*/ 56,/*Attack=LMB*/ 57,/*Use=RMB*/   99,/*Menu/Back=ESCAPE*/ 80,/*Toggle Mode=TAB*/ 17,/*Reload=R*/ 127,/*Wep+=MWHEEL+*/ 128,/* Wep-=MWHEEL-*/ 6,/* Grenade=G*/    19,/*Gren+= T*/     131,/*Gren-=*/            21,/*Ammo Type=V*/     9,/*Patch Use=J*/       8,/*Patch+=I*/    132,/*Patch-=,*/     12,/*Full Map=M*/   21,/*Swim Up= V*/ 2,/*Swim Down=C*/ 101,/*Screenshot=F12*/ 102,/*Console=GRAVE*/},
@@ -447,24 +443,47 @@ InputElement inputElements[134]={{"A",KEY_A},{"B",KEY_B},{"C",KEY_C},{"D",KEY_D}
 static bool uiWheelBlocked; static bool f7StepEdge = false, f7DownLatch = false; static KeyState unboundInput; bool rebindCaptureActive = false;/*Set by the Input tab when a binding row is capturing a key; suppresses GetKeyPressed(25) Menu ESC-back + wheel capture while capturing.*/ bool UIInteractions(void); void UI_ProcessNavigation(void);
 KeyState* GetCodeMapping(int settingIndex) { if (settingIndex<0 || settingIndex>=42) return &unboundInput; i32 i=Sys_Settings.InputCodeSettings[settingIndex]; if (i<0 || i>=(i32)(sizeof(inputElements)/sizeof(inputElements[0]))) return &unboundInput; if (i>=53 && i<=60) { int button=inputElements[i].value; return (uiMouseCaptured&(1u<<button)) ? &unboundInput : &Sys_Input.mouseButtons[button]; } return &Sys_Input.keyStates[inputElements[i].value]; }
 void TextEntry(i32 k) {
-    if (k == KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { World.playerName[0] = '\0'; currentPlayerNameLength = 0; return; } if (k == KEY_ENTER || k == KEY_KP_ENTER) { currentMenuItem++; return; } if (k == KEY_BACKSPACE && currentPlayerNameLength > 0) { World.playerName[--currentPlayerNameLength] = '\0'; return; } if (currentPlayerNameLength >= 26) return;
+    if (k == KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { World.playerName[0] = '\0'; currentPlayerNameLength = 0; return; } if (k == KEY_ENTER || k == KEY_KP_ENTER) { curMenuIt++; return; } if (k == KEY_BACKSPACE && currentPlayerNameLength > 0) { World.playerName[--currentPlayerNameLength] = '\0'; return; } if (currentPlayerNameLength >= 26) return;
     char c = (k >= KEY_A && k <= KEY_Z) ? 'a' + (k - KEY_A) : ((k >= KEY_1 && k <= KEY_9) ? '1' + (k - KEY_1) : ((k == KEY_0) ? '0' : ((k == KEY_SPACE) ? ' ' : 0))); if (c) { World.playerName[currentPlayerNameLength] = c; World.playerName[++currentPlayerNameLength] = '\0'; }
 }
-extern bool editFieldEditing,enteringSaveName; extern float cyberWallFade[INSTANCE_CNT];
+extern bool editFieldEditing,typingSav; extern float cyberWallFade[INSTANCE_CNT];
 void GoIntoGame() {
     NewGame(); mp3_clear(); DualLog("Player named \"%s\" started the game!\n", World.playerName); game_actual_start_time = get_timed();
     DualLog("Entity counts::0:%4u|1:%4u|2:%4u|3:%4u|4:%4u|5:%4u|6:%4u|7:%4u|8:%4u|9:%4u|10:%4u|11:%4u|12:%4u|13:%4u\n Light counts::0:%4u|1:%4u|2:%4u|3:%4u|4:%4u|5:%4u|6:%4u|7:%4u|8:%4u|9:%4u|10:%4u|11:%4u|12:%4u|13:%4u\n",World.levelInstCount[0],World.levelInstCount[1],World.levelInstCount[2],World.levelInstCount[3],World.levelInstCount[4],
     World.levelInstCount[5],World.levelInstCount[6],World.levelInstCount[7],World.levelInstCount[8],World.levelInstCount[9],World.levelInstCount[10],World.levelInstCount[11],World.levelInstCount[12],World.levelInstCount[13],World.levelLoadedLights[0],World.levelLoadedLights[1],World.levelLoadedLights[2],World.levelLoadedLights[3],
     World.levelLoadedLights[4],World.levelLoadedLights[5],World.levelLoadedLights[6],World.levelLoadedLights[7],World.levelLoadedLights[8],World.levelLoadedLights[9],World.levelLoadedLights[10],World.levelLoadedLights[11],World.levelLoadedLights[12],World.levelLoadedLights[13]);
 }
-void InputKey(char* keys,int key,int action) {
-    if (key >= 0 && key < WS_KEYCOUNT) { if (action == INPUT_RELEASE && keys[key] == INPUT_RELEASE) { return; } if (action == INPUT_PRESS && keys[key] == INPUT_PRESS) { action = INPUT_REPEAT; } else { keys[key] = action; } }
-    if (key == KEY_F10 && action) OS_Exit(0); if (!window_has_focus && action != INPUT_RELEASE) return;
-    if (World.menuActive && !returnToPause) { if (((key == KEY_RIGHT_ALT || key == KEY_LEFT_ALT) && action && Sys_Input.keyStates[KEY_ENTER].down) || (key == KEY_ENTER && action && (Sys_Input.keyStates[KEY_LEFT_ALT].down || Sys_Input.keyStates[KEY_RIGHT_ALT].down /*Qmaster's Cheat!*/))){GoIntoGame();} }
-    if (key >=0 && key < MAX_KEYS && (action == INPUT_PRESS || (action == INPUT_REPEAT && !(key == KEY_KP_ENTER || key == KEY_ENTER || key == KEY_TAB || key == KEY_ESCAPE)))) {
-        Sys_Input.keyStates[key].down = true; Sys_Input.keyStates[key].pressed = (action == INPUT_PRESS);
-        if (Cheats.consoleActive) ConsoleEmulator(key); else if (editFieldEditing) EditFieldKey(key); else if (World.Sys_UI.keycodeValid) KeycodeEntryKey(key); else if (enteringSaveName && World.menuActive) SaveNameEntry(key); else if (enteringPlayerName && World.menuActive) TextEntry(key);
-    } else if (key >= 0 && key < MAX_KEYS && action == INPUT_RELEASE) { Sys_Input.keyStates[key].pressed=false; Sys_Input.keyStates[key].down=false; }
+static void KeycodeKeypress(int k) { SystemUI* s=&World.Sys_UI; if (!s->keycodeValid) return; if (s->keycodeSolved) return; play_wav("buttons/button_beep",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);
+    if (k>=0&&k<=9) {
+        if (World.Sys_UI.keycodeOnes < 0) { World.Sys_UI.keycodeOnes = (i8)k; World.Sys_UI.keycodeEntry = World.Sys_UI.keycodeOnes; }
+        else if (World.Sys_UI.keycodeTens < 0) { World.Sys_UI.keycodeTens = World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes = (i8)k; World.Sys_UI.keycodeEntry = World.Sys_UI.keycodeOnes + World.Sys_UI.keycodeTens*10; }
+        else if (World.Sys_UI.keycodeHuns < 0) { World.Sys_UI.keycodeHuns = World.Sys_UI.keycodeTens; World.Sys_UI.keycodeTens = World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes = (i8)k; World.Sys_UI.keycodeEntry = World.Sys_UI.keycodeOnes + World.Sys_UI.keycodeTens*10 + World.Sys_UI.keycodeHuns*100; }
+        else { World.Sys_UI.keycodeHuns = World.Sys_UI.keycodeTens; World.Sys_UI.keycodeTens = World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)k; World.Sys_UI.keycodeEntry = World.Sys_UI.keycodeOnes + World.Sys_UI.keycodeTens*10 + World.Sys_UI.keycodeHuns*100; }
+    }
+    else if (k==10) { if (s->keycodeHuns>=0) { s->keycodeOnes=s->keycodeTens; s->keycodeTens=s->keycodeHuns; s->keycodeHuns=-1; s->keycodeEntry=s->keycodeOnes+s->keycodeTens*10; return; } else if (s->keycodeTens>=0) { s->keycodeOnes=s->keycodeTens; s->keycodeTens=-1; s->keycodeEntry=s->keycodeOnes; return; } else if (s->keycodeOnes>=0) { s->keycodeOnes=-1; s->keycodeEntry=-1; return; } else return;/*empty backspace leaves the preloaded easy-difficulty value intact*/ }
+    else if (k==11) { s->keycodeHuns=s->keycodeTens=s->keycodeOnes=-1; s->keycodeEntry=-1; }
+    if (s->keycodeEntry==s->keycodeValue) { if (s->keycodeHuns>=0) play_wav("buttons/keycard_success",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);/*code accepted*/ u16 pad=s->tetheredKeypadKeycode; if (pad>=INSTS_1ST_IDX && pad<World.instCount) { UseTargets(pad,World.instances[pad].targetIdx); if (World.instances[pad].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pad].messageLingdex]); } s->keycodeSolved=true; }
+    else if (s->keycodeHuns>=0) play_wav("buttons/button_deny",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);/*code not accepted*/
+}
+static void SaveSlotCancelTyping(void) { saveSlotEditing=-1; typingSav = false; saveNameEntryLen=0; saveNameEntry[0]='\0'; }
+static void SaveSlotConfirmTyping(void) { i8 slot = saveSlotEditing; char name[48]; u8 n=saveNameEntryLen; if (n > 47) { n = 47; } for (u8 i=0;i<n;++i) name[i] = saveNameEntry[i]; name[n] = '\0'; SaveSlotCancelTyping(); if (slot < 0 || slot > 7 || n == 0) return; for (u8 i=0;i<=n;++i) saveSlotNames[slot][i] = name[i]; World.menuActive = false; World.paused = false; returnToPause = false; SaveGame((u8)slot,name); }
+void SaveNameEntry(i32 k) {
+    if (k==KEY_ESCAPE) { Sys_Input.keyStates[KEY_ESCAPE].pressed=false; SaveSlotCancelTyping(); return; } if (k==KEY_ENTER||k==KEY_KP_ENTER) { Sys_Input.keyStates[KEY_ENTER].pressed = Sys_Input.keyStates[KEY_KP_ENTER].pressed = false; SaveSlotConfirmTyping(); return; } if (k==KEY_BACKSPACE && saveNameEntryLen>0) { saveNameEntry[--saveNameEntryLen] = '\0'; return; }
+    if (k==KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { saveNameEntry[0] = '\0'; saveNameEntryLen = 0; return; } if (saveNameEntryLen>=47) { return; } 
+    char c = (k >= KEY_A && k <= KEY_Z) ? (char)('a' + (k - KEY_A)):((k >= KEY_1 && k <= KEY_9) ? (char)('1' + (k - KEY_1)) : ((k == KEY_0) ? '0' : ((k == KEY_SPACE) ? ' ' : 0))); if (c) { saveNameEntry[saveNameEntryLen] = c; saveNameEntry[++saveNameEntryLen] = '\0'; }
+}
+void InputKey(char* keys, int k, int action) {
+    if (k >= 0 && k < WS_KEYCOUNT) { if (action == INPUT_RELEASE && keys[k] == INPUT_RELEASE) { return; } if (action == INPUT_PRESS && keys[k] == INPUT_PRESS) { action = INPUT_REPEAT; } else { keys[k] = action; } }
+    if (k == KEY_F10 && action) OS_Exit(0); if (!window_has_focus && action != INPUT_RELEASE) return;
+    if (World.menuActive && !returnToPause) { if (((k == KEY_RIGHT_ALT || k == KEY_LEFT_ALT) && action && Sys_Input.keyStates[KEY_ENTER].down) || (k == KEY_ENTER && action && (Sys_Input.keyStates[KEY_LEFT_ALT].down || Sys_Input.keyStates[KEY_RIGHT_ALT].down /*Qmaster's Cheat!*/))){GoIntoGame();} }
+    if (k >=0 && k < MAX_KEYS && (action == INPUT_PRESS || (action == INPUT_REPEAT && !(k == KEY_KP_ENTER || k == KEY_ENTER || k == KEY_TAB || k == KEY_ESCAPE)))) {
+        Sys_Input.keyStates[k].down = true; Sys_Input.keyStates[k].pressed = (action == INPUT_PRESS);
+        if (Cheats.consoleActive) ConsoleEmulator(k);
+        else if (editFieldEditing) EditFieldKey(k);
+        else if (World.Sys_UI.keycodeValid) { if (World.Sys_UI.keycodeValid && !World.Sys_UI.keycodeSolved) { if (k>=KEY_0 && k<=KEY_9) KeycodeKeypress(k-KEY_0); else if (k>=KEY_KP_0 && k<=KEY_KP_9) KeycodeKeypress(k-KEY_KP_0); else if (k==KEY_BACKSPACE) KeycodeKeypress(10); else if (k==KEY_DELETE || k==KEY_KP_DECIMAL) KeycodeKeypress(11); } }
+        else if (typingSav && World.menuActive) SaveNameEntry(k);
+        else if (enteringPlayerName && World.menuActive) TextEntry(k);
+    } else if (k >= 0 && k < MAX_KEYS && action == INPUT_RELEASE) { Sys_Input.keyStates[k].pressed=false; Sys_Input.keyStates[k].down=false; }
 }
 void InputMouseClick(char* mouseButtons, int button, int action) { if (button<0 || button>7) {return;} char wasDown = mouseButtons[button]; mouseButtons[button] = (char)action; bool down = (action == 1); Sys_Input.mouseButtons[button].pressed  = down && !wasDown; Sys_Input.mouseButtons[button].down=down; }
 void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, float roll_deg) { float yaw=deg2rad(yaw_deg), pitch=deg2rad(pitch_deg), roll=deg2rad(roll_deg/*Around Z (forward)*/); float cy=vcosf(yaw * 0.5f), sy=vsinf(yaw * 0.5f), cp=vcosf(pitch * 0.5f), sp=vsinf(pitch * 0.5f), cr=vcosf(roll * 0.5f), sr=vsinf(roll * 0.5f); q->w=cy*cp*cr + sy*sp*sr; q->x=cy*sp*cr + sy*cp*sr;/*X(pitch)*/ q->y=sy*cp*cr - cy*sp*sr;/*Y(yaw)*/ q->z=cy*cp*sr - sy*sp*cr;/*Z(roll)*/ } // Skipping quat normalization, not needed
@@ -494,8 +513,7 @@ void InputProcessing() {
         if (Sys_Input.keyStates[KEY_F6].pressed && (get_time() - World.justSavedTimeStamp) > 0.2f) { Sys_Input.keyStates[KEY_F6].pressed = false; if (!World.menuActive) { bool wasPaused=World.paused; World.paused=false; SaveGame(7,"quicksave"); if (wasPaused) World.paused=true; } return; }
         if (Sys_Input.keyStates[KEY_F9].pressed && (get_time() - World.justSavedTimeStamp) > 0.2f) { Sys_Input.keyStates[KEY_F9].pressed = false; LoadGame(7); return; }
         if (GetKeyPressed(41)/*Console`~*/ && !rebindCaptureActive) ToggleConsole();
-        if (GetKeyPressed(25)/*Menu*/ && !World.menuActive && !editFieldEditing) { World.paused = !World.paused; return; }
-        if (GetKeyPressed(25)/*Menu*/ && World.menuActive && !rebindCaptureActive && VidMenuKeyArmed()) { MenuGoBack(); return; }
+        if (GetKeyPressed(25)/*Menu*/) { if (!World.menuActive && !editFieldEditing) { World.paused = !World.paused; return; } else if (!rebindCaptureActive && ((curMenuPg != MPG_INTRO && curMenuPg != MPG_CREDS && curMenuPg != MPG_DEATH) ? true : vidMenuKeyArmed)) { MenuGoBack(); return; } }
         if (World.paused || World.menuActive || Cheats.consoleActive || World.invP1.ressurectingFinished > World.pauseRelativeTime) return; // Pause/Menu barrier <<<<<<<
         if (Sys_Input.keyStates[KEY_1].pressed) { debugWepOffset.x += 0.05f; } else if (Sys_Input.keyStates[KEY_2].pressed) { debugWepOffset.x -= 0.05f; } // Debug weapon offset adjustment hooks TEMP TODO DELETE ME ONCE PIPE AND RAPIER OFFSETS ARE FIXED!!
         if (Sys_Input.keyStates[KEY_3].pressed) { debugWepOffset.y += 0.05f; } else if (Sys_Input.keyStates[KEY_4].pressed) { debugWepOffset.y -= 0.05f; }
@@ -640,11 +658,11 @@ int ParseLevelArg(const char* arg) {
     char clean[64] = {0}; int j = 0; for (int i = 0; arg[i] && j < 60; i++) { if (arg[i] != ' ' && arg[i] != '_') { clean[j++] = c2Lower((u8)arg[i]); } } clean[j] = '\0'; if (sEqual(clean,"r")) { return 0; } if (sFindSub(clean,"g1") || sFindSub(clean,"10")) { return 10; } if (sFindSub(clean,"g2") || sFindSub(clean,"11")) { return 11; } if (sFindSub(clean,"g4") || sFindSub(clean,"12")) { return 12; }
     if (sFindSub(clean, "g3")) { CenterStatusPrint("%s", Sys_Text.stringTable[1001]); return -2; } /*"Gamma grove already jettisoned!"  Those poor arrogant people.*/ int level = s2i32(clean); if (level >= 0 && level < MAX_LEVELS) { return level; } return -1; // Invalid
 }
-u8 queuedLevelToLoad = 255u; V3 queuedLevelPos; bool ElevatorDefaultDestinationPos(u8,V3*);
+u8 cuedLevToLoad = 255u; V3 cuedLevPos; bool ElevatorDefaultDestinationPos(u8,V3*);
 static void cmd_loadlevel(const char* arg) {
     if (World.menuActive) { CenterStatusPrint("%s", Sys_Text.stringTable[1015]); return; /*"Cannot load levels via cheat while on the main menu!"*/} int level = ParseLevelArg(arg); if (level == -2) { return; /*Already printed message*/ } if (level < 0) { CenterStatusPrint("cmd_loadlevel invalid level argument %d", level); return; } if (level == World.curLev) { CenterStatusPrint("cmd_loadlevel already at level %d", level); return; }
-    CenterStatusPrint("Loading level %u",level); queuedLevelToLoad=level;
-    if (level == LEVEL_CYBERSPACE) { queuedLevelPos = cyberSpaceEntryLocations[World.curLev < 8 ? (u8)World.curLev : 0]; } else if (level > 9) { if (!ElevatorDefaultDestinationPos(level, &queuedLevelPos)) { queuedLevelPos = (V3){0.0f, 0.0f, 0.0f}; } else {  queuedLevelPos.y += PLYR_CAM_OFS_Y; } } else { queuedLevelPos = ressurectionLocations[level]; queuedLevelPos.y -= (1.0f - PLYR_CAM_OFS_Y); } LoadLevel(level,queuedLevelPos);
+    CenterStatusPrint("Loading level %u",level); cuedLevToLoad=level;
+    if (level == LEVEL_CYBERSPACE) { cuedLevPos = cyberSpaceEntryLocations[World.curLev < 8 ? (u8)World.curLev : 0]; } else if (level > 9) { if (!ElevatorDefaultDestinationPos(level, &cuedLevPos)) { cuedLevPos = (V3){0.0f, 0.0f, 0.0f}; } else {  cuedLevPos.y += PLYR_CAM_OFS_Y; } } else { cuedLevPos = ressurectionLocations[level]; cuedLevPos.y -= (1.0f - PLYR_CAM_OFS_Y); } LoadLevel(level,cuedLevPos);
 }
 static void cmd_loadarsenal(const char* arg) { int level = ParseLevelArg(arg); if (level >= 0 && level < MAX_LEVELS) { EnableCheatArsenal(level); } }
 static void cmd_summon(int itemConstIndex) {
@@ -1087,8 +1105,8 @@ void UpdateLights() {
         }
     }
     glBindBuffer(GL_SSBO, lightsID); glBufferSubData(GL_SSBO, 0, World.loadedLights * sizeof(Light), World.lights);
-    glUseProgram(voxelUpdateSP); glUniform3f(5, World.position[PLAYER1].x, World.position[PLAYER1].y, World.position[PLAYER1].z); glUniform3f(8, World.instances[PLAYER1].forward.x, World.instances[PLAYER1].forward.y, World.instances[PLAYER1].forward.z); glUniform1ui(9, Sys_Settings.Reflections); glUniform1ui(2, World.loadedLights);
-    glDispatchCompute((VOXELS_X + 15) / 16, (VOXELS_Z + 15) / 16, 1); glMemoryBarrier(0x2000/*GL_SHADER_STORAGE_BARRIER_BIT*/);
+    glUseProgram(voxelUpdateSP); glUniform3f(5,World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z); glUniform3f(8,World.instances[PLAYER1].forward.x,World.instances[PLAYER1].forward.y,World.instances[PLAYER1].forward.z); glUniform1ui(9,Sys_Settings.Reflections); glUniform1ui(2,World.loadedLights);
+    glDispatchCompute((VOXELS_X + 15) / 16,(VOXELS_Z + 15) / 16, 1); glMemoryBarrier(0x2000/*GL_SHADER_STORAGE_BARRIER_BIT*/);
 }
 // Shadowmapping
 typedef struct {float depth; u16 index; } DepthSort;
@@ -1641,7 +1659,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.menuActive = World.paused = enteringPlayerName = fovSliderActive = gammaSliderActive = masterVolumeSliderActive = musicVolumeSliderActive = messageVolumeSliderActive = sfxVolumeSliderActive = returnToPause = false;
     for (int i=0;i<MAX_LEVELS;++i) { World.worldMin_x[i] = levMins[i].x; World.worldMin_z[i] = levMins[i].y; World.voxMinCtrX[i] = World.worldMin_x[i] + (VOXEL_SIZE * 0.5f); World.voxMinCtrZ[i] = World.worldMin_z[i] + (VOXEL_SIZE * 0.5f); World.farPlane[i] = lFars[i]; World.fogColor[i] = fogLUT[i]; World.fogColor[i].a *= 3.8f; }
     World.curLev = 0; World.col[0] = CT_NONE;
-    currentMenuItem = currentMenuTab = 0; currentMenuPage = MPG_FRONT;
+    curMenuIt = curMenuTab = 0; curMenuPg = MPG_FRONT;
     World.current_time = newGamePrepStart; World.pauseRelativeTime = World.last_physics_time = 0.0f; World.dt = 0.0166666666f;
     mset(World.instances,0,3 * sizeof(Entity));
     World.instances[PLAYER1].index = 767;
@@ -1908,11 +1926,10 @@ void InitalizeEnvironment() {
     DualLog("Scratch arena total peak: %u MB, ", (u32)(scratch_peak >> 20)); OS_Free(scratch_base,SCRATCH_ARENA_SIZE); // Free the initialization scratch arena.
     DebugRAMPeak(); DualLog(".......Game Initialization TOTAL %.6f secs\n",get_timed() - game_start_time); DebugRAMActual("init");
 }
-static void RessurectionTextUpdate() { static int lastStage = -1; float fin = World.invP1.ressurectingFinished; if (fin <= World.pauseRelativeTime) { lastStage = -1; return; } float el = World.pauseRelativeTime - (fin - 3.0f); int stage = (int)(el * 8.0f / 3.0f); if (stage < 0) stage = 0; if (stage > 7) stage = 7; if (stage != lastStage) { lastStage = stage; CenterStatusPrint("%s", Sys_Text.stringTable[860 + stage]); } }
 i32 main() {
     InitalizeEnvironment();
     while(1) {
-        if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad,queuedLevelPos); queuedLevelToLoad = 255u; continue; }
+        if (cuedLevToLoad != 255u) { LoadLevel(cuedLevToLoad,cuedLevPos); cuedLevToLoad = 255u; continue; }
         double curtime = get_timed(); float curtimef = get_time(); raycastCalls = 0; raycastMs = 0.0; World.dt = World.current_time < 0.001 ? 0.000 : vmax(curtime - World.current_time,0.0); World.absoluteTime += (double)World.dt; World.current_time = curtime;
         World.painStaticAlpha = vmax(0.0f,World.painStaticAlpha - World.dt * 2.0f);
         World.empStaticAlpha = vmax(0.0f,World.empStaticAlpha - World.dt * 4.0f);
@@ -1923,7 +1940,10 @@ i32 main() {
         UpdateAnims();/*Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.*/
         prePhys = get_timed() - input_start;
         if (!World.paused && !World.menuActive && stepFrame) { double ps = get_timed(); float dt = vclamp((World.pauseRelativeTime - World.last_physics_time),0.0005f,0.1f); World.last_physics_time = World.pauseRelativeTime; World.dt = dt; Physics(dt); physTime = get_timed() - ps; } else physTime = 0.0;
-        double gameT_start = get_timed(); if (stepFrame) ModUpdate();/*After physics so mod/gamecode can modify velocities before next frame.*/ BioMonitorUpdate(); RessurectionTextUpdate(); if (!World.paused && !World.menuActive && stepFrame){ PSys_Update(World.dt); }/*Particles*/ UpdateAudio();/*Updates states, music triggers, ambients, etc.*/ gameTime = get_timed() - gameT_start;
+        double gameT_start = get_timed();
+        if (stepFrame && !World.paused && !World.menuActive) { ModUpdate();/*After physics so mod/gamecode can modify velocities before next frame.*/ ParticlesUpdate(World.dt); }
+        if (Cheats.showFPS || (!World.menuActive && !World.paused)) { BioMonitorUpdate(); }
+        UpdateAudio();/*Updates states, music triggers, ambients, etc.*/ gameTime = get_timed() - gameT_start;
         if (likely((!World.paused && !World.menuActive) || Cheats.editMode)) { UpdateWeaponViewModel(); UpdateInstanceMatrix4x4s(); /*Before camviews so camview shadows render same as main pass*/ }
         drawCalls = uiDrawCalls = shadDrawCalls = vertsRendered = 0;
         UpdateSensaroundCamViews(); RenderCameraViews();/*Before main Render() so that tv screens are up to date*/ if(likely(!World.paused && !World.menuActive)) { CullCore(); } /*Before automap and audio update due to audio occlusion and automap FoW discovery*/ AudioUpdateMix();/*Actually mixes all the audio for output.*/ AutomapTick(); MinigameTick();

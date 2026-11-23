@@ -1,5 +1,4 @@
 // ui.c - User Interface(UI) aka HUD
-bool enteringSaveName; static bool reflDropdownOpen,saveSlotUsed[8],uiClickLock,uiClickBlocked; static i8 reflHoverIdx = -1, rebindRow = -1, saveSlotEditing = -1, softwareInvCurrent = -1; static u32 rebindArmedFrame; static char saveSlotNames[8][48],saveNameEntry[48]; static u8 saveNameEntryLen; extern V3 queuedLevelPos; extern u8 queuedLevelToLoad; extern float reloadTime[16];
 #define UI_MFD_IDS(P) UI_ID_##P##_TAB_WEAPON, UI_ID_##P##_TAB_ITEM, UI_ID_##P##_TAB_AUTOMAP, UI_ID_##P##_TAB_DATA,      UI_ID_##P##_PANEL,      UI_ID_##P##_WEAPON_NAME, UI_ID_##P##_WEAPON_ICON,      UI_ID_##P##_WEAPON_AMMO,       UI_ID_##P##_WEAPON_RELOAD,     UI_ID_##P##_WEAPON_UNLOAD, UI_ID_##P##_WEAPON_OVERLOAD, UI_ID_##P##_WEAPON_ENERGY_SLIDER, UI_ID_##P##_MEDIA_HEADER, UI_ID_##P##_MEDIA_TAB_0, UI_ID_##P##_MEDIA_TAB_3 = UI_ID_##P##_MEDIA_TAB_0 + 3, \
                       UI_ID_##P##_ITEM_NAME, UI_ID_##P##_ITEM_ICON, UI_ID_##P##_ITEM_USE,    UI_ID_##P##_ITEM_VAPORIZE, UI_ID_##P##_ITEM_SKATE, UI_ID_##P##_ITEM_BOOST,  UI_ID_##P##_ITEM_TIMER_VALUE, UI_ID_##P##_ITEM_TIMER_SLIDER, UI_ID_##P##_ITEM_ACCESS_CARDS, UI_ID_##P##_BLOCKED_SECURITY_TEXT, UI_ID_##P##_ELEV_FLOOR_INDICATOR, UI_ID_##P##_ELEV_BUTTON_0,    UI_ID_##P##_ELEV_BUTTON_7 = UI_ID_##P##_ELEV_BUTTON_0 + 7, UI_ID_##P##_ELEV_CLOSE, \
                       UI_ID_##P##_KEYCODE_0, UI_ID_##P##_KEYCODE_11 = UI_ID_##P##_KEYCODE_0 + 11, UI_ID_##P##_KEYCODE_DIGIT_0, UI_ID_##P##_KEYCODE_DIGIT_2 = UI_ID_##P##_KEYCODE_DIGIT_0 + 2,          UI_ID_##P##_KEYCODE_CLOSE,     UI_ID_##P##_AUDIOLOG_IMAGE,    UI_ID_##P##_AUDIOLOG_NAME, UI_ID_##P##_AUDIOLOG_SENDER, UI_ID_##P##_AUDIOLOG_SUBJECT, UI_ID_##P##_PUZZLE_NODE_SOURCE, UI_ID_##P##_PUZZLE_NODE, UI_ID_##P##_PUZZLE_CELL_0, \
@@ -12,7 +11,7 @@ enum{UI_ID_NONE, /*Menu*/ UI_ID_MENU_SINGLEPLAYER, UI_ID_MENU_MULTIPLAYER, UI_ID
                           UI_ID_MENU_SAVE_SLOT_7 = UI_ID_MENU_SAVE_SLOT_0 + 7,
     /*Pause*/ UI_ID_PAUSE_RESUME, UI_ID_PAUSE_LOAD, UI_ID_PAUSE_SAVE, UI_ID_PAUSE_OPTIONS, UI_ID_PAUSE_QUIT_TO_MENU, UI_ID_PAUSE_QUIT_GAME,
     /*HUD*/ UI_ID_HUD_SHOOTMODE, UI_ID_HUD_HW_0, UI_ID_HUD_HW_7 = UI_ID_HUD_HW_0 + 7, UI_ID_CMFD_MISSION_TIMER, UI_ID_CMFD_CYBER_TIMER, UI_ID_CMFD_BIOMONITOR, UI_ID_VMAIL_VIEWER, UI_ID_FULLMAP_CLOSE, UI_ID_SENSA_CTR, UI_ID_SENSA_LH, UI_ID_SENSA_RH,
-    /*Center MFD*/ UI_ID_CMFD_ADD_TO_INVENTORY, UI_ID_CMFD_TAB_MAIN, UI_ID_CMFD_TAB_HARDWARE, UI_ID_CMFD_TAB_GENERAL, UI_ID_CMFD_TAB_SOFTWARE, UI_ID_CMFD_WEAPON_HEADER, UI_ID_CMFD_SHOTS_HEADER, UI_ID_CMFD_WEAPON_ROW_0, UI_ID_CMFD_WEAPON_ROW_6 = UI_ID_CMFD_WEAPON_ROW_0 + 6, UI_ID_CMFD_GREN_HEADER, UI_ID_CMFD_PATCH_HEADER, UI_ID_CMFD_GREN_USE_0, UI_ID_CMFD_GREN_USE_6 = UI_ID_CMFD_GREN_USE_0 + 6, UI_ID_CMFD_GREN_ROW_0,
+    /*Center MFD*/ UI_ID_CMFD_ADD_TO_INVENTORY, UI_ID_CMFD_TAB_MAIN, UI_ID_CMFD_TAB_HARDWARE, UI_ID_CMFD_TAB_GENERAL, UI_ID_CMFD_TAB_SOFTWARE, UI_ID_CMFD_WEAPON_HEADER, UI_ID_CMFD_SHOTS_HEADER, UI_ID_CMFD_WEP_ROW_0, UI_ID_CMFD_WEP_ROW_6 = UI_ID_CMFD_WEP_ROW_0 + 6, UI_ID_CMFD_GREN_HEADER, UI_ID_CMFD_PATCH_HEADER, UI_ID_CMFD_GREN_USE_0, UI_ID_CMFD_GREN_USE_6 = UI_ID_CMFD_GREN_USE_0 + 6, UI_ID_CMFD_GREN_ROW_0,
                    UI_ID_CMFD_GREN_ROW_6 = UI_ID_CMFD_GREN_ROW_0 + 6, UI_ID_CMFD_PATCH_USE_0, UI_ID_CMFD_PATCH_USE_6 = UI_ID_CMFD_PATCH_USE_0 + 6, UI_ID_CMFD_PATCH_ROW_0, UI_ID_CMFD_PATCH_ROW_6 = UI_ID_CMFD_PATCH_ROW_0 + 6, UI_ID_CMFD_HARDWARE_HEADER, UI_ID_CMFD_HARDWARE_ROW_0, UI_ID_CMFD_HARDWARE_ROW_11 = UI_ID_CMFD_HARDWARE_ROW_0 + 11, UI_ID_CMFD_GENERAL_HEADER, UI_ID_CMFD_GENERAL_USE_0, UI_ID_CMFD_GENERAL_USE_13 = UI_ID_CMFD_GENERAL_USE_0 + 13,
                    UI_ID_CMFD_GENERAL_ROW_0, UI_ID_CMFD_GENERAL_ROW_13 = UI_ID_CMFD_GENERAL_ROW_0 + 13, UI_ID_CMFD_SOFTWARE_HEADER, UI_ID_CMFD_SOFTWARE_ROW_0, UI_ID_CMFD_SOFTWARE_ROW_6 = UI_ID_CMFD_SOFTWARE_ROW_0 + 6, UI_ID_CMFD_MEDIA_HEADER, UI_ID_CMFD_LOG_TABLE_0, UI_ID_CMFD_LOG_TABLE_9 = UI_ID_CMFD_LOG_TABLE_0 + 9, UI_ID_CMFD_LOG_ENTRY_0, UI_ID_CMFD_LOG_ENTRY_14 = UI_ID_CMFD_LOG_ENTRY_0 + 14, UI_ID_CMFD_LOG_TEXT, UI_ID_CMFD_LOG_MORE,
                    UI_ID_CMFD_LOG_BACK, UI_ID_CMFD_EMAIL_ENTRY_0, UI_ID_CMFD_EMAIL_ENTRY_14 = UI_ID_CMFD_EMAIL_ENTRY_0 + 14, UI_ID_CMFD_DATA_ENTRY_0, UI_ID_CMFD_DATA_ENTRY_12 = UI_ID_CMFD_DATA_ENTRY_0 + 12, UI_ID_CMFD_NOTE_TOGGLE_0, UI_ID_CMFD_NOTE_TOGGLE_17 = UI_ID_CMFD_NOTE_TOGGLE_0 + 17,
@@ -27,26 +26,10 @@ INLINE bool WorldToScreenPoint(V3 d, float* sx, float* sy) {
 }
 INLINE void UIR(u32 id, i16 x, i16 y, i16 w, i16 h) { if (!id) { return; } if (!World.uiComponents[id].initialized) { World.uiComponents[id].min = (V2){(float)x,(float)y}; World.uiComponents[id].max = (V2){(float)(x + w),(float)(y + h)}; World.uiComponents[id].initialized = true; } World.uiComponents[id].active = true; }
 INLINE void UIRImg(u32 id, i16 x, i16 y, i16 w, i16 h, u16 tex) { UIR(id,x,y,w,h); RenderUIImage(x,y,w,h,tex); }
-INLINE i16 UITextW(const char* t, float sc, i16 maxW) { float w=MeasureLineAdvance(t,FONT_NORMAL)*sc; if (w<1.0f) w=1.0f; return (maxW>0 && w>(float)maxW) ? maxW : (i16)w; }
-INLINE void UIRText(u32 id, i16 x, i16 y, u32 col, u8 font, float sc, i16 maxW, const char* t) { UIR(id,x,y,UITextW(t,sc,maxW),(i16)(22.0f*sc)); RenderTextL(x,y,col,font,sc,"%s",t); }
+INLINE void UIRText(u32 id, i16 x, i16 y, u32 col, u8 font, float sc, i16 maxW, const char* t) { float w = MeasureLineAdvance(t,FONT_NORMAL) * sc; if (w < 1.0f) w = 1.0f; UIR(id,x,y,(maxW > 0 && w > (float)maxW) ? maxW : (i16)w,(i16)(22.0f*sc)); RenderTextL(x,y,col,font,sc,"%s",t); }
 INLINE bool UIOver(u32 id) { return UIC(id).active && CursorIsOverBounds(UIC(id).min.x,UIC(id).max.x,UIC(id).min.y,UIC(id).max.y); }
-static void UI_BeginFrame() { for (u32 i=1;i<UI_ID_COUNT;++i) UIC(i).active = false; }
-static u8 UIClicked(u32 id) {
-    if (id >= UI_ID_COUNT || id == 0) return 0; if (!UIOver(id)) return 0; bool l=Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed, r=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed; if (!l && !r) return 0;
-    Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed = Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed = false; World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true; float* t = l ? &World.uiComponents[id].lastLMB : &World.uiComponents[id].lastRMB; u8 dbl = (*t > 0.0f && (World.pauseRelativeTime - *t) <= 0.5f) ? 4u : 0u; *t = dbl ? 0.0f : World.pauseRelativeTime; return (u8)((l ? 1u : 2u) | dbl);
-}
-static void RefreshSaveSlots(void) { for (u8 i=0;i<8;++i) { saveSlotUsed[i] = ReadSaveSlotName(i,saveSlotNames[i],sizeof(saveSlotNames[i])); if (!saveSlotUsed[i]) { const char* t = (i==7) ? "- unused quicksave -" : "- unused -"; size_t n = 0; while (t[n] && n < sizeof(saveSlotNames[i]) - 1) { saveSlotNames[i][n] = t[n]; ++n; } saveSlotNames[i][n] = '\0'; } } }
-static void SaveSlotCancelTyping(void) { saveSlotEditing=-1; enteringSaveName=false; saveNameEntryLen=0; saveNameEntry[0]='\0'; }
-static void SaveSlotConfirmTyping(void) { i8 slot = saveSlotEditing; char name[48]; u8 n=saveNameEntryLen; if (n > 47) { n = 47; } for (u8 i=0;i<n;++i) name[i] = saveNameEntry[i]; name[n] = '\0'; SaveSlotCancelTyping(); if (slot < 0 || slot > 7 || n == 0) return; for (u8 i=0;i<=n;++i) saveSlotNames[slot][i] = name[i]; World.menuActive = false; World.paused = false; returnToPause = false; SaveGame((u8)slot,name); }
-void SaveNameEntry(i32 k) {
-    if (k==KEY_ESCAPE) { Sys_Input.keyStates[KEY_ESCAPE].pressed=false; SaveSlotCancelTyping(); return; } if (k==KEY_ENTER||k==KEY_KP_ENTER) { Sys_Input.keyStates[KEY_ENTER].pressed = Sys_Input.keyStates[KEY_KP_ENTER].pressed = false; SaveSlotConfirmTyping(); return; } if (k==KEY_BACKSPACE && saveNameEntryLen>0) { saveNameEntry[--saveNameEntryLen] = '\0'; return; }
-    if (k==KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { saveNameEntry[0] = '\0'; saveNameEntryLen = 0; return; } if (saveNameEntryLen>=47) { return; } 
-    char c = (k >= KEY_A && k <= KEY_Z) ? (char)('a' + (k - KEY_A)):((k >= KEY_1 && k <= KEY_9) ? (char)('1' + (k - KEY_1)) : ((k == KEY_0) ? '0' : ((k == KEY_SPACE) ? ' ' : 0))); if (c) { saveNameEntry[saveNameEntryLen] = c; saveNameEntry[++saveNameEntryLen] = '\0'; }
-}
 void MFD_ResetGeneral() { World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.consumableClickRow=-1; World.Sys_UI.genClickSlot = -1; }
 void MFD_ShowGeneralItem() { u8 side=World.Sys_UI.lastItemSideRH?2:1; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdGeneralItem=true; World.Sys_UI.mfdHardwareItem=false; softwareInvCurrent=-1; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; World.Sys_UI.mfdTab[side]=2; World.Sys_UI.mfdSelected[side]=2; }
-void MFD_OpenSearch(bool isRH) { for (u8 side=0;side<2;++side) {u8 tab=World.Sys_UI.mfdTab[1+!!side]; if (!(tab==2 && World.Sys_UI.mfdItemReader[side]) && World.Sys_UI.MFD_Data!=5) { World.Sys_UI.mfdReturnTab[side+1]=tab; World.Sys_UI.mfdReturnView[side+1]=World.Sys_UI.MFD_Data;}} World.Sys_UI.MFD_Data=5; World.Sys_UI.mfdTab[1+!!isRH]=4;}
-void MFD_CloseSearch() {if (World.Sys_UI.MFD_Data!=5) return; for (u8 side=0;side<2;++side) {u8* tab=&World.Sys_UI.mfdTab[1+!!side]; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];} u8 rv=World.Sys_UI.mfdReturnView[1]; if (rv==5) rv=0; World.Sys_UI.MFD_Data=rv;}
 void MFD_OpenData(bool isRH,u8 code) { u8 side=isRH?2:1; u8 tab=World.Sys_UI.mfdTab[1+!!isRH]; if (tab!=4) World.Sys_UI.mfdReturnTab[side]=tab; if (World.Sys_UI.MFD_Data == 0 || World.Sys_UI.MFD_Data == 5) World.Sys_UI.mfdReturnView[side]=World.Sys_UI.MFD_Data; World.Sys_UI.MFD_Data=code; World.Sys_UI.mfdTab[1+!!isRH]=4; }
 void MFD_CloseData() { if (World.Sys_UI.MFD_Data == 0 || World.Sys_UI.MFD_Data == 5) return; u8 keepDataTab=(World.Sys_UI.mfdReturnTab[1]==4||World.Sys_UI.mfdReturnTab[2]==4); for (u8 side=0;side<2;++side) {u8* tab=&World.Sys_UI.mfdTab[1+!!side]; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];} World.Sys_UI.MFD_Data=keepDataTab?(((World.invP1.hasHardware&HW_SYS)?7:0)):0; }
 INLINE void MFD_SelectTab(u8 panel, u8 tab, bool toggle) {
@@ -60,34 +43,29 @@ INLINE void MFD_SelectTab(u8 panel, u8 tab, bool toggle) {
     if (panel && tab == 4 && view == 9) { World.Sys_UI.lastMinigameSideRH = (panel == 2); }
     play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0},false);
 }
-void WeaponSelectSlot(int slot) {
-    int wi = (int)World.invP1.wepInvIndices[slot]; if (wi < 0 || wi >= MAX_ENTS || (int)World.invP1.wepCur == slot || World.invP1.reloadFinished > World.pauseRelativeTime) { return; } play_wav("hud/changeweapon",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); World.invP1.wepCurPending = (i16)slot; World.invP1.weaponIndexPending = (i16)wi; int w = Get16WeaponIndexFromConstIndex(wi); WeaponFireStartWeaponDip((w >= 0 && w < 16) ? reloadTime[w] : 0.5f);
-}
 __attribute__((noinline)) bool MenuEnter() { return !Cheats.consoleActive && (Sys_Input.keyStates[KEY_KP_ENTER].pressed || Sys_Input.keyStates[KEY_ENTER].pressed); }
 static void UiClickGate() { bool anyDown = false; for (u8 b = 0; b < MAX_MOUSE_BUTTONS; ++b) anyDown |= Sys_Input.mouseButtons[b].down; uiClickBlocked = false; if (uiClickLock) { if (!anyDown) uiClickLock = false; else uiClickBlocked = true; } }
-__attribute__((noinline)) u8 UI_MenuInteractable(u32 id, i16 x, i16 y, float w, float h, bool* cursorOver, i8 this, bool sustained) {
-    UIR(id,x,(i16)((float)y-h),(i16)w,(i16)h); bool cursorIsOver = CursorIsOverBounds(x, x + w, (float)y - h, (float)y); if (cursorIsOver && mouseMovementThisFrame && !resDropdownOpen) { currentMenuItem = this; if (cursorOver != NULL) {*cursorOver = cursorIsOver;} } if (uiClickBlocked) return 0u; if ((sustained ? Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].down : Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].pressed) && cursorIsOver) { uiClickBlocked = true; uiClickLock = true; return 1u; }
-    if ((sustained ? Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down : Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) && cursorIsOver) { uiClickBlocked = true; uiClickLock = true; return 2u; } return 0u;
+__attribute__((noinline)) u8 UI_MenuInteractable(u32 id, i16 x, i16 y, float w, float h, bool* cursorOver, i8 this, bool held) {
+    UIR(id,x,(i16)((float)y-h),(i16)w,(i16)h); bool cursorIsOver = CursorIsOverBounds(x, x + w, (float)y - h, (float)y); if (cursorIsOver && mouseMovementThisFrame && !resDropdownOpen) { curMenuIt = this; if (cursorOver != NULL) {*cursorOver = cursorIsOver;} } if (uiClickBlocked) return 0u;
+    if ((held ? Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].down : Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].pressed) && cursorIsOver) { uiClickBlocked = true; uiClickLock = true; return 1u; }
+    if ((held ? Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down : Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) && cursorIsOver) { uiClickBlocked = true; uiClickLock = true; return 2u; } return 0u;
 }
 __attribute__((noinline)) u8 UI_Button(u32 id, i16 x, i16 y, float w, float h, bool* cursorOver, i8 this) { return UI_MenuInteractable(id,x,y,w,h,cursorOver,this,false); }
 __attribute__((noinline)) bool AnyLeftRightMouseDown() { return (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down); }
 bool UI_Slider(u32 id, i16 x, i16 y, i16 w, i16 h, i16 sliderPos, i16 xPosForLabel, u8* out, bool* sliderActive, u8 min, u8 max, u8 step, u8 mindex, u16 lingdex) {
     bool over=false,changed=false; u8 currentValue=*out; RenderUIImage(x,y, w,h, 1079);/*Slider background*/ RenderUIImage(x + sliderPos,y, h,h,1078);/*Slider handle*/ if (UI_MenuInteractable(id,xPosForLabel,y,(float)((x + w) - xPosForLabel),(float)h,&over,mindex,true)) *sliderActive = true; if(*sliderActive && World.currentMouse_dx!=0){i32 new=(i32)currentValue+vmin(vmax(World.currentMouse_dx,-1),1); *out=(u8)vmin(vmax(new,min),max); if(*out!=currentValue){changed=true;}}
-    if (!AnyLeftRightMouseDown()) { if (*sliderActive) { *sliderActive = false; SaveConfig(); } } if (MenuEnter() && currentMenuItem == mindex) {bool shiftHeld = Sys_Input.keyStates[KEY_LEFT_SHIFT].down || Sys_Input.keyStates[KEY_RIGHT_SHIFT].down; if (shiftHeld)*out=*out<=((min+step)-1) ? max : *out-step; else *out=*out >=((max-step)+1) ?  min : *out+step; changed=true;}
-    over=over||currentMenuItem==mindex; RenderTextL(xPosForLabel,y,over ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"%s %u",Sys_Text.stringTable[lingdex],*out); if (changed && !AnyLeftRightMouseDown()) SaveConfig(); return changed;
+    if (!AnyLeftRightMouseDown()) { if (*sliderActive) { *sliderActive = false; SaveConfig(); } } if (MenuEnter() && curMenuIt == mindex) {bool shiftHeld = Sys_Input.keyStates[KEY_LEFT_SHIFT].down || Sys_Input.keyStates[KEY_RIGHT_SHIFT].down; if (shiftHeld)*out=*out<=((min+step)-1) ? max : *out-step; else *out=*out >=((max-step)+1) ?  min : *out+step; changed=true;}
+    over=over||curMenuIt==mindex; RenderTextL(xPosForLabel,y,over ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"%s %u",Sys_Text.stringTable[lingdex],*out); if (changed && !AnyLeftRightMouseDown()) SaveConfig(); return changed;
 }
-u8 UI_MenuButton(u32 id, i16 bX, i16 bY, u8 menuItem, i16 bW, i16 bH, i16 tX, i16 tY, const char* text, i16 pX, i16 pY){bool over=false; u8 retvalue=0u; retvalue=UI_Button(id,bX,bY,bW,bH,&over,menuItem); if(!retvalue)retvalue=(MenuEnter()&&currentMenuItem==menuItem); over=over||currentMenuItem==menuItem; RenderTextL(tX,tY,over ? T_STOPD_RED : T_RED_MENU,FONT_STOPD,1.5f,text); RenderUIImage(pX,pY,40,40,over ? 1029 : 1028);/*Menu pad*/ return retvalue;}
-bool UI_Checkbox(u32 id, i16 x, i16 y, i8 mitem, u16 textIdx, bool currentlyOn){RenderUIImage(x,y,16,16,910);/*Checkbox background*/ bool over=false; bool changed=(UI_Button(id,x,y+16,210,16,&over,mitem)||(MenuEnter()&&currentMenuItem==mitem)); over=over||currentMenuItem==mitem; if(currentlyOn)RenderUIImage(x+2,y+2,12,12,912);/*Checkbox check*/ RenderTextL(x+20,y,over ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,Sys_Text.stringTable[textIdx]); return changed;}
+u8 UI_MenuButton(u32 id, i16 bX, i16 bY, u8 menuItem, i16 bW, i16 bH, i16 tX, i16 tY, const char* text, i16 pX, i16 pY){bool over=false; u8 retvalue=0u; retvalue=UI_Button(id,bX,bY,bW,bH,&over,menuItem); if(!retvalue)retvalue=(MenuEnter()&&curMenuIt==menuItem); over=over||curMenuIt==menuItem; RenderTextL(tX,tY,over ? T_STOPD_RED : T_RED_MENU,FONT_STOPD,1.5f,text); RenderUIImage(pX,pY,40,40,over ? 1029 : 1028);/*Menu pad*/ return retvalue;}
+bool UI_Checkbox(u32 id, i16 x, i16 y, i8 mitem, u16 textIdx, bool currentlyOn){RenderUIImage(x,y,16,16,910);/*Checkbox background*/ bool over=false; bool changed=(UI_Button(id,x,y+16,210,16,&over,mitem)||(MenuEnter()&&curMenuIt==mitem)); over=over||curMenuIt==mitem; if(currentlyOn)RenderUIImage(x+2,y+2,12,12,912);/*Checkbox check*/ RenderTextL(x+20,y,over ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,Sys_Text.stringTable[textIdx]); return changed;}
 __attribute__((noinline)) void UI_HeaderText(i16 x, const char* text) { RenderTextL(x,50,T_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,text); RenderTextL(x,46,T_GREEN_MENU_GLOW,FONT_STOPD,1.75f,text); RenderTextL(x,48,T_GREEN_MENU,FONT_STOPD,1.75f,text); }
-void PlayMenuMusic(),mp3_clear(),SndClearAll(),PlayVideoPageMusic(bool),PlayDeathVideoMusic(),StopVideoPageMusic();
+void PlayMenuMusic() { videoPageClip = NULL; mp3_clear(); play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500); }
 __attribute__((noinline)) void MenuGoBack() {
-    if (enteringSaveName) { SaveSlotCancelTyping(); return; }
-    bool leavingClipPage = (currentMenuPage==MPG_INTRO||currentMenuPage==MPG_CREDS||currentMenuPage==MPG_DEATH), toPause=returnToPause;
-    if (toPause) { returnToPause = World.menuActive = false; World.paused = true; mp3_clear(); }
-    if (currentMenuPage == MPG_SINGPLYR || currentMenuPage == MPG_MULTPLYR || currentMenuPage == MPG_OPTS) { currentMenuPage = MPG_FRONT; }
-    else if (currentMenuPage == MPG_LOAD || currentMenuPage == MPG_NEWGM || currentMenuPage == MPG_INTRO || currentMenuPage == MPG_CREDS) { currentMenuPage = MPG_SINGPLYR; }
-    else if (currentMenuPage == MPG_DEATH) { currentMenuPage = MPG_FRONT; }
-    if (leavingClipPage) { currentMenuItem = currentMenuTab = 0; if (toPause) StopVideoPageMusic(); else PlayMenuMusic(); }
+    if (typingSav) { SaveSlotCancelTyping(); return; }
+    bool leavingClipPage = (curMenuPg==MPG_INTRO||curMenuPg==MPG_CREDS||curMenuPg==MPG_DEATH), toPause=returnToPause; if (toPause) { returnToPause = World.menuActive = false; World.paused = true; mp3_clear(); }
+    if (curMenuPg == MPG_SINGPLYR || curMenuPg == MPG_MULTPLYR || curMenuPg == MPG_OPTS) { curMenuPg = MPG_FRONT; } else if (curMenuPg == MPG_LOAD || curMenuPg == MPG_NEWGM || curMenuPg == MPG_INTRO || curMenuPg == MPG_CREDS) { curMenuPg = MPG_SINGPLYR; } else if (curMenuPg == MPG_DEATH) { curMenuPg = MPG_FRONT; }
+    if (leavingClipPage) { curMenuIt = curMenuTab = 0; if (toPause) { videoPageClip = NULL; mp3_clear(); } else { PlayMenuMusic(); } }
 }
 static void CreateShadowBuffers() { shadowMapSSBO = MakeSSBO(&shadowMapSSBO, 5, (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32), NULL, GL_STATIC_DRAW); shadowMapsIndirectionID = MakeSSBO(&shadowMapsIndirectionID, 6, LIGHT_CNT * sizeof(u32), NULL, GL_STATIC_DRAW);  shadowBuffersCreated = true; }
 // Menu Video Playback
@@ -95,9 +73,7 @@ static double introVidStart = 0.0, creditsVidStart = 0.0, deathVidStart = 0.0;
 static const float introTextAt[15] = {0.0f,6.7f,9.9f,19.2f,30.7f,37.9f,43.7f,48.1f,59.3f,69.1f,74.5f,81.2f,89.2f,98.4f,105.0f};
 static const float outroTextAt[3] = {0.0f,7.0f,11.0f};/*CreditsScroll swaps to card 2 at 7s, card 3 at 11s, then hides all cards at 14s*/
 static const float deathTextAt[2] = {0.0f,5.53f};
-static bool vidSkipArmedMouse[MAX_MOUSE_BUTTONS], vidSkipArmedEsc, vidSkipArmedEnter, vidSkipArmedSpace, vidMenuKeyArmed;
-void VidSkipArm() { for (int b=0;b<MAX_MOUSE_BUTTONS;++b) vidSkipArmedMouse[b] = !Sys_Input.mouseButtons[b].down; vidSkipArmedEsc = !Sys_Input.keyStates[KEY_ESCAPE].down; vidSkipArmedEnter = !Sys_Input.keyStates[KEY_ENTER].down && !Sys_Input.keyStates[KEY_KP_ENTER].down; vidSkipArmedSpace = !Sys_Input.keyStates[KEY_SPACE].down; vidMenuKeyArmed = !GetKey(25); }
-bool VidMenuKeyArmed() { if (currentMenuPage != MPG_INTRO && currentMenuPage != MPG_CREDS && currentMenuPage != MPG_DEATH) return true; return vidMenuKeyArmed; }
+static bool vidSkipArmedMouse[MAX_MOUSE_BUTTONS],vidSkipArmedEsc,vidSkipArmedEnter,vidSkipArmedSpace;
 static bool VidSkipPressed() {
     bool press = false;
     for (int b=0;b<MAX_MOUSE_BUTTONS;++b) { if (!Sys_Input.mouseButtons[b].down) vidSkipArmedMouse[b] = true; else if (Sys_Input.mouseButtons[b].pressed && vidSkipArmedMouse[b]) press = true; }
@@ -107,60 +83,43 @@ static bool VidSkipPressed() {
     if (!GetKey(25)) vidMenuKeyArmed = true;
     return press;
 }
-void ChangeMenuPage(u8 pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; resDropdownOpen = false; resHoverIdx = -1; if (pg==MPG_SAVE||pg==MPG_LOAD) { SaveSlotCancelTyping(); RefreshSaveSlots(); } if (pg==MPG_INTRO) { introVidStart=World.absoluteTime; PlayVideoPageMusic(true); } if (pg==MPG_CREDS) { creditsVidStart=World.absoluteTime; PlayVideoPageMusic(false); } if (pg==MPG_DEATH) { deathVidStart=World.absoluteTime; PlayDeathVideoMusic(); } if (pg==MPG_INTRO||pg==MPG_CREDS||pg==MPG_DEATH) VidSkipArm(); }
-void GameEndSequence() { World.gameFinished = true; World.paused = true; World.menuActive = true; ChangeMenuPage(MPG_CREDS); }
-void GameDeathSequence() { World.paused = true; World.menuActive = true; returnToPause = false; SndClearAll(); ChangeMenuPage(MPG_DEATH); }
-static void RenderVideoPage(u8 page) {
-    bool isIntro = (page==MPG_INTRO), isDeath = (page==MPG_DEATH);
-    double start = isIntro ? introVidStart : (isDeath ? deathVidStart : creditsVidStart);
-    if (start <= 0.0) { start=World.absoluteTime; if (isIntro) introVidStart=start; else if (isDeath) deathVidStart=start; else creditsVidStart=start; }
-    double elapsed = World.absoluteTime - start;
-    const float* at = isIntro ? introTextAt : (isDeath ? deathTextAt : outroTextAt);
-    int cardCount = isIntro ? 15 : (isDeath ? 2 : 3);
-    double vidLen = isIntro ? 117.141 : (isDeath ? 16.8 : 54.144); double cardsEnd = isIntro ? vidLen : (isDeath ? 16.8 : 14.0);
-    int frames = isIntro ? 735 : (isDeath ? 506 : 408); u32 frameBase = isIntro ? 2166u : (isDeath ? 3454u : 2901u);
-    if (frameBase + (u32)frames > (u32)texCnt) frames = 0;
-    i32 frame = frames > 0 ? (i32)(elapsed * (double)frames / vidLen) : 0; if (frame<0) frame = 0; else if (frame>=frames) frame = frames-1;
-    static u32 heldRt = 0xFFFFFFFFu, heldBase = 0xFFFFFFFFu;
-    if (heldBase != frameBase) { heldBase = frameBase; heldRt = 0xFFFFFFFFu; }
-    if (frames>0) { u32 want = frameBase+(u32)frame; u32 nxt = VideoPeekFrame(want); QueueVideoFrame(want,false); if (nxt != 0xFFFFFFFFu) QueueVideoFrame(nxt,true); u32 rt = VideoFrameTexIndex(want); if (rt != 0xFFFFFFFFu) heldRt = rt; if (heldRt != 0xFFFFFFFFu) RenderUIImage(43,isIntro ? 39 : 0,1280,isIntro ? 600 : 720,heldRt); }    
-    int card = -1;
-    if (elapsed < cardsEnd) { for (int i=cardCount-1;i>=0;--i) { if (elapsed >= (double)at[i]) { card = i; break; } } }
-    if (card >= 0) { RenderTextC(546,544,T_VIDEOTEXT,FONT_NORMAL,1.25f,"%s",Sys_Text.stringTable[(isIntro?613:(isDeath?628:610))+card]); }
-    bool click = VidSkipPressed();
-    if (click) { uiClickBlocked = uiClickLock = true; }
-    bool skip = (isIntro || isDeath) ? (elapsed > 1.5 && click) : click;
-    if(skip || elapsed >= vidLen){if (isIntro || isDeath) MenuGoBack(); else { World.creditsActive=true; World.creditsPageIndex=0; }}
+void ChangeMenuPage(u8 pg) {
+    curMenuPg = pg; curMenuIt = curMenuTab = 0; resDropdownOpen = false; resHoverIdx = -1;
+    if (pg == MPG_SAVE || pg == MPG_LOAD) { SaveSlotCancelTyping(); for (u8 i=0;i<8;++i) { saveSlotUsed[i] = ReadSavName(i,saveSlotNames[i],sizeof(saveSlotNames[i])); if (!saveSlotUsed[i]) { const char* t = (i==7) ? "- unused quicksave -" : "- unused -"; size_t n = 0; while (t[n] && n < sizeof(saveSlotNames[i]) - 1) { saveSlotNames[i][n] = t[n]; ++n; } saveSlotNames[i][n] = '\0'; } } }
+    if (pg == MPG_INTRO) { introVidStart = World.absoluteTime; videoPageClip = "./Audio/music/VIDINTRO-00_intro.mp3"; }
+    if (pg == MPG_CREDS) { creditsVidStart = World.absoluteTime; videoPageClip = "./Audio/music/VIDOUTRO-00_outro.mp3"; }
+    if (pg == MPG_DEATH) { deathVidStart = World.absoluteTime; videoPageClip = "./Audio/music/THM0-17_death.mp3"; }
+    if (pg == MPG_INTRO || pg == MPG_CREDS || pg == MPG_DEATH) { mp3_clear(); play_mp3(videoPageClip,0); for (int b=0;b<MAX_MOUSE_BUTTONS;++b) vidSkipArmedMouse[b] = !Sys_Input.mouseButtons[b].down; vidSkipArmedEsc = !Sys_Input.keyStates[KEY_ESCAPE].down; vidSkipArmedEnter = !Sys_Input.keyStates[KEY_ENTER].down && !Sys_Input.keyStates[KEY_KP_ENTER].down; vidSkipArmedSpace = !Sys_Input.keyStates[KEY_SPACE].down; vidMenuKeyArmed = !GetKey(25); }
 }
-static void MenuBackButton(i16 bgX, i16 bgY, i16 tX, i16 tY, i8 item) { RenderUIImage(bgX,bgY,84,36,1252);/*Back Button background*/ bool over=false; if (UI_Button(UI_ID_MENU_BACK,bgX,bgY+34,84,32,&over,item) || (MenuEnter() && currentMenuItem==item && !rebindCaptureActive)) MenuGoBack(); over=over||currentMenuItem==item; RenderTextL(tX,tY,over ? T_STOPD_RED_HIGHLIGHT : T_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]); }
+static void MenuBackButton(i16 bgX, i16 bgY, i16 tX, i16 tY, i8 item) { RenderUIImage(bgX,bgY,84,36,1252);/*Back Button background*/ bool over=false; if (UI_Button(UI_ID_MENU_BACK,bgX,bgY+34,84,32,&over,item) || (MenuEnter() && curMenuIt==item && !rebindCaptureActive)) MenuGoBack(); over=over||curMenuIt==item; RenderTextL(tX,tY,over ? T_STOPD_RED_HIGHLIGHT : T_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]); }
 static void DiffDigits(i16 tx, i16 ty, u8 cur) { static const i16 dx4[4]={0,71,145,217}; for (u8 i=0;i<4;++i) RenderTextL(tx+dx4[i],ty,cur==i ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"%u",i); }
 void RenderMenu() {
-    if (currentMenuPage != MPG_OPTS || currentMenuTab != 1) { rebindRow = -1; rebindCaptureActive = false; }
-    if (currentMenuPage != MPG_INTRO && currentMenuPage != MPG_CREDS && currentMenuPage != MPG_DEATH && currentMenuPage != MPG_OPTS) RenderUIImage(-417,-384, 2200,1536, 1026);/*Menu background*/
-    if (currentMenuPage == MPG_INTRO || currentMenuPage == MPG_CREDS || currentMenuPage == MPG_DEATH) RenderUIImage(-417,-384, 2200,1536, 0);/*Video blackground*/
-    if (currentMenuPage == MPG_OPTS) RenderUIImage(-417,-384, 2200,1536, 1032);/*Menu background*/
-    if (currentMenuPage == MPG_FRONT) {
+    if (curMenuPg != MPG_OPTS || curMenuTab != 1) { rebindRow = -1; rebindCaptureActive = false; }
+    if (curMenuPg != MPG_INTRO && curMenuPg != MPG_CREDS && curMenuPg != MPG_DEATH && curMenuPg != MPG_OPTS) RenderUIImage(-417,-384, 2200,1536, 1026);/*Menu background*/
+    if (curMenuPg == MPG_INTRO || curMenuPg == MPG_CREDS || curMenuPg == MPG_DEATH) RenderUIImage(-417,-384, 2200,1536, 0);/*Video blackground*/
+    if (curMenuPg == MPG_OPTS) RenderUIImage(-417,-384, 2200,1536, 1032);/*Menu background*/
+    if (curMenuPg == MPG_FRONT) {
         menuItemCount = 4; menuTabCount = 1; RenderUIImage(282,46, 800,128, 1031);/*Title CITADEL with strikethrough effect*/
         if (UI_MenuButton(UI_ID_MENU_SINGLEPLAYER,408,340, 0, 574,84, 304,188,/*"SINGLEPLAYER"*/Sys_Text.stringTable[719],413,276)) ChangeMenuPage(MPG_SINGPLYR);
         if (UI_MenuButton(UI_ID_MENU_MULTIPLAYER, 408,458, 1, 574,84, 304,268,/*"MULTIPLAYER"*/ Sys_Text.stringTable[720],413,396)) ChangeMenuPage(MPG_MULTPLYR);
         if (UI_MenuButton(UI_ID_MENU_OPTIONS,     408,582, 2, 574,84, 304,350,/*"OPTIONS"*/     Sys_Text.stringTable[721],413,520)) ChangeMenuPage(MPG_OPTS);
         if (UI_MenuButton(UI_ID_MENU_QUIT,        408,702, 3, 574,84, 304,430,/*"QUIT"*/        Sys_Text.stringTable[722],413,638)) OS_Exit(0);
-    } else if (currentMenuPage == MPG_SINGPLYR) {
+    } else if (curMenuPg == MPG_SINGPLYR) {
         menuItemCount = 5; menuTabCount = 1; UI_HeaderText(250,/*"SINGLEPLAYER"*/Sys_Text.stringTable[719]);
         if (UI_MenuButton(UI_ID_MENU_CONTINUE,    408,340,0,574,84, 304,188,/*"CONTINUE"*/    Sys_Text.stringTable[723],413,276)) ChangeMenuPage(MPG_LOAD);
         if (UI_MenuButton(UI_ID_MENU_NEW_GAME,    408,458,1,574,84, 304,268,/*"NEW GAME"*/    Sys_Text.stringTable[741],413,396)) ChangeMenuPage(MPG_NEWGM);
         if (UI_MenuButton(UI_ID_MENU_PLAY_INTRO,  408,582,2,574,84, 304,350,/*"PLAY INTRO"*/  Sys_Text.stringTable[742],413,520)) ChangeMenuPage(MPG_INTRO);
         if (UI_MenuButton(UI_ID_MENU_PLAY_CREDITS,408,702,3,574,84, 304,430,/*"PLAY CREDITS"*/Sys_Text.stringTable[743],413,638)) ChangeMenuPage(MPG_CREDS);
         MenuBackButton(1060,724,1076,732,4);
-    } else if (currentMenuPage == MPG_MULTPLYR) {
+    } else if (curMenuPg == MPG_MULTPLYR) {
         menuItemCount = 1; menuTabCount = 1; UI_HeaderText(266,/*"MULTIPLAYER"*/Sys_Text.stringTable[720]); MenuBackButton(1060,724,1076,732,0);
-    } else if (currentMenuPage == MPG_OPTS) {
-        menuTabCount = 3; UI_HeaderText(238,/*"CONFIGURATION"*/Sys_Text.stringTable[745]); if(currentMenuTab!=0){resDropdownOpen=false; resHoverIdx=-1; reflDropdownOpen=false; reflHoverIdx=-1;}
-        if (currentMenuTab != 0) RenderUIImage(179,220, 1001,548, 1030);/*Config background*/
-        if (currentMenuTab == 0) RenderUIImage(179,220, 1001,548, 1033);/*Config background graphics (empty alpha center)*/
+    } else if (curMenuPg == MPG_OPTS) {
+        menuTabCount = 3; UI_HeaderText(238,/*"CONFIGURATION"*/Sys_Text.stringTable[745]); if(curMenuTab!=0){resDropdownOpen=false; resHoverIdx=-1; reflDropdownOpen=false; reflHovIdx=-1;}
+        if (curMenuTab != 0) RenderUIImage(179,220, 1001,548, 1030);/*Config background*/
+        if (curMenuTab == 0) RenderUIImage(179,220, 1001,548, 1033);/*Config background graphics (empty alpha center)*/
         static const i16 cfgTabX[3]={190,354,520}; static const u16 cfgTabStr[3]={791,792,793}; static const i16 cfgTabTx[3]={200,366,530}; static const u32 cfgTabId[3]={UI_ID_MENU_TAB_GRAPHICS,UI_ID_MENU_TAB_INPUT,UI_ID_MENU_TAB_AUDIO_LANG};
-        for (i8 t=2;t>=0;--t) { RenderUIImage(cfgTabX[t],196,160,30,currentMenuTab==t ? 920 : 921); if (UI_Button(cfgTabId[t],cfgTabX[t],196+30,160,30,NULL,t)) currentMenuTab=(u8)t; RenderTextL(cfgTabTx[t],202,currentMenuTab==t ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,Sys_Text.stringTable[cfgTabStr[t]]); }
-        if (currentMenuTab == 0) {
+        for (i8 t=2;t>=0;--t) { RenderUIImage(cfgTabX[t],196,160,30,curMenuTab==t ? 920 : 921); if (UI_Button(cfgTabId[t],cfgTabX[t],196+30,160,30,NULL,t)) curMenuTab=(u8)t; RenderTextL(cfgTabTx[t],202,curMenuTab==t ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,Sys_Text.stringTable[cfgTabStr[t]]); }
+        if (curMenuTab == 0) {
             bool overRes = false, overFull = false, overChgM = false, overApply = false; menuItemCount = 14;/*Graphics*/
             if(resDropdownOpen){ bool lmb=Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed, rmb=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed;
                 if(lmb||rmb){ int rlh=resDropdownCount*16; bool inList=resDropdownCount>0 && World.cursorPos_x>=336 && World.cursorPos_x<=496 && World.cursorPos_y>=710-rlh && World.cursorPos_y<=710;
@@ -170,8 +129,8 @@ void RenderMenu() {
                     if(inList||inHeader){ Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed=false; World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; } } }
             bool overGI=false;
             RenderUIImage(200,470, 16,16, 910);
-            if (UI_Button(UI_ID_MENU_GI,200,486, 210,16, &overGI, 1) || (MenuEnter() && currentMenuItem == 1)) { Sys_Settings.GI = Sys_Settings.GI ? 0u : 1u; SaveConfig(); }
-            overGI = overGI || currentMenuItem == 1; if (Sys_Settings.GI) RenderUIImage(202,472, 12,12, 912);
+            if (UI_Button(UI_ID_MENU_GI,200,486, 210,16, &overGI, 1) || (MenuEnter() && curMenuIt == 1)) { Sys_Settings.GI = Sys_Settings.GI ? 0u : 1u; SaveConfig(); }
+            overGI = overGI || curMenuIt == 1; if (Sys_Settings.GI) RenderUIImage(202,472, 12,12, 912);
             RenderTextL(220,470,overGI ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"Global Illumination");
             if (UI_Checkbox(UI_ID_MENU_MODEL_DETAIL,200,500,2,Sys_Settings.ModelDetail ?/*High*/915 :/*No Detail Level Models*/914,Sys_Settings.ModelDetail)) { Sys_Settings.ModelDetail = Sys_Settings.ModelDetail ? 0u : 1u; SaveConfig(); }
             if (UI_Checkbox(UI_ID_MENU_FXAA,200,530,3,/*"FXAA"*/780,Sys_Settings.FXAA)) { Sys_Settings.FXAA = Sys_Settings.FXAA ? 0u : 1u; SaveConfig(); }
@@ -185,22 +144,22 @@ void RenderMenu() {
                 }
             }
             bool overRefl=false;
-            if (UI_Button(UI_ID_MENU_SSR,190,606,328,16,&overRefl,5) || (MenuEnter() && currentMenuItem == 5)) { if (!reflDropdownOpen) { reflDropdownOpen=true; } else { reflDropdownOpen=false; } currentMenuItem = 5; }
-            overRefl = overRefl || currentMenuItem == 5;
+            if (UI_Button(UI_ID_MENU_SSR,190,606,328,16,&overRefl,5) || (MenuEnter() && curMenuIt == 5)) { if (!reflDropdownOpen) { reflDropdownOpen=true; } else { reflDropdownOpen=false; } curMenuIt = 5; }
+            overRefl = overRefl || curMenuIt == 5;
             static const char* reflNames[3] = {"OFF","SCREEN SPACE","RAYTRACED"};
             char reflBuf[32]; sFormat(reflBuf, sizeof(reflBuf), "%s", reflNames[Sys_Settings.Reflections > 2u ? 0u : Sys_Settings.Reflections]);
             RenderUIImage(476,590,16,16,overRefl ? 1119 : 1077); RenderTextL(200,590,overRefl ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"REFLECTIONS %s",reflBuf);
             if (reflDropdownOpen) { int rlh=3*16, rTop=590-rlh;
-                reflHoverIdx = (World.cursorPos_x>=336 && World.cursorPos_x<=496 && World.cursorPos_y>=rTop && World.cursorPos_y<rTop+rlh) ? (World.cursorPos_y-rTop)/16 : -1; 
+                reflHovIdx = (World.cursorPos_x>=336 && World.cursorPos_x<=496 && World.cursorPos_y>=rTop && World.cursorPos_y<rTop+rlh) ? (World.cursorPos_y-rTop)/16 : -1; 
                 RenderUIImage(336,rTop,160,rlh,922);
-                for (int ri=0; ri<3; ++ri) { if (ri==Sys_Settings.Reflections) RenderUIImage(336,rTop-2+ri*16,160,18,1087); RenderTextL(366,rTop+ri*16, (ri==reflHoverIdx) ? T_YELLOW : T_GREEN, FONT_NORMAL, 0.9f, "%s", reflNames[ri]); }
-            } else { reflHoverIdx=-1; }
+                for (int ri=0; ri<3; ++ri) { if (ri==Sys_Settings.Reflections) RenderUIImage(336,rTop-2+ri*16,160,18,1087); RenderTextL(366,rTop+ri*16, (ri==reflHovIdx) ? T_YELLOW : T_GREEN, FONT_NORMAL, 0.9f, "%s", reflNames[ri]); }
+            } else { reflHovIdx=-1; }
             if (UI_Checkbox(UI_ID_MENU_VSYNC,200,620,6,/*VSYNC*/1026,Sys_Settings.Vsync)) { Sys_Settings.Vsync = Sys_Settings.Vsync ? 0u : 1u; window->context.swapInterval((i32)Sys_Settings.Vsync); SaveConfig(); }
             RenderTextL(310,620,T_GREEN,FONT_NORMAL,1.0f,"(FPS: %d)", globalframesPerLastSecond);/*Helper to see vsync take effect.*/
             UI_Slider(UI_ID_MENU_FOV_SLIDER,400,650,128,16,(((Sys_Settings.FOV - 45.0f) / 105.0f) * (128 - 16)),200,&Sys_Settings.FOV,&fovSliderActive,45,150,5,7,/*Field of View*/775);
             UI_Slider(UI_ID_MENU_GAMMA_SLIDER,400,680,128,16,((Sys_Settings.Brightness / 100.0f) * (128 - 16)),200,&Sys_Settings.Brightness,&gammaSliderActive,0,100,2,8,/*Brightness*/774);
-            if (UI_Button(UI_ID_MENU_RESOLUTION,190,726,328,16,&overRes,9) || (MenuEnter() && currentMenuItem == 9)) { DualLog("Resolution dropdown clicked! %u\n",globalframe); if(!resDropdownOpen){ GatherResolutionModesFor(GetCurrentMonitorIndex()); if(resDropdownCount>0){resDropdownOpen=true;} } else{resDropdownOpen=false;} currentMenuItem = 9; }
-            overRes = overRes || currentMenuItem == 9; char resBuf[32];
+            if (UI_Button(UI_ID_MENU_RESOLUTION,190,726,328,16,&overRes,9) || (MenuEnter() && curMenuIt == 9)) { DualLog("Resolution dropdown clicked! %u\n",globalframe); if(!resDropdownOpen){ GatherResolutionModesFor(GetCurrentMonitorIndex()); if(resDropdownCount>0){resDropdownOpen=true;} } else{resDropdownOpen=false;} curMenuIt = 9; }
+            overRes = overRes || curMenuIt == 9; char resBuf[32];
             if (resDropdownCount > 0) sFormat(resBuf, sizeof(resBuf), "%ux%u",(u32)resModes[resSelectedIdx].w,(u32)resModes[resSelectedIdx].h); else sFormat(resBuf, sizeof(resBuf), "%ux%u",Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
             RenderUIImage(476,710,16,16,overRes ? 1119 : 1077); RenderTextL(200,710,overRes ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"RESOLUTION %s",resBuf);
             if(resDropdownOpen && resDropdownCount>0){ int rlh2=resDropdownCount*16, rTop=710-rlh2;
@@ -209,15 +168,15 @@ void RenderMenu() {
                 for(int ri=0;ri<resDropdownCount;++ri){char rb[32]; sFormat(rb,sizeof(rb),"%ux%u",(u32)resModes[ri].w,(u32)resModes[ri].h); if(ri==resSelectedIdx){RenderUIImage(336,rTop-2+ri*16,160,18,1087);} RenderTextL(366,rTop+ri*16,ri==resHoverIdx ? T_YELLOW : T_GREEN,FONT_NORMAL,0.9f,"%s",rb);}
             } else { resHoverIdx = -1; }
             RenderUIImage(200,740, 16,16, 910);/*Fullscreen checkbox background*/
-            if (UI_Button(UI_ID_MENU_FULLSCREEN,200,756, 210,16, &overFull, 10) || (MenuEnter() && currentMenuItem == 10)) { Sys_Settings.Fullscreen = Sys_Settings.Fullscreen == 1u ? 0u : 1u; ChangeFullScreenWindowed(true); SaveConfig(); }
-            overFull = overFull || currentMenuItem == 10; if (Sys_Settings.Fullscreen) RenderUIImage(202,742, 12,12, 912);/*Checkbox check*/
+            if (UI_Button(UI_ID_MENU_FULLSCREEN,200,756, 210,16, &overFull, 10) || (MenuEnter() && curMenuIt == 10)) { Sys_Settings.Fullscreen = Sys_Settings.Fullscreen == 1u ? 0u : 1u; ChangeFullScreenWindowed(true); SaveConfig(); }
+            overFull = overFull || curMenuIt == 10; if (Sys_Settings.Fullscreen) RenderUIImage(202,742, 12,12, 912);/*Checkbox check*/
             RenderTextL(220,740,overFull ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,/*"Fullscreen"*/Sys_Text.stringTable[773]); RenderUIImage(588,730, 210,30, 1079);/*Toggle monitor button background*/
-            if (UI_Button(UI_ID_MENU_TOGGLE_MONITOR,588,760, 210,30, &overChgM, 11) || (MenuEnter() && currentMenuItem == 11)) { CycleToNextMonitor(); }
-            overChgM = overChgM || currentMenuItem == 11; RenderTextL(602,735,overChgM ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,/*"CHANGE MONITOR"*/Sys_Text.stringTable[1025]);
+            if (UI_Button(UI_ID_MENU_TOGGLE_MONITOR,588,760, 210,30, &overChgM, 11) || (MenuEnter() && curMenuIt == 11)) { CycleToNextMonitor(); }
+            overChgM = overChgM || curMenuIt == 11; RenderTextL(602,735,overChgM ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,/*"CHANGE MONITOR"*/Sys_Text.stringTable[1025]);
             RenderUIImage(588,690, 210,30, 1079);/*Apply button background*/
-            if (UI_Button(UI_ID_MENU_RES_APPLY,588,720, 210,30, &overApply, 12) || (MenuEnter() && currentMenuItem == 12)) { ApplyStagedWindowedSize(); GatherResolutionModesFor(GetCurrentMonitorIndex()); currentMenuItem = 12; }
-            overApply = overApply || currentMenuItem == 12; RenderTextL(602,695,overApply ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"APPLY");
-        } else if (currentMenuTab == 1) {
+            if (UI_Button(UI_ID_MENU_RES_APPLY,588,720, 210,30, &overApply, 12) || (MenuEnter() && curMenuIt == 12)) { ApplyStagedWindowedSize(); GatherResolutionModesFor(GetCurrentMonitorIndex()); curMenuIt = 12; }
+            overApply = overApply || curMenuIt == 12; RenderTextL(602,695,overApply ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"APPLY");
+        } else if (curMenuTab == 1) {
             i8 cfgIdxOf[64]; u8 inCount=0; for (int c=0;c<CONFIG_CNT && inCount<64;++c) if (configTable[c].type==SETTING_INPUT) cfgIdxOf[inCount++]=(i8)c;
             menuItemCount = (i8)(inCount + 9);/*Input rows + BACK*/
             bool armState = rebindRow >= 0; if (armState) rebindCaptureActive = true;
@@ -227,11 +186,11 @@ void RenderMenu() {
                 i16 labelX = col ? (i16)750 : (i16)210; i16 valueX = col ? (i16)895 : (i16)450;
                 bool over=false;
                 u8 clk = UI_Button(UI_ID_MENU_INPUT_0 + r, labelX, (i16)(rowY+16), col ? 280 : 280, 16, &over, (i8)r);
-                bool enterArm = !armState && MenuEnter() && currentMenuItem == (i8)r;
+                bool enterArm = !armState && MenuEnter() && curMenuIt == (i8)r;
                 if (clk) { if (rebindRow == cfgIdxOf[r]) { rebindRow = -1; rebindCaptureActive = false; }/*Click captured row again: cancel*/ else { rebindRow = cfgIdxOf[r]; rebindArmedFrame = globalframe; rebindCaptureActive = true; } }
                 else if (enterArm) { rebindRow = cfgIdxOf[r]; rebindArmedFrame = globalframe; rebindCaptureActive = true; }
                 bool isCaptured = rebindRow == cfgIdxOf[r];
-                over = over || currentMenuItem == (i8)r;
+                over = over || curMenuIt == (i8)r;
                 u16 iv = *(u16*)configTable[cfgIdxOf[r]].ptr;
                 const char* nm = (iv < 134 && inputElements[iv].name) ? inputElements[iv].name : "UNBOUND";
                 if (isCaptured) { RenderUIImage(labelX,rowY,280,18,899); RenderTextL((i16)(col?1038:588),rowY,T_YELLOW,FONT_NORMAL,1.0f,"Press/Click Key"); }
@@ -273,49 +232,49 @@ void RenderMenu() {
             /*Language picker*/
             static const char* langNames[8] = {"English","Espa\u00f1ol","Deutsch","Fran\u00e7""ais","\u65e5\u672c\u8a9e","\u0420\u0443\u0441\u0441\u043a\u0438\u0439","Italiano","Portugu\u00ea""s"};
             bool langOver = false;
-            if (UI_Button(UI_ID_MENU_LANGUAGE,200,370, 328,16, &langOver, 4) || (MenuEnter() && currentMenuItem == 4)) {
+            if (UI_Button(UI_ID_MENU_LANGUAGE,200,370, 328,16, &langOver, 4) || (MenuEnter() && curMenuIt == 4)) {
                 Sys_Settings.Language = (Sys_Settings.Language + 1) % 8;
                 LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language);
-                SaveConfig(); currentMenuItem = 4;
+                SaveConfig(); curMenuIt = 4;
             }
-            langOver = langOver || currentMenuItem == 4;
+            langOver = langOver || curMenuIt == 4;
             RenderTextL(200,370, langOver ? T_YELLOW : T_GREEN, FONT_NORMAL, 1.0f, "LANGUAGE: %s", langNames[Sys_Settings.Language % 8]);
             bool spkOver = false;
-            if (UI_Button(UI_ID_MENU_SPEAKER_MODE,200,410, 328,16, &spkOver, 5) || (MenuEnter() && currentMenuItem == 5)) { Sys_Settings.SpeakerMode = (Sys_Settings.SpeakerMode + 1) % 7; SaveConfig(); currentMenuItem = 5; }
-            spkOver = spkOver || currentMenuItem == 5;
+            if (UI_Button(UI_ID_MENU_SPEAKER_MODE,200,410, 328,16, &spkOver, 5) || (MenuEnter() && curMenuIt == 5)) { Sys_Settings.SpeakerMode = (Sys_Settings.SpeakerMode + 1) % 7; SaveConfig(); curMenuIt = 5; }
+            spkOver = spkOver || curMenuIt == 5;
             RenderTextL(200,410,spkOver ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f, "SPEAKER MODE: %s", Sys_Text.stringTable[795 + (Sys_Settings.SpeakerMode % 7)]);
             RenderUIImage(200,440, 16,16, 910);
             bool overRev=false;
-            if (UI_Button(UI_ID_MENU_REVERB,200,456, 210,16, &overRev, 6) || (MenuEnter() && currentMenuItem == 6)) { Sys_Settings.Reverb = Sys_Settings.Reverb ? 0u : 1u; SaveConfig(); }
-            overRev = overRev || currentMenuItem == 6; if (Sys_Settings.Reverb) RenderUIImage(202,442, 12,12, 912);
+            if (UI_Button(UI_ID_MENU_REVERB,200,456, 210,16, &overRev, 6) || (MenuEnter() && curMenuIt == 6)) { Sys_Settings.Reverb = Sys_Settings.Reverb ? 0u : 1u; SaveConfig(); }
+            overRev = overRev || curMenuIt == 6; if (Sys_Settings.Reverb) RenderUIImage(202,442, 12,12, 912);
             RenderTextL(220,440,overRev ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"Reverb");
             if (UI_Checkbox(UI_ID_MENU_DYNAMIC_MUSIC,200,470,7,807,Sys_Settings.DynamicMusic)) { Sys_Settings.DynamicMusic = Sys_Settings.DynamicMusic ? 0u : 1u; SaveConfig(); }
             if (UI_Checkbox(UI_ID_MENU_FOOTSTEPS,200,500,8,808,Sys_Settings.Footsteps)) { Sys_Settings.Footsteps = Sys_Settings.Footsteps ? 0u : 1u; SaveConfig(); }
         }
         MenuBackButton(1087,723,1103,731,(i8)(menuItemCount - 1));
-    } else if (currentMenuPage == MPG_LOAD || currentMenuPage == MPG_SAVE) {
-        menuItemCount = 9; menuTabCount = 1; bool isSave = currentMenuPage == MPG_SAVE;
+    } else if (curMenuPg == MPG_LOAD || curMenuPg == MPG_SAVE) {
+        menuItemCount = 9; menuTabCount = 1; bool isSave = curMenuPg == MPG_SAVE;
         UI_HeaderText(isSave ? 284 : 340, isSave ?/*"SAVE GAME"*/Sys_Text.stringTable[769] :/*"LOAD"*/Sys_Text.stringTable[726]); RenderUIImage(400,214, 586,500, 1037);/*Load/Save table background*/
         for (u8 i=0;i<8;++i) {
             i16 ry=(i16)(232+i*56); bool over=false;
             u8 clicked=UI_Button(UI_ID_MENU_SAVE_SLOT_0+i,420,ry,546,48,&over,(i8)i);
-            bool typingThis=enteringSaveName&&saveSlotEditing==(i8)i;
-            if (clicked || (!enteringSaveName && MenuEnter() && currentMenuItem==(i8)i)) {
-                currentMenuItem=(i8)i;
-                if (isSave) { saveSlotEditing=(i8)i; enteringSaveName=true; if (saveSlotUsed[i]) { u8 n=0; while(n<47&&saveSlotNames[i][n]){saveNameEntry[n]=saveSlotNames[i][n];++n;} saveNameEntry[n]='\0'; saveNameEntryLen=n; } else { saveNameEntry[0]='\0'; saveNameEntryLen=0; } }/*clicking a slot starts name entry with cursor at end of existing name*/
+            bool typingThis=typingSav&&saveSlotEditing==(i8)i;
+            if (clicked || (!typingSav && MenuEnter() && curMenuIt==(i8)i)) {
+                curMenuIt=(i8)i;
+                if (isSave) { saveSlotEditing=(i8)i; typingSav=true; if (saveSlotUsed[i]) { u8 n=0; while(n<47&&saveSlotNames[i][n]){saveNameEntry[n]=saveSlotNames[i][n];++n;} saveNameEntry[n]='\0'; saveNameEntryLen=n; } else { saveNameEntry[0]='\0'; saveNameEntryLen=0; } }/*clicking a slot starts name entry with cursor at end of existing name*/
                 else if (saveSlotUsed[i]) { LoadGame(i); World.menuActive=false; World.paused=false; returnToPause=false; mp3_clear(); }
                 else CenterStatusPrint("%s",/*"No data to load."*/Sys_Text.stringTable[1022]);
             }
-            over=over||currentMenuItem==(i8)i;
+            over=over||curMenuIt==(i8)i;
             if (typingThis) RenderTextL(440,ry+30,over?T_STOPD_RED_HIGHLIGHT:T_STOPD_RED,FONT_STOPD,1.0f,"%s%s",saveNameEntry,(globalframe%40)<20?"_":" ");
             else RenderTextL(440,ry+30,saveSlotUsed[i]?(over?T_STOPD_RED_HIGHLIGHT:T_STOPD_RED):T_RED_MENU,FONT_STOPD,1.0f,"%s",saveSlotNames[i]);
         }
         MenuBackButton(1060,724,1076,732,8);
-    } else if (currentMenuPage == MPG_NEWGM) {
-        menuItemCount = 7; menuTabCount = (currentMenuItem > 0 && currentMenuItem <= 16) ? 2 : 1; UI_HeaderText(290,/*"NEW GAME"*/Sys_Text.stringTable[741]);
+    } else if (curMenuPg == MPG_NEWGM) {
+        menuItemCount = 7; menuTabCount = (curMenuIt > 0 && curMenuIt <= 16) ? 2 : 1; UI_HeaderText(290,/*"NEW GAME"*/Sys_Text.stringTable[741]);
         RenderUIImage(136,196,1088,558,1048);/*Newgame inset*/ RenderUIImage(136,196,1088,558,1049);/*Newgame background*/
         if (UI_MenuButton(UI_ID_MENU_NAME_INPUT,276,270,0,795,74, 226,146,/*"NAME:"*/Sys_Text.stringTable[746],299,214)) {/*Just for highlight*/ }
-        enteringPlayerName = (currentMenuItem == 0);
+        enteringPlayerName = (curMenuIt == 0);
         if (World.playerName[0] == '\0') RenderTextL(642,232,T_RED_MENU,FONT_STOPD,1.0f,/*"ENTER NAME..."*/Sys_Text.stringTable[749]); else RenderTextL(518,232,enteringPlayerName ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.0f,World.playerName);
         if (UI_MenuButton(UI_ID_MENU_DIFF_COMBAT, 174,377,1,496,95, 148,202,/*"COMBAT"*/Sys_Text.stringTable[748],185,299)) { World.diffCbt = World.diffCbt >= 3 ? 0 : World.diffCbt + 1; }
         RenderTextL(184,352,T_RED_MENU,FONT_NORMAL,1.0f,Sys_Text.stringTable[World.diffCbt+752]);
@@ -326,23 +285,36 @@ void RenderMenu() {
         if (UI_MenuButton(UI_ID_MENU_DIFF_CYBER,  704,568,4,496,92, 509,330,/*"CYBERSPACE"*/Sys_Text.stringTable[750],726,490)) { World.diffCyb = World.diffCyb >= 3 ? 0 : World.diffCyb + 1; }
         RenderTextL(714,545,T_RED_MENU,FONT_NORMAL,1.0f,Sys_Text.stringTable[World.diffCyb+764]);
         DiffDigits(162,270,World.diffCbt); DiffDigits(513,270,World.diffMis); DiffDigits(162,399,World.diffPuz); DiffDigits(730-217,399,World.diffCyb);
-        {static const i16 dcx[4]={221,330,439,547}; for (u8 c=0;c<4;++c) for (u8 i=0;i<4;++i) { if (!UI_Button(UI_ID_MENU_DIFF_CELL_0+c*4+i,(i16)(dcx[i]+(c>=2?527:0)),(c&1)?651:460,82,79,NULL,(i8)(c+1))) continue; switch(c){case 0:World.diffCbt=i;break; case 1:World.diffPuz=i;break; case 2:World.diffMis=i;break; default:World.diffCyb=i;break;} currentMenuItem=(i8)(c+1); }}
-        bool overStart = false; if (UI_Button(UI_ID_MENU_START,544,747, 282,68, &overStart, 5) || (MenuEnter() && currentMenuItem == 5)) GoIntoGame();
-        overStart = overStart || currentMenuItem == 5; RenderTextL(400,464,overStart ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,/*"START"*/Sys_Text.stringTable[886]); MenuBackButton(1060,724,1076,732,6);
-    } else if (currentMenuPage == MPG_INTRO || currentMenuPage == MPG_CREDS || currentMenuPage == MPG_DEATH) { menuItemCount = menuTabCount = 1; RenderVideoPage(currentMenuPage); }
-    if (menuTabCount <= currentMenuTab) currentMenuTab = 0;
-    if (menuItemCount <= currentMenuItem) currentMenuItem = 0;
-    static const i8 ngSwap[7] = {0,3,4,1,2,6,5};
-    if (Sys_Input.keyStates[KEY_RIGHT].pressed || Sys_Input.keyStates[KEY_LEFT].pressed) { if (!rebindCaptureActive) { int dir = Sys_Input.keyStates[KEY_RIGHT].pressed ? 1 : -1; currentMenuTab = (currentMenuTab + menuTabCount + dir) % menuTabCount; if (currentMenuPage == MPG_NEWGM && currentMenuItem < 7) {currentMenuItem=ngSwap[currentMenuItem];} } }
-}
-void RenderPausedUI() {
-    menuItemCount = 6; menuTabCount = 1; static const i16 pY[6]={330,390,450,510,570,714},pH[6]={52,52,60,60,60,42},pTx[6]={610,630,635,599,546,572},pTy[6]={306,364,422,480,538,690}; static const u16 pStr[6]={725,726,727,721,728,729};
-    RenderUIImage(519,276,328,300,1025);/*Pause Menu background*/ RenderUIImage(519,276,328,300,1080);/*Pause Menu background outline*/ RenderUIImage(519,672,328,42,1252);/*Pause Quit Game background*/ RenderTextL(610,210,T_STOPD_RED_PAUSETITLE,FONT_STOPD,1.0f,/*"PAUSED"*/Sys_Text.stringTable[724]);
-    for (u8 i=0;i<6;++i) {
-        bool over=false;
-        if (UI_Button(UI_ID_PAUSE_RESUME+i,522,pY[i],322,pH[i],&over,(i8)i) || (MenuEnter() && currentMenuItem==i)) { if (i==0) World.paused=false; else if (i==5) OS_Exit(0); else { if (i==4) { DualLog("Player exited to menu\n"); clearRenderTargetsOnNextFrame = true; } ChangeMenuPage(i==1?MPG_LOAD:i==2?MPG_SAVE:i==3?MPG_OPTS:MPG_FRONT); PlayMenuMusic(); World.menuActive=true; returnToPause=(i!=4); } }
-        over=over||currentMenuItem==i; RenderTextL(pTx[i],pTy[i],over ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.0f,Sys_Text.stringTable[pStr[i]]);
+        {static const i16 dcx[4]={221,330,439,547}; for (u8 c=0;c<4;++c) for (u8 i=0;i<4;++i) { if (!UI_Button(UI_ID_MENU_DIFF_CELL_0+c*4+i,(i16)(dcx[i]+(c>=2?527:0)),(c&1)?651:460,82,79,NULL,(i8)(c+1))) continue; switch(c){case 0:World.diffCbt=i;break; case 1:World.diffPuz=i;break; case 2:World.diffMis=i;break; default:World.diffCyb=i;break;} curMenuIt=(i8)(c+1); }}
+        bool overStart = false; if (UI_Button(UI_ID_MENU_START,544,747, 282,68, &overStart, 5) || (MenuEnter() && curMenuIt == 5)) GoIntoGame();
+        overStart = overStart || curMenuIt == 5; RenderTextL(400,464,overStart ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,/*"START"*/Sys_Text.stringTable[886]); MenuBackButton(1060,724,1076,732,6);
+    } else if (curMenuPg == MPG_INTRO || curMenuPg == MPG_CREDS || curMenuPg == MPG_DEATH) {
+        menuItemCount = menuTabCount = 1;
+        bool isIntro = (curMenuPg == MPG_INTRO), isDeath = (curMenuPg == MPG_DEATH);
+        double start = isIntro ? introVidStart : (isDeath ? deathVidStart : creditsVidStart);
+        if (start <= 0.0) { start=World.absoluteTime; if (isIntro) introVidStart=start; else if (isDeath) deathVidStart=start; else creditsVidStart=start; }
+        double elapsed = World.absoluteTime - start;
+        const float* at = isIntro ? introTextAt : (isDeath ? deathTextAt : outroTextAt);
+        int cardCount = isIntro ? 15 : (isDeath ? 2 : 3);
+        double vidLen = isIntro ? 117.141 : (isDeath ? 16.8 : 54.144); double cardsEnd = isIntro ? vidLen : (isDeath ? 16.8 : 14.0);
+        int frames = isIntro ? 735 : (isDeath ? 506 : 408); u32 frameBase = isIntro ? 2166u : (isDeath ? 3454u : 2901u);
+        if (frameBase + (u32)frames > (u32)texCnt) frames = 0;
+        i32 frame = frames > 0 ? (i32)(elapsed * (double)frames / vidLen) : 0; if (frame<0) frame = 0; else if (frame>=frames) frame = frames-1;
+        static u32 heldRt = 0xFFFFFFFFu, heldBase = 0xFFFFFFFFu;
+        if (heldBase != frameBase) { heldBase = frameBase; heldRt = 0xFFFFFFFFu; }
+        if (frames>0) { u32 want = frameBase+(u32)frame; u32 nxt = VideoPeekFrame(want); QueueVideoFrame(want,false); if (nxt != 0xFFFFFFFFu) QueueVideoFrame(nxt,true); u32 rt = VideoFrameTexIndex(want); if (rt != 0xFFFFFFFFu) heldRt = rt; if (heldRt != 0xFFFFFFFFu) RenderUIImage(43,isIntro ? 39 : 0,1280,isIntro ? 600 : 720,heldRt); }    
+        int card = -1;
+        if (elapsed < cardsEnd) { for (int i=cardCount-1;i>=0;--i) { if (elapsed >= (double)at[i]) { card = i; break; } } }
+        if (card >= 0) { RenderTextC(546,544,T_VIDEOTEXT,FONT_NORMAL,1.25f,"%s",Sys_Text.stringTable[(isIntro?613:(isDeath?628:610))+card]); }
+        bool click = VidSkipPressed();
+        if (click) { uiClickBlocked = uiClickLock = true; }
+        bool skip = (isIntro || isDeath) ? (elapsed > 1.5 && click) : click;
+        if(skip || elapsed >= vidLen){if (isIntro || isDeath) MenuGoBack(); else { World.creditsActive=true; World.creditsPageIndex=0; }}
     }
+    if (menuTabCount <= curMenuTab) curMenuTab = 0;
+    if (menuItemCount <= curMenuIt) curMenuIt = 0;
+    static const i8 ngSwap[7] = {0,3,4,1,2,6,5};
+    if (Sys_Input.keyStates[KEY_RIGHT].pressed || Sys_Input.keyStates[KEY_LEFT].pressed) { if (!rebindCaptureActive) { int dir = Sys_Input.keyStates[KEY_RIGHT].pressed ? 1 : -1; curMenuTab = (curMenuTab + menuTabCount + dir) % menuTabCount; if (curMenuPg == MPG_NEWGM && curMenuIt < 7) {curMenuIt=ngSwap[curMenuIt];} } }
 }
 void GetWeaponAmmoText(int slot,char* buf,size_t bufSize) {
     buf[0] = '\0'; int wepIdx = World.invP1.wepInvIndices[slot]; bool alt = World.invP1.wepLoadedWithAlternate[slot]; float heat = World.invP1.curWepHeat[slot]; u8 mag = alt ? World.invP1.currentMagazineAmount2[slot] : World.invP1.currentMagazineAmount[slot];
@@ -384,22 +356,6 @@ void HwToggle(u8 i) {
 }
 static const char* mgName[9]={"Ping","15","Wing 0","Botbounce","Eel Zapper","Road","TriopToe","Corp Conq","Chess"};
 static void SysUIDataClose(void) { MFD_CloseData(); World.Sys_UI.objectInUsePos=(V3){999.0f,999.0f,999.0f}; }
-static void KeycodeSetDigit(int n) { if (World.Sys_UI.keycodeOnes < 0) { World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes; } else if (World.Sys_UI.keycodeTens < 0) { World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes+World.Sys_UI.keycodeTens*10; } else if (World.Sys_UI.keycodeHuns < 0) { World.Sys_UI.keycodeHuns=World.Sys_UI.keycodeTens; World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes+World.Sys_UI.keycodeTens*10+World.Sys_UI.keycodeHuns*100; } else { World.Sys_UI.keycodeHuns=World.Sys_UI.keycodeTens; World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes+World.Sys_UI.keycodeTens*10+World.Sys_UI.keycodeHuns*100; } }
-static void KeycodeKeypress(int k) { SystemUI* s=&World.Sys_UI; if (!s->keycodeValid) return; if (s->keycodeSolved) return; play_wav("buttons/button_beep",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);
-    if (k>=0&&k<=9) KeycodeSetDigit(k);
-    else if (k==10) { if (s->keycodeHuns>=0) { s->keycodeOnes=s->keycodeTens; s->keycodeTens=s->keycodeHuns; s->keycodeHuns=-1; s->keycodeEntry=s->keycodeOnes+s->keycodeTens*10; return; } else if (s->keycodeTens>=0) { s->keycodeOnes=s->keycodeTens; s->keycodeTens=-1; s->keycodeEntry=s->keycodeOnes; return; } else if (s->keycodeOnes>=0) { s->keycodeOnes=-1; s->keycodeEntry=-1; return; } else return;/*empty backspace leaves the preloaded easy-difficulty value intact*/ }
-    else if (k==11) { s->keycodeHuns=s->keycodeTens=s->keycodeOnes=-1; s->keycodeEntry=-1; }
-    if (s->keycodeEntry==s->keycodeValue) { if (s->keycodeHuns>=0) play_wav("buttons/keycard_success",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);/*code accepted*/ u16 pad=s->tetheredKeypadKeycode; if (pad>=INSTS_1ST_IDX && pad<World.instCount) { UseTargets(pad,World.instances[pad].targetIdx); if (World.instances[pad].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pad].messageLingdex]); } s->keycodeSolved=true; }
-    else if (s->keycodeHuns>=0) play_wav("buttons/button_deny",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);/*code not accepted*/
-}
-void UI_KeycodeKey(bool rh,int k) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh; if (k<0||k>11) return; KeycodeKeypress(k); }
-void KeycodeEntryKey(i32 k) {
-    if (!World.Sys_UI.keycodeValid || World.Sys_UI.keycodeSolved) return;
-    if (k>=KEY_0 && k<=KEY_9) KeycodeKeypress(k-KEY_0);
-    else if (k>=KEY_KP_0 && k<=KEY_KP_9) KeycodeKeypress(k-KEY_KP_0);
-    else if (k==KEY_BACKSPACE) KeycodeKeypress(10);
-    else if (k==KEY_DELETE || k==KEY_KP_DECIMAL) KeycodeKeypress(11);
-}
 void UI_KeycodeClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredKeypadKeycode=U16_MAX; World.Sys_UI.keycodeValid=false; World.Sys_UI.keycodeHuns=World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes=-1; World.Sys_UI.keycodeEntry=-1; World.Sys_UI.keycodeValue=0; World.Sys_UI.keycodeSolved=false; SysUIDataClose(); }
 void UI_ElevFloorClick(bool rh,int btn) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh; if (btn<0||btn>7) return;
     if (World.Sys_UI.linkedElevatorDoor==U16_MAX) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); return; }/*Too far away from that.*/
@@ -409,8 +365,8 @@ void UI_ElevFloorClick(bool rh,int btn) { World.Sys_UI.mouseClickHeldOverGUI=tru
     if (World.Sys_UI.elevButtonLabelIdx[btn]<0 || !World.Sys_UI.buttonsEnabled[btn] || World.Sys_UI.buttonsDarkened[btn]) { CenterStatusPrint("%s",Sys_Text.stringTable[8]); return; }/*Floor not accessible.*/
     u8 destLevel=World.Sys_UI.elevButtonLevelIdx[btn]; if (destLevel==255) { CenterStatusPrint("%s",Sys_Text.stringTable[8]); return; }
     V3 srcKeypad=World.Sys_UI.objectInUsePos; V3 offset=V3_AsubB(World.position[PLAYER1],srcKeypad);
-    V3 destKeypad; if (FindElevatorKeypadPos(destLevel,&destKeypad)) queuedLevelPos=V3Add(destKeypad,offset); else queuedLevelPos=(V3){0.0f,0.0f,0.0f};
-    queuedLevelToLoad=destLevel;
+    V3 destKeypad; if (FindElevatorKeypadPos(destLevel,&destKeypad)) cuedLevPos=V3Add(destKeypad,offset); else cuedLevPos=(V3){0.0f,0.0f,0.0f};
+    cuedLevToLoad=destLevel;
 }
 
 void UI_ElevClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredKeypadElevator=U16_MAX; World.Sys_UI.linkedElevatorDoor=U16_MAX; SysUIDataClose(); }
@@ -562,7 +518,13 @@ void UI_SoftwareRowClick(int idx,bool dbl) {
     if (!cyber) { CenterStatusPrint("%s",Sys_Text.stringTable[460]); return; }
     UseCyberspaceItemByIndex(idx - SW_TURBO);
 }
-void UI_WeaponIconClick() { World.Sys_UI.mouseClickHeldOverGUI=true; if (CurrentWeaponUsesEnergy()) OverloadButtonAction(); else ActualChangeAmmoType(); }
+void UI_WeaponIconClick() {
+    World.Sys_UI.mouseClickHeldOverGUI = true;
+    if (CurrentWeaponUsesEnergy()) {
+        if (World.Sys_UI.overloadClickFinished >= World.pauseRelativeTime){ return; } World.Sys_UI.overloadClickFinished = World.pauseRelativeTime + 0.4f; if (World.invP1.curWepHeat[World.invP1.wepCur] > 25.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[12]);/*Weapon too hot*/ return; }
+        if (World.invP1.overloadEnabled) { CenterStatusPrint("%s",Sys_Text.stringTable[13]);/*Overload disabled*/ World.invP1.overloadEnabled = false; } else { CenterStatusPrint("%s",Sys_Text.stringTable[17]);/*Overload enabled*/ World.invP1.overloadEnabled = true; }
+    } else ActualChangeAmmoType();
+}
 void UI_AutomapClick(bool rh,int action) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastAutomapSideRH=rh; u8 side=rh?1:0; u8* z=&World.automapZoom;
     if (World.invP1.hwVers[HW_NAV_IDX]<2 && action!=UI_AUTOMAP_FULL && action!=UI_AUTOMAP_SIDE) { CenterStatusPrint("%s",Sys_Text.stringTable[465]); return; }
     if (action==UI_AUTOMAP_ZOOM_IN) { if (*z==0) { CenterStatusPrint("%s",Sys_Text.stringTable[317]); return; } (*z)--; }
@@ -636,7 +598,6 @@ void RenderConsumableItem(bool isRH) {
         UIRImg(MID(isRH,ITEM_TIMER_SLIDER),dx+40,650,224,24,1087); RenderUIImage(dx+40+(i16)(204.0f*vclamp((value-min)/(60.0f-min),0.0f,1.0f)),652,20,20,1086);
     }
 }
-static void BoosterSetMode(bool boost) { if (!(World.invP1.hasHardware & HW_BST)) return; World.invP1.hwVersSetting[HW_BST_IDX] = boost ? (u8)vmax(1,(i32)World.invP1.hwVers[HW_BST_IDX]-1) : 0; play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
 static void RenderSoftwareItem(bool isRH) {
     i32 idx=softwareInvCurrent; if (idx<0||idx>6) return; bool owned=idx<SW_GAMES ? ((World.invP1.hasSoft&(1u<<idx))!=0 || World.invP1.softVersions[idx]>0) : World.invP1.hasMinigame!=0; if (!owned) return; i16 dx=isRH?1059:0; UIRText(MID(isRH,ITEM_NAME),dx+28,540,T_YELLOW,FONT_NORMAL,0.8f,260,swLabels[idx]);
     if (idx<SW_GAMES) RenderTextL(dx+112,650,T_GREEN_MENU,FONT_NORMAL,0.8f,(idx<=SW_SHIELD)?"v%d":"x%d",World.invP1.softVersions[idx]); else RenderTextL(dx+112,650,T_GREEN_MENU,FONT_NORMAL,0.8f,"%d",World.invP1.hasMinigame?1:0);
@@ -647,6 +608,8 @@ static void RenderHardwareItem(bool isRH) {
     u16 tex = ref < 0 ? MAXTEX : GetItemFrobTexture((u16)(ref+307)); if (tex<MAXTEX) UIRImg(MID(isRH,ITEM_ICON),dx+112,560,80,64,tex);
     RenderTextL(dx+112,650,T_GREEN_MENU,FONT_NORMAL,0.8,"v%d",(i32)World.invP1.hwVers[slot]);
 }
+bool GeneralInvCanVaporize(int slot) { int item=GeneralInvItem(slot); return slot>0 && item>=0 && (item<6 || item==33 || item==35 || item==58 || item==62); }
+bool GeneralInvCanUse(int slot) { int item=GeneralInvItem(slot); return slot>0 && (item==52 || item==53 || item==55); }
 void RenderGeneralItem(bool isRH) {
     if (softwareInvCurrent>=0) { RenderSoftwareItem(isRH); return; }
     if (World.Sys_UI.mfdHardwareItem) { RenderHardwareItem(isRH); return; }
@@ -661,9 +624,8 @@ void RenderGeneralItem(bool isRH) {
         i16 x=dx+36,y=638;
         for (int card=ACC_Std;card<=ACC_Per5;++card) if (InventoryHasAccessCard((AccCardType)card)) { const char* code=AccessCardCodeForType((AccCardType)card); float w=MeasureLineAdvance(code,FONT_NORMAL)*0.8f; if (x+w>dx+280) { x=dx+36; y+=20; } RenderTextL(x,y,T_YELLOW,FONT_NORMAL,0.8,"%s",code); x+=(i16)(w+8); }
         UIR(MID(isRH,ITEM_ACCESS_CARDS),dx+36,638,244,(i16)((y+20)-638));/*One region over the whole wrapped card block; the codes are display only*/
-    } else if (GeneralInvCanUse(slot) || GeneralInvCanVaporize(slot)) { bool use=GeneralInvCanUse(slot); i16 y=use?691:628; UIRImg(use?MID(isRH,ITEM_USE):MID(isRH,ITEM_VAPORIZE),dx+72,y,160,40,1087); RenderTextL(dx+72,y,T_GREEN_MENU,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[use?736:883]); }
+    } else if (GeneralInvCanUse(slot) || GeneralInvCanVaporize(slot)) { bool use = GeneralInvCanUse(slot); i16 y=use?691:628; UIRImg(use?MID(isRH,ITEM_USE):MID(isRH,ITEM_VAPORIZE),dx+72,y,160,40,1087); RenderTextL(dx+72,y,T_GREEN_MENU,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[use?736:883]); }
 }
-void UpdateSearchTether(void),CloseSearch(void); bool SearchTakeSlot(u8 slot);
 void RenderSearchFX(void) {
     for (int side=0;side<2;++side) {
         if (!World.Sys_UI.searchFXActive[side]) continue; float elapsed = World.pauseRelativeTime - World.Sys_UI.searchFXStartTime[side]; if (elapsed >= 1.0f) { World.Sys_UI.searchFXActive[side] = false; continue; } if (Cheats.noHUD || (World.Sys_UI.mfdTab[1+!!side])!=4 || World.Sys_UI.MFD_Data!=5 || World.Sys_UI.tetheredSearchable==U16_MAX) continue;
@@ -958,7 +920,7 @@ void CenterMFD() { //640x240
                 UIR(UI_ID_CMFD_PATCH_ROW_0+row,831,y,109,21); RenderTextL(868,y,color,FONT_NORMAL,0.8f,"%s",text); RenderTextL(949,y,color,FONT_NORMAL,0.8f,"%u",count); UIRImg(UI_ID_CMFD_PATCH_USE_0+row,974,y-6,20,20,1086); RenderUIImage(979,y-2,11,11,1079);/*Row spans label+count+use, USE ids sort first so they win the overlap*/
             }
             for(int slot=0;slot<7;++slot){
-                int widx=World.invP1.wepInvIndices[slot]; if(widx<0)continue; int y=generalRowY[slot]; UIR(UI_ID_CMFD_WEAPON_ROW_0+slot,372,(i16)(y-5),340,21); bool hov=UIOver(UI_ID_CMFD_WEAPON_ROW_0+slot); /*Slight shift of 6 feels better than just doing y and y + 22 as one would expect, then lopped 1 off one end to prevent double highlighting*/
+                int widx=World.invP1.wepInvIndices[slot]; if(widx<0)continue; int y=generalRowY[slot]; UIR(UI_ID_CMFD_WEP_ROW_0+slot,372,(i16)(y-5),340,21); bool hov=UIOver(UI_ID_CMFD_WEP_ROW_0+slot); /*Slight shift of 6 feels better than just doing y and y + 22 as one would expect, then lopped 1 off one end to prevent double highlighting*/
                 u32 col = (hov&&World.inventoryMode && World.invP1.wepCur!=slot) ? T_GREEN_MENU : (World.invP1.wepCur==slot?T_YELLOW:(World.invP1.wepCurPending==slot?T_DARK_YELLOW:T_GREEN)); RenderTextL(372,y,col,FONT_NORMAL,0.8f,"%s",Sys_Text.stringTable[ItemStringIdx((i32)widx)]);/*Weapon text*/
                 char b[64]; GetWeaponAmmoText(slot,b,sizeof(b)); RenderTextL(574,y,col,FONT_NORMAL,0.8f,"%s",b);/*Ammo text*/
             }
@@ -1020,7 +982,6 @@ static void UI_DragRegions(void) {
         id = MID(s,WEAPON_ENERGY_SLIDER); if (UIOver(id)) UI_WeaponEnergySliderSet(s != 0);
     }
 }
-void CompleteWeaponChange();
 void RemoveWeapon(i32 slot) {
     if (slot < 0 || slot >= 7 || World.invP1.wepInvIndices[slot] < 0 || World.invP1.holdingObject) { return; }
     World.invP1.heldAmmo = World.invP1.currentMagazineAmount[slot]; World.invP1.heldAmmo2 = World.invP1.currentMagazineAmount2[slot]; World.invP1.heldObjectLoadedAlternate = World.invP1.wepLoadedWithAlternate[slot];
@@ -1036,6 +997,13 @@ void RemoveWeapon(i32 slot) {
     if (World.invP1.weaponIndexPending < 0) { World.instances[World.weaponVModelIndex].modelIndex = MAX_MDLS; World.invP1.wepCurPending = World.invP1.weaponIndexPending = -1; ForceInventoryMode(); return; } /* no valid weapon selected: hide the view model */
     CompleteWeaponChange(); ForceInventoryMode();
 }
+void GeneralInvRemove(int slot) {
+    if (slot<=0 || slot>=14) { return; } for (int i=slot;i<13;++i) { World.invP1.genInvIdxRef[i]=World.invP1.genInvIdxRef[i+1]; World.invP1.genInvCustIdx[i]=World.invP1.genInvCustIdx[i+1]; } World.invP1.genInvIdxRef[13] = -1; World.invP1.genInvCustIdx[13] = U16_MAX; World.Sys_UI.genClickSlot = -1;
+    if (World.invP1.generalInvCurrent==slot) { if (GeneralInvItem(slot) < 0) { World.invP1.generalInvCurrent = 0; for (int i=13;i>=0;--i) { if (GeneralInvItem(i) >= 0) { World.invP1.generalInvCurrent = (u8)i; break; } } } } else if (World.invP1.generalInvCurrent>slot) World.invP1.generalInvCurrent--;
+}
+static void GenInvClick(int buttonIdx) { int item = GeneralInvItem(buttonIdx); if (item < 0) return; World.invP1.generalInvCurrent = (u8)buttonIdx; World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true; MFD_ShowGeneralItem(); }
+static void GenInvApply(int buttonIdx) { if (!GeneralInvCanUse(buttonIdx) || World.invP1.holdingObject) { return; } int item = GeneralInvItem(buttonIdx); if ((item == 55 ? World.instances[PLAYER1].health : World.invP1.energy) >= 255.0f) { CenterStatusPrint("%s", Sys_Text.stringTable[303]); return; } if (item == 55) { World.instances[PLAYER1].health = 255.0f; } else { GiveEnergy(item == 52 ? 83.0f : 255.0f,EnerTyp_Battery); } GeneralInvRemove(buttonIdx); }
+static void GenInvTake(int s, int item) { if (!World.invP1.holdingObject) { World.invP1.grenActive = false; World.invP1.heldObjectIndex = (u16)(item + 307); World.invP1.heldObjectCustIdx = World.invP1.genInvCustIdx[s]; World.invP1.holdingObject = true; GeneralInvRemove(s); ForceInventoryMode(); CenterStatusPrint("%s%s",Sys_Text.stringTable[item+326],Sys_Text.stringTable[319]); } }
 static void UI_OnRegionClick(u32 id, u8 c) {
     bool dbl = (c & 4) != 0, left = (c & 3) == 1, rh = false; if (id >= UI_ID_RMFD_TAB_WEAPON && id < UI_ID_CMFD_EDIT_PANEL) { id -= (UI_ID_RMFD_TAB_WEAPON - UI_ID_LMFD_TAB_WEAPON); rh = true; }
     switch (id) {
@@ -1043,7 +1011,10 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_HUD_HW_0 ... UI_ID_HUD_HW_7: HwToggle((u8)(id-UI_ID_HUD_HW_0)); return;
         case UI_ID_CMFD_ADD_TO_INVENTORY: if (World.invP1.holdingObject) { AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem(); } return;
         case UI_ID_CMFD_TAB_MAIN ... UI_ID_CMFD_TAB_SOFTWARE: MFD_SelectTab(0,(u8)(id - UI_ID_CMFD_TAB_MAIN + 1),true); if (World.Sys_UI.mfdTab[0] == 1) { World.Sys_UI.firstMain = true; } else if (World.Sys_UI.mfdTab[0] == 2) { World.Sys_UI.firstHardware = true; } else if (World.Sys_UI.mfdTab[0] == 3) { World.Sys_UI.firstGeneral = true; } return;
-        case UI_ID_CMFD_WEAPON_ROW_0 ... UI_ID_CMFD_WEAPON_ROW_6: { int row=(int)(id - UI_ID_CMFD_WEAPON_ROW_0); if (left) WeaponSelectSlot(row); else RemoveWeapon(row); return; }
+        case UI_ID_CMFD_WEP_ROW_0 ... UI_ID_CMFD_WEP_ROW_6: { int r=(int)(id - UI_ID_CMFD_WEP_ROW_0);
+            if (left) {
+                int wi = (int)World.invP1.wepInvIndices[r]; if (wi < 0 || wi >= MAX_ENTS || (int)World.invP1.wepCur == r || World.invP1.reloadFinished > World.pauseRelativeTime) { return; } play_wav("hud/changeweapon",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); World.invP1.wepCurPending = (i16)r; World.invP1.weaponIndexPending = (i16)wi; int w = Get16WeaponIndexFromConstIndex(wi); WeaponFireStartWeaponDip((w >= 0 && w < 16) ? reloadTime[w] : 0.5f);
+            } else RemoveWeapon(r); return; }
         case UI_ID_CMFD_GREN_USE_0 ... UI_ID_CMFD_GREN_USE_6: ConsumableUse(false,(int)(id - UI_ID_CMFD_GREN_USE_0)); return;
         case UI_ID_CMFD_GREN_ROW_0 ... UI_ID_CMFD_GREN_ROW_6: { int row = (int)(id - UI_ID_CMFD_GREN_ROW_0); ConsumableSelect(false,row); if (dbl) ConsumableUse(false,row); return; }
         case UI_ID_CMFD_PATCH_USE_0 ... UI_ID_CMFD_PATCH_USE_6: ConsumableUse(true,(int)(id - UI_ID_CMFD_PATCH_USE_0)); return;
@@ -1051,7 +1022,7 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_CMFD_HARDWARE_ROW_0 ... UI_ID_CMFD_HARDWARE_ROW_11: UI_HardwareRowClick((int)(id - UI_ID_CMFD_HARDWARE_ROW_0)); return;
         case UI_ID_CMFD_SOFTWARE_ROW_0 ... UI_ID_CMFD_SOFTWARE_ROW_6: UI_SoftwareRowClick((int)(id - UI_ID_CMFD_SOFTWARE_ROW_0),dbl); return;
         case UI_ID_CMFD_GENERAL_USE_0 ... UI_ID_CMFD_GENERAL_USE_13: { u8 s=(u8)(id - UI_ID_CMFD_GENERAL_USE_0); World.Sys_UI.genClickSlot = -1; GenInvClick(s); GenInvApply(s); return; }
-        case UI_ID_CMFD_GENERAL_ROW_0 ... UI_ID_CMFD_GENERAL_ROW_13: { u8 s = (u8)(id - UI_ID_CMFD_GENERAL_ROW_0); int item = GeneralInvItem(s); if (item<0) { return; } if (!left) { World.Sys_UI.genClickSlot = -1; if (s) GenInvTake(s); return; }
+        case UI_ID_CMFD_GENERAL_ROW_0 ... UI_ID_CMFD_GENERAL_ROW_13: { u8 s = (u8)(id - UI_ID_CMFD_GENERAL_ROW_0); int item = GeneralInvItem(s); if (item<0) { return; } if (!left) { World.Sys_UI.genClickSlot = -1; if (s) GenInvTake(s,item); return; }
             World.Sys_UI.genClickSlot = -1; GenInvClick(s); if (dbl && World.Sys_UI.genClickSlot == (i8)s && World.Sys_UI.genClickItem == (i16)item && World.Sys_UI.genClickCustom == World.invP1.genInvCustIdx[s]) GenInvApply(s); else { World.Sys_UI.genClickSlot = (i8)s; World.Sys_UI.genClickItem = (i16)item; World.Sys_UI.genClickCustom = World.invP1.genInvCustIdx[s]; World.Sys_UI.genClickTime = World.pauseRelativeTime; } return; }
         case UI_ID_CMFD_LOG_TABLE_0 ... UI_ID_CMFD_LOG_TABLE_9: UI_LogTableClick((int)(id - UI_ID_CMFD_LOG_TABLE_0)); return;
         case UI_ID_CMFD_LOG_ENTRY_0 ... UI_ID_CMFD_LOG_ENTRY_14: UI_LogEntryClick((int)(id - UI_ID_CMFD_LOG_ENTRY_0)); return;
@@ -1072,9 +1043,9 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_LMFD_MEDIA_TAB_0 ... UI_ID_LMFD_MEDIA_TAB_3: {
             u8 sec = (u8)(id - UI_ID_LMFD_MEDIA_TAB_0); if (sec == MM_NOTES && !World.diffMis) { return; } World.Sys_UI.mfdTab[0] = 5; World.Sys_UI.MFD_MediaTab = World.Sys_UI.lastMultiMediaTabOpened = sec; World.Sys_UI.MFD_ReaderView = MFD_READER_CONTENTS; if (sec >= MM_DATA_TABLE) { World.Sys_UI.highlightStatus[sec] = false; World.Sys_UI.highlightTickCount[sec] = 0; } play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0},false); return; }
         case UI_ID_LMFD_ITEM_USE: { World.Sys_UI.lastItemSideRH=rh; if (World.Sys_UI.mfdConsumable) { int row=ConsumableSelectedRow(); ConsumableUse(World.Sys_UI.mfdConsumable==2,row); } else { int s=World.invP1.generalInvCurrent; World.Sys_UI.genClickSlot = -1; if (GeneralInvCanUse(s)) GenInvApply(s); } return; }
-        case UI_ID_LMFD_ITEM_VAPORIZE: World.Sys_UI.lastItemSideRH=rh; World.Sys_UI.genClickSlot = -1; if (GeneralInvCanVaporize(World.invP1.generalInvCurrent)) VaporizeClick(); return;
-        case UI_ID_LMFD_ITEM_SKATE: World.Sys_UI.lastItemSideRH=rh; BoosterSetMode(false); return;
-        case UI_ID_LMFD_ITEM_BOOST: World.Sys_UI.lastItemSideRH=rh; BoosterSetMode(true); return;
+        case UI_ID_LMFD_ITEM_VAPORIZE: World.Sys_UI.lastItemSideRH=rh; World.Sys_UI.genClickSlot = -1; int slot = World.invP1.generalInvCurrent; if (GeneralInvCanVaporize(slot)) { GeneralInvRemove(slot); play_wav("hud/patchuse",AppliedFXVol(1.0f),(V3){0},false); } return;
+        case UI_ID_LMFD_ITEM_SKATE: World.Sys_UI.lastItemSideRH = rh; if (World.invP1.hasHardware & HW_BST) { World.invP1.hwVersSetting[HW_BST_IDX] = 0; play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); } return;
+        case UI_ID_LMFD_ITEM_BOOST: World.Sys_UI.lastItemSideRH = rh; if (World.invP1.hasHardware & HW_BST) { World.invP1.hwVersSetting[HW_BST_IDX] = (u8)vmax(1,(i32)World.invP1.hwVers[HW_BST_IDX]-1); play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); } return;
         case UI_ID_LMFD_ITEM_TIMER_SLIDER: World.Sys_UI.lastItemSideRH=rh; ConsumableSetTimer(((float)World.cursorPos_x-UIC(MID(rh,ITEM_TIMER_SLIDER)).min.x)/224.0f); return;
         case UI_ID_LMFD_WEAPON_ICON: UI_WeaponIconClick(); return;
         case UI_ID_LMFD_WEAPON_RELOAD: ReloadSecret(false); return;
@@ -1083,7 +1054,7 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_LMFD_WEAPON_ENERGY_SLIDER: UI_WeaponEnergySliderSet(rh); return;
         case UI_ID_LMFD_ELEV_BUTTON_0 ... UI_ID_LMFD_ELEV_BUTTON_7: UI_ElevFloorClick(rh,(int)(id-UI_ID_LMFD_ELEV_BUTTON_0)); return;
         case UI_ID_LMFD_ELEV_CLOSE: UI_ElevClose(rh); return;
-        case UI_ID_LMFD_KEYCODE_0 ... UI_ID_LMFD_KEYCODE_11: UI_KeycodeKey(rh,(int)(id-UI_ID_LMFD_KEYCODE_0)); return;
+        case UI_ID_LMFD_KEYCODE_0 ... UI_ID_LMFD_KEYCODE_11: { int k = (int)(id-UI_ID_LMFD_KEYCODE_0); World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh; if (k<0||k>11) return; KeycodeKeypress(k); return; }
         case UI_ID_LMFD_KEYCODE_CLOSE: UI_KeycodeClose(rh); return;
         case UI_ID_LMFD_AUDIOLOG_IMAGE: UI_AudioLogClick(); return;
         case UI_ID_LMFD_PUZZLE_CELL_0 ... UI_ID_LMFD_PUZZLE_CELL_34: UI_PuzzleGridCell((int)(id-UI_ID_LMFD_PUZZLE_CELL_0)); return;
@@ -1100,7 +1071,13 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         default: return; /*Decoration, labels and panel backdrops: they block the pointer but have no action*/
     }
 }
-static bool UI_DispatchRegions(void) { for (u32 id=UI_ID_NONE+1;id<UI_ID_COUNT;++id) { if (!UIC(id).active) continue; u8 c=UIClicked(id); if (!c) continue; UI_OnRegionClick(id,c); return true; } return false; }
+static bool UI_DispatchRegions(void) {
+    for (u32 id=UI_ID_NONE+1;id<UI_ID_COUNT;++id) {
+        if (!UIC(id).active) continue; u8 c = 0u; if (id >= UI_ID_COUNT || id == 0) continue; if (!UIOver(id)) continue; bool l = Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed, r=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed; if (!l && !r) continue;
+        Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed = Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed = false; World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true; float* t = l ? &World.uiComponents[id].lastLMB : &World.uiComponents[id].lastRMB; u8 dbl = (*t > 0.0f && (World.pauseRelativeTime - *t) <= 0.5f) ? 4u : 0u; *t = dbl ? 0.0f : World.pauseRelativeTime; c = (u8)((l ? 1u : 2u) | dbl); if (!c) continue;
+        UI_OnRegionClick(id,c); return true;
+    } return false;
+}
 void UI_ProcessNavigation(void) {
     UpdateSearchTether(); if (World.menuActive || World.paused || World.creditsActive || Cheats.consoleActive || World.Sys_UI.vmailActive) { World.Sys_UI.genClickSlot = -1; return; }
     static const u16 keys[8] = {KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F7, KEY_F8, KEY_F11}; static const u8 mfdtabs[8]={1, 2, 3, 4, 1, 2, 3, 4};
@@ -1124,7 +1101,7 @@ u16 GetItemFrobTexture(u16 index) {
 static u16 CursorClickTexture(void) { return (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down) ? 2147 : 1261; }
 u16 GetCursorTexture() { if (World.paused || World.menuActive) { return CursorClickTexture(); } if (World.invP1.holdingObject) { u16 t = GetItemFrobTexture(World.invP1.heldObjectIndex); return t < MAXTEX ? t : 1250; } if (World.uiIsBlocking || World.Sys_UI.mouseClickHeldOverGUI) { return CursorClickTexture(); } return GetCrosshairTexture(); }
 static void RenderUI() {
-    drawCallsNormal = drawCalls; UiClickGate(); UI_BeginFrame();
+    drawCallsNormal = drawCalls; UiClickGate(); for (u32 i=1;i<UI_ID_COUNT;++i) { UIC(i).active = false; }
     if (!EditSelIsActive() && !EditLightSelIsActive()) { editFieldEditing = false; }
     if (World.creditsActive) {
         RenderUIImage(0,0, 1366,768, 0);/*Video blackground*/
@@ -1133,12 +1110,21 @@ static void RenderUI() {
         else if (!uiClickBlocked && Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed && World.creditsPageIndex>0) { uiClickBlocked = uiClickLock = true; --World.creditsPageIndex; }
         if (World.creditsPageIndex>=22) { World.creditsActive=false; MenuGoBack(); return; } if (World.creditsPageIndex==1) { CreditsStats(); RenderTextL(208,72,T_WHITE,FONT_NORMAL,1.0f,(const char*)&creditStats); } else { RenderTextL(208,72,T_WHITE,FONT_NORMAL,1.0f,creditPages[World.creditsPageIndex]); } return;
     }
-    if (World.menuActive) { RenderMenu(); } else if (World.paused) { RenderPausedUI(); }
+    if (World.menuActive) { RenderMenu(); }
+    else if (World.paused) {
+        menuItemCount = 6; menuTabCount = 1; static const i16 pY[6]={330,390,450,510,570,714},pH[6]={52,52,60,60,60,42},pTx[6]={610,630,635,599,546,572},pTy[6]={306,364,422,480,538,690}; static const u16 pStr[6]={725,726,727,721,728,729};
+        RenderUIImage(519,276,328,300,1025);/*Pause Menu background*/ RenderUIImage(519,276,328,300,1080);/*Pause Menu background outline*/ RenderUIImage(519,672,328,42,1252);/*Pause Quit Game background*/ RenderTextL(610,210,T_STOPD_RED_PAUSETITLE,FONT_STOPD,1.0f,/*"PAUSED"*/Sys_Text.stringTable[724]);
+        for (u8 i=0;i<6;++i) {
+            bool over=false;
+            if (UI_Button(UI_ID_PAUSE_RESUME+i,522,pY[i],322,pH[i],&over,(i8)i) || (MenuEnter() && curMenuIt==i)) { if (i==0) World.paused=false; else if (i==5) OS_Exit(0); else { if (i==4) { DualLog("Player exited to menu\n"); clearRenderTargetsOnNextFrame = true; } ChangeMenuPage(i==1?MPG_LOAD:i==2?MPG_SAVE:i==3?MPG_OPTS:MPG_FRONT); PlayMenuMusic(); World.menuActive=true; returnToPause=(i!=4); } }
+            over=over||curMenuIt==i; RenderTextL(pTx[i],pTy[i],over ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.0f,Sys_Text.stringTable[pStr[i]]);
+        }
+    }
     if (World.menuActive || World.paused) {
-        if (resDropdownOpen && currentMenuPage==MPG_OPTS && currentMenuTab==0) { if (Sys_Input.keyStates[KEY_DOWN].pressed) { if(resSelectedIdx<resDropdownCount-1){resSelectedIdx++;} } else if (Sys_Input.keyStates[KEY_UP].pressed) { if(resSelectedIdx>0){resSelectedIdx--;} } }
-        if (reflDropdownOpen && currentMenuPage==MPG_OPTS && currentMenuTab==0) { if (Sys_Input.keyStates[KEY_DOWN].pressed) { if(Sys_Settings.Reflections<2){Sys_Settings.Reflections++; SaveConfig(); EnsureReflectionResources();} } else if (Sys_Input.keyStates[KEY_UP].pressed) { if(Sys_Settings.Reflections>0){Sys_Settings.Reflections--; SaveConfig(); EnsureReflectionResources();} } }
-        else if (!rebindCaptureActive && !enteringSaveName && Sys_Input.keyStates[KEY_DOWN].pressed) { currentMenuItem = (currentMenuItem + 1) >= menuItemCount ? 0                 : currentMenuItem + 1; }
-        else if (!rebindCaptureActive && !enteringSaveName && Sys_Input.keyStates[KEY_UP  ].pressed) { currentMenuItem = (currentMenuItem - 1) < 0              ? menuItemCount - 1 : currentMenuItem - 1; }
+        if (resDropdownOpen && curMenuPg==MPG_OPTS && curMenuTab==0) { if (Sys_Input.keyStates[KEY_DOWN].pressed) { if(resSelectedIdx<resDropdownCount-1){resSelectedIdx++;} } else if (Sys_Input.keyStates[KEY_UP].pressed) { if(resSelectedIdx>0){resSelectedIdx--;} } }
+        if (reflDropdownOpen && curMenuPg==MPG_OPTS && curMenuTab==0) { if (Sys_Input.keyStates[KEY_DOWN].pressed) { if(Sys_Settings.Reflections<2){Sys_Settings.Reflections++; SaveConfig(); EnsureReflectionResources();} } else if (Sys_Input.keyStates[KEY_UP].pressed) { if(Sys_Settings.Reflections>0){Sys_Settings.Reflections--; SaveConfig(); EnsureReflectionResources();} } }
+        else if (!rebindCaptureActive && !typingSav && Sys_Input.keyStates[KEY_DOWN].pressed) { curMenuIt = (curMenuIt + 1) >= menuItemCount ? 0                 : curMenuIt + 1; }
+        else if (!rebindCaptureActive && !typingSav && Sys_Input.keyStates[KEY_UP  ].pressed) { curMenuIt = (curMenuIt - 1) < 0              ? menuItemCount - 1 : curMenuIt - 1; }
     } else if (!World.Sys_UI.vmailActive) {
         if (!Cheats.noHUD) {
             for(u16 i=INSTS_1ST_IDX;i<World.instCount;++i){/*TargetID*/
@@ -1232,7 +1218,7 @@ static void RenderUI() {
     }
     if (Cheats.consoleActive) RenderTextL(16,0,T_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (World.statusTextDecayFinished > World.current_time) RenderTextC(683,164,T_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
-    if (World.invP1.ressurectingFinished > World.pauseRelativeTime) { float el = World.pauseRelativeTime - (World.invP1.ressurectingFinished - 3.0f); static const float resDelay[8] = {0.2f,0.4f,0.5f,0.7f,0.8f,0.9f,1.0f,1.4f}; static const i16 resY[8] = {9,30,30,52,52,74,74,94}; if (el < 2.0f) { for (int i = 0; i < 8; ++i) { if (el >= resDelay[i]) RenderTextL(38,resY[i],T_GREEN,FONT_NORMAL,1.8f,"%s",Sys_Text.stringTable[860 + i]); } } }
+    if (World.invP1.ressurectingFinished > World.pauseRelativeTime) { float el = World.pauseRelativeTime - (World.invP1.ressurectingFinished - 5.0f); static const float resDelay[8] = {0.5f,1.0f,1.5f,2.0f,2.5f,3.0f,3.5f,4.0f}; static const i16 resY[8] = {9,30,30,52,52,74,74,94}; for (int i = 0; i < 8; ++i) { if (el >= resDelay[i]) RenderTextL(38,resY[i],T_GREEN,FONT_NORMAL,1.8f,"%s",Sys_Text.stringTable[860 + i]); } }
     if (Cheats.showLocation) RenderTextL(16, 90, T_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f, Cursor: %d, %d  dx:%d dy:%d",(double)World.position[PLAYER1].x,(double)World.position[PLAYER1].y,(double)World.position[PLAYER1].z,(double)World.rotation[PLAYER1].x,(double)World.rotation[PLAYER1].y,(double)World.rotation[PLAYER1].z,(double)World.rotation[PLAYER1].w,World.cursorPos_x,World.cursorPos_y,World.currentMouse_dx,World.currentMouse_dy);
     if (Cheats.showFPS) {
         double time_now = get_timed(); World.thisFrameTime = (time_now - World.last_time) * 1000.0; World.last_time = time_now; World.cpuFrameTime = World.cpuTime * 1000.0; u8 timingColor = (time_now - World.current_time) > (World.thisFrameTime - 0.2) ? T_RED : T_WHITE;

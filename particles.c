@@ -290,7 +290,7 @@ void PSys_Render(float* viewProj, V3 camPos, V3 camRight, V3 camUp, V3 camForwar
     }
 }
 INLINE int sort_cmp(const void* a, const void* b) { u32 ka = ((const PartSortEntry*)a)->sortKey; u32 kb = ((const PartSortEntry*)b)->sortKey; return (ka > kb) - (ka < kb); }
-void PSys_Update(float dt) {
+void ParticlesUpdate(float dt) {
     if (!World.particles) { psys.aliveCount = 0; psys.trailCount = 0; return; }
     if (World.particles->count > MAX_LEVEL_PARTICLES) World.particles->count = MAX_LEVEL_PARTICLES;
     PSysCompactLevelList();
