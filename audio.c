@@ -536,17 +536,17 @@ void PlayTrack(TrackType ttype, MusicType mtype) {
     if (dynamic) { if (mtype == MT_Override) mp3_clear(); clip = GetCorrespondingLevelClip(ttype); }
     else if (mtype == MT_Override) { switch (ttype) { case TT_Revive : clip = reviveMusic[World.curLev]; break; case TT_Die: clip = dieMusic; break; case TT_Elev: clip = elevMusic; break; case TT_Distortion: clip = distrtMusic[World.curLev]; break; default: return; } }
     else { if (World.curLev == 9) return; clip = loopMusic[World.curLev]; }
-    char p[128]; sFormat(p,sizeof(p),dynamic ? "./Audio/music/%s.mp3" : "./Audio/music/looped/%s.mp3",clip); play_mp3(p,dynamic ? 50 : 0); if (dynamic && !World.Sys_Music.elevator) World.Sys_Music.levelEntry=false;
+    char p[128]; sFormat(p,sizeof(p),dynamic || mtype == MT_Override ? "./Audio/music/%s.mp3" : "./Audio/music/looped/%s.mp3",clip); play_mp3(p,dynamic ? 50 : 0); if (dynamic && !World.Sys_Music.elevator) World.Sys_Music.levelEntry=false;
 }
 void UpdateAudio() {
     if (!World.paused && !World.menuActive) {MixAmbs();} if ((World.paused && !World.menuActive) || (!Sys_Settings.VolumeMusic && !videoPageClip)) { mp3_paused = true; return; }
     mp3_paused = false; u32 zone = World.Sys_Music.inZone ? (((u32)World.Sys_Music.zoneTrack & 0xFFu) | ((u32)World.Sys_Music.zoneMusic << 8)) : 0u; if (!zone && (World.Sys_Music.elevator || World.Sys_Music.distortion)) zone = (u32)(World.Sys_Music.distortion ? TT_Distortion : TT_Elev) | ((u32)MT_Override << 8);
     static u32 musicZoneLast = 0U; bool zoneChanged=(zone!=musicZoneLast); musicZoneLast=zone;
-    if (zoneChanged && !World.menuActive) { if (zone) { PlayTrack((TrackType)(zone&0xFFu),(MusicType)((zone>>8)&0xFFu)); return; } if (Sys_Settings.DynamicMusic) { PlayTrack(TT_Walking,MT_Walking); } return; }
+    if (zoneChanged && !World.menuActive) { if (zone) { PlayTrack((TrackType)(zone&0xFFu),(MusicType)((zone>>8)&0xFFu)); return; } PlayTrack(TT_Walking,MT_Walking); return; }
     float remaining = mp3_remaining[mp3_slot]; if (remaining > 0.05f){return;}
     if (videoPageClip) { play_mp3(videoPageClip,150); return; }
     if (World.menuActive) { play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500); return; }
     if (World.pauseRelativeTime - World.invP1.justFired < 15.0f && !World.Sys_Music.inZone && World.Sys_Music.combatImpulseFinished < World.pauseRelativeTime) { PlayTrack(TT_Combat,MT_Override); World.Sys_Music.combatImpulseFinished = World.pauseRelativeTime + 20.0f; return; }
     if (World.Sys_Music.inZone){ if (zone) { PlayTrack((TrackType)(zone&0xFFu),(MusicType)((zone>>8)&0xFFu)); return; } }
-    if (Sys_Settings.DynamicMusic) { PlayTrack(TT_Walking,MT_Walking); }
+    PlayTrack(TT_Walking,MT_Walking);
 }
