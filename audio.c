@@ -265,7 +265,7 @@ static u64 mp3_get_pcm_frame_count(mp3* pMP3){
 }
 typedef struct { FHandle fp; u16 channels,bitsPerSample; u32 sampleRate; u64 totalPCMFrameCount,bytesRemaining; } Wav;
 static bool WavInit(Wav *w, const char *path) {
-    u8 buf[36]; mset(w,0,sizeof(*w)); w->fp = OS_OpenReadonly(path); if (w->fp == INVALID_FHANDLE) return false; if (OS_Read(w->fp,buf,12) != 12) goto fail; if (mcmp(buf,"RIFF",4) != 0) goto fail; if (mcmp(buf+8,"WAVE",4) != 0) goto fail; bool got_fmt=false,got_data=false;
+    u8 buf[36]; mset(w,0,sizeof(*w)); w->fp = OS_OpenReadonly(path); if (w->fp == INVALID_FHANDLE) return false; if (OS_Read(w->fp,buf,12) != 12) goto fail; if (mcmp(buf,"RIFF",4) != 0) goto fail; if (mcmp(buf+8,"WAVE",4) != 0) goto fail; bool got_fmt = false, got_data = false;
     for (;;) {
         u8 chunkId[4],szBuf[4]; if ((OS_Read(w->fp,chunkId,4) != 4) || (OS_Read(w->fp,szBuf,4) != 4)) break; u32 chunkSize = (u32)(szBuf[0]|(szBuf[1]<<8)|(szBuf[2]<<16)|(szBuf[3]<<24));
         if (mcmp(chunkId,"fmt ",4) == 0) {
@@ -284,7 +284,7 @@ static u64 WavReadPCMFrames(Wav *w, u64 ftr/*Frames to read*/, float *out) {
 typedef struct mp3_channel_s { mp3 dec; bool open; u32 src_rate; u64 frames_decoded; u64 total_frames; float fade_vol,fade_target,fade_step; } mp3_channel_t; typedef struct log_channel_s { mp3 dec; u32 src_rate; } log_channel_t;
 typedef struct { float *samples; u32 frame_count; float frame_pos; float volume; float pitch; bool looping,positional; bool playing; V3 pos; size_t allocSize; i32 cacheSlot; } wav_channel_t;
 static wav_channel_t wav_ch[MAX_CHANNELS],*ext_ch[MAX_CHANNELS]; static u32 wav_count,ext_count; static u32 mp3_slot; static log_channel_t* log_ch; static const char* videoPageClip = NULL;
-static mp3_channel_t* mp3_ch[2]; static bool mp3_paused=false; static float mp3_remaining[2]; static mp3_channel_t* mp3_fade_out_target[2]; static i32 mp3_fade_out_ms[2];
+static mp3_channel_t* mp3_ch[2]; static bool mp3_paused; static float mp3_remaining[2]; static mp3_channel_t* mp3_fade_out_target[2]; static i32 mp3_fade_out_ms[2];
 static void resample_stereo_inplace(float* buf,size_t nativeBytes,u32* frames,u32 src_rate,size_t* sz) {
     if (!src_rate) src_rate=AUDIO_RATE; if (src_rate==AUDIO_RATE) { if (sz) *sz=nativeBytes; return; }
     u32 sf=*frames,df=(u32)((u64)sf*AUDIO_RATE/src_rate); float ratio=(float)sf/(float)df; i64 step=df>sf ? -1 : 1,end=df>sf ? -1 : (i64)df;
@@ -293,10 +293,8 @@ static void resample_stereo_inplace(float* buf,size_t nativeBytes,u32* frames,u3
     } if (sz) *sz=(size_t)df*2*sizeof(float); *frames=df;
 }
 static void WavUnInit(Wav *w) { if (w->fp != INVALID_FHANDLE) { OS_Close(w->fp); w->fp = INVALID_FHANDLE; } }
-typedef struct { char path[192]; u64 pathHash; u32 pathLen; float* samples; size_t allocSize; size_t poolOfs; u32 frame_count; u32 refs; u64 lastUse; float lastPlayTime; bool used; } AudioCacheEntry;
-static AudioCacheEntry g_acache[512]; static i32 g_acacheIdx[1024]; static size_t g_acacheBytes = 0;
-typedef struct { size_t ofs, size; bool used; } ACacheSpan;
-static ACacheSpan g_acacheSpans[1025]; static i32 g_acacheSpanCount = 0;
+typedef struct { char path[192]; u64 pathHash; u32 pathLen; float* samples; size_t allocSize; size_t poolOfs; u32 frame_count; u32 refs; u64 lastUse; float lastPlayTime; bool used; } AudioCacheEntry;    typedef struct { size_t ofs,size; bool used; } ACacheSpan;
+static AudioCacheEntry g_acache[512]; static ACacheSpan g_acacheSpans[1025]; static i32 g_acacheIdx[1024],g_acacheSpanCount; static size_t g_acacheBytes;
 static void acachePoolInit() { if (g_acacheSpanCount) { return; } g_acacheSpans[0].ofs = 0; g_acacheSpans[0].size = 16777216; g_acacheSpans[0].used = false; g_acacheSpanCount = 1; }
 static size_t acachePoolAlloc(size_t bytes) { acachePoolInit(); bytes = (bytes + 7u) & ~(size_t)7u; for (i32 i = 0; i < g_acacheSpanCount; i++) { if (g_acacheSpans[i].used || g_acacheSpans[i].size < bytes) { continue; } size_t ofs = g_acacheSpans[i].ofs; size_t rem = g_acacheSpans[i].size - bytes; if (rem >= 64u && g_acacheSpanCount < 1025) { for (i32 j = g_acacheSpanCount; j > i + 1; j--) { g_acacheSpans[j] = g_acacheSpans[j-1]; } g_acacheSpans[i+1].ofs = ofs + bytes; g_acacheSpans[i+1].size = rem; g_acacheSpans[i+1].used = false; g_acacheSpanCount++; g_acacheSpans[i].size = bytes; } g_acacheSpans[i].used = true; return ofs; } return (size_t)-1; }
 static void acachePoolFree(size_t ofs) { for (i32 i = 0; i < g_acacheSpanCount; i++) { if (!g_acacheSpans[i].used || g_acacheSpans[i].ofs != ofs) { continue; } g_acacheSpans[i].used = false; if (i + 1 < g_acacheSpanCount && !g_acacheSpans[i+1].used) { g_acacheSpans[i].size += g_acacheSpans[i+1].size; for (i32 j = i + 1; j + 1 < g_acacheSpanCount; j++) { g_acacheSpans[j] = g_acacheSpans[j+1]; } g_acacheSpanCount--; } if (i > 0 && !g_acacheSpans[i-1].used) { g_acacheSpans[i-1].size += g_acacheSpans[i].size; for (i32 j = i; j + 1 < g_acacheSpanCount; j++) { g_acacheSpans[j] = g_acacheSpans[j+1]; } g_acacheSpanCount--; } return; } }
@@ -343,25 +341,13 @@ typedef float (*SynthFn)(SynthVoice*);
 typedef struct SynthVoice { SynthFn fn; u32 frame,frames; float vol,pitch; V3 pos; bool positional,active; float p[4],s[8]; } SynthVoice;
 static float rev_buf[4][REV_BUF_LEN]/*4 comb delay lines, ~1.7MB static*/, ap_buf[2][3533]; /*2 allpass lines, prime lengths*/ static u32 rev_idx[4], ap_idx[2], rev_len[4]; /*per-comb delay length in samples*/ static float rev_fb[4]/*per-comb feedback gain*/, rev_lp[4]/*per-comb LP filter state (damps high freqs in tail)*/, rev_wet = 0.20f, rev_dry = 1.00f; static SynthVoice syn_ch[MAX_SYNTH_VOICES]; static const u32 REV_BASE[4]={1373,1607,1931,2269};
 static const u32 AP_LEN[2]={379,547}; /*Allpass delay lengths — fixed, short for diffusion not coloration.*/
-static const struct {float sz,wet;} ReverbPresetParams[28]={{0.0f,0.0f}/*0:Off[unused]*/,{0.3f,0.4f}/*1:Generic[unused]*/,{0.1f,0.3f}/*2:PaddedCell*/,{0.4f,0.5f}/*3:Room*/,{0.6f,0.7f}/*4:Bathroom[unused]*/,{0.5f,0.6f}/*5:Livingroom*/,{0.8f,0.7f}/*6:Stoneroom[unused]*/,{0.9f,0.8f}/*7:Auditorium*/,{1.0f,0.9f}/*8:ConcertHall*/,{0.95f,0.85f}/*9:Cave*/,{1.0f,0.8f}/*10:Arena[unused]*/,{0.9f,0.75f}/*11:Hangar*/,{0.2f,0.4f}/*12:CarpetedHallway*/,
-                                                            {0.4f,0.5f}/*13:Hallway*/,{0.7f,0.65f}/*14:StoneCorridor*/,{0.5f,0.55f}/*15:Alley*/,{0.4f,0.4f}/*16:Forest*/,{0.6f,0.5f}/*17:City[unused]*/,{0.8f,0.6f}/*18:Mountains[unused]*/,{0.85f,0.7f}/*19:Quarry[unused]*/,{0.2f,0.3f}/*20:Plain[unused]*/,{0.5f,0.45f}/*21:ParkingLot[unused]*/,{0.9f,0.8f}/*22:SewerPipe*/,{0.7f,0.9f}/*23:Underwater[unused]*/,{0.3f,0.6f}/*24:Drugged[unused]*/,
-                                                            {0.4f,0.7f}/*25:Dizzy[unused]*/,{0.9f,0.95f}/*26:Psychotic[unused]*/,{0.5f,0.5f}/*27:User (default)[unused]*/};
+static const struct {float sz,wet;} ReverbPresetParams[28]={{0.0f,0.0f}/*0:Off*/,{0.3f,0.4f}/*1:Generic*/,{0.1f,0.3f}/*2:PaddedCell*/,{0.4f,0.5f}/*3:Room*/,{0.6f,0.7f}/*4:Bathroom*/,{0.5f,0.6f}/*5:Livingroom*/,{0.8f,0.7f}/*6:Stoneroom*/,{0.9f,0.8f}/*7:Auditorium*/,{1.0f,0.9f}/*8:ConcertHall*/,{0.95f,0.85f}/*9:Cave*/,{1.0f,0.8f}/*10:Arena*/,{0.9f,0.75f}/*11:Hangar*/,{0.2f,0.4f}/*12:CarpetHallway*/,{0.4f,0.5f}/*13:Hallway*/,{0.7f,0.65f}/*14:StoneCorridor*/,
+                                                            {0.5f,0.55f}/*15:Alley*/,{0.4f,0.4f}/*16:Forest*/,{0.6f,0.5f}/*17:City*/,{0.8f,0.6f}/*18:Mountains*/,{0.85f,0.7f}/*19:Quarry*/,{0.2f,0.3f}/*20:Plain*/,{0.5f,0.45f}/*21:ParkingLot*/,{0.9f,0.8f}/*22:SewerPipe*/,{0.7f,0.9f}/*23:Underwater*/,{0.3f,0.6f}/*24:Drugged*/,{0.4f,0.7f}/*25:Dizzy*/,{0.9f,0.95f}/*26:Psychotic*/,{0.5f,0.5f}/*27:Default*/};
 void synth_set_room(float sz, float wet) {
-    static float last_sz = -1.0f; static bool first_call = true;
-    if (first_call || sz != last_sz) {
-        float scale = 1.0f + sz*4.0f, fb = 0.3f + sz*0.62f;
-        for (u32 i=0;i<4;++i) { u32 len = (u32)(REV_BASE[i] * scale); if (len >= REV_BUF_LEN) len = REV_BUF_LEN - 1; rev_len[i] = len; rev_fb[i] = fb * (0.97f + i*0.007f); rev_lp[i] = 0.0f; rev_idx[i] = 0; }
-        mset(rev_buf,0,sizeof(rev_buf));
-        mset( ap_buf,0,sizeof(ap_buf));
-        ap_idx[0] = ap_idx[1] = 0;
-        last_sz = sz;
-        first_call = false;
-    }
-    rev_wet = wet;
-    rev_dry = 1.0f;
+    static float lastsz = -1.0f; static bool first_call = true;
+    if (first_call || sz != lastsz) { float scale = 1.0f + sz*4.0f, fb = 0.3f + sz*0.62f; for (u32 i=0;i<4;++i) { u32 len = (u32)(REV_BASE[i] * scale); if (len >= REV_BUF_LEN) len = REV_BUF_LEN - 1; rev_len[i] = len; rev_fb[i] = fb * (0.97f + i*0.007f); rev_lp[i] = 0.0f; rev_idx[i] = 0; } mset(rev_buf,0,sizeof(rev_buf)); mset( ap_buf,0,sizeof(ap_buf)); ap_idx[0] = ap_idx[1] = 0; lastsz = sz; first_call = false; } rev_wet = wet; rev_dry = 1.0f;
 }
-
-void synth_set_reverb_preset(u16 preset) { if (preset < 28) { synth_set_room(ReverbPresetParams[preset].sz, ReverbPresetParams[preset].wet); } else { synth_set_room(0.5f, 0.5f); } }
+void synth_set_reverb_preset(u16 preset) { if (preset < 28) { synth_set_room(ReverbPresetParams[preset].sz,ReverbPresetParams[preset].wet); } else { synth_set_room(0.5f,0.5f); } }
 static float reverb_tick(float in){float s=0.0f; for(u32 i=0;i<4;++i){float delayed=rev_buf[i][rev_idx[i]]; rev_lp[i]+=0.5f*(delayed-rev_lp[i]); rev_buf[i][rev_idx[i]]=in+rev_lp[i]*rev_fb[i]; rev_idx[i]=(rev_idx[i]+1>=rev_len[i]) ? 0 : rev_idx[i]+1; s+=delayed;} s*=0.25f; for(u32 i=0;i<2;++i){float delayed=ap_buf[i][ap_idx[i]]; float w=s+delayed*0.5f; ap_buf[i][ap_idx[i]]=w; ap_idx[i]=(ap_idx[i]+1>=AP_LEN[i]) ? 0 : ap_idx[i]+1; s=delayed-0.5f*w;} return s;}
 static void synth_mix(SynthVoice* v, float* mix) { float vol=AppliedFXVol(v->vol); if(v->positional){float d=V3_Dist(v->pos,World.position[PLAYER1]); vol*=(d >= 64.0f) ? 0.0f : (d <= 1.0f) ? 1.0f : 1.0f-(d-1.0f)/63.0f;} for(i32 f=0;f<AUDIO_FRAMES;f++){if(v->frame >= v->frames){v->active=false; return;} float s=v->fn(v)*vol; mix[f*2+0]+=s; mix[f*2+1]+=s; v->frame++;} }
 void synth_reverb_apply(float* mix, i32 frames){ if (rev_wet < 0.001f) return; for (i32 f = 0; f < frames; f++) { float mono = (mix[f*2+0] + mix[f*2+1]) * 0.5f; float wet  = reverb_tick(mono); mix[f*2+0] = mix[f*2+0] * rev_dry + wet * rev_wet; mix[f*2+1] = mix[f*2+1] * rev_dry + wet * rev_wet; } }
@@ -442,7 +428,7 @@ static void audio_mix_period(i16 *out) {
 }
 
 void play_wav_ext(const char *path,float volume,V3 pos,bool positional,float pitch) {
-    if(!path || slen(path) < 1 || sEqual(path,"null")){return;} char p[128]; sFormat(p,sizeof(p),"./Audio/%s.wav",path); bool isMp3=false; if(!OS_FileExists(p)){sFormat(p,sizeof(p),"./Audio/%s.mp3",path); isMp3=true;} i32 slot=GetFreeWavSlot(); if(slot==-1){ if(wav_count < MAX_CHANNELS){ slot=(i32)wav_count; wav_count++; } } if(slot==-1){DualLogWarn("Max WAV channels (%d) reached\n",MAX_CHANNELS); return;}
+    if (!path || slen(path) < 1) { return; } char p[128]; sFormat(p,sizeof(p),"./Audio/%s.wav",path); bool isMp3=false; if(!OS_FileExists(p)){sFormat(p,sizeof(p),"./Audio/%s.mp3",path); isMp3=true;} i32 slot=GetFreeWavSlot(); if(slot==-1){ if(wav_count < MAX_CHANNELS){ slot=(i32)wav_count; wav_count++; } } if(slot==-1){DualLogWarn("Max WAV channels (%d) reached\n",MAX_CHANNELS); return;}
     float *buf=NULL; u32 frames=0; size_t sz=0; i32 cslot=audioCacheAcquire(p,isMp3,&buf,&frames,&sz); if(!buf){DualLogError("Failed to load%s\n",p); return;} wav_ch[slot] = (wav_channel_t){.samples=buf, .allocSize=sz, .frame_count=frames, .frame_pos=0, .volume=volume, .pitch=pitch, .looping=false, .positional=positional, .pos=pos, .playing=true, .cacheSlot=cslot};
 }
 
@@ -508,9 +494,8 @@ void mp3_clear() { for (i32 i=0;i<2;i++) { mp3_fade_out_target[i]=NULL; mp3_chan
 #endif
 // Looping Ambients SFX System
 typedef struct { wav_channel_t sound; u32 loaded; } AmbientSlot; typedef struct { u16 index; float vol; const char* filename; } AmbientDef; static u16 ambReg[MAXAMB]; static AmbientSlot ambientSlots[MAXAMB] = {0}; static u16 ambs=0;
-static const AmbientDef ambientSounds[] = {{621,0.05f,"airhiss"},{622,0.20f,"clicker"},{623,0.4f,"compressor"},{624,0.2f,"dishwasher"},{625,0.5f,"drip_amb"},{626,0.3f,"fan1"},{627,0.3f,"generator_gas"},{628,0.3f,"gurgle"},{629,0.6f,"icemaker"},{630,0.2f,"intake"},{631,0.4f,"lathe"},{632,0.1f,"lev3loop1"},{633,0.1f,"lev3loop2"},{634,0.1f,"lev3loop3"},{635,0.1f,"lev3loop4"},{636,1.0f,"liquid_bubble"},{637,0.4f,"lava2"},{638,0.4f,"rain"/*looping*/},
-                                           {639,0.4f,"machgear_loop"},{640,0.8f,"machine_ambience"},{641,0.6f,"machine_go"},{642,1.0f,"machine_humamb7"},{643,0.4f,"machine_humlonoise"},{644,0.4f,"machine_loop1"},{645,0.4f,"machine_loop2"},{646,0.4f,"machinea1"},{647,0.8f,"machinevat_loop"},{648,0.02f,"steam_loop" },{649,0.65f,"pipewater_loop"},{650,0.3f,"powerloom"},{651,0.2f,"pump"},{652,0.05f,"pump2"},{653,0.55f,"rain"},{654,0.1f,"steam_loop"},
-                                           {655,0.5f,"washing_machine"}};
+static const AmbientDef ambientSounds[] = {{621,.05f,"airhiss"},{622,.20f,"clicker"},{623,.4f,"compressor"},{624,.2f,"dishwasher"},{625,.5f,"drip_amb"},{626,.3f,"fan1"},{627,.3f,"generator_gas"},{628,.3f,"gurgle"},{629,.6f,"icemaker"},{630,.2f,"intake"},{631,.4f,"lathe"},{632,.1f,"lev3loop1"},{633,.1f,"lev3loop2"},{634,.1f,"lev3loop3"},{635,.1f,"lev3loop4"},{636,1.0f,"liquid_bubble"},{637,.4f,"lava2"},{638,.4f,"rain"},{639,.4f,"machgear_loop"},
+                                           {640,.8f,"machine_ambience"},{641,.6f,"machine_go"},{642,1.0f,"machine_humamb7"},{643,.4f,"machine_humlonoise"},{644,.4f,"machine_loop1"},{645,.4f,"machine_loop2"},{646,.4f,"machinea1"},{647,.8f,"machinevat_loop"},{648,.02f,"steam_loop" },{649,.65f,"pipewater_loop"},{650,.3f,"powerloom"},{651,.2f,"pump"},{652,0.05f,"pump2"},{653,0.55f,"rain"},{654,0.1f,"steam_loop"},{655,.5f,"washing_machine"}};
 void MixAmbs() {
     u32 loadsLeft = 1;
     for (u16 i=0;i<ambs;++i) {
@@ -525,7 +510,7 @@ void MixAmbs() {
 void ResetLevelAudio(){ambs=0; mset(ambReg,0,MAXAMB*sizeof(u16)); for(u32 s=0;s<MAXAMB;++s){if(ambientSlots[s].loaded){ambientSlots[s].sound.playing=false;}} for(u16 i=INSTS_1ST_IDX;i<World.instCount;++i){if(IdxIsAmbient(World.instances[i].index)){ambReg[ambs]=i; ambs++; if(ambs>=MAXAMB){DualLogError("Ambients %u > %u!\n",ambs,MAXAMB); break;}}}}
 void SndClearAll() { for (u32 i=0;i<wav_count;++i) { if (wav_ch[i].playing) SndUninit(&wav_ch[i]); } for (u32 s=0;s<MAXAMB;++s) { ambientSlots[s].sound.playing=false; } ext_count=0; if (log_ch) { mp3_uninit(&log_ch->dec); log_ch=NULL; } mset(rev_buf,0,sizeof(rev_buf)); mset(ap_buf,0,sizeof(ap_buf)); mset(rev_lp,0,sizeof(rev_lp)); }
 // Music System
-static const char* loopMusic[MAX_LEVELS]={"looped/track0","looped/track1","looped/track2","looped/track3","looped/track2","looped/track0","looped/track6","looped/track0","looped/track8","misc/null","looped/track10","looped/track10","looped/track10","looped/track13"}; const char* cyberMusic[13]={"THM10-02_cyberstart","THM10-01_cyber1","THM10-03_cyber2","THM10-04_cyber3","THM10-05_cyber4","THM10-06_cyber5","THM10-07_cyber6","THM10-08_cyber7","THM10-09_cyber8"};
+static const char* loopMusic[MAX_LEVELS]={"track0","track1","track2","track3","track2","track0","track6","track0","track8","","track10","track10","track10","track13"}; const char* cyberMusic[13]={"THM10-02_cyberstart","THM10-01_cyber1","THM10-03_cyber2","THM10-04_cyber3","THM10-05_cyber4","THM10-06_cyber5","THM10-07_cyber6","THM10-08_cyber7","THM10-09_cyber8"};
 static const char* reactorMusic[13]={"THM4-01_reactorcombat1","THM4-02_reactorcombat2","THM4-03_reactorcombat3","THM4-04_reactorcombat4","THM4-05_reactorwalkingatocombat","THM4-06_reactorwalkingbtocombat","THM4-09_reactorwalkinga1","THM4-10_reactorwalkinga2","THM4-11_reactorwalkingb1","THM4-12_reactorwalkingb2","THM4-13_reactorwalkingb3","THM4-14_reactorwalkingc1","THM4-15_reactorwalkingc2"};
 static const char* medMusic[11]={"THM1-19_medicalstart","THM1-01_medicalwalking1","THM1-02_medicalwalking2","THM1-03_medicalwalking3","THM1-04_medicalwalking4","THM1-05_medicalcombat1","THM1-06_medicalcombat2","THM1-07_medicalcombat3","THM1-08_medicalcombat4","THM1-09_medicalcombat5","THM1-10_medicalcombat6"};
 static const char* sciMusic[10]={"THM3-17_sciencestart","THM3-03_science1","THM3-04_science2","THM3-05_science3","THM3-06_science4","THM3-07_science5","THM3-08_science6","THM3-09_science7","THM3-01_scienceaction1","THM3-02_scienceaction2"}; const char* dieMusic="THM0-17_death";
@@ -540,19 +525,18 @@ void PlayDeathVideoMusic() { videoPageClip = "./Audio/music/THM0-17_death.mp3"; 
 void PlayMenuMusic() { videoPageClip = NULL; mp3_clear(); play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500); }
 void StopVideoPageMusic() { videoPageClip = NULL; mp3_clear(); } // Clip teardown with no replacement track, for leaving a clip page straight back into the paused game where no menu music belongs. Clearing videoPageClip also stops UpdateAudio from looping the bed back in.
 const char* GetCorrespondingLevelClip(TrackType ttype) {
-    switch(ttype) { case TT_Revive:return reviveMusic[World.curLev]; case TT_Die:return dieMusic; case TT_Elev:return elevMusic; case TT_Distortion:return distrtMusic[World.curLev]; }/*Override types*/
-    static const struct { const char** tracks; u8 entry,combatMin,combatMax,walkMin,walkMax; } lists[]={{reactorMusic,6,0,5,6,12},{medMusic,0,5,10,1,4},{sciMusic,0,8,9,1,7},{securityMusic,9,0,5,6,18},{execMusic,0,9,12,0,9},{groveMusic,19,0,8,9,23}};
-    static const u8 levelList[MAX_LEVELS]={0,1,2,255,2,0,4,0,3,255,5,5,5,255};
+    switch(ttype) { case TT_Revive: return reviveMusic[World.curLev]; case TT_Die: return dieMusic; case TT_Elev: return elevMusic; case TT_Distortion: return distrtMusic[World.curLev]; }/*Override types*/
+    static const struct { const char** tracks; u8 entry,combatMin,combatMax,walkMin,walkMax; } lists[]={{reactorMusic,6,0,5,6,12},{medMusic,0,5,10,1,4},{sciMusic,0,8,9,1,7},{securityMusic,9,0,5,6,18},{execMusic,0,9,12,0,9},{groveMusic,19,0,8,9,23}}; static const u8 levelList[MAX_LEVELS]={0,1,2,255,2,0,4,0,3,255,5,5,5,255};
     u8 li=World.curLev<MAX_LEVELS ? levelList[World.curLev] : 255;
     if (li<sizeof(lists)/sizeof(lists[0])) { if (World.Sys_Music.levelEntry) return lists[li].tracks[lists[li].entry]; bool combat=ttype==TT_Combat; return lists[li].tracks[random_range_u8(combat ? lists[li].combatMin : lists[li].walkMin,combat ? lists[li].combatMax : lists[li].walkMax)]; }
-    if (World.curLev==13){if(World.Sys_Music.levelEntry){return cyberMusic[0];} if(World.Sys_Music.cyberTube){return cyberMusic[random_range_u8(4,7)];} if (random_range(0.0f,1.0f) < 0.5f){return cyberMusic[random_range_u8(1,4)];} return cyberMusic[8]; }/*13 CYBERSPACE*/     return loopMusic[0];
+    if (World.curLev == 13) { if (World.Sys_Music.levelEntry) { return cyberMusic[0]; } if (World.Sys_Music.cyberTube) { return cyberMusic[random_range_u8(4,7)]; } if (random_range(0.0f,1.0f) < 0.5f) { return cyberMusic[random_range_u8(1,4)]; } return cyberMusic[8]; }     return "THM1-01_medicalwalking1";
 }
 void PlayTrack(TrackType ttype, MusicType mtype) {
-    const char* clip; bool dynamic=Sys_Settings.DynamicMusic;
-    if (dynamic) { if (mtype==MT_Override) mp3_clear(); clip=GetCorrespondingLevelClip(ttype); }
-    else if (mtype==MT_Override) { switch (ttype) { case TT_Revive:clip=reviveMusic[World.curLev]; break; case TT_Die:clip=dieMusic; break; case TT_Elev:clip=elevMusic; break; case TT_Distortion:clip=distrtMusic[World.curLev]; break; default:return; } }
-    else { if (World.curLev==9) return; clip=loopMusic[World.curLev]; }
-    char p[128]; sFormat(p,sizeof(p),"./Audio/music/%s.mp3",clip); play_mp3(p,dynamic ? 50 : 0); if (dynamic && !World.Sys_Music.elevator) World.Sys_Music.levelEntry=false;
+    const char *clip; bool dynamic = Sys_Settings.DynamicMusic;
+    if (dynamic) { if (mtype == MT_Override) mp3_clear(); clip = GetCorrespondingLevelClip(ttype); }
+    else if (mtype == MT_Override) { switch (ttype) { case TT_Revive : clip = reviveMusic[World.curLev]; break; case TT_Die: clip = dieMusic; break; case TT_Elev: clip = elevMusic; break; case TT_Distortion: clip = distrtMusic[World.curLev]; break; default: return; } }
+    else { if (World.curLev == 9) return; clip = loopMusic[World.curLev]; }
+    char p[128]; sFormat(p,sizeof(p),dynamic ? "./Audio/music/%s.mp3" : "./Audio/music/looped/%s.mp3",clip); play_mp3(p,dynamic ? 50 : 0); if (dynamic && !World.Sys_Music.elevator) World.Sys_Music.levelEntry=false;
 }
 void UpdateAudio() {
     if (!World.paused && !World.menuActive) {MixAmbs();} if ((World.paused && !World.menuActive) || (!Sys_Settings.VolumeMusic && !videoPageClip)) { mp3_paused = true; return; }

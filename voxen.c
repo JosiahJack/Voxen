@@ -1902,7 +1902,7 @@ void InitalizeEnvironment() {
     NewGame();
     if (Sys_Settings.Reflections >= 1u) { EnsureReflectionResources(); }
     double initAudioStart = get_timed(); InitAudio(); synth_set_reverb_preset(0); 
-    //World.menuActive = true; //COMMENT for immediate into game
+    World.menuActive = true; //COMMENT for immediate into game
     if (playIntroAtBoot && World.menuActive) ChangeMenuPage(MPG_INTRO); else if (World.menuActive) { PlayMenuMusic(); } else { PlayTrack(TT_Walking, MT_Walking); }
     DualLog("Audio and Menu init.................................................................took %.6f secs\n",get_timed() - initAudioStart);
     DualLog("Scratch arena total peak: %u MB, ", (u32)(scratch_peak >> 20)); OS_Free(scratch_base,SCRATCH_ARENA_SIZE); // Free the initialization scratch arena.
