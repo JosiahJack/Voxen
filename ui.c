@@ -446,69 +446,67 @@ void UI_PuzzleGridCell(int cell) {
     }
 }
 void UI_PuzzleGridClose() { World.Sys_UI.mouseClickHeldOverGUI = true; World.Sys_UI.tetheredPGP = U16_MAX; World.Sys_UI.pg_solved = false; World.Sys_UI.pg_width = World.Sys_UI.pg_height = 0; SysUIDataClose(); }
-static i8 PWFindCol(const i8* arr,int wire) { for (i8 c=0;c<7;++c) if ((int)arr[c]==wire) return c; return -1; }
-static void PWClickEnd(int spot,bool colRH) {
+static i8 PWFindCol(const i8* arr, i32 wire) { for (i8 c=0;c<7;++c) if ((i32)arr[c] == wire) return c; return -1; }
+static void PWClickEnd(i32 spot,bool colRH) {
     if (spot<0||spot>6) return;
     i8* col=colRH?World.Sys_UI.pw_curR:World.Sys_UI.pw_curL; if (World.Sys_UI.pw_selectedWire >= 0 && World.Sys_UI.pw_selectedWireRH == colRH) { i8 sel = World.Sys_UI.pw_selectedWire; i8 temp = col[spot]; col[spot] = col[sel]; col[sel] = temp; World.Sys_UI.pw_selectedWire = -1; return; } World.Sys_UI.pw_selectedWire = -1; if (col[spot] >= 0 && World.Sys_UI.pw_wireOn[col[spot]]) { World.Sys_UI.pw_selectedWire = (i8)spot; World.Sys_UI.pw_selectedWireRH = colRH; }
 }
 static float PWMatchValue(void) { float match=0.0f; for (i8 w=0;w<7;++w) { if (!World.Sys_UI.pw_wireOn[w]) { continue; } i8 l = PWFindCol(World.Sys_UI.pw_curL,w), r = PWFindCol(World.Sys_UI.pw_curR,w); if (l>=0 && l==World.Sys_UI.pw_tgtL[w]) match += 0.19f; if (r>=0 && r==World.Sys_UI.pw_tgtR[w]) match += 0.19f; } if (World.diffPuz==1) { match += 0.19f; } return match; }
 static void PWEval(void) { float match=PWMatchValue(); bool all=true; for (i8 w=0;w<7;++w) { if (!World.Sys_UI.pw_wireOn[w]) continue; i8 l=PWFindCol(World.Sys_UI.pw_curL,w),r=PWFindCol(World.Sys_UI.pw_curR,w); if (!(l>=0 && l==World.Sys_UI.pw_tgtL[w] && r>=0 && r==World.Sys_UI.pw_tgtR[w])) all=false; } World.Sys_UI.pw_solved=(match>0.92f || all); }
-void UI_WireNodeClick(bool rh,int node) {
+void UI_WireNodeClick(bool rh, i32 node) {
     World.Sys_UI.mouseClickHeldOverGUI = true; (void)rh; if (World.Sys_UI.tetheredPWP == U16_MAX || World.Sys_UI.pw_solved || node < 0 || node > 13) { return; } if (!World.Sys_UI.pw_rowActive[node%7]) { return; }
     PWClickEnd(node % 7, node >= 7); PWEval(); if (World.Sys_UI.pw_solved) { u16 pw=World.Sys_UI.tetheredPWP; if (pw>=INSTS_1ST_IDX && pw<World.instCount) { UseTargets(pw,World.instances[pw].targetIdx); if (World.instances[pw].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pw].messageLingdex]); } }
 }
 void UI_WireClose() { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredPWP=U16_MAX; World.Sys_UI.pw_solved=false; World.Sys_UI.pw_selectedWire=-1; SysUIDataClose(); }
 void UI_BlockedClose() { World.Sys_UI.mouseClickHeldOverGUI=true; SysUIDataClose(); }
 void UI_SysAnalyzerClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; MFD_CloseData(); }
-void UI_MinigameStart(bool rh,int game) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastMinigameSideRH=rh; if (game<0||game>8) return; if (!World.invP1.hasMinigame) return; World.Sys_UI.mg_current=(i8)game; World.Sys_UI.mg_running[rh?1:0]=true; if (game==1) Mg15Reset(); CenterStatusPrint("%s %s",Sys_Text.stringTable[1021],mgName[game]); play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
-void UI_MinigameInput(bool rh,int x,int y) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.mg_current==1) Mg15Click(rh,x,y); }
+void UI_MinigameStart(bool rh, i32 game) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastMinigameSideRH=rh; if (game<0||game>8) return; if (!World.invP1.hasMinigame) return; World.Sys_UI.mg_current=(i8)game; World.Sys_UI.mg_running[rh?1:0]=true; if (game==1) Mg15Reset(); CenterStatusPrint("%s %s",Sys_Text.stringTable[1021],mgName[game]); play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
+void UI_MinigameInput(bool rh, i32 x, i32 y) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.mg_current==1) Mg15Click(rh,x,y); }
 void UI_MinigameBack(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.mg_current<0) return; World.Sys_UI.mg_current=-1; World.Sys_UI.mg_running[rh?1:0]=false; play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
-#define LOG_TLINES 8
-#define LOG_PAGE_CHARS 568
-#define LOG_BTN_Y 721
-static int UILogWrap(char* out,int outSz,int startChar,int maxLines) {/*word-wraps the whole log; emits lines starting at or after startChar (up to maxLines) into out joined by \n; returns the total wrapped line count*/
-    int li=(int)World.Sys_UI.logReferenceIndex; if (li<0||li>=LOGCNT||!out||outSz<8) { if(out&&outSz) *out=0; return 0; }
+static i32 UILogWrap(char* out, i32 outSz, i32 startChar, i32 maxLines) {/*word-wraps the whole log; emits lines starting at or after startChar (up to maxLines) into out joined by \n; returns the total wrapped line count*/
+    i32 li = (i32)World.Sys_UI.logReferenceIndex; if (li < 0 || li >= LOGCNT || !out || outSz < 8) { if (out&&outSz) *out = 0; return 0; }
     const char* s=World.audioLogSpeech2Text[li]; char line[T_LOGSTR_MAX]; float maxU = (float)520 / 0.8f;
-    int total=0,op=0,emitted=0,lineStart=0;
+    i32 total = 0, op = 0, emitted = 0, lineStart = 0;
     while (*s) {
-        int n=0; float w=0; const char* lastSp=NULL; int lastN=0;
-        while (*s && n<(int)sizeof(line)-5) {
-            const u8* c=(const u8*)s; int clen=(*c<0x80)?1:(((*c&0xE0)==0xC0)?2:3);
-            if (n+clen>=(int)sizeof(line)-1) break;
-            mcpy(line+n,s,(size_t)clen); n+=clen; s+=clen; line[n]=0;
-            if (c[clen-1]==' '||c[clen-1]==',') { lastSp=s; lastN=n; }
-            w=MeasureLineAdvance(line,FONT_NORMAL);
-            if (w>maxU && n>0) { if (lastSp) { s=lastSp; n=lastN; } else { s-=clen; n-=clen; } break; }
+        i32 n = 0, lastN = 0; float w = 0; const char* lastSp = NULL;
+        while (*s && n < (i32)sizeof(line) - 5) {
+            const u8 *c = (const u8*)s; i32 clen = (*c < 0x80) ? 1 : (((*c & 0xE0) == 0xC0) ? 2 : 3);
+            if (n + clen >= (i32)sizeof(line) - 1) break;
+            mcpy(line + n,s,(size_t)clen); n += clen; s += clen; line[n] = 0;
+            if (c[clen-1] == ' ' || c[clen-1] == ',') { lastSp = s; lastN = n; }
+            w = MeasureLineAdvance(line,FONT_NORMAL);
+            if (w > maxU && n > 0) { if (lastSp) { s = lastSp; n = lastN; } else { s -= clen; n -= clen; } break; }
         }
         if (!n) { break; }
-        line[n]=0; if (line[n-1]==' ') line[--n]=0;
-        if (lineStart>=startChar && emitted<maxLines && op+n+1<outSz) { mcpy(out+op,line,(size_t)n); op+=n; out[op++]='\n'; emitted++; }
-        lineStart+=n; total++;
-    }
-    out[op]=0; return total;
+        line[n] = 0; if (line[n - 1] == ' ') line[--n] = 0;
+        if (lineStart >= startChar && emitted < maxLines && op + n + 1 < outSz) { mcpy(out + op,line,(size_t)n); op += n; out[op++] = '\n'; emitted++; }
+        lineStart += n; total++;
+    } out[op] = 0; return total;
 }
 static char logPageBuf[T_LOGSTR_MAX],UILogCountBuf[8];
-static int UILogTotalLines(void) { return UILogWrap(logPageBuf,sizeof(logPageBuf),(int)World.Sys_UI.logReaderPage*LOG_PAGE_CHARS,8); }
-static int UILogFullLines(void) { return UILogWrap(UILogCountBuf,sizeof(UILogCountBuf),0,0); }
-static bool UILogHasMore(void) { int li=(int)World.Sys_UI.logReferenceIndex; if (li<0||li>=LOGCNT) return false; return (int)slen(World.audioLogSpeech2Text[li]) > (int)(World.Sys_UI.logReaderPage+1)*LOG_PAGE_CHARS; }
+static i32 UILogTotalLines() { return UILogWrap(logPageBuf,sizeof(logPageBuf),(i32)World.Sys_UI.logReaderPage * 568,8); }
+static i32 UILogFullLines() { return UILogWrap(UILogCountBuf,sizeof(UILogCountBuf),0,0); }
+static bool UILogHasMore() { i32 li = (i32)World.Sys_UI.logReferenceIndex; if (li < 0 || li >= LOGCNT) return false; return (i32)slen(World.audioLogSpeech2Text[li]) > (i32)(World.Sys_UI.logReaderPage + 1) * 568; }
 static const char* UILogTextPage() { UILogTotalLines(); return logPageBuf; }
-void MFD_OpenAudioLog(int idx) { if (idx<0||idx>=LOGCNT) return; World.invP1.hardwareIsActive|=HW_ERD; World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.logReaderPage=0; MFD_OpenData(false,6); if (Sys_Text.audioLogImagesRefIndicesRH[idx]) MFD_OpenData(true,6); World.Sys_UI.mfdTab[0]=5; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT; }
-void MFD_OpenPaperLog(int idx, V3 tetherPoint) { if (idx<0||idx>=LOGCNT) return; World.invP1.hardwareIsActive|=HW_ERD; if (Sys_Text.audioLogImagesRefIndicesLH[idx]) MFD_OpenData(false,6); if (Sys_Text.audioLogImagesRefIndicesRH[idx]) MFD_OpenData(true,6); World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.logReaderPage=0; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT; World.Sys_UI.mfdTab[0]=5; World.Sys_UI.MFD_MediaTab=MM_LOG_TABLE; World.Sys_UI.objectInUsePos=tetherPoint; }
-static void UIOpenEntryAndRead(int idx,bool playable) {
+void MFD_OpenAudioLog(i32 idx) { if (idx<0||idx>=LOGCNT) return; World.invP1.hardwareIsActive|=HW_ERD; World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.logReaderPage=0; MFD_OpenData(false,6); if (Sys_Text.audioLogImagesRefIndicesRH[idx]) MFD_OpenData(true,6); World.Sys_UI.mfdTab[0]=5; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT; }
+void MFD_OpenPaperLog(i32 idx, V3 tetherPoint) {
+    if (idx < 0 || idx >= LOGCNT) return; World.invP1.hardwareIsActive|=HW_ERD; if (Sys_Text.audioLogImagesRefIndicesLH[idx]) MFD_OpenData(false,6); if (Sys_Text.audioLogImagesRefIndicesRH[idx]) MFD_OpenData(true,6); World.Sys_UI.logReferenceIndex = (u16)idx; World.Sys_UI.logReaderPage=0; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT; World.Sys_UI.mfdTab[0]=5; World.Sys_UI.MFD_MediaTab=MM_LOG_TABLE; World.Sys_UI.objectInUsePos=tetherPoint;
+}
+static void UIOpenEntryAndRead(i32 idx, bool playable) {
     if (idx<0||idx>=LOGCNT) return; World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT; World.Sys_UI.logReaderPage=0; World.invP1.readLog[idx]=true;
     if (playable && (World.invP1.hasHardware&HW_ERD) && audioLogs[idx] && audioLogs[idx][0]) PlayLog(idx); CheckForUnreadLogs(); if (!World.invP1.hasNewEmail && !World.invP1.hasNewLogs && !World.invP1.hasNewNotes) World.Sys_UI.highlightStatus[MM_EMAIL_TABLE]=World.Sys_UI.highlightStatus[MM_LOG_TABLE]=World.Sys_UI.highlightStatus[MM_DATA_TABLE]=false;
 }
-void UI_LogTableClick(int level) { World.Sys_UI.mouseClickHeldOverGUI=true; if (level<0||level>9) return; World.invP1.hardwareIsActive|=HW_ERD; World.Sys_UI.logFolderCount=0; World.Sys_UI.MFD_ReaderView=MFD_READER_FOLDER; for (int i=0;i<LOGCNT && World.Sys_UI.logFolderCount<15;++i) if (World.invP1.hasLog[i] && Sys_Text.audioLogLevelFound[i]==(u8)level) { World.Sys_UI.logFolderList[World.Sys_UI.logFolderCount]=(i16)i; World.Sys_UI.logFolderCount++; } play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
-void UI_LogEntryClick(int entry) { World.Sys_UI.mouseClickHeldOverGUI=true; if (entry<0||entry>=(int)World.Sys_UI.logFolderCount) return; UIOpenEntryAndRead((int)World.Sys_UI.logFolderList[entry],true); }
-static int UIEmailRefAt(int pos) { int c=0; for (int i=0;i<LOGCNT;++i) if (World.invP1.hasLog[i] && Sys_Text.audioLogType[i]==AudioLogType_Email) { if (c==pos) return i; ++c; } return -1; }
-static int UIDataRefAt(int pos) { int c=0; for (int i=0;i<LOGCNT;++i) if (World.invP1.hasLog[i] && Sys_Text.audioLogType[i]==AudioLogType_Papers) { if (c==pos) return i; ++c; } return -1; }
-void UI_EmailEntryClick(int entry) { World.Sys_UI.mouseClickHeldOverGUI=true; if (entry<0||entry>14) return; int idx=UIEmailRefAt(entry); if (idx<0) return; UIOpenEntryAndRead(idx,false); }/*emails have no voice track*/
-void UI_DataEntryClick(int entry) { World.Sys_UI.mouseClickHeldOverGUI=true; if (entry<0||entry>12) return; int idx=UIDataRefAt(entry); if (idx<0) return; UIOpenEntryAndRead(idx,false); }
-void UI_LogMore(void) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.MFD_ReaderView!=MFD_READER_TEXT) return; if (UILogHasMore()) { World.Sys_UI.logReaderPage++; return; }/*[MORE]*/ World.Sys_UI.logReaderPage=0; MFD_CloseData();/*[CLOSE]*/ World.Sys_UI.MFD_ReaderView=MFD_READER_FOLDER; }
-void UI_LogBack(void) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.MFD_ReaderView==MFD_READER_TEXT) { if (World.Sys_UI.logReaderPage>0) { World.Sys_UI.logReaderPage--; return; } return; } if (World.Sys_UI.MFD_ReaderView==MFD_READER_FOLDER) World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS; }
-void UI_NoteToggleClick(int note) { World.Sys_UI.mouseClickHeldOverGUI=true; if (note<0||note>17) return; if (!World.questNotesActive[note]) return; World.questNotesChecked[note]=!World.questNotesChecked[note]; play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
-void UI_HardwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if (idx<0||idx>=HW_COUNT) return; World.invP1.hardwareInvCurrent=idx; play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); bool rh=World.Sys_UI.lastItemSideRH; World.Sys_UI.mfdHardwareItem=true; World.Sys_UI.mfdGeneralItem=false; softwareInvCurrent=-1; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; if (idx==HW_SYS_IDX) { MFD_OpenData(World.Sys_UI.lastDataSideRH,7); return; } World.Sys_UI.mfdTab[1+!!rh]=2; }
-void UI_SoftwareRowClick(int idx,bool dbl) {
+void UI_LogTableClick(i32 level) { World.Sys_UI.mouseClickHeldOverGUI=true; if (level<0||level>9) return; World.invP1.hardwareIsActive|=HW_ERD; World.Sys_UI.logFolderCount=0; World.Sys_UI.MFD_ReaderView=MFD_READER_FOLDER; for (i32 i=0;i<LOGCNT && World.Sys_UI.logFolderCount<15;++i) if (World.invP1.hasLog[i] && Sys_Text.audioLogLevelFound[i]==(u8)level) { World.Sys_UI.logFolderList[World.Sys_UI.logFolderCount]=(i16)i; World.Sys_UI.logFolderCount++; } play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
+void UI_LogEntryClick(i32 entry) { World.Sys_UI.mouseClickHeldOverGUI=true; if (entry<0||entry >= (i32)World.Sys_UI.logFolderCount) return; UIOpenEntryAndRead((i32)World.Sys_UI.logFolderList[entry],true); }
+static i32 UIEmailRefAt(i32 pos) { i32 c = 0; for (i32 i=0;i<LOGCNT;++i) if (World.invP1.hasLog[i] && Sys_Text.audioLogType[i] ==  AudioLogType_Email) { if (c == pos) return i; ++c; } return -1; }
+static i32 UIDataRefAt(i32 pos ) { i32 c = 0; for (i32 i=0;i<LOGCNT;++i) if (World.invP1.hasLog[i] && Sys_Text.audioLogType[i] == AudioLogType_Papers) { if (c == pos) return i; ++c; } return -1; }
+void UI_EmailEntryClick(i32 entry) { World.Sys_UI.mouseClickHeldOverGUI = true; if (entry < 0 || entry > 14) return; i32 idx = UIEmailRefAt(entry); if (idx < 0) return; UIOpenEntryAndRead(idx,false); }/*emails have no voice track*/
+void UI_DataEntryClick(i32 entry)  { World.Sys_UI.mouseClickHeldOverGUI = true; if (entry < 0 || entry > 12) return; i32 idx =  UIDataRefAt(entry); if (idx < 0) return; UIOpenEntryAndRead(idx,false); }
+void UI_LogMore() { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.MFD_ReaderView!=MFD_READER_TEXT) return; if (UILogHasMore()) { World.Sys_UI.logReaderPage++; return; }/*[MORE]*/ World.Sys_UI.logReaderPage=0; MFD_CloseData();/*[CLOSE]*/ World.Sys_UI.MFD_ReaderView=MFD_READER_FOLDER; }
+void UI_LogBack() { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.MFD_ReaderView==MFD_READER_TEXT) { if (World.Sys_UI.logReaderPage>0) { World.Sys_UI.logReaderPage--; return; } return; } if (World.Sys_UI.MFD_ReaderView==MFD_READER_FOLDER) World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS; }
+void UI_NoteToggleClick(i32 note) { World.Sys_UI.mouseClickHeldOverGUI=true; if (note<0||note>17) return; if (!World.questNotesActive[note]) return; World.questNotesChecked[note]=!World.questNotesChecked[note]; play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
+void UI_HardwareRowClick(i32 idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if (idx<0||idx>=HW_COUNT) return; World.invP1.hardwareInvCurrent=idx; play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); bool rh=World.Sys_UI.lastItemSideRH; World.Sys_UI.mfdHardwareItem=true; World.Sys_UI.mfdGeneralItem=false; softwareInvCurrent=-1; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; if (idx==HW_SYS_IDX) { MFD_OpenData(World.Sys_UI.lastDataSideRH,7); return; } World.Sys_UI.mfdTab[1+!!rh]=2; }
+void UI_SoftwareRowClick(i32 idx,bool dbl) {
     World.Sys_UI.mouseClickHeldOverGUI=true; if (idx<0||idx>6) return; bool cyber = World.curLev == LEVEL_CYBERSPACE;/*row 0 ICE Drill, 1 Pulser, 2 Cyber Shield, 3 Turbo, 4 Decoy, 5 Recall, 6 Games*/
     softwareInvCurrent=(i8)idx; play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0},false); bool rh=World.Sys_UI.lastItemSideRH; World.Sys_UI.mfdHardwareItem=false; World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; World.Sys_UI.mfdTab[1+!!rh]=2; if (!dbl) return;
     if (idx==SW_DRILL)  { World.invP1.isPulserNotDrill = false; play_wav("hud/changeweapon",AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ return; }
@@ -943,9 +941,8 @@ void CenterMFD() { //640x240
         }
         if (World.Sys_UI.mfdTab[0]==4) {/*Software*/
             UIRText(UI_ID_CMFD_SOFTWARE_HEADER,372,hdrH,T_RED,FONT_NORMAL,0.8f,260,Sys_Text.stringTable[876]/*SOFTS*/);
-            for (int i=0;i<7;++i) { bool owned; int count=0;
-                if (i<SW_GAMES) { count=World.invP1.softVersions[i]; if (count<0) count=0; owned=(World.invP1.hasSoft&(1u<<i))!=0 || count>0; } else owned=World.invP1.hasMinigame;
-                if (!owned) continue;
+            for (int i=0;i<7;++i) { bool owned; u8 count = 0;
+                if (i<SW_GAMES) { count = World.invP1.softVersions[i]; owned = (World.invP1.hasSoft & (1u << i)) != 0 || count > 0; } else { owned = World.invP1.hasMinigame; } if (!owned) continue;
                 i16 y=generalRowY[i]; const char* label=swLabels[i]; bool selected = (i==SW_DRILL) ? !World.invP1.isPulserNotDrill : (i==SW_PULSER) ? World.invP1.isPulserNotDrill : (i>=SW_TURBO && i<=SW_RECALL) ? (i-SW_TURBO)==World.invP1.cyberItemIndex : false; float w=MeasureLineAdvance(label,FONT_NORMAL),sc=w>0?vmin(0.8f,210.0f/w):0.8f;
                 UIRText(UI_ID_CMFD_SOFTWARE_ROW_0+i,454,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,sc,210,label);
                 if (i<SW_GAMES) RenderTextL(680,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8f,(i<=SW_SHIELD)?"v%d":"x%d",count); else RenderTextL(680,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8f,"%d",World.invP1.hasMinigame?1:0); }
@@ -959,11 +956,11 @@ void CenterMFD() { //640x240
             } else if (World.Sys_UI.MFD_ReaderView==MFD_READER_FOLDER) {
                 for (u8 i=0;i<15;++i) { i16 x=mediaColX[i/8],y=mediaRowY[i%8]; int li=i<(int)World.Sys_UI.logFolderCount?World.Sys_UI.logFolderList[i]:-1; if(li<0){continue;} UIR(UI_ID_CMFD_LOG_ENTRY_0+i,x,y,222,21); RenderTextL(x,y,World.invP1.readLog[li]?T_GREEN_MENU_GLOW:T_GREEN,FONT_NORMAL,0.8,"%s",World.audiologNames[li]); }
             } else if (World.Sys_UI.MFD_ReaderView==MFD_READER_TEXT) {
-                UIR(UI_ID_CMFD_LOG_TEXT,372,574,520,LOG_TLINES*22); RenderTextL(372,574,T_GREEN,FONT_NORMAL,0.8f,"%s",UILogTextPage());
-                i16 cmw=(i16)(TAB_THICK+MFD_SPACING+SIDE_MFD_W+MFD_SPACINGCTR); bool more=UILogHasMore(); int totL=UILogFullLines();
+                UIR(UI_ID_CMFD_LOG_TEXT,372,574,520,176); RenderTextL(372,574,T_GREEN,FONT_NORMAL,0.8f,"%s",UILogTextPage());
+                i16 cmw=(i16)(TAB_THICK+MFD_SPACING+SIDE_MFD_W+MFD_SPACINGCTR); bool more=UILogHasMore(); int totL = UILogFullLines();
                 const char* mcb=Sys_Text.stringTable[more?26:27]; i16 mcbW=(i16)(MeasureLineAdvance(mcb,FONT_NORMAL)*0.8f);
-                UIR(UI_ID_CMFD_LOG_MORE,(i16)(cmw+CTR_MFD_W-mcbW),LOG_BTN_Y,mcbW,26); RenderTextL((i16)(cmw+CTR_MFD_W-mcbW),LOG_BTN_Y,T_YELLOW,FONT_NORMAL,0.8,"%s",mcb);
-                if (totL>LOG_TLINES) { const char* bk=Sys_Text.stringTable[879];/*[BACK] on every page of a multipage log*/ i16 bkW=(i16)(MeasureLineAdvance(bk,FONT_NORMAL)*0.8f); UIR(UI_ID_CMFD_LOG_BACK,372,LOG_BTN_Y,bkW,26); RenderTextL(372,LOG_BTN_Y,T_YELLOW,FONT_NORMAL,0.8,"%s",bk); } 
+                UIR(UI_ID_CMFD_LOG_MORE,(i16)(cmw+CTR_MFD_W-mcbW),721,mcbW,26); RenderTextL((i16)(cmw+CTR_MFD_W-mcbW),721,T_YELLOW,FONT_NORMAL,0.8,"%s",mcb);
+                if (totL > 8) { const char* bk=Sys_Text.stringTable[879];/*[BACK] on every page of a multipage log*/ i16 bkW = (i16)(MeasureLineAdvance(bk,FONT_NORMAL)*0.8f); UIR(UI_ID_CMFD_LOG_BACK,372,721,bkW,26); RenderTextL(372,721,T_YELLOW,FONT_NORMAL,0.8,"%s",bk); } 
             }
         }
         if (World.Sys_UI.MFD_MediaTab==MM_EMAIL_TABLE) { for (u8 i=0;i<15;++i) { i16 x=mediaColX[i/8],y=mediaRowY[i%8]; int li=UIEmailRefAt(i); if(li<0){continue;} UIR(UI_ID_CMFD_EMAIL_ENTRY_0+i,x,y,223,21); RenderTextL(x,y,World.invP1.readLog[li]?T_GREEN_MENU_GLOW:T_GREEN,FONT_NORMAL,0.8,"%s",World.audiologNames[li]); } }

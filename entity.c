@@ -416,9 +416,7 @@ void LoadLevelMod(u8 lev) {
         {"health",__builtin_offsetof(Entity,health),sizeof(((Entity*)0)->health),6,0,0,0},{"cyberHealth",__builtin_offsetof(Entity,cyberHealth),sizeof(((Entity*)0)->cyberHealth),11,0,0,0},{"startYAngle",__builtin_offsetof(Entity,camStartYAngle),sizeof(((Entity*)0)->camStartYAngle),11,0,0,0},{"endYAngle",__builtin_offsetof(Entity,camEndYAngle),sizeof(((Entity*)0)->camEndYAngle),9,0,0,0},
         {"waitTime",__builtin_offsetof(Entity,camWaitTime),sizeof(((Entity*)0)->camWaitTime),8,0,0,0},{"keycode",__builtin_offsetof(Entity,keycode),sizeof(((Entity*)0)->keycode),7,2,0,0},{"radiationAmount",__builtin_offsetof(Entity,radiation),sizeof(((Entity*)0)->radiation),15,0,0,0},{"ammo",__builtin_offsetof(Entity,ammo),sizeof(((Entity*)0)->ammo),4,1,0,0},
         {"ammo2",__builtin_offsetof(Entity,ammo2),sizeof(((Entity*)0)->ammo2),5,1,0,0},{"useableItemIndex",__builtin_offsetof(Entity,lookUpIndex),sizeof(((Entity*)0)->lookUpIndex),16,1,0,0},{"idleTime",__builtin_offsetof(Entity,idleTime),sizeof(((Entity*)0)->idleTime),8,0,0,0},{"lookUpIndex",__builtin_offsetof(Entity,lookUpIndex),sizeof(((Entity*)0)->lookUpIndex),11,1,0,0},
-        {"attack1SoundTime",__builtin_offsetof(Entity,attack1SoundTime),sizeof(((Entity*)0)->attack1SoundTime),16,0,0,0},{"attack2SoundTime",__builtin_offsetof(Entity,attack2SoundTime),sizeof(((Entity*)0)->attack2SoundTime),16,0,0,0},
-        {"attack3SoundTime",__builtin_offsetof(Entity,attack3SoundTime),sizeof(((Entity*)0)->attack3SoundTime),16,0,0,0},{"currentDestination.x",__builtin_offsetof(Entity,currentDestination.x),sizeof(((Entity*)0)->currentDestination.x),20,0,0,0},
-        {"currentDestination.y",__builtin_offsetof(Entity,currentDestination.y),sizeof(((Entity*)0)->currentDestination.y),20,0,0,0},{"currentDestination.z",__builtin_offsetof(Entity,currentDestination.z),sizeof(((Entity*)0)->currentDestination.z),20,0,0,0},
+        {"currentDestination.x",__builtin_offsetof(Entity,currentDestination.x),sizeof(((Entity*)0)->currentDestination.x),20,0,0,0},{"currentDestination.y",__builtin_offsetof(Entity,currentDestination.y),sizeof(((Entity*)0)->currentDestination.y),20,0,0,0},{"currentDestination.z",__builtin_offsetof(Entity,currentDestination.z),sizeof(((Entity*)0)->currentDestination.z),20,0,0,0},
         {"idealTransformForward.x",__builtin_offsetof(Entity,idealTransformForward.x),sizeof(((Entity*)0)->idealTransformForward.x),23,0,0,0},{"idealTransformForward.y",__builtin_offsetof(Entity,idealTransformForward.y),sizeof(((Entity*)0)->idealTransformForward.y),23,0,0,0},
         {"idealTransformForward.z",__builtin_offsetof(Entity,idealTransformForward.z),sizeof(((Entity*)0)->idealTransformForward.z),23,0,0,0},{"idealPos.x",__builtin_offsetof(Entity,idealPos.x),sizeof(((Entity*)0)->idealPos.x),10,0,0,0},{"idealPos.y",__builtin_offsetof(Entity,idealPos.y),sizeof(((Entity*)0)->idealPos.y),10,0,0,0},{"idealPos.z",__builtin_offsetof(Entity,idealPos.z),sizeof(((Entity*)0)->idealPos.z),10,0,0,0},
         {"targettingPosition.x",__builtin_offsetof(Entity,targettingPosition.x),sizeof(((Entity*)0)->targettingPosition.x),20,0,0,0},{"targettingPosition.y",__builtin_offsetof(Entity,targettingPosition.y),sizeof(((Entity*)0)->targettingPosition.y),20,0,0,0},
@@ -760,11 +758,9 @@ void LoadLevelSetup(u8 lev) {
     mset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, World.loadedLights * sizeof(u32));
 }
 void LoadLevel(u8 curlevel, V3 pos) {
-    u8 prevLevel = World.curLev;
-    if (curlevel == LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE) { World.cyberReturnLevel = (i8)World.curLev; World.cybRetPos = World.position[PLAYER1]; }
+    u8 prevLevel = World.curLev; if (curlevel == LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE) { World.cyberReturnLevel = (i8)World.curLev; World.cybRetPos = World.position[PLAYER1]; }
     LoadPerLevelModels(curlevel);
-    CloseSearch();
-    World.Sys_UI.tetheredKeypadKeycode = World.Sys_UI.tetheredKeypadElevator = World.Sys_UI.tetheredPGP = World.Sys_UI.tetheredPWP=U16_MAX;
+    CloseSearch(); World.Sys_UI.tetheredKeypadKeycode = World.Sys_UI.tetheredKeypadElevator = World.Sys_UI.tetheredPGP = World.Sys_UI.tetheredPWP=U16_MAX;
     World.levelCurrentlyLoading = true; World.paused = World.menuActive = false;
     if (World.curLev != curlevel) { CopyPlayerState(World.curLev,curlevel); PSysClearLevel(World.curLev); World.curLev = curlevel; SetLevelPointers(curlevel); }
     for (u16 i = PLAYER1; i < World.instCount; ++i) ComputeConvexMeshInertiaTensor(i);

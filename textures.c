@@ -225,17 +225,17 @@ void LoadTextures() {
     texCnt = (u16)(texCnt + VIDEO_RING);
     PngArenaInit(&g_vidArena); OS_ThreadCreate(&g_vidThr,vid_worker,NULL);
     for (int t=0;t<(i32)threadCnt;++t) { OS_Free(thread_png_arenas[t].base, 16777216); }
-    FHandle fp = OS_OpenReadonly(WIN_ICON);
+    FHandle fp = OS_OpenReadonly("./Textures/UI/menudot1.png");
     int windowIconFileSize = OS_FileSize(fp);
-    u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize, fp, WIN_ICON);
+    u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize,fp,"./Textures/UI/menudot1.png");
     OS_Close(fp); PngArenaInit(&png_arena_main);
     int w = 1, h = 1;
-    u8* pixels = PngLoad(file_buffer, windowIconFileSize, &w, &h, &png_arena_main); if (!pixels) { DualLogError("Failed to load icon: %s\n", WIN_ICON); OS_Exit(1); }
-    WinSysIcon image = (WinSysIcon){w, h, pixels};
+    u8* pixels = PngLoad(file_buffer,windowIconFileSize,&w,&h,&png_arena_main); if (!pixels) { DualLogError("Failed to load icon: %s\n","./Textures/UI/menudot1.png"); OS_Exit(1); }
+    WinSysIcon image = (WinSysIcon){w,h,pixels};
     SetWindowIcon(&image);
-    OS_Free(file_buffer, windowIconFileSize);
-    OS_Free(png_arena_main.base, 16777216);
-    OS_Free(arena, arena_size);
+    OS_Free(file_buffer,windowIconFileSize);
+    OS_Free(png_arena_main.base,16777216);
+    OS_Free(arena,arena_size);
     png_arena_main.base = NULL;
     OS_FreeInitPhase();
     DualLog("took %.6f secs\n", get_timed() - start_time);

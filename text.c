@@ -103,7 +103,7 @@ static void font_MakeGlyphBitmapSubpixel(const font_fontinfo* font, u8* dst, int
         }
     }
     if (win) {
-        int inv = 1; float ysi = inv ? -sy : sy; font__edge* e; int n_edges = 0;
+        float ysi = -sy; font__edge* e; int n_edges = 0;
         for (int i = 0; i < wc; ++i) { n_edges += wl[i]; }
         e = (font__edge*)OS_AllocScratch(sizeof(*e) * ((size_t)n_edges + 1));
         if (e) {
@@ -112,7 +112,7 @@ static void font_MakeGlyphBitmapSubpixel(const font_fontinfo* font, u8* dst, int
                 V2* p = win + m; m += wl[i]; int j = wl[i] - 1;
                 for (int k = 0; k < wl[i]; j = k++) {
                     int a = k, b = j; if (p[j].y == p[k].y) continue;
-                    e[n_edges].invert = 0; if (inv ? p[j].y > p[k].y : p[j].y < p[k].y) { e[n_edges].invert = 1; a = j; b = k; }
+                    e[n_edges].invert = 0; if (p[j].y > p[k].y) { e[n_edges].invert = 1; a = j; b = k; }
                     e[n_edges].x0 = p[a].x * sx; e[n_edges].y0 = p[a].y * ysi;
                     e[n_edges].x1 = p[b].x * sx; e[n_edges].y1 = p[b].y * ysi; ++n_edges;
                 }
@@ -327,7 +327,7 @@ u8* LoadTextFile(const char* path, size_t* out_size, size_t* out_dp, int* out_ut
     if(asz >= 2 && data[0]==0xFF && data[1]==0xFE) { *out_dp = 2; *out_utf16 = 1; } else if(asz >= 3 && data[0]==0xEF && data[1]==0xBB && data[2]==0xBF) { *out_dp = 3; } else { int nl=0; for(size_t i=1; i<(size_t)asz && i<1024; i+=2) if(data[i]==0) nl++; if(nl*3 > asz) *out_utf16 = 1; } return data;
 }
 static size_t ReadTextLine(const u8* data,size_t size,size_t* dp,int utf16,char* line,size_t cap) { size_t start=*dp,len=GetLineLength(data,size,start,utf16); *dp=len ? start+len : size; if (utf16) utf16le_to_utf8(data+start,len,line,cap); else { if (len>=cap) len=cap-1; mcpy(line,data+start,len); line[len]=0; } len=slen(line); while (len && (line[len-1]=='\r' || line[len-1]=='\n')) line[--len]=0; return len; }
-static char stringPool[131072]; static size_t stringPoolUsed=0;
+static char stringPool[98304]; static size_t stringPoolUsed=0;
 static char audioLogPool[131072]; static size_t audioLogPoolUsed=0;
 static const char* InternString(const char* s, size_t len) { if (stringPoolUsed + len + 1 > sizeof(stringPool)) { DualLogError("String pool exhausted!\n"); return ""; } char* dst = stringPool + stringPoolUsed; mcpy(dst, s, len); dst[len] = 0; stringPoolUsed += len + 1; return dst; }
 static const char* InternAudioLog(const char* s, size_t len) { if (audioLogPoolUsed + len + 1 > sizeof(audioLogPool)) { DualLogError("Audio log pool exhausted!\n"); return ""; } char* dst = audioLogPool + audioLogPoolUsed; mcpy(dst, s, len); dst[len] = 0; audioLogPoolUsed += len + 1; return dst; }

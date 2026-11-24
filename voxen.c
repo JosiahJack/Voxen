@@ -1136,7 +1136,7 @@ extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artif
 extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_xor_ps(__m256 __A, __m256 __B) { return (__m256)((__m256i)__A ^ (__m256i)__B); }
 extern __inline int __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_movemask_ps(__m256 __A) { return __builtin_ia32_movmskps256((__v8sf)__A); }
 extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_setzero_ps(void) { return (__m256){ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f }; }
-u16 shadowCasterIndices[SC_MAX], candidates[MAX_SHADOWMAPS]; static __attribute__((aligned(64))) float sc_posX[SC_MAX],sc_posY[SC_MAX],sc_posZ[SC_MAX],sc_radius[SC_MAX],sc_shadRadius[SC_MAX]; static u16 sc_origIdx[SC_MAX], shadowSlot[LIGHT_CNT]; static u8 shadowFaces[LIGHT_CNT]; static float shadowPosSum[LIGHT_CNT]; static u32 shadowIdSum[LIGHT_CNT];
+u16 shadowCasterIndices[INSTANCE_CNT], candidates[MAX_SHADOWMAPS]; static __attribute__((aligned(64))) float sc_posX[INSTANCE_CNT],sc_posY[INSTANCE_CNT],sc_posZ[INSTANCE_CNT],sc_radius[INSTANCE_CNT],sc_shadRadius[INSTANCE_CNT]; static u16 sc_origIdx[INSTANCE_CNT], shadowSlot[LIGHT_CNT]; static u8 shadowFaces[LIGHT_CNT]; static float shadowPosSum[LIGHT_CNT]; static u32 shadowIdSum[LIGHT_CNT];
 static const u32 shadClearSentinel = 0xFFFFFFFFu;
 static i8 shadowLevel=-1; u32 shadowNextSlot=0; static const i8 faceAxis[6] = {0,0,1,1,2,2}; static const float faceSign[6] = {1.f,-1.f,1.f,-1.f,1.f,-1.f};
 static const __m256i faceBitVecs[6] = { (__m256i){0x100000001LL,0x100000001LL,0x100000001LL,0x100000001LL}, (__m256i){0x200000002LL,0x200000002LL,0x200000002LL,0x200000002LL}, (__m256i){0x400000004LL,0x400000004LL,0x400000004LL,0x400000004LL}, (__m256i){0x800000008LL,0x800000008LL,0x800000008LL,0x800000008LL}, (__m256i){0x1000000010LL,0x1000000010LL,0x1000000010LL,0x1000000010LL}, (__m256i){0x2000000020LL,0x2000000020LL,0x2000000020LL,0x2000000020LL}};
@@ -1175,7 +1175,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps() {
     u16 unslotted=0;
     for (u16 c=0;c<numCandidates;++c) { if (shadowSlot[candidates[c]]==U16_MAX) { ++unslotted; } }
     if (shadowNextSlot+unslotted > MAX_SHADOWMAPS) { mset(shadowSlot, 0xFF, sizeof(shadowSlot)); mset(shadowFaces, 0, sizeof(shadowFaces)); shadowNextSlot = 0; }
-    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { if(EntNotVisible(i,(World.instances[i].entflags & EF_NO_SHADOWS)) || IdxIsNPC(World.instances[i].index)){continue;} shadowCasterIndices[numCasters++]=i; if(numCasters >= SC_MAX){break;} }
+    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { if(EntNotVisible(i,(World.instances[i].entflags & EF_NO_SHADOWS)) || IdxIsNPC(World.instances[i].index)){continue;} shadowCasterIndices[numCasters++]=i; if(numCasters >= INSTANCE_CNT){break;} }
     const u16 numCastersAligned = numCasters & ~7u;
     for (i32 i=0;i<numCastersAligned;++i) { u16 j=shadowCasterIndices[i]; sc_origIdx[i]=j; sc_posX[i]=World.position[j].x; sc_posY[i]=World.position[j].y; sc_posZ[i]=World.position[j].z; sc_radius[i]=World.radius[j]; sc_shadRadius[i]=World.instances[j].shadRadius; }
     for (i32 i=numCastersAligned;i<numCasters;++i) { u16 j=shadowCasterIndices[i]; sc_posX[i]=World.position[j].x; sc_posY[i]=World.position[j].y; sc_posZ[i]=World.position[j].z; sc_radius[i]=World.radius[j]; sc_shadRadius[i]=World.instances[j].shadRadius; sc_origIdx[i]=j; }
