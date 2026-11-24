@@ -52,7 +52,7 @@ void InitNPC(u16 i) {
     World.instances[i].attackFinished = World.pauseRelativeTime + 1.0f;
     World.instances[i].attack1SoundTime = World.instances[i].attack2SoundTime = World.instances[i].attack3SoundTime = World.instances[i].timeTillPainFinished = World.instances[i].tTillDeadFinished = World.instances[i].gracePeriodFinished = World.instances[i].randWaitAtt1Finished = World.instances[i].randWaitAtt2Finished = World.instances[i].randWaitAtt3Finished = World.instances[i].tranquilizeFinished = World.instances[i].deathBurstFinished
                                         = World.instances[i].wanderFinished = World.instances[i].posCheckFinished = World.instances[i].timeTillEnemyChangeFinished = World.pauseRelativeTime;
-    World.instances[i].currentFrameFinished = World.instances[i].timeSinceMovedEnough = 0.0f; World.instances[i].currentState = AIState_Idle;
+    World.instances[i].currentFrameFinished = 0.0f; World.instances[i].currentState = AIState_Idle;
     if (npcID == 20 && !World.instances[i].textureAnimating) { TextureSequenceStart(i, 47); }
     if ((World.instances[i].entflags & EF_WANDERING) && !(World.instances[i].entflags & EF_ASLEEP) && (random_range(0.0f,1.0f) < 0.5f)) { World.instances[i].currentState = AIState_Walk; } else { flag_set(&World.instances[i].entflags,EF_WANDERING, false); }
     World.instances[i].clip = World.instances[i].currentState; World.instances[i].frame = mdlAnimClips[World.instances[i].animationNum][World.instances[i].currentState].frameStart; /*Only A_DYING index that doesn't match the AIState_Dying, only dead, idle, walk are the 3 at init.*/

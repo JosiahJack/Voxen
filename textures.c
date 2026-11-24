@@ -49,7 +49,7 @@ u32 VideoFrameTexIndex(u32 texIdx) {
     } if (best == 0xFFFFFFFFu) return 0xFFFFFFFFu; return best;
 }
 typedef struct { u32 img_x,img_y; i32 img_n,img_out_n; u8 img_depth, img_color_type, img_error; u16 img_palette_count; PngPalEntry img_palette[256]; u8 img_trns[256],*img_buffer,*img_buffer_end; } PngContext;    typedef struct { u8* indices; u32* palette,palSize; i32 w,h; u8* cpuRgba; } TexResult;    typedef struct TextureParseTask { u32 texCnt; _Atomic u32* shared_idx; const TextureDataParser* parser; TexResult* results; int tid; } TextureParseTask;
-typedef struct { PngContext* s; u8* idata, *expanded, *out; } PngData;    typedef struct { u16 fast[1 << 9], firstcode[16], firstsymbol[16], value[288]; i32 maxcode[17]; u8 size[288]; } PngHuffman;    typedef struct { u8 *zbuffer,*zbuffer_end,*zout,*zout_start; i32 num_bits; u32 code_buffer; PngHuffman z_length,z_distance; } pngzbuf;
+typedef struct { PngContext* s; u8* idata, *expanded, *out; } PngData;    typedef struct { u16 fast[1 << 9], firstcode[16], firstsymbol[16], value[288]; i32 maxcode[17]; } PngHuffman;    typedef struct { u8 *zbuffer,*zbuffer_end,*zout,*zout_start; i32 num_bits; u32 code_buffer; PngHuffman z_length,z_distance; } pngzbuf;
 PngArena png_arena_main; static PngArena* thread_png_arenas = NULL; static u32 totalPixels, totalPaletteColors;
 void PngArenaInit(PngArena* arena) { if (!arena->base) { arena->base = OS_Alloc(16777216); arena->cursor = arena->base; arena->end = arena->base + 16777216; } }
 void* PngArenaAlloc(PngArena* a, size_t s) { s=(s + 15) & ~(size_t)15;/*Keep every allocation 16-byte aligned*/ if (!a->base || a->cursor + s > a->end) { DualLogError("PngArena overflow\n"); OS_Exit(1); } void* p = a->cursor; a->cursor += s; return p; }
@@ -59,7 +59,7 @@ static i32 PngHuf(PngHuffman* z, const u8* sl, i32 num) {
     i32 i, k=0, code=0, nc[16], sz[17] = {0}; mset(z->fast, 0, sizeof(z->fast)); if(num != 32) { for (i=0;i<num;++i) { ++sz[sl[i]]; } } sz[0] = 0;
     for (i=1;i<16;++i) { if (sz[i] > (1<<i)) { return 0; } nc[i] = code; z->firstcode[i] = (u16)code; z->firstsymbol[i] = (u16)k; code += sz[i]; if (sz[i] && code - 1 >= (1 << i)) { return 0; } z->maxcode[i] = code << (16 - i); code <<= 1; k += sz[i]; }
     z->maxcode[16] = 0x10000;
-    for (i=0;i<num;++i) { int s = (num == 32) ? 5 : sl[i]; if (!s) { continue; } int c = nc[s] - z->firstcode[s] + z->firstsymbol[s]; u16 fv = (u16)((s << 9) | i); z->size[c] = (u8)s; z->value[c] = (u16)i; if(s <= 9){ int j=BitReverse(nc[s],s); while (j < (1 << 9)) { z->fast[j] = fv; j += (1 << s); } } ++nc[s]; }
+    for (i=0;i<num;++i) { int s = (num == 32) ? 5 : sl[i]; if (!s) { continue; } int c = nc[s] - z->firstcode[s] + z->firstsymbol[s]; u16 fv = (u16)((s << 9) | i); z->value[c] = (u16)i; if(s <= 9){ int j=BitReverse(nc[s],s); while (j < (1 << 9)) { z->fast[j] = fv; j += (1 << s); } } ++nc[s]; }
     return 1;
 }
 INLINE u32 PngZReceive(pngzbuf* z, int n) { if (z->num_bits < 16 && z->zbuffer < z->zbuffer_end) { do { z->code_buffer |= (u32)(*z->zbuffer++) << z->num_bits; z->num_bits += 8; } while (z->num_bits <= 24 && z->zbuffer < z->zbuffer_end); } u32 k=z->code_buffer&((1u<<n)-1); z->code_buffer>>=n; z->num_bits-=n; return k; }
@@ -72,7 +72,7 @@ u8* PngDecode(const u8* buffer, i32 len, i32 initial_size, i32* outlen, PngArena
     pngzbuf a={0}; u8 *p=(u8*)PngArenaAlloc(arena,initial_size),d_len[288],*zout_end; i32 f,t; a.zbuffer=(u8*)buffer; a.zbuffer_end=(u8*)buffer+len; a.zout_start=a.zout=p; a.zbuffer+=2; zout_end=p+initial_size;
     do {if(a.zbuffer>=a.zbuffer_end){return NULL;} f=PngZReceive(&a,1); t=PngZReceive(&a,2);
         if (t == 0) {/*Uncompressed block*/
-            u8 header[4]; if (a.num_bits & 7) PngZReceive(&a,a.num_bits & 7); for (int k=0;k<4;++k) { header[k] = (a.num_bits > 0) ? (a.num_bits -= 8, (u8)(a.code_buffer >> (k * 8))) : *a.zbuffer++; } a.code_buffer >>= (a.num_bits > 0 ? 0 : 0); i32 lenh=(header[1] << 8) | header[0]; if(a.zbuffer + lenh > a.zbuffer_end || a.zout + lenh > zout_end){return NULL;} mcpy(a.zout,a.zbuffer,lenh); a.zbuffer+=lenh; a.zout+=lenh;
+            u8 header[4]; if (a.num_bits & 7) PngZReceive(&a,a.num_bits & 7); for (int k=0;k<4;++k) { header[k] = (a.num_bits > 0) ? (a.num_bits -= 8, (u8)(a.code_buffer >> (k * 8))) : *a.zbuffer++; } i32 lenh=(header[1] << 8) | header[0]; if(a.zbuffer + lenh > a.zbuffer_end || a.zout + lenh > zout_end){return NULL;} mcpy(a.zout,a.zbuffer,lenh); a.zbuffer+=lenh; a.zout+=lenh;
         } else {
             if (t == 1) { for(int i=0; i<288; ++i) d_len[i]=PngZDefLen(i); PngHuf(&a.z_length, d_len, 288); PngHuf(&a.z_distance, NULL, 32); }
             else {/*Huffman compressed block*/

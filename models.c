@@ -602,7 +602,7 @@ void MdlSwapWindowDisposeData(u16 m) {
     modelTriangles[m] = NULL; modelBVHNodeCounts[m] = 0; modelBVHTriOrderCounts[m] = 0; physVertCounts[m] = 0; modelVertexCounts[m] = 0; modelTriangleCounts[m] = 0; if (vPos) { vPos[m] = NULL; }
 }
 INLINE void MdlCvtHalf(half* dst, const float* verts, u32 vc) { for (u32 k = 0; k < vc; ++k) { __m256 v_in = (*(__m256_u const *)(&verts[k*8])); __m128i v_half = ((__m128i)__builtin_ia32_vcvtps2ph256((__v8sf)(__m256)v_in, (int)(0/*_MM_FROUND_TO_NEAREST_INT*/|0x8/*_MM_FROUND_NO_EXC*/))); _mm_storeu_si128((__m128i*)&dst[k*8], v_half); } }
-static u32 MdlBvhNodeBound(u32 triCount) { if (triCount <= 8) return 1; if (triCount <= 16) return 10; if (triCount <= 32) return 20; if (triCount <= 64) return 32; if (triCount <= 128) return 65; if (triCount <= 256) return 105; if (triCount <= 512) return 252; if (triCount <= 1024) return 337; if (triCount <= 2048) return 421; if (triCount <= 4096) return 421; return 465; }
+static u32 MdlBvhNodeBound(u32 triCount) { if (triCount <= 8) return 1; if (triCount <= 16) return 10; if (triCount <= 32) return 20; if (triCount <= 64) return 32; if (triCount <= 128) return 65; if (triCount <= 256) return 105; if (triCount <= 512) return 252; if (triCount <= 1024) return 337; if (triCount <= 4096) return 421; return 465; }
 typedef struct { u32 lo, hi; const u8* skipStamp; u32 mode; u32 winVbCap, winIbCap; u32* tvOut; u32* ttOut; } MdlLoadSet;
 static void MdlLoadModelSet(MdlLoadSet* s) {
     if (!mdlsCnt || s->hi < s->lo) return;
@@ -775,7 +775,7 @@ void LoadModels() {
     u32 tv = 0, tt = 0, vrun = 0, irun = 0; MdlLoadSet s = { lo, hi, mdlPersistentSet, 0, 0, 0, &tv, &tt }; MdlLoadModelSet(&s);
     for (u32 m=0; m<mdlsCnt; ++m) { if (!mdlPersistentSet[m] || !mdlPstHalfV[m]) continue; mdlVboOfs[m] = (vrun + 255u) & ~255u; vrun = mdlVboOfs[m] + MdlVbBytesRaw((u16)m); mdlIboOfs[m] = (irun + 255u) & ~255u; irun = mdlIboOfs[m] + MdlIbBytesRaw((u16)m); }
     mdlSwapVboBase = (vrun + 255u) & ~255u; mdlSwapIboBase = (irun + 255u) & ~255u;
-    u32 pOrdU16 = 0, pNodeSlW = 0, pTriW = 0;;
+    u32 pOrdU16 = 0, pNodeSlW = 0, pTriW = 0;
     for (u32 m=0; m<mdlsCnt; ++m) { if (!mdlPersistentSet[m] || !mdlPstHalfV[m]) continue; if (BvhHasBVH((u16)m)) { pOrdU16 = (pOrdU16 + 1u) & ~1u; pOrdU16 += modelBVHTriOrderCounts[m]; pNodeSlW += modelBVHNodeCounts[m]; pTriW += modelBVHTriOrderCounts[m]; } }
     u32 wvbMax=0, wibMax=0, wOrdMax=0, wNodeMax=0, wTriMax=0, wVtxMax=0;
     for (u8 lev=0; lev<MAX_LEVELS; ++lev) {

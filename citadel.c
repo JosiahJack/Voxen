@@ -524,7 +524,7 @@ void DoorUse(u16 self, u16 activator) {
     if (e->requiredAccessCard != ACC_None) { if (!DoorInventoryHasAccessCard(e->requiredAccessCard)) {CenterStatusPrint("%s%s",AccessCardCodeForType(e->requiredAccessCard),Sys_Text.stringTable[2]); play_wav("buttons/locked_deny",AppliedFXVol(0.7f),World.position[self],true); return;} else {e->requiredAccessCard = ACC_None;}}
     if ((e->entflags & EF_LOCKED) != 0) { CenterStatusPrint("%s",Sys_Text.stringTable[e->lockedMessageLingdex]); play_wav("buttons/locked_deny",AppliedFXVol(0.55f),World.position[self],true); return; }  if ((e->onlyTargetOnce && !e->targetAlreadyDone) || !e->onlyTargetOnce) { e->targetAlreadyDone = true; UseTargets(self,e->targetIdx); } if (e->ajar) e->ajar = false; DoorActuate(self);
 }
-void DoorTargetted(u16 self, u16 activator) { if ((World.instances[self].entflags & EF_LOCKED) != 0) EntitySetLocked(&World.instances[self],false); if (!World.instances[self].targettingOnlyUnlocks) DoorUse(self,activator); }
+void DoorTargetted(u16 self, u16 activator) { if ((World.instances[self].entflags & EF_LOCKED) != 0) EntitySetLocked(&World.instances[self],false); DoorUse(self,activator); }
 static void DoorLayerUpdate(u16 self, Entity* e) { if (!IdxIsLayerDoor(e->index)) { return; } u32 want = (e->doorState == DoorState_Closed) ? L_Door : L_InterDebris; if (World.layer[self] != want) World.layer[self] = want; }
 void DoorUpdate(u16 self) {
     Entity* e = &World.instances[self]; if(e->ajar){return;} AnimationClip opening=mdlAnimClips[e->animationNum][A_OPENING], closing=mdlAnimClips[e->animationNum][A_CLOSING];
@@ -602,7 +602,7 @@ static const WirePuzzleDef* WirePuzzleDefFor(u16 constIndex) { for (u32 i=0;i<si
 static void WireLoadInstance(u16 self, const WirePuzzleDef* def) {
     Entity* e=&World.instances[self];
     for (u8 c=0;c<7;++c) { World.Sys_UI.pw_curL[c]=-1; World.Sys_UI.pw_curR[c]=-1; }
-    for (u8 w=0;w<7;++w) { int l=(int)e->wireCurL[w], r=(int)e->wireCurR[w]; if (w<7 && l>=0 && l<7) World.Sys_UI.pw_curL[l]=(i8)w; if (w<7 && r>=0 && r<7) World.Sys_UI.pw_curR[r]=(i8)w; }
+    for (u8 w=0;w<7;++w) { int l=(int)e->wireCurL[w], r=(int)e->wireCurR[w]; if (l>=0 && l<7) World.Sys_UI.pw_curL[l]=(i8)w; if (r>=0 && r<7) World.Sys_UI.pw_curR[r]=(i8)w; }
     for (u8 w=0;w<7;++w) { World.Sys_UI.pw_tgtL[w]=def->tgtL[w]; World.Sys_UI.pw_tgtR[w]=def->tgtR[w]; World.Sys_UI.pw_wireOn[w]=def->wireOn[w]; World.Sys_UI.pw_rowActive[w]=def->rowsActive[w]!=0; World.Sys_UI.pw_wireColor[w]=def->wireColor[w];/*raw HUDColor, as PuzzleWire.wireColors holds it*/ }
 }
 typedef struct { V3 pos; u8 gridType, theme, security; const char* target; u8 cellType[35]; } GridPuzzleDef;
@@ -712,7 +712,7 @@ static void ElevatorPanelUse(u16 i) {
     World.Sys_UI.tetheredKeypadElevator=i; World.Sys_UI.linkedElevatorDoor=U16_MAX; World.Sys_UI.objectInUsePos=World.position[i];
     { V3 kp=World.position[i]; float best=1000000000000000000000000000000.0f; for (u32 d=INSTS_1ST_IDX;d<World.instCount;++d) { Entity* de=&World.instances[d]; if(!IdxIsDoor(de->index)||!(de->entflags&EF_ACTIVE)) continue; V3 dd=V3_AsubB(World.position[d],kp); float dist2=V3_dot(dd,dd); if(dist2<best){best=dist2; World.Sys_UI.linkedElevatorDoor=(u16)d;} } }
     int layout=-1; V3 pp=World.position[i]; for (u32 m=0;m<sizeof(elevPanelMap)/sizeof(elevPanelMap[0]);++m) { if (elevPanelMap[m].level==World.curLev) { float dx=elevPanelMap[m].x-pp.x,dz=elevPanelMap[m].z-pp.z; if (dx*dx+dz*dz<4.0f) { layout=elevPanelMap[m].layout; break; } } }
-    if (layout<0) layout=1;/*fallback: 2 to 3 strip*/ for (int b=0;b<8;++b) { World.Sys_UI.elevButtonLabelIdx[b]=elevLayouts[layout][b].label; World.Sys_UI.buttonsDarkened[b]=elevLayouts[layout][b].darkened; World.Sys_UI.buttonsEnabled[b]=elevLayouts[layout][b].label>=0; World.Sys_UI.elevButtonLevelIdx[b]=ElevLabelToLevel(elevLayouts[layout][b].label); World.Sys_UI.elevButtonSpawnIdx[b]=U16_MAX; }
+    if (layout<0) layout=1;/*fallback: 2 to 3 strip*/ for (int b=0;b<8;++b) { World.Sys_UI.elevButtonLabelIdx[b]=elevLayouts[layout][b].label; World.Sys_UI.buttonsDarkened[b]=elevLayouts[layout][b].darkened; World.Sys_UI.buttonsEnabled[b]=elevLayouts[layout][b].label>=0; World.Sys_UI.elevButtonLevelIdx[b]=ElevLabelToLevel(elevLayouts[layout][b].label); }
     ForceInventoryMode(); play_wav("hud/searchsound",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); MFD_OpenData(World.Sys_UI.lastDataSideRH,1);
 }
 static void KeycodePanelUse(u16 i) {
@@ -816,9 +816,8 @@ static void Frob(V3 p,V3 f,V3 r){
         return;/*No pickup/search/use while in edit mode; selection only.*/
     }
     if (World.Sys_UI.vmailActive) { World.Sys_UI.vmailActive = 0; return; } if (World.invP1.holdingObject) { if (FrobHeldItemIntoPanel(p,f,r)) { return; } DropHeldItem(); return; }
-    if (TargetIDFrob(p,f,r)) { return; } float o=(float)UI_H*0.02f;RaycastHit fh={0},bh = {0}; bool ok = false; V3 d0 = ScreenPointToRayOffset(f,r,0,0); fh = Raycast(p,d0,FROB_DISTANCE,LMASK_PLAYER_FROB);bh=fh;ok=FrobRayIsFrobable(fh);float ox[8]={0,0,o,-o,o,-o,-o,o},oy[8]={-o,o,0,0,o,-o,o,-o};
+    if (TargetIDFrob(p,f,r)) { return; } float o=(float)UI_H*0.02f; RaycastHit fh={0},bh = {0}; bool ok = false; V3 d0 = ScreenPointToRayOffset(f,r,0,0); fh = Raycast(p,d0,FROB_DISTANCE,LMASK_PLAYER_FROB); bh = fh; ok = FrobRayIsFrobable(fh);float ox[8]={0,0,o,-o,o,-o,-o,o},oy[8]={-o,o,0,0,o,-o,o,-o};
     for (int i=0;i<8&&!ok;++i) { V3 d = ScreenPointToRayOffset(f,r,ox[i],oy[i]); RaycastHit th = Raycast(p,d,FROB_DISTANCE,LMASK_PLAYER_FROB); if(FrobRayIsFrobable(th)) { bh = th; ok = true; } } 
-    if (!ok) { bh = fh; }
     if (Cheats.showPhys) { World.debugLine_start = p; World.debugLineFinished = World.pauseRelativeTime + 3.0f; V3 dbg = ok ? ScreenPointToRayOffset(f,r,0,0) : d0; RaycastHit dh = ok ? bh : fh; World.debugLine_end = dh.hit ? dh.point : (V3){dbg.x*FROB_DISTANCE+p.x,dbg.y*FROB_DISTANCE+p.y,dbg.z*FROB_DISTANCE+p.z}; }
     if (!ok) { if (fh.hit) { u16 idx = fh.hitInstanceIndex; if (idx < World.instCount) { u16 ei = World.instances[idx].index; if (IdxIsGeometry(ei) || IdxIsDoor(ei) || World.instances[idx].index >= 595) { int t = UseNameTableIndex(ei); const char* sec = UseSecretText(ei,idx); CenterStatusPrint("%s%s",Sys_Text.stringTable[29],sec?sec:(t >= 0 ? Sys_Text.stringTable[t] : "")); return; } } } CenterStatusPrint("%s",Sys_Text.stringTable[30]); }
     else UseEntity(bh.hitInstanceIndex);

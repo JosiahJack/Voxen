@@ -1,6 +1,6 @@
 // text.c - Text and Font Rendering/Loading System
 #include "common.h"
-typedef struct { i16 x,y,cx,cy; u8 type,padding; } font_vertex;    typedef struct {u8 *data; int fontstart,numGlyphs,loca,head,glyf,hhea,hmtx,index_map,indexToLocFormat; } font_fontinfo;    typedef struct tt_heapchk{ struct tt_heapchk* next; }tt_heapchk;    typedef struct{ tt_heapchk* head; void* first_free; int remaining; }font__hheap;    typedef struct{ float x0,y0,x1,y1; int invert; }font__edge;
+typedef struct { i16 x,y,cx,cy; u8 type,padding; } font_vertex;    typedef struct {u8 *data; int numGlyphs,loca,head,glyf,hhea,hmtx,index_map,indexToLocFormat; } font_fontinfo;    typedef struct tt_heapchk{ struct tt_heapchk* next; }tt_heapchk;    typedef struct{ tt_heapchk* head; void* first_free; int remaining; }font__hheap;    typedef struct{ float x0,y0,x1,y1; int invert; }font__edge;
 typedef struct font__active_edge{ struct font__active_edge*next; float fx,fdx,fdy,direction,sy,ey; }font__active_edge;
 INLINE i16 ttSHORT (u8*p) { return p[0]*256 + p[1]; }
 INLINE u16 ttUSHORT(u8*p) { return p[0]*256 + p[1]; }
@@ -17,8 +17,7 @@ INLINE const char* DecodeUTF8(const char* p, u32* out_cp) { const u8* s = (const
 }
 static u32 _find_table(u8*d,u32 fs,const char*tag){i32 n=ttUSHORT(d+fs+4);u32 td=fs+12;for(i32 i=0;i<n;++i){u32 l=td+16*i;if(((d+l+0)[0]==(tag[0]) && (d+l+0)[1]==(tag[1]) && (d+l+0)[2]==(tag[2]) && (d+l+0)[3]==(tag[3])))return ttULONG(d+l+8);}return 0;}
 static int font_InitFont_internal(font_fontinfo* info, u8* data, int fs) {
-    u32 cmap,t,i,nt; info->data = data; info->fontstart = fs; 
-    cmap = _find_table(data,fs,"cmap"); info->loca = _find_table(data,fs,"loca"); info->head = _find_table(data,fs,"head"); info->glyf = _find_table(data,fs,"glyf"); info->hhea = _find_table(data,fs,"hhea"); info->hmtx = _find_table(data,fs,"hmtx"); if(!cmap || !info->head || !info->hhea || !info->hmtx) return 0;
+    u32 cmap,t,i,nt; info->data = data; cmap = _find_table(data,fs,"cmap"); info->loca = _find_table(data,fs,"loca"); info->head = _find_table(data,fs,"head"); info->glyf = _find_table(data,fs,"glyf"); info->hhea = _find_table(data,fs,"hhea"); info->hmtx = _find_table(data,fs,"hmtx"); if(!cmap || !info->head || !info->hhea || !info->hmtx) return 0;
     if (info->glyf) { if (!info->loca) return 0; } else { return 0; }
     t=_find_table(data,fs,"maxp"); info->numGlyphs = t ? ttUSHORT(data+t+4) : 0xffff; nt=ttUSHORT(data+cmap+2);info->index_map=0; for(i=0;i<nt;++i){u32 er=cmap+4+8*i;switch(ttUSHORT(data+er)){case 3:switch(ttUSHORT(data+er+2)){case 1:case 10:info->index_map=cmap+ttULONG(data+er+4);}break;case 0:info->index_map=cmap+ttULONG(data+er+4);break;}} if(!info->index_map)return 0; info->indexToLocFormat=ttUSHORT(data+info->head+50);return 1;
 }
@@ -154,7 +153,7 @@ static void font_MakeGlyphBitmapSubpixel(const font_fontinfo* font, u8* dst, int
 typedef struct {u16 x0,y0,x1,y1; float xoff,yoff,xadvance,xoff2,yoff2;} font_packedchar;
 INLINE void _pre(u8 *p, int w, int h, int str, u32 kw, int v) { int out = v ? w : h, in = v ? h : w, os = v ? 1 : str, is = v ? str : 1; for (int j=0;j<out;++j,p+=os) { u8 buf[8] = {0}; int tot = 0; for (int i=0;i<in;++i) { if (i <= in - (int)kw) { tot += p[i * is] - buf[i & 7]; buf[(i + kw) & 7] = p[i * is]; } else { tot -= buf[i & 7]; } p[i * is] = (u8)(tot / kw); } } }
 // Font Loading System
-static int numPackedGlyphs=0,numPackedGlyphsStopD=0; extern u32 textVAO,textVBO,textSP;
+extern u32 textVAO,textVBO,textSP;
 u32 fontAtlasTex,fontAtlasTexStopD;
 static font_packedchar fontPackedChar[MAX_GLYPHS],fontPackedCharStopD[MAX_GLYPHS];
 static float fixedNumberAdvanceWidth=0.0f,fixedNumberAdvanceWidthStopD=0.0f;
@@ -315,7 +314,7 @@ void InitFontAtlasses() {
     FHandle fd1,fd2;int sz1,sz2; fontData[0]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[0],&fd1,&sz1); fontData[1]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[1],&fd2,&sz2); if (!fontData[0] || !fontData[1]) { DualLogError("Failed to load font\n"); OS_Exit(1); }
     if(!font_InitFont_internal(&fontInfo[0],fontData[0],0)){DualLogError("%s font init failed\n",fontPaths[0]); OS_Exit(1);}
     if(!font_InitFont_internal(&fontInfo[1],fontData[1],0)){DualLogError("%s font init failed\n",fontPaths[1]); OS_Exit(1);}
-    LoadFallbackFont(fallbackFontPaths[0],2,0); LoadFallbackFont(fallbackFontPaths[1],3,0); LoadFallbackFont(fallbackFontPaths[2],4,0);
+    LoadFallbackFont(fallbackFontPaths[0],2,0); LoadFallbackFont(fallbackFontPaths[1],3,0); LoadFallbackFont(fallbackFontPaths[2],4,0); int numPackedGlyphs = 0, numPackedGlyphsStopD = 0;
     u8* bmp = fontBmp1 = OS_AllocScratch(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);    BuildAtlasCPU(&numPackedGlyphs,fontPackedChar,&fixedNumberAdvanceWidth,20.0f,0,FONT_NORMAL,bmp,FONT_ATLAS_SIZE);
     u8* bmp2 = fontBmp2 = OS_AllocScratch(FONT_ATLAS_SIZE2*FONT_ATLAS_SIZE2); BuildAtlasCPU(&numPackedGlyphsStopD,fontPackedCharStopD,&fixedNumberAdvanceWidthStopD,54.0f,1,FONT_STOPD,bmp2,FONT_ATLAS_SIZE2);
     LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language);
