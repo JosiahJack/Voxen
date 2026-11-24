@@ -209,7 +209,7 @@ INLINE void build_curve(float* curve, const float* keys, const float* times, int
 INLINE u32 sample_color_ramp(Emitter* em, float t) { int idx = (int)(t * 63.0f); if (idx < 0) idx = 0; if (idx >= 64) idx = 63; return em->colorRamp[idx]; }
 INLINE float sample_curve(const float* curve, float t) { int idx = (int)(t * 31.0f); if (idx < 0) idx = 0; if (idx >= 31) return curve[31]; float localT = t * 31.0f - idx; return curve[idx] + (curve[idx + 1] - curve[idx]) * localT; }
 static bool PSysLevelOwnsEmitter(u16 emitter) { if (!World.particles) return false; for (u16 i = 0; i < World.particles->count; ++i) if (World.particles->emitters[i] == emitter) return true; return false; }
-static void PSysCompactLevelList(void) { u16 out = 0; for (u16 i=0;i<World.particles->count;++i) { u16 emitter = World.particles->emitters[i]; if (emitter < MAX_EMITTERS && (psys.emitters[emitter].active || psys.emitters[emitter].aliveCount)) World.particles->emitters[out++] = emitter; } World.particles->count = out; }
+static void PSysCompactLevelList() { u16 out = 0; for (u16 i=0;i<World.particles->count;++i) { u16 emitter = World.particles->emitters[i]; if (emitter < MAX_EMITTERS && (psys.emitters[emitter].active || psys.emitters[emitter].aliveCount)) World.particles->emitters[out++] = emitter; } World.particles->count = out; }
 void PSysClearLevel(u8 level) {
     if (level < MAX_LEVELS) {
         if (World.levParticles[level].count > MAX_LEVEL_PARTICLES) World.levParticles[level].count = MAX_LEVEL_PARTICLES;

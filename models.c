@@ -1,6 +1,6 @@
 // models.c - 3D Models Loading System, Animation, Convex Edge Adjacency, Mesh Optimization
 #include "common.h"
-void mul_mat4(float*,const float*,const float*);
+void mul_mat4(float*,const float*,const float*),PortalCulling(),PlaySparkSound(V3);    bool ToggleDoorPortal(u32,u16,u16);    extern WeaponFireCtx wfx;    extern const u16 wepModelIndices[16];
 #define ARENA_ALIGN(p) ((char*)(((uintptr_t)(p) + 15) & ~(uintptr_t)15)) // 16-byte align sub-arena cursors
 typedef struct { u8* base; u8* cur; u8* end; } SubArena;
 static SubArena thrd_sub[SUB_MAIN + 1];
@@ -13,7 +13,6 @@ u32 mdlVboOfs[MAX_MDLS],mdlIboOfs[MAX_MDLS],modelVBO,modelIBO,rtCapNodeWords,rtC
 u8 mdlPersistentSet[MAX_MDLS],mdlSwapLev = 255u; 
 static u8 mdlIsAnimFrame[MAX_MDLS]; static u16 mdlLevelBits[MAX_MDLS], **mdlPstTri = NULL; static bool mdlDerivDone = false; static u32 mdlSwapVboBase,mdlSwapIboBase,mdlPoolVbBytes,mdlPoolIbBytes,mdlSpanBase[MAX_MDLS],g_mdlDataCnt = 0; static ModelData* g_mdlData = NULL; static float** vPos; static half** mdlPstHalfV = NULL; static u32 *mdlMetaVertCounts = NULL, *mdlMetaTriCounts = NULL;
 typedef struct { u32 base, spanLen; } AnimEntryRef; static AnimEntryRef animNumSpans[MAXANIM][8]; static u8 animNumSpanCnt[MAXANIM];
-extern const u16 wepModelIndices[16];
 INLINE void MdlMarkLevel(u16 m, u16 levBit, bool persistForced) { if (m >= mdlsCnt) return; if (persistForced) { mdlPersistentSet[m] = 1; } else { mdlLevelBits[m] |= (u16)levBit; } }
 static void MdlMarkAnimNum(u16 a, u16 levBit, bool persistForced) { if (a >= MAXANIM) return; for (u8 k = 0; k < animNumSpanCnt[a]; ++k) { AnimEntryRef* r = &animNumSpans[a][k]; if (!r->spanLen) { MdlMarkLevel((u16)r->base, levBit, persistForced); continue; } for (u32 m = r->base; m < r->base + r->spanLen && m < mdlsCnt; ++m) { MdlMarkLevel((u16)m, levBit, persistForced); } } }
 static void MdlCloseConst(u16 c, u16 levBit, bool persistForced) { if (c >= MAX_ENTS) return; const EPerms* ed = &EDefs[c]; if (ed->modelIndex < mdlsCnt) MdlMarkLevel(ed->modelIndex, levBit, persistForced); if (ed->colMeshIndex < mdlsCnt) MdlMarkLevel(ed->colMeshIndex, levBit, persistForced); if (EntIsLodCardConst(c)) MdlMarkLevel(178, levBit, persistForced); if (!persistForced) MdlMarkAnimNum(ed->animationNum, levBit, false); }
@@ -719,24 +718,16 @@ static void MdlLoadModelSet(MdlLoadSet* s) {
     if(poolThreadCnt) { poolJobCount=0; __atomic_store_n(&poolStop,1,__ATOMIC_RELEASE); __atomic_fetch_add(&poolGen,1,__ATOMIC_RELEASE); OS_FutexWakeAll(&poolGen); for(u32 i=0;i<poolThreadCnt;++i) OS_ThreadJoin(&poolThreads[i]); poolThreadCnt=0; }
     for (u32 k=0;k<rawSz;++k) { if (opened && opened[k] && raw[k].data) { OS_Free((void*)raw[k].data, raw[k].size); } }
     OS_Free(arena_base, arena + 4096);
-    glb_Tasks = NULL;
-    poolSkipStamp = NULL;
+    glb_Tasks = NULL; poolSkipStamp = NULL;
 }
 void LoadPerLevelModels(u8 lev) {
     if (lev >= MAX_LEVELS || !mdlDerivDone || modelVBO == 0 || mdlSwapLev == lev) return;
-    u32 incCnt = 0, ic = 0;
-    for (u32 m=0; m<mdlsCnt; ++m) { if (MdlIsWinMemberSet((u16)m, lev)) ++incCnt; }
-    u16* incList = incCnt ? (u16*)OS_Alloc(incCnt * sizeof(u16)) : NULL;
-    for (u32 m=0; m<mdlsCnt; ++m) { if (MdlIsWinMemberSet((u16)m, lev) && ic < incCnt) incList[ic++] = (u16)m; }
-    u32 lo = incCnt ? incList[0] : 0, hi = incCnt ? incList[incCnt-1] : 0; u32 anyOut = (mdlSwapLev != 255u); static u8 incStamp[MAX_MDLS]; mset(incStamp,0,mdlsCnt);
+    u32 incCnt = 0, ic = 0; for (u32 m=0; m<mdlsCnt; ++m) { if (MdlIsWinMemberSet((u16)m, lev)) ++incCnt; } u16* incList = incCnt ? (u16*)OS_Alloc(incCnt * sizeof(u16)) : NULL; for (u32 m=0; m<mdlsCnt; ++m) { if (MdlIsWinMemberSet((u16)m, lev) && ic < incCnt) incList[ic++] = (u16)m; } u32 lo = incCnt ? incList[0] : 0, hi = incCnt ? incList[incCnt-1] : 0; u32 anyOut = (mdlSwapLev != 255u); static u8 incStamp[MAX_MDLS]; mset(incStamp,0,mdlsCnt);
     for (u32 k=0;k<ic;++k) incStamp[incList[k]] = 1;
     for (u32 m=0; m<mdlsCnt; ++m) { bool inc = incStamp[m] != 0; bool outg = anyOut && MdlIsWinMemberSet((u16)m, mdlSwapLev); if (!inc && !outg) continue; if (physPos[m] || modelTriangles[m] || modelVertexCounts[m]) { MdlSwapWindowDisposeData((u16)m); } mdlVboOfs[m] = mdlIboOfs[m] = 0xFFFFFFFFu; }
-    if (incList) OS_Free(incList, incCnt*sizeof(u16));
-    if (incCnt) { u32 winVB = mdlPoolVbBytes - mdlSwapVboBase, winIB = mdlPoolIbBytes - mdlSwapIboBase; double startSwapTime = get_timed(); MdlLoadSet s = {lo,hi,incStamp,1,winVB,winIB,NULL,NULL}; MdlLoadModelSet(&s); DualLog("Loading models for lev %u, count %u ...............................................took %.6f secs\n",lev,incCnt,get_timed() - startSwapTime); }
-    mdlSwapLev = lev;
-    RtSwapPatchModels();
+    if (incList) OS_Free(incList, incCnt*sizeof(u16)); if (incCnt) { u32 winVB = mdlPoolVbBytes - mdlSwapVboBase, winIB = mdlPoolIbBytes - mdlSwapIboBase; double startSwapTime = get_timed(); MdlLoadSet s = {lo,hi,incStamp,1,winVB,winIB,NULL,NULL}; MdlLoadModelSet(&s); DualLog("Loading models for lev %u, count %u ...............................................took %.6f secs\n",lev,incCnt,get_timed() - startSwapTime); } mdlSwapLev = lev; RtSwapPatchModels();
 }
-void ParseAllModels(void) {
+void ParseAllModels() {
     double startParseTime = get_timed();
     ModelDataParser mp = {0}; ParseModelData(&mp,MAX_MDLS,"./Data/models.txt");
     u32 maxid = 0, totalActual = 0;
@@ -763,13 +754,7 @@ void ParseAllModels(void) {
     DualLog(" total verts: %u, tris: %u...................took %.6f secs\n", metaV, metaT, get_timed() - startParseTime);
 }
 void LoadModels() {
-    static bool mdlPersistentsLoaded = false;
-    if (mdlPersistentsLoaded) return;
-    double startModelTime = get_timed();
-    u32 lo = mdlsCnt, hi = 0, pstCnt = 0;
-    for (u32 m=0; m<mdlsCnt; ++m) { if (mdlPersistentSet[m]) { ++pstCnt; if (m < lo) lo = m; if (m > hi) hi = m; } }
-    DualLog("Loading   models ( %d persistent) ",pstCnt);
-    if (lo > hi) { mdlPersistentsLoaded = true; return; }
+    static bool mdlPersistentsLoaded = false; if (mdlPersistentsLoaded) return; double startModelTime = get_timed(); u32 lo = mdlsCnt, hi = 0, pstCnt = 0; for (u32 m=0; m<mdlsCnt; ++m) { if (mdlPersistentSet[m]) { ++pstCnt; if (m < lo) lo = m; if (m > hi) hi = m; } } DualLog("Loading   models ( %d persistent) ",pstCnt); if (lo > hi) { mdlPersistentsLoaded = true; return; }
     mdlPstHalfV = OS_Alloc(mdlsCnt * sizeof(void*)); mset(mdlPstHalfV,0,mdlsCnt*sizeof(void*));
     mdlPstTri   = OS_Alloc(mdlsCnt * sizeof(void*)); mset(mdlPstTri,0,mdlsCnt*sizeof(void*));
     u32 tv = 0, tt = 0, vrun = 0, irun = 0; MdlLoadSet s = { lo, hi, mdlPersistentSet, 0, 0, 0, &tv, &tt }; MdlLoadModelSet(&s);
@@ -783,31 +768,19 @@ void LoadModels() {
         for (u32 m=0; m<mdlsCnt; ++m) { if (!MdlIsWinMemberSet((u16)m,lev)) continue; vb = ((vb + 255u) & ~255u) + mdlMetaVertCounts[m]*VRT_ATT_SZ; ib = ((ib + 255u) & ~255u) + mdlMetaTriCounts[m]*6u + 4u; if (mdlMetaTriCounts[m]) { nsl += MdlBvhNodeBound(mdlMetaTriCounts[m]); tri += mdlMetaTriCounts[m]; ord = (ord + 1u) & ~1u; ord += mdlMetaTriCounts[m]; } vtx += mdlMetaVertCounts[m]; }
         if (vb > wvbMax) wvbMax = vb; if (ib > wibMax) wibMax = ib; if (ord > wOrdMax) wOrdMax = ord; if (nsl > wNodeMax) wNodeMax = nsl; if (tri > wTriMax) wTriMax = tri; if (vtx > wVtxMax) wVtxMax = vtx;
     }
-    u32 wvbMarg = wvbMax + (wvbMax + 49u) / 50u;
-    rtCapNodeWords = (pNodeSlW + wNodeMax) * 16u; rtCapTriWords  = (pTriW + wTriMax) * 2u; rtCapOrderU16  = pOrdU16 + wOrdMax + 2u; rtPersistNodeWords = pNodeSlW * 16u; rtPersistTriWords = pTriW * 2u; rtPersistOrderU16 = pOrdU16;
-    mdlPoolVbBytes = mdlSwapVboBase + wvbMarg; mdlPoolIbBytes = mdlSwapIboBase + wibMax;
+    u32 wvbMarg = wvbMax + (wvbMax + 49u) / 50u; rtCapNodeWords = (pNodeSlW + wNodeMax) * 16u; rtCapTriWords  = (pTriW + wTriMax) * 2u; rtCapOrderU16  = pOrdU16 + wOrdMax + 2u; rtPersistNodeWords = pNodeSlW * 16u; rtPersistTriWords = pTriW * 2u; rtPersistOrderU16 = pOrdU16; mdlPoolVbBytes = mdlSwapVboBase + wvbMarg; mdlPoolIbBytes = mdlSwapIboBase + wibMax;
     glGenBuffers(1, &modelVBO); glBindBuffer(GL_ARRAY_BUFFER, modelVBO); glBufferData(GL_ARRAY_BUFFER, mdlPoolVbBytes, NULL, GL_STATIC_DRAW);
     glGenBuffers(1, &modelIBO); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, modelIBO); glBufferData(GL_ELEMENT_ARRAY_BUFFER, mdlPoolIbBytes, NULL, GL_STATIC_DRAW);
     u32 batch = 0;
     for (u32 m=0; m<mdlsCnt; ++m) {
-        u32 vb, ib;
-        if (!mdlPersistentSet[m] || !mdlPstHalfV[m]) continue;
-        vb = MdlVbBytesRaw((u16)m); ib = MdlIbBytesRaw((u16)m);
-        glBindBuffer(GL_ARRAY_BUFFER, modelVBO);
-        half* mpv = (half*)glMapBufferRange(GL_ARRAY_BUFFER, mdlVboOfs[m], vb, 0x2/*GL_MAP_WRITE_BIT*/|0x4/*GL_MAP_INVALIDATE_RANGE_BIT*/);
-        mcpy(mpv, mdlPstHalfV[m], vb); glUnmapBuffer(GL_ARRAY_BUFFER);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, modelIBO);
-        void* mpt = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, mdlIboOfs[m], ib, 0x2|0x8/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
-        mcpy(mpt, mdlPstTri[m], ib); glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
-        if (++batch >= 32) { glFinish(); batch = 0; }
+        u32 vb, ib; if (!mdlPersistentSet[m] || !mdlPstHalfV[m]) continue;
+        vb = MdlVbBytesRaw((u16)m); ib = MdlIbBytesRaw((u16)m); glBindBuffer(GL_ARRAY_BUFFER, modelVBO); half* mpv = (half*)glMapBufferRange(GL_ARRAY_BUFFER, mdlVboOfs[m], vb, 0x2/*GL_MAP_WRITE_BIT*/|0x4/*GL_MAP_INVALIDATE_RANGE_BIT*/); mcpy(mpv, mdlPstHalfV[m], vb); glUnmapBuffer(GL_ARRAY_BUFFER);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, modelIBO); void* mpt = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, mdlIboOfs[m], ib, 0x2|0x8/*GL_MAP_INVALIDATE_BUFFER_BIT*/); mcpy(mpt, mdlPstTri[m], ib); glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER); if (++batch >= 32) { glFinish(); batch = 0; }
     }
-    if (batch) { glFinish(); }
-    glBindBuffer(GL_ARRAY_BUFFER,0);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
-    for (u32 m=0; m<mdlsCnt; ++m) { if (mdlPstHalfV[m]) OS_Free(mdlPstHalfV[m], (size_t)rtSrcVertCounts[m]*VRT_ATT_SZ); if (mdlPstTri[m]) OS_Free(mdlPstTri[m], (size_t)modelTriangleCounts[m]*6+4); }
-    OS_Free(mdlPstHalfV, mdlsCnt*sizeof(void*)); OS_Free(mdlPstTri, mdlsCnt*sizeof(void*)); mdlPstHalfV = NULL; mdlPstTri = NULL;
-    DualLog(" vertices: %u, tris: %u..................took %.6f secs\n", tv, tt, get_timed() - startModelTime);
-    mdlPersistentsLoaded = true;
+    glFinish(); glBindBuffer(GL_ARRAY_BUFFER,0); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
+    for (u32 m=0;m<mdlsCnt;++m) { if (mdlPstHalfV[m]) OS_Free(mdlPstHalfV[m],(size_t)rtSrcVertCounts[m]*VRT_ATT_SZ); if (mdlPstTri[m]) OS_Free(mdlPstTri[m],(size_t)modelTriangleCounts[m]*6+4); }
+    OS_Free(mdlPstHalfV,mdlsCnt*sizeof(void*)); OS_Free(mdlPstTri,mdlsCnt*sizeof(void*)); mdlPstHalfV = NULL; mdlPstTri = NULL;
+    DualLog(" vertices: %u, tris: %u..................took %.6f secs\n", tv, tt, get_timed() - startModelTime);    mdlPersistentsLoaded = true;
 }
 AnimationClip mdlAnimClips[MAXANIM][MAX_ANIMCLIPS] = { // speed, frameStart, frameEnd, frameStartModelIndex, framerate
     [0]={[A_IDLE_CLOSED]={1.0f,2,2,699,24},[A_OPENING]={1.0f,2,11,699,24},[A_IDLE_OPEN]={1.0f,11,11,708,24},[A_CLOSING]={1.0f,12,21,709,24}},/*doorB (door2)*/                  [1]={[A_IDLE_CLOSED]={1.0f,2,2,719,24},[A_OPENING]={1.0f,2,12,719,24},[A_IDLE_OPEN]={1.0f,12,12,729,24},[A_CLOSING]={1.0f,14,24,731,24}},/*doorA (door1)*/
@@ -844,10 +817,8 @@ AnimationClip mdlAnimClips[MAXANIM][MAX_ANIMCLIPS] = { // speed, frameStart, fra
     [51]={[A_IDLE]={1.0f,1,65,5768,24},[A_WALK]={1.0f,75,98,5833,24},[A_RUN]={1.0f,75,98,5833,24},[A_ATTACK2]={1.0f,109,126,5857,24},[A_ATTACK1]={1.0f,128,142,5875,24},[A_PAIN]={1.0f,144,159,5890,24},[A_PAIN2]={1.0f,161,174,5906,24},[A_DYING]={1.0f,176,243,5920,24}},/*npc_mutant_cyborg*/
     [52]={[A_LOOP_ALL]={1.0f,1,40,7446,24}},/*g_energmine*/  [53]={[A_LOOP_ALL]={1.0f,1,260,6076,24}},/*cyber_data*/ [54]={[A_LOOP_ALL]={1.0f,1,80,6336,24}},/*cyber_datafrag*/ [55]={[A_LOOP_ALL]={1.0f,1,100,6416,24}},/*cyber_exit*/                  [56]={[A_LOOP_ALL]={1.0f,1,99,6516,24}},/*cyber_ice*/ [57]={[A_LOOP_ALL]={1.0f,1,260,6615,24}},/*cyber_item*/ [58]={[A_INACTIVE]={1.0f,1,1,80,24},[A_ACTIVATED]={1.0f,2,2,81,24}},/*cyber_switch: 1=off, 2=on*/
 };
-void PortalCulling(); bool ToggleDoorPortal(u32,u16,u16);
 void ChangeAnim(Entity* e, u8 c) { if (e->animationNum >= MAXANIM || c >= MAX_ANIMCLIPS) return; AnimationClip* clip=&mdlAnimClips[e->animationNum][c]; if (clip->framerate <= 0 || clip->speed <= 0 || e->clip == c) return; e->clip=c; e->frame=clip->frameStart; e->modelIndex=clip->frameStartModelIndex; e->currentFrameFinished=0.0; }
-extern WeaponFireCtx wfx; void PlaySparkSound(V3);
-void UpdateAnims(void) {
+void UpdateAnims() {
     if (World.paused || World.menuActive) { return; } static float lastPauseTime = 0.0f; if (lastPauseTime == 0.0f) { lastPauseTime = World.pauseRelativeTime; } float  animDT = (float)(World.pauseRelativeTime - lastPauseTime); lastPauseTime = World.pauseRelativeTime; if (animDT > 0.1f) { animDT = 0.1f; } if (animDT <= 0.0f) { return; } bool portalsNeedUpdated = false; u8 animTest = Cheats.animTest;
     for (u16 i = INSTS_1ST_IDX; i < INSTANCE_CNT; ++i) {
         if (i == World.weaponVModelIndex) continue; Entity* e = &World.instances[i]; if (e->modelIndex >= MAX_MDLS || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAXANIM || e->ajar) continue;

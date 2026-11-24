@@ -6,7 +6,7 @@ static u8 mgPx[AM_W * AM_H * 4],mg15num[17];
 static bool mgDirty = true, mgSliding = false, mg15solved = false;
 static const u16 mgFontCps[] = {32, 33, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 65, 67, 68, 69, 71, 73, 75, 76, 78, 79, 80, 83, 84, 85, 86, 89, 90};
 void MgViewRect(bool rh, i32* x, i32* y, i32* w, i32* h) { *x = rh ? 1022 : 24; *y = 524; *w = AM_W; *h = AM_H; }
-void MinigameInit(void) { Font0CacheBuild(mgFontCps, sizeof(mgFontCps) / sizeof(mgFontCps[0])); GenerateAndBindTexture(&mgTexId, GL_RGBA8, AM_W, AM_H, GL_RGBA, GL_UNSIGNED_BYTE, GL_LINEAR, NULL); glGenFramebuffers(1, &mgFBO); glBindFramebuffer(GL_FRAMEBUFFER, mgFBO); glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, mgTexId, 0); glBindFramebuffer(GL_FRAMEBUFFER, uiFBO); }
+void MinigameInit() { Font0CacheBuild(mgFontCps, sizeof(mgFontCps) / sizeof(mgFontCps[0])); GenerateAndBindTexture(&mgTexId, GL_RGBA8, AM_W, AM_H, GL_RGBA, GL_UNSIGNED_BYTE, GL_LINEAR, NULL); glGenFramebuffers(1, &mgFBO); glBindFramebuffer(GL_FRAMEBUFFER, mgFBO); glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, mgTexId, 0); glBindFramebuffer(GL_FRAMEBUFFER, uiFBO); }
 static void MgFillRect(i32 x, i32 y, i32 w, i32 h, u8 r, u8 g, u8 b) { i32 x0 = vmax(x, 0), y0 = vmax(y, 0), x1 = vmin(x + w, AM_W), y1 = vmin(y + h, AM_H); for (i32 yy = y0; yy < y1; ++yy) { u8* p = mgPx + ((size_t)yy * AM_W + (u32)x0) * 4; for (i32 xx = x0; xx < x1; ++xx, p += 4) { p[0] = r; p[1] = g; p[2] = b; p[3] = 255; } } }
 static void MgBlitImage(u16 tex, i32 dx, i32 dy, i32 dw, i32 dh) {
     i32 sw = 0, sh = 0;
@@ -75,7 +75,7 @@ static void Mg15DrawTile(i32 x, i32 y, i32 num, bool hover) {
     if (Font0CacheGet((u32)nb[0], &bmp, &gw, &gh, &xoff, &yoff, &xadv) && bmp) baseline = (i32)(y + (28 - gh) * 0.5f - yoff + 0.5f);
     MgDrawText(tx, baseline, 0, 0, 0, nb);
 }
-static void Mg15Render(void) {
+static void Mg15Render() {
     MgFillRect(0, 0, AM_W, AM_H, 6, 25, 11);
     if (mg15solved) { MgDrawTextC(24, 255, 255, 0, "PUZZLE SOLVED!"); MgDrawTextC(190, 255, 255, 255, "CLICK TO PLAY AGAIN"); } else { MgDrawTextC(24, 255, 255, 255, "15 PUZZLE"); }
     for (i32 cell = 1; cell <= 16; ++cell) { i32 cx = 0, cy = 0; Mg15CellXY(cell, &cx, &cy); if (mgSliding && (cell == mgSlideFrom || cell == mgSlideTo)) { MgFillRect(cx, cy, 28, 28, 128, 102, 102); continue; } Mg15DrawTile(cx, cy, mg15num[cell], !mgSliding && !mg15solved && cell == mgHoverCell); }
@@ -104,8 +104,8 @@ static void Mg15Slide(i32 from, i32 to, bool resetting) {
     mgSlideTick = World.pauseRelativeTime + 0.1f;
     mgDirty = true;
 }
-static void Mg15Evaluate(void) { for (i32 i = 1; i <= 15; ++i) if (mg15num[i] != i) return; mg15solved = true; mgDirty = true; play_wav("buttons/keycard_success",AppliedFXVol(1.0f),(V3){0},false); }
-void Mg15Reset(void) {
+static void Mg15Evaluate() { for (i32 i = 1; i <= 15; ++i) if (mg15num[i] != i) return; mg15solved = true; mgDirty = true; play_wav("buttons/keycard_success",AppliedFXVol(1.0f),(V3){0},false); }
+void Mg15Reset() {
     for (i32 i = 1; i <= 16; ++i) mg15num[i] = (u8)i;
     mgSliding = false; mg15solved = false; mgHoverCell = -1; i32 shuffleIter = World.diffPuz * 5;
     while (shuffleIter > 0) { i32 randIter = 32; while (randIter > 0) { i32 r = (i32)random_range_u32(1, 16); i32 emp = Mg15EmptyNeighbor(r); if (emp) { Mg15Slide(r, emp, true); break; } randIter--; } shuffleIter--; }
@@ -113,7 +113,7 @@ void Mg15Reset(void) {
 }
 static i32 Mg15CellAt(i32 lx, i32 ly) { if (lx < 96 || ly < 36 || lx >= 224 || ly >= 164) return 0; return ((ly - 36) / 32) * 4 + ((lx - 96) / 32) + 1; }
 void Mg15Click(bool rh, i32 x, i32 y) { i32 vx = 0, vy = 0, vw = 0, vh = 0; MgViewRect(rh, &vx, &vy, &vw, &vh); i32 lx = x - vx, ly = y - vy; if (lx < 0 || ly < 0 || lx >= vw || ly >= vh) return; if (mg15solved) { Mg15Reset(); return; } if (mgSliding) return; i32 cell = Mg15CellAt(lx, ly); if (!cell) return; i32 emp = Mg15EmptyNeighbor(cell); if (emp) Mg15Slide(cell, emp, false); Mg15Evaluate(); }
-void MinigameTick(void) {
+void MinigameTick() {
     if (World.Sys_UI.mg_current != 1 || !mgSliding || World.pauseRelativeTime < mgSlideTick) return;
     float tdiff = World.pauseRelativeTime - mgSlideTick; float shift = (float)(tdiff / 0.04f) * 12.0f; mgSlideTick = World.pauseRelativeTime + 0.04f; mgSlideX += mgSlideDirX * shift; mgSlideY += mgSlideDirY * shift; bool done = false;
     if (mgSlideDirX > 0.0f && mgSlideX >= mgSlideToX) done = true;

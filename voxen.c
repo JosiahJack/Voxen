@@ -8,7 +8,7 @@ size_t scratch_peak,cvxAdjOffsetBytes[MAX_UNIQUE_CVX_MESHES],cvxAdjListBytes[MAX
 float rasterPerspectiveProjection[16],modelMatrices[INSTANCE_CNT*16],*world_from_mdl = modelMatrices,modelBounds[MAX_MDLS],**physPos,lightView[MAX_SHADOWMAPS][6][4][4],lightViewProj[MAX_SHADOWMAPS][6][16],shadowmapsPerspectiveProjection[16],sunShadowMatrix[16],berserkSeedTime,cyberStaticAlpha,healFlashFinished,chargeFlashFinished;    static float shakeAmp = 0.15f,amMapScaleX,amMapScaleY,amMapOffsetX;    extern float reloadTime[16];
 static u32 globalframesPerLastSecond,inputImageID,inputUIID,inputDepthID,inputSpecID,inputNormalID,outputImageID,gBufferFBO,uiSP,depthPrepassSP,chunkSP,chunkVAO,matricesBufferID,ssrSP,rtSP,rtCopySP,imageBlitSP,quadVAO,quadVBO,rtInstanceInfoID,rtCellCountsID,rtCellListsID,rtGeomID,rtOrderBufID,gpuQ[5][5],wireVertCount,raycastPickMode,rebindArmedFrame;
 u32 globalframe,threadCnt = 1,*physVertCounts,*rtSrcVertCounts,uiFBO,textDecalVBO[MAX_LEVELS][INSTANCE_CNT],textSP,textVAO,textVBO,textDecalVertexCount[MAX_LEVELS][INSTANCE_CNT],lightsID,voxelUpdateSP,cellVisibleDataID,shadowmapsSP,shadowMapSSBO,shadowMapsIndirectionID,sunShadowFBO,sunShadowTex,shadowmapIndirectionList[LIGHT_CNT],colorBufferID,texPalID,texPalOfsID,textureOffsetsID,textureSizesID,psysInstancesID,
-    psysTrailsID,psysquadVAO,psysquadVBO,particleSP,trailSP,camViewTextures[64],levelCamViewTextures[14][64],drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal,biomTexId,biomFBO,raycastCalls,debugUnlitSP,debugLinesVAO,debugLinesVBO,wireLinesVAO,wireLinesVBO,uniqueCvxMeshCount = 0;    extern u32 numActivePortals;
+    psysTrailsID,psysquadVAO,psysquadVBO,particleSP,trailSP,camViewTextures[64],levelCamViewTextures[14][64],drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal,biomTexId,biomFBO,raycastCalls,debugUnlitSP,debugLinesVAO,debugLinesVBO,wireLinesVAO,wireLinesVBO,uniqueCvxMeshCount = 0;
 u16 **modelTriangles,modelTriangleCounts[MAX_MDLS],mdlsCnt,**physTris,texCnt,decStyleCnt,decTxtLevel[DECAL_INLINE_TEXT_MAX],decTxtInst[DECAL_INLINE_TEXT_MAX],decTxtCount,uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES];
 u8 particleBlendTexture[MAXTEX],camViewCount,levelCamViewCount[14],*scratch_base,*scratch_cur,*scratch_end;    static u8 currentPlayerNameLength,curMenuPg,resDropdownCount,resSelectedIdx,gpuQFrame,uiMouseCaptured,saveNameEntryLen;    extern u8 mdlSwapLev,*fontBmp1,*fontBmp2;        static i8 curMenuIt,curMenuTab, menuItemCount = 4, menuTabCount = 1, resHoverIdx = -1, saveSlotEditing = -1, reflHovIdx = -1, rebindRow = -1, softwareInvCurrent = -1;
 char decTxt[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN];    static char saveSlotNames[8][48],saveNameEntry[48];
@@ -18,8 +18,8 @@ typedef struct WSWin WSWin;    typedef struct WSCtx WSCtx;    typedef struct WSL
 static WSWin* window; static InstanceRTInfo rtPrevInfo[INSTANCE_CNT]; static ModelRTInfo rtModelInfo[MAX_MDLS];
 void ConsoleEmulator(i32),EditFieldKey(i32),CycleWeaponSlot(int),CloseFullmap(),UI_AutomapClick(bool,int),UpdateScreenSize(i32,i32),SaveConfig(),InputWindowFocus(i32),InputKey(char*,int,int),InputMouseClick(char*,int,int),InputCursorPos(double*,double*,double,double),InputMonitor(WSMon*,int,int),ComputeWindowPlacement(int,int*,int*),SaveGame(u8,const char*),LoadGame(u8),ApplyPlayerMovements(float),NewGame(),
      HwToggle(u8),MFD_ResetGeneral(),PSys_Render(float*,V3,V3,V3,V3,u32,float,float,float,float),MissionTimerInit(),AddHardwareToInventory(int,int),mp3_clear(),AddDoorPortal(u16,u16),MdlSwapWindowDisposeData(u16),LoadModels(),LoadTextures(),InitAudio(),Physics(float),UpdateAnims(),UpdateAudio(),AudioUpdateMix(),ParticlesUpdate(float),BioMonitorUpdate(),MenuGoBack(),DebugRAMActual(const char*),DebugRAMPeak(),BiomonitorBlitToUI(),LoadTextForLanguage(u8),
-     LoadLogTextForLanguage(u8),SaveGame(u8,const char*),LoadGame(u8),WeaponFireStartWeaponDip(float),ActualChangeAmmoType(),ReloadSecret(bool),Unload(bool),PlayLog(int),CheckForUnreadLogs(),UseTargets(u16,u16),UseCyberspaceItemByIndex(int),mp3_clear(),GiveEnergy(float,EnerTyp),GeneralInvRemove(int),UpdateSearchTether(),CloseSearch(),CompleteWeaponChange(),MinigameInit(),MinigameTick();
-bool PlayerInElevatorCell(),FindElevatorKeypadPos(u8,V3*),MdlIsWinMemberSet(u16,u8),InventoryHasAccessCard(AccCardType),ReadSavName(u8,char*,size_t),SearchTakeSlot(u8);
+     LoadLogTextForLanguage(u8),SaveGame(u8,const char*),LoadGame(u8),WeaponFireStartWeaponDip(float),ActualChangeAmmoType(),ReloadSecret(bool),Unload(bool),PlayLog(int),CheckForUnreadLogs(),UseTargets(u16,u16),UseCyberspaceItemByIndex(int),mp3_clear(),GiveEnergy(float,EnerTyp),GeneralInvRemove(int),UpdateSearchTether(),CloseSearch(),CompleteWeaponChange(),MinigameInit(),MinigameTick(),UI_ProcessNavigation();
+bool PlayerInElevatorCell(),FindElevatorKeypadPos(u8,V3*),MdlIsWinMemberSet(u16,u8),InventoryHasAccessCard(AccCardType),ReadSavName(u8,char*,size_t),SearchTakeSlot(u8),UIInteractions();
 i32 s2i32(const char*),GeneralInvItem(i32);
 u16 GetItemFrobTexture(u16);
 const char* AccessCardCodeForType(AccCardType);
@@ -401,20 +401,19 @@ void PlaceWindowOnMonitor(int monIdx) {
     #endif
 }
 void ApplyStagedWindowedSizeOn(int monIdx) {
-    if(monIdx>=WinSys.monitorCount){monIdx=0;} if(resDropdownCount>0){ if(resSelectedIdx<0){resSelectedIdx=0;} if(resSelectedIdx>=resDropdownCount){resSelectedIdx=resDropdownCount-1;} Sys_Settings.ScreenWidth=(u32)resModes[resSelectedIdx].w; Sys_Settings.ScreenHeight=(u32)resModes[resSelectedIdx].h; } Sys_Settings.Fullscreen=0; window->decorated=1; SetWindowDecorated(window,1);
-    WSMon* m=WinSys.monitors[monIdx]; int wx,wy,ww,wh; GetMonitorWorkarea(m,&wx,&wy,&ww,&wh); int ddw,ddh; GetDecorationOverhead(&ddw,&ddh); int w=vmax(vmin((int)Sys_Settings.ScreenWidth,ww-ddw),320),h=vmax(vmin((int)Sys_Settings.ScreenHeight,wh-ddh),200); Sys_Settings.ScreenWidth=(u16)w; Sys_Settings.ScreenHeight=(u16)h; 
-    SetWindowSize(w,h); PlaceWindowOnMonitor(monIdx); UpdateScreenSize(w,h); resDropdownOpen=false; resHoverIdx=-1; SaveConfig();
+    if (monIdx >= WinSys.monitorCount) { monIdx = 0; } if (resDropdownCount > 0) { if (resSelectedIdx >= resDropdownCount) { resSelectedIdx = vmax((i32)resDropdownCount - 1,0);} Sys_Settings.ScreenWidth = (u32)resModes[resSelectedIdx].w; Sys_Settings.ScreenHeight = (u32)resModes[resSelectedIdx].h; } Sys_Settings.Fullscreen = 0; window->decorated = 1; SetWindowDecorated(window,1);
+    WSMon* m = WinSys.monitors[monIdx]; int wx,wy,ww,wh; GetMonitorWorkarea(m,&wx,&wy,&ww,&wh); int ddw,ddh; GetDecorationOverhead(&ddw,&ddh); int w = vmax(vmin((int)Sys_Settings.ScreenWidth,ww - ddw),320), h = vmax(vmin((int)Sys_Settings.ScreenHeight,wh - ddh),200); Sys_Settings.ScreenWidth = (u16)w; Sys_Settings.ScreenHeight = (u16)h; 
+    SetWindowSize(w,h); PlaceWindowOnMonitor(monIdx); UpdateScreenSize(w,h); resDropdownOpen = false; resHoverIdx = -1; SaveConfig();
 }
 void ApplyStagedWindowedSize() { int i = GetCurrentMonitorIndex(); Sys_Settings.CurrentMonitor = (u8)i; ApplyStagedWindowedSizeOn(i); }
 void GatherResolutionModesFor(int monIdx) {
-    int keepW=-1,keepH=-1; if(resSelectedIdx>=0 && resSelectedIdx<resDropdownCount){keepW=resModes[resSelectedIdx].w; keepH=resModes[resSelectedIdx].h;}
+    int keepW = -1, keepH = -1; if (resSelectedIdx < resDropdownCount) { keepW = resModes[resSelectedIdx].w; keepH = resModes[resSelectedIdx].h;}
     resDropdownCount = 0; if(monIdx>=WinSys.monitorCount){monIdx=0;} WSMon* m = WinSys.monitors[monIdx]; int wx,wy,ww,wh; GetMonitorWorkarea(m,&wx,&wy,&ww,&wh); static const struct {int w,h;} cr[] = {{320,200},{640,400},{640,480},{800,600},{1024,768},{1280,720},{1280,800},{1366,768},{1440,900},{1600,900},{1920,1080},{2560,1440}}; int j; int fddw,fddh;
     GetDecorationOverhead(&fddw,&fddh);
     for (int i = 0; i < 12; ++i) { if (cr[i].w+fddw > ww || cr[i].h+fddh > wh) continue; for (j = 0; j < resDropdownCount; ++j) { if (resModes[j].w == cr[i].w && resModes[j].h == cr[i].h) break; } if (j == resDropdownCount) resModes[resDropdownCount++] = (ResMode){cr[i].w,cr[i].h}; }
     { int fw=ww-fddw, fh=wh-fddh; if (fw>=320 && fh>=200){ for (j = 0; j < resDropdownCount; ++j) { if (resModes[j].w == fw && resModes[j].h == fh) break; } if (j == resDropdownCount) resModes[resDropdownCount++] = (ResMode){fw,fh}; } }
     if (resDropdownCount==0) { resModes[resDropdownCount++]=(ResMode){vmax((int)Sys_Settings.ScreenWidth,320),vmax((int)Sys_Settings.ScreenHeight,200)};} resSelectedIdx=-1;
     for (int i=0;i<resDropdownCount;++i) { if(resModes[i].w == keepW && resModes[i].h == keepH){resSelectedIdx=i; break;} if (resModes[i].w == (int)Sys_Settings.ScreenWidth && resModes[i].h == (int)Sys_Settings.ScreenHeight) { resSelectedIdx = i; } }
-    if(resSelectedIdx<0){ int cw=(int)Sys_Settings.ScreenWidth, chh=(int)Sys_Settings.ScreenHeight; if (cw >= 320 && chh >= 200 && cw + fddw <= ww && chh + fddh <= wh) { resModes[resDropdownCount++] = (ResMode){cw,chh}; } resSelectedIdx = resDropdownCount - 1; }
 }
 void ChangeFullScreenWindowed(bool adjustToFit) {
     int ci=(int)Sys_Settings.CurrentMonitor; if(ci<0||ci>=WinSys.monitorCount){ci=0; Sys_Settings.CurrentMonitor=0;} WSMon* m = WinSys.monitors[ci]; int x,y,w,h; GetMonitorFullarea(m,&x,&y,&w,&h); int sddw,sddh; GetDecorationOverhead(&sddw,&sddh);
@@ -440,7 +439,7 @@ InputElement inputElements[134]={{"A",KEY_A},{"B",KEY_B},{"C",KEY_C},{"D",KEY_D}
                                  {"TAB",KEY_TAB},{"NUMENTER",KEY_KP_ENTER},{"ESCAPE",KEY_ESCAPE},{"SPACE",KEY_SPACE},{"DELETE",KEY_DELETE},{"INSERT",KEY_INSERT},{"HOME",KEY_HOME},{"END",KEY_END},{"PAGEUP",KEY_PAGE_UP},{"PAGEDN",KEY_PAGE_DOWN},{"F1",KEY_F1},{"F2",KEY_F2},{"F3",KEY_F3},{"F4",KEY_F4},{"F5",KEY_F5},{"F6",KEY_F6},{"F7",KEY_F7},{"F8",KEY_F8},{"F9",KEY_F9},{"F10",KEY_F10},{"F11",KEY_F11},{"F12",KEY_F12},{"GRAVE",KEY_GRAVE_ACCENT},
                                  {"-",KEY_MINUS},{"=",KEY_EQUAL},{"[",KEY_LEFT_BRACKET},{"]",KEY_RIGHT_BRACKET},{"\\",KEY_BACKSLASH},{"/",KEY_SLASH},{".",KEY_PERIOD},{",",KEY_COMMA},{";",KEY_SEMICOLON},{"'",KEY_APOSTROPHE},{"CAPSLOCK",KEY_CAPS_LOCK},{"NUM0",KEY_KP_0},{"NUM4",KEY_KP_4},{"NUM5",KEY_KP_5},{"NUM6",KEY_KP_6},{"NUM7",KEY_KP_7},{"NUM8",KEY_KP_8},{"NUM9",KEY_KP_9},{"NUM*",KEY_KP_MULTIPLY},{"NUM-",KEY_KP_SUBTRACT},{"NUM.",KEY_KP_DECIMAL},
                                  {"MENU",KEY_MENU},{"PAUSE",KEY_PAUSE},{"NUMLOCK",KEY_NUM_LOCK},{"MWHEEL+",127},{"MWHEEL-",128},/*Handled special case for mousewheel +/-respectively*/{"PRINT",KEY_PRINT_SCREEN},{"JOY18",4},{"JOY19",8},{"UNUSED",0}};
-static bool uiWheelBlocked; static bool f7StepEdge = false, f7DownLatch = false; static KeyState unboundInput; bool rebindCaptureActive = false;/*Set by the Input tab when a binding row is capturing a key; suppresses GetKeyPressed(25) Menu ESC-back + wheel capture while capturing.*/ bool UIInteractions(void); void UI_ProcessNavigation(void);
+static bool uiWheelBlocked; static bool f7StepEdge = false, f7DownLatch = false; static KeyState unboundInput; bool rebindCaptureActive = false;/*Set by the Input tab when a binding row is capturing a key; suppresses GetKeyPressed(25) Menu ESC-back + wheel capture while capturing.*/
 KeyState* GetCodeMapping(int settingIndex) { if (settingIndex<0 || settingIndex>=42) return &unboundInput; i32 i=Sys_Settings.InputCodeSettings[settingIndex]; if (i<0 || i>=(i32)(sizeof(inputElements)/sizeof(inputElements[0]))) return &unboundInput; if (i>=53 && i<=60) { int button=inputElements[i].value; return (uiMouseCaptured&(1u<<button)) ? &unboundInput : &Sys_Input.mouseButtons[button]; } return &Sys_Input.keyStates[inputElements[i].value]; }
 void TextEntry(i32 k) {
     if (k == KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { World.playerName[0] = '\0'; currentPlayerNameLength = 0; return; } if (k == KEY_ENTER || k == KEY_KP_ENTER) { curMenuIt++; return; } if (k == KEY_BACKSPACE && currentPlayerNameLength > 0) { World.playerName[--currentPlayerNameLength] = '\0'; return; } if (currentPlayerNameLength >= 26) return;
@@ -453,7 +452,7 @@ void GoIntoGame() {
     World.levelInstCount[5],World.levelInstCount[6],World.levelInstCount[7],World.levelInstCount[8],World.levelInstCount[9],World.levelInstCount[10],World.levelInstCount[11],World.levelInstCount[12],World.levelInstCount[13],World.levelLoadedLights[0],World.levelLoadedLights[1],World.levelLoadedLights[2],World.levelLoadedLights[3],
     World.levelLoadedLights[4],World.levelLoadedLights[5],World.levelLoadedLights[6],World.levelLoadedLights[7],World.levelLoadedLights[8],World.levelLoadedLights[9],World.levelLoadedLights[10],World.levelLoadedLights[11],World.levelLoadedLights[12],World.levelLoadedLights[13]);
 }
-static void KeycodeKeypress(int k) { SystemUI* s=&World.Sys_UI; if (!s->keycodeValid) return; if (s->keycodeSolved) return; play_wav("buttons/button_beep",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);
+static void KeycodeKeypress(int k) { SystemUI* s=&World.Sys_UI; if (!s->keycodeValid) return; if (s->keycodeSolved) return; play_wav("buttons/button_beep",AppliedFXVol(1.0f),(V3){0},false);
     if (k>=0&&k<=9) {
         if (World.Sys_UI.keycodeOnes < 0) { World.Sys_UI.keycodeOnes = (i8)k; World.Sys_UI.keycodeEntry = World.Sys_UI.keycodeOnes; }
         else if (World.Sys_UI.keycodeTens < 0) { World.Sys_UI.keycodeTens = World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes = (i8)k; World.Sys_UI.keycodeEntry = World.Sys_UI.keycodeOnes + World.Sys_UI.keycodeTens*10; }
@@ -462,11 +461,11 @@ static void KeycodeKeypress(int k) { SystemUI* s=&World.Sys_UI; if (!s->keycodeV
     }
     else if (k==10) { if (s->keycodeHuns>=0) { s->keycodeOnes=s->keycodeTens; s->keycodeTens=s->keycodeHuns; s->keycodeHuns=-1; s->keycodeEntry=s->keycodeOnes+s->keycodeTens*10; return; } else if (s->keycodeTens>=0) { s->keycodeOnes=s->keycodeTens; s->keycodeTens=-1; s->keycodeEntry=s->keycodeOnes; return; } else if (s->keycodeOnes>=0) { s->keycodeOnes=-1; s->keycodeEntry=-1; return; } else return;/*empty backspace leaves the preloaded easy-difficulty value intact*/ }
     else if (k==11) { s->keycodeHuns=s->keycodeTens=s->keycodeOnes=-1; s->keycodeEntry=-1; }
-    if (s->keycodeEntry==s->keycodeValue) { if (s->keycodeHuns>=0) play_wav("buttons/keycard_success",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);/*code accepted*/ u16 pad=s->tetheredKeypadKeycode; if (pad>=INSTS_1ST_IDX && pad<World.instCount) { UseTargets(pad,World.instances[pad].targetIdx); if (World.instances[pad].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pad].messageLingdex]); } s->keycodeSolved=true; }
-    else if (s->keycodeHuns>=0) play_wav("buttons/button_deny",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);/*code not accepted*/
+    if (s->keycodeEntry==s->keycodeValue) { if (s->keycodeHuns>=0) play_wav("buttons/keycard_success",AppliedFXVol(1.0f),(V3){0},false);/*code accepted*/ u16 pad=s->tetheredKeypadKeycode; if (pad>=INSTS_1ST_IDX && pad<World.instCount) { UseTargets(pad,World.instances[pad].targetIdx); if (World.instances[pad].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pad].messageLingdex]); } s->keycodeSolved=true; }
+    else if (s->keycodeHuns>=0) play_wav("buttons/button_deny",AppliedFXVol(1.0f),(V3){0},false);/*code not accepted*/
 }
-static void SaveSlotCancelTyping(void) { saveSlotEditing=-1; typingSav = false; saveNameEntryLen=0; saveNameEntry[0]='\0'; }
-static void SaveSlotConfirmTyping(void) { i8 slot = saveSlotEditing; char name[48]; u8 n=saveNameEntryLen; if (n > 47) { n = 47; } for (u8 i=0;i<n;++i) name[i] = saveNameEntry[i]; name[n] = '\0'; SaveSlotCancelTyping(); if (slot < 0 || slot > 7 || n == 0) return; for (u8 i=0;i<=n;++i) saveSlotNames[slot][i] = name[i]; World.menuActive = false; World.paused = false; returnToPause = false; SaveGame((u8)slot,name); }
+static void SaveSlotCancelTyping() { saveSlotEditing=-1; typingSav = false; saveNameEntryLen=0; saveNameEntry[0]='\0'; }
+static void SaveSlotConfirmTyping() { i8 slot = saveSlotEditing; char name[48]; u8 n=saveNameEntryLen; if (n > 47) { n = 47; } for (u8 i=0;i<n;++i) name[i] = saveNameEntry[i]; name[n] = '\0'; SaveSlotCancelTyping(); if (slot < 0 || slot > 7 || n == 0) return; for (u8 i=0;i<=n;++i) saveSlotNames[slot][i] = name[i]; World.menuActive = false; World.paused = false; returnToPause = false; SaveGame((u8)slot,name); }
 void SaveNameEntry(i32 k) {
     if (k==KEY_ESCAPE) { Sys_Input.keyStates[KEY_ESCAPE].pressed=false; SaveSlotCancelTyping(); return; } if (k==KEY_ENTER||k==KEY_KP_ENTER) { Sys_Input.keyStates[KEY_ENTER].pressed = Sys_Input.keyStates[KEY_KP_ENTER].pressed = false; SaveSlotConfirmTyping(); return; } if (k==KEY_BACKSPACE && saveNameEntryLen>0) { saveNameEntry[--saveNameEntryLen] = '\0'; return; }
     if (k==KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { saveNameEntry[0] = '\0'; saveNameEntryLen = 0; return; } if (saveNameEntryLen>=47) { return; } 
@@ -1135,7 +1134,7 @@ extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artif
 extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_or_ps(__m256 __A, __m256 __B) { return (__m256)((__m256i)__A | (__m256i)__B); }
 extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_xor_ps(__m256 __A, __m256 __B) { return (__m256)((__m256i)__A ^ (__m256i)__B); }
 extern __inline int __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_movemask_ps(__m256 __A) { return __builtin_ia32_movmskps256((__v8sf)__A); }
-extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_setzero_ps(void) { return (__m256){ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f }; }
+extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_setzero_ps() { return (__m256){ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f }; }
 u16 shadowCasterIndices[INSTANCE_CNT], candidates[MAX_SHADOWMAPS]; static __attribute__((aligned(64))) float sc_posX[INSTANCE_CNT],sc_posY[INSTANCE_CNT],sc_posZ[INSTANCE_CNT],sc_radius[INSTANCE_CNT],sc_shadRadius[INSTANCE_CNT]; static u16 sc_origIdx[INSTANCE_CNT], shadowSlot[LIGHT_CNT]; static u8 shadowFaces[LIGHT_CNT]; static float shadowPosSum[LIGHT_CNT]; static u32 shadowIdSum[LIGHT_CNT];
 static const u32 shadClearSentinel = 0xFFFFFFFFu;
 static i8 shadowLevel=-1; u32 shadowNextSlot=0; static const i8 faceAxis[6] = {0,0,1,1,2,2}; static const float faceSign[6] = {1.f,-1.f,1.f,-1.f,1.f,-1.f};
@@ -1662,7 +1661,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.instances[PLAYER1].index = 767;
     World.layer[PLAYER1] = L_Player; World.scale[PLAYER1] = (V3){1.0f,1.0f,1.0f}; World.rotation[PLAYER1] = (Quaternion){0.0f,0.7071f,0.0f,0.7071f}; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
     World.instances[PLAYER1].entflags = EF_ACTIVE|EF_RIGIDBODY; World.instances[PLAYER1].modelIndex = MAX_MDLS;
-    World.col[PLAYER1] = CT_CAP; World.colliderCenter[PLAYER1].y = -PLYR_CAM_OFS_Y; World.colliderSize[PLAYER1] = (V3){0.48f,2.0f,1.0f}; World.velocity[PLAYER1] = (V3){0.0f,0.0f,0.0f};
+    World.col[PLAYER1] = CT_CAP; World.colliderCenter[PLAYER1].y = -PLYR_CAM_OFS_Y; World.colliderSize[PLAYER1] = (V3){0.48f,2.0f,1.0f}; World.velocity[PLAYER1] = (V3){0};
     World.cam_yaw = 90.0f; World.cam_pitch = World.cam_roll = World.invP1.leanTarget = 0.0f; World.instances[PLAYER1].hasGrav = true;
     World.instances[PLAYER1].health = 211.0f; World.instances[PLAYER1].cyberHealth = 255.0f; World.instances[PLAYER1].bloodType = BloodType_Red;
     World.invP1.noiseFinished = World.pauseRelativeTime; World.invP1.energy = 54.0f; World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1f + random_range(0.5f,1.0f);
@@ -1686,7 +1685,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     mset(World.levelCameraCount,0,sizeof(World.levelCameraCount));     mset(World.levelSmallNodeCount,0,sizeof(World.levelSmallNodeCount));     mset(World.levelLargeNodeCount,0,sizeof(World.levelLargeNodeCount));
     mset(World.levCamDestroyedCnt,0,sizeof(World.levCamDestroyedCnt)); mset(World.levSmNodeDestroyedCnt,0,sizeof(World.levSmNodeDestroyedCnt)); mset(World.levNodeDestroyedCnt,0,sizeof(World.levNodeDestroyedCnt));
     for (u32 u = 0; u < uniqueCvxMeshCount; ++u) { if (cvxAdjOffsets[u]) { OS_Free(cvxAdjOffsets[u], cvxAdjOffsetBytes[u]); cvxAdjOffsets[u] = 0; cvxAdjOffsetBytes[u] = 0; } if (cvxAdjLists[u]) { OS_Free(cvxAdjLists[u], cvxAdjListBytes[u]); cvxAdjLists[u] = 0; cvxAdjListBytes[u] = 0; } }
-    uniqueCvxMeshCount = 0; numActivePortals = 0; cullVisibilityValid = false; mset(World.physSleep, 0, sizeof(World.physSleep));
+    uniqueCvxMeshCount = 0; World.numActivePortals = 0; cullVisibilityValid = false; mset(World.physSleep, 0, sizeof(World.physSleep));
     DualLog(" prep...............................................................took %.6f secs\n",get_timed() - newGamePrepStart);
     LoadAllLevels();
     for (u8 lev=0;lev<MAX_LEVELS;++lev) { /*Done after levels are loaded to remove difficulty related items.*/
@@ -1698,7 +1697,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     LoadLevel(1/*medical*/,(V3){10.52f, -43.792f + 0.84f, 20.2908f});
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { if (IdxIsPortalBlockingDoor(World.instances[i].index)) { AddDoorPortal(World.instances[i].index,i); } }
     double newGameCvxStart = get_timed();
-    World.invP1.currentCrouchRatio = 1.0f;
+    World.invP1.curCrouchRatio = 1.0f;
     for (u32 m=0; m<mdlsCnt; ++m) { if (mdlPersistentSet[m]) continue; if (World.curLev < MAX_LEVELS && MdlIsWinMemberSet((u16)m,World.curLev)) continue; if (physPos[m] || modelTriangles[m] || modelVertexCounts[m]) { MdlSwapWindowDisposeData((u16)m); } }
     World.lev1SecCode = World.lev2SecCode = World.lev3SecCode = World.lev4SecCode = World.lev5SecCode = World.lev6SecCode = -1; World.missionBits = 0;
     AutomapNewGame();
@@ -1815,7 +1814,7 @@ void InitalizeEnvironment() {
         #undef GA
         if (sa) { WinSys.x11.xlib.Free(sa); } XcursorImage* native = ImageCreate(16,16); mset(native->pixels,0,256*sizeof(XcursorUInt)); native->xhot=native->yhot = 0; WinSys.x11.hiddenCursorHandle = ImageLoadCursor(WinSys.x11.display,native); ImageDestroy(native); PollMonitors();
     #endif
-    threadCnt = (u32)vclampi(OS_GetNumThreads(),1,32); World.diffCbt = World.diffCyb = World.diffPuz = World.diffMis = 2; /*Default difficulties of normal*/ World.cursorPos_x = 680; World.cursorPos_y = 384; /*Internal mouse cursor representation (separate from OS cursor) starts at center*/;
+    threadCnt = (u32)vclampi(OS_GetNumThreads(),1,32); World.diffCbt = World.diffCyb = World.diffPuz = World.diffMis = 2u; /*Default difficulties of normal*/ World.cursorPos_x = 680; World.cursorPos_y = 384; /*Internal mouse cursor representation (separate from OS cursor) starts at center*/;
     FHandle f = OS_OpenReadonly("./Data/Config.ini"); char line[512]; // Load Config.ini
     while (sUpToEndLine(line,sizeof(line),f)) {
         char* s = data_parser_trim(line); if (*s == 0 || (s[0] == '/' && s[1] == '/')) { continue; } char* eq = StringFindFirstCharWithin(s, '='); if (!eq) { continue; } *eq = 0; char *key = data_parser_trim(s), *val = data_parser_trim(eq + 1);

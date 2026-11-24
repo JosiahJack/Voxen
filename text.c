@@ -368,7 +368,7 @@ void RenderTextL(i16 x, i16 y, u32 color, u8 f, float scale, const char* restric
 void RenderTextC(i16 x, i16 y, u32 color, u8 f, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,f,scale,TALIGN_CENTER,s,a); __builtin_va_end(a); }
 void RenderText3DC(V3 worldPos, u32 color, u8 f, float scale, const char* restrict s, ...) { va_list a; __builtin_va_start(a,s); RenderFormattedText((i16)worldPos.x,(i16)worldPos.y,color,f,scale,TALIGN_CENTER,s,a); __builtin_va_end(a); }
 static u16 F32ToHalf(float f){u32 x; mcpy(&x,&f,4); u32 sign=(x>>16)&0x8000u,exp=(x>>23)&0xFFu, mant=x&0x7FFFFFu; if(exp==0xFFu)return (u16)(sign|0x7C00u|(mant?0x200u:0)); int e=(int)exp-127+15; if (e>=31)return (u16)(sign|0x7C00u); if(e<=0){if(e<-10){return (u16)sign;} mant|=0x800000u; u32 shift=(u32)(14-e); u32 h=mant>>shift; if((mant>>(shift-1))&1u)h++; return (u16)(sign|h);} u32 h=((u32)e<<10)|(mant>>13); if(mant&0x1000u)h++; return (u16)(sign|h);}
-void BuildTextDecalMeshes(void) {
+void BuildTextDecalMeshes() {
     mset(textDecalVBO,0,sizeof(textDecalVBO)); mset(textDecalVertexCount,0,sizeof(textDecalVertexCount)); const float DECAL_SCALE_NORMAL = 5.0f*0.25f/0.7f, DECAL_SCALE_STOPD = 2.5f*9.0f/11.5f, DECAL_PX_NORMAL = 0.2f/20.0f, DECAL_PX_STOPD = 9.0f/54.0f; const float DECAL_PX_N = DECAL_SCALE_NORMAL*DECAL_PX_NORMAL, DECAL_PX_S = DECAL_SCALE_STOPD*DECAL_PX_STOPD;
     for (u8 lev=0;lev<MAX_LEVELS;++lev) {
         for (u16 i=INSTS_1ST_IDX; i<World.levelInstCount[lev]; ++i) {

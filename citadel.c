@@ -11,19 +11,19 @@ V3 ScreenPointToRay(V3 fwd, V3 rt) {
     V3 view=V3_Normalize((V3){ndcX*aspect*tanFov,ndcY*tanFov,-1.0f}),flipForward=(V3){-fwd.x,-fwd.y,-fwd.z}; V3 up=V3_Normalize(V3_Cross(rt,flipForward));
     return (V3){view.x*rt.x+view.y*up.x+view.z*flipForward.x,view.x*rt.y+view.y*up.y+view.z*flipForward.y,view.x*rt.z+view.y*up.z+view.z*flipForward.z};
 }
-static i16 GrenadeTypeFromConst(u16 idx) { switch(idx) { case 370:return 7; case 372:return 8; case 387:return 9; case 389:return 10; case 402:return 11; case 403:return 12; case 404:return 13; default:return -1; } }
+static i16 GrenadeTypeFromConst(u16 idx) { switch(idx) { case 370:return 7; case 372:return 8; case 387:return 9; case 389:return 10; case 402:return 11; case 403:return 12; case 404:return 13; case 363:return 14;/*Special value for plastique.*/ default:return -1; } }
 bool IsLiveGrenade(u16 idx) { return GrenadeTypeFromConst(idx) >= 7; }
 static const float grenadeDamage[7]={150,325,80,375,230,200,150},grenadePenetration[7]={20,35,100,50,35,25,100},grenadeOffense[7]={3,6,3,6,5,3,3},grenadeRadius[7]={4,7,6,7.5f,5.1f,5.12f,4}; static const AttType grenadeAttackType[7]={Att_HitS,Att_HitS,Att_Magn,Att_HitS,Att_HitS,Att_HitS,Att_Gas};
 void GrenadeInit(u16 s) { Entity* e = &World.instances[s]; i16 idx = GrenadeTypeFromConst(e->index) - 7; if (idx< 0 || idx >= 7) { return; } if (e->damage <= 0.0f) { e->damage = grenadeDamage[idx]; } if (e->strength <= 0.0f) { e->strength = grenadePenetration[idx]; } if (e->speed <= 0.0f) { e->speed = grenadeOffense[idx]; } if (e->attackType == Att_None) { e->attackType = grenadeAttackType[idx]; } }
 void GrenadeActivate(u16 s) { Entity* e = &World.instances[s]; i16 i = GrenadeTypeFromConst(e->index); if (i == 10) { World.invP1.earthShakerTimeSetting = vclamp(World.invP1.earthShakerTimeSetting,4.0f,60.0f); } else if (i == 12) { World.invP1.nitroTimeSetting = vclamp(World.invP1.nitroTimeSetting,2.0f,60.0f); } e->timerFinished = World.pauseRelativeTime + ((i == 10) ? World.invP1.earthShakerTimeSetting : World.invP1.nitroTimeSetting); }
-void ResetHeldItem() { World.invP1.heldObjectIndex=World.invP1.heldObjectCustIdx=U16_MAX; World.invP1.heldAmmo=World.invP1.heldAmmo2=0; World.invP1.heldObjectLoadedAlternate=World.invP1.holdingObject=World.invP1.grenActive=false; }
+void ResetHeldItem() { World.invP1.heldObjIdx = World.invP1.heldObjCustIdx = U16_MAX; World.invP1.heldAmmo = World.invP1.heldAmmo2 = 0; World.invP1.heldObjectLoadedAlternate = World.invP1.holdingObject = World.invP1.grenActive = false; }
 void DropHeldItem() {
-    if (World.invP1.heldObjectIndex >= World.instCount) { ResetHeldItem(); return; } if (World.invP1.dropFinished > World.pauseRelativeTime) {return;} World.invP1.dropFinished = World.pauseRelativeTime + 0.2f;/*Prevent immediate re-grab at high fps*/ u16 n = AddInstance(World.invP1.heldObjectIndex,World.position[PLAYER1]);
-    Entity* e = &World.instances[n]; e->customIndex = World.invP1.heldObjectCustIdx; e->ammo = World.invP1.heldAmmo; e->ammo2 = World.invP1.heldAmmo2; e->heldObjectLoadedAlternate = World.invP1.heldObjectLoadedAlternate;
-    flag_set(&e->entflags,EF_RIGIDBODY,true); bool liveGrenade=IsLiveGrenade(e->index); if(liveGrenade){World.layer[n]=L_PlayerBullets; e->recentMostActivator=PLAYER1; GrenadeInit(n);} Entity* p = &World.instances[PLAYER1]; V3 tossDir = ScreenPointToRay(p->forward,p->right); World.position[n] = V3Add(World.position[PLAYER1],V3_ScaleByF(tossDir,0.48f)); World.velocity[n] = V3_ScaleByF(tossDir,10.0f); if(liveGrenade)GrenadeActivate(n); ResetHeldItem();
+    if (World.invP1.heldObjIdx >= MAX_ENTS) { ResetHeldItem(); return; } if (World.invP1.dropFinished > World.pauseRelativeTime) {return;} World.invP1.dropFinished = World.pauseRelativeTime + 0.2f;/*Prevent immediate re-grab at high fps*/ u16 n = AddInstance(World.invP1.heldObjIdx,World.position[PLAYER1]); if (!n) return;
+    Entity* e = &World.instances[n]; e->customIndex = World.invP1.heldObjCustIdx; e->ammo = World.invP1.heldAmmo; e->ammo2 = World.invP1.heldAmmo2; e->heldObjectLoadedAlternate = World.invP1.heldObjectLoadedAlternate;
+    flag_set(&e->entflags,EF_RIGIDBODY,true); bool liveGrenade = IsLiveGrenade(e->index); if (liveGrenade) { World.layer[n] = L_PlayerBullets; e->recentMostActivator = PLAYER1; GrenadeInit(n); } Entity* p = &World.instances[PLAYER1]; V3 d = ScreenPointToRay(p->forward,p->right); World.position[n] = V3Add(World.position[PLAYER1],V3_ScaleByF(d,0.48f)); World.velocity[n] = V3_ScaleByF(d,10.0f); if(liveGrenade)GrenadeActivate(n); ResetHeldItem();
 }
 void PatchUse(int patchSlot) {
-    if (patchSlot < 0 || patchSlot > 6) return; if (World.invP1.patchCounts[patchSlot] <= 0) { CenterStatusPrint("%s", Sys_Text.stringTable[324]); return; } if (patchSlot == 3 && World.instances[PLAYER1].health >= 255.0f) { CenterStatusPrint("%s", Sys_Text.stringTable[304]); return; }
+    if (patchSlot < 0 || patchSlot > 6) return; if (World.invP1.patchCounts[patchSlot] == 0) { CenterStatusPrint("%s", Sys_Text.stringTable[324]); return; } if (patchSlot == 3 && World.instances[PLAYER1].health >= 255.0f) { CenterStatusPrint("%s", Sys_Text.stringTable[304]); return; }
     World.invP1.patchCounts[patchSlot]--; World.invP1.patchActive |= (u16)(1u << patchSlot);
     switch (patchSlot) {
         case 0: if (World.invP1.berserkFinished > World.pauseRelativeTime) { World.invP1.berserkFinished += 20.0f; } else { World.invP1.berserkFinished = World.pauseRelativeTime + 20.0f; World.invP1.berserkIncTime = World.pauseRelativeTime + 4.0f; World.invP1.berserkIncrement = 0; berserkSeedTime = random_range(0.0f,1000.0f); } break;
@@ -34,8 +34,8 @@ void PatchUse(int patchSlot) {
         case 5: if (World.invP1.sightFinishedTime > World.pauseRelativeTime) World.invP1.sightFinishedTime += 40.0f; else { World.invP1.sightFinishedTime = World.pauseRelativeTime + 40.0f; World.invP1.sightSideEffectFinishedTime = -1.0f; } break;
         case 6: if (World.invP1.staminupFinishedTime > World.pauseRelativeTime) World.invP1.staminupFinishedTime += 60.0f; else World.invP1.staminupFinishedTime = World.pauseRelativeTime + 60.0f; World.invP1.staminupActive = true; World.invP1.fatigue = 0.0f; break;
     }
-    if (World.invP1.patchCounts[patchSlot] <= 0) { for (int i = 0; i < 7; i++) { if (World.invP1.patchCounts[i] > 0) { World.invP1.patchCur = (i8)i; break; } } CenterStatusPrint("%s%s%s",Sys_Text.stringTable[590],Sys_Text.stringTable[340+patchSlot],Sys_Text.stringTable[589]); } else CenterStatusPrint("%s%s",Sys_Text.stringTable[340+patchSlot],Sys_Text.stringTable[589]);
-    play_wav("hud/patchuse",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);
+    if (World.invP1.patchCounts[patchSlot] == 0) { for (int i = 0; i < 7; i++) { if (World.invP1.patchCounts[i] > 0) { World.invP1.patchCur = (i8)i; break; } } CenterStatusPrint("%s%s%s",Sys_Text.stringTable[590],Sys_Text.stringTable[340+patchSlot],Sys_Text.stringTable[589]); } else CenterStatusPrint("%s%s",Sys_Text.stringTable[340+patchSlot],Sys_Text.stringTable[589]);
+    play_wav("hud/patchuse",AppliedFXVol(1.0f),(V3){0},false);
 }
 void WeaponFireStartWeaponDip(float t) { if (t <= 0.0f) { World.invP1.reloadFinished = 0.0f; return; } World.invP1.reloadFinished = World.pauseRelativeTime + t; World.lerpStartTime = World.pauseRelativeTime; }
 bool InventoryHasAccessCard(AccCardType card) { return (World.invP1.accessCardOwned & (1u << card)) != 0; }
@@ -57,7 +57,7 @@ void AddHardwareToInventory(int index,int hwversion) {
 }
 bool AddGeneralObjectToInventory(int index, int custIdx){
     if (!World.Sys_UI.firstGeneral){World.Sys_UI.firstGeneral=true; World.Sys_UI.mfdTab[0]=3;}
-    for (i8 i=1;i<14;++i) { if (World.invP1.genInvIdxRef[i]==-1) { if (!World.invP1.accessCardOwned && World.invP1.generalInvCurrent == 0 /*First slot is always access cards.*/) { World.invP1.generalInvCurrent = i; } World.invP1.genInvIdxRef[i] = index; World.invP1.genInvCustIdx[i] = (i16)custIdx; World.Sys_UI.genClickSlot = -1; CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[31]); return true; } }
+    for (i8 i=1;i<14;++i) { if (World.invP1.genInvIdxRef[i]==-1) { if (!World.invP1.accessCardOwned && World.invP1.genInvCur == 0 /*First slot is always access cards.*/) { World.invP1.genInvCur = i; } World.invP1.genInvIdxRef[i] = index; World.invP1.genInvCustIdx[i] = (i16)custIdx; World.Sys_UI.genClickSlot = -1; CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[31]); return true; } }
     return false;
 }
 void CheckForUnreadLogs() { int e=0,l=0; for (int i=0;i<LOGCNT;++i) if (World.invP1.hasLog[i] && !World.invP1.readLog[i]) *(Sys_Text.audioLogType[i] == AudioLogType_Email ? &e : &l)=1; World.invP1.hasNewEmail=e; World.invP1.hasNewLogs=l; }
@@ -96,8 +96,8 @@ static float DefaultEnergySettingForWeapon(int wep16Index) { return (wep16Index 
 bool AddWeaponToInventory(int ci) {
     if (ci < 0) return false; if (!World.Sys_UI.firstMain){World.Sys_UI.firstMain=true; World.Sys_UI.mfdTab[0]=1;} if(!World.Sys_UI.firstWeapon){World.Sys_UI.firstWeapon=true; World.Sys_UI.mfdTab[1]=1;}
     for (i32 i = 0; i < 7; i++) {
-        if(World.invP1.wepInvIndices[i] >= 0){continue;} World.invP1.wepInvIndices[i] = ci; i32 index16 = Get16WeaponIndexFromConstIndex(ci); World.invP1.weaponEnergySetting[index16] = DefaultEnergySettingForWeapon(index16); if (i == 0) { World.invP1.wepCurPending=i; World.invP1.weaponIndexPending=(u16)ci; WeaponFireStartWeaponDip(0.5f); World.invP1.recoiling = false; }
-        if (World.invP1.heldObjectLoadedAlternate && World.invP1.heldAmmo2 > 0){World.invP1.currentMagazineAmount2[i]=(u8)World.invP1.heldAmmo2; if (World.invP1.heldAmmo > 0) World.invP1.wepAmmo[index16]+=(u16)World.invP1.heldAmmo; World.invP1.wepLoadedWithAlternate[i]=true;}else{World.invP1.currentMagazineAmount[i]=(u8)World.invP1.heldAmmo; if (World.invP1.heldAmmo2 > 0) World.invP1.wepAmmoSecondary[index16]+=(u16)World.invP1.heldAmmo2; World.invP1.wepLoadedWithAlternate[i]=false;}
+        if(World.invP1.wepInvIndices[i] >= 0){continue;} World.invP1.wepInvIndices[i] = ci; i32 index16 = Get16WeaponIndexFromConstIndex(ci); World.invP1.weaponEnergySetting[index16] = DefaultEnergySettingForWeapon(index16); if (i == 0) { World.invP1.wepCurPending=i; World.invP1.wepIdxPending=(u16)ci; WeaponFireStartWeaponDip(0.5f); World.invP1.recoiling = false; }
+        if (World.invP1.heldObjectLoadedAlternate && World.invP1.heldAmmo2 > 0){World.invP1.curMagAmt2[i]=(u8)World.invP1.heldAmmo2; if (World.invP1.heldAmmo > 0) World.invP1.wepAmmo[index16]+=(u16)World.invP1.heldAmmo; World.invP1.wepLoadedWithAlternate[i]=true;}else{World.invP1.curMagAmt[i]=(u8)World.invP1.heldAmmo; if (World.invP1.heldAmmo2 > 0) World.invP1.wepAmmoSecondary[index16]+=(u16)World.invP1.heldAmmo2; World.invP1.wepLoadedWithAlternate[i]=false;}
         CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(ci)],Sys_Text.stringTable[33]); World.invP1.numweapons=0; for (i32 j=0;j<7;j++) { if(World.invP1.wepInvIndices[j] >= 0){World.invP1.numweapons++;} } return true;
     } return false;
 }
@@ -107,22 +107,22 @@ void UseGrenade(int index) {
     if (index<314 || index>320) return;
     if (!World.invP1.grenAmmo[grenadeSlots[index-314]]) { CenterStatusPrint("%s",Sys_Text.stringTable[322]); return; }
     if (World.invP1.holdingObject) { CenterStatusPrint("%s",Sys_Text.stringTable[311]); return; }/*Can't use grenade, hands full*/ ForceInventoryMode(); ResetHeldItem(); World.invP1.grenActive=true; CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[320]); /*activated, grenade is LIVE!*/
-    World.invP1.heldObjectIndex=live[index-314]; RemoveGrenade(grenadeSlots[index-314]);
-    World.invP1.heldObjectCustIdx = U16_MAX; World.invP1.heldAmmo = 0; World.invP1.heldAmmo2 = 0; World.invP1.heldObjectLoadedAlternate = false; World.invP1.holdingObject = true;
+    World.invP1.heldObjIdx=live[index-314]; RemoveGrenade(grenadeSlots[index-314]);
+    World.invP1.heldObjCustIdx = U16_MAX; World.invP1.heldAmmo = 0; World.invP1.heldAmmo2 = 0; World.invP1.heldObjectLoadedAlternate = false; World.invP1.holdingObject = true;
 }
 void InventoryUpdate() {
-    if (GetKeyPressed(30)/*Grenade use*/) { if (World.curLev == LEVEL_CYBERSPACE){UseCyberspaceItem();} else if (World.invP1.grenCur >= 0 && World.invP1.grenCur < 7 && World.invP1.grenAmmo[World.invP1.grenCur] > 0){UseGrenade(World.invP1.grenConstIndex[World.invP1.grenCur]);} else {CenterStatusPrint("%s",Sys_Text.stringTable[322]);/*Out of grenades.*/} }
+    if (GetKeyPressed(30)/*Grenade use*/) { if (World.curLev == LEVEL_CYBERSPACE) { UseCyberspaceItem(); } else if (World.invP1.grenCur < 7 && World.invP1.grenAmmo[World.invP1.grenCur] > 0){UseGrenade(World.invP1.grenConstIndex[World.invP1.grenCur]);} else {CenterStatusPrint("%s",Sys_Text.stringTable[322]);/*Out of grenades.*/} }
     if (GetKeyPressed(31)/*Grenade cycle+*/)  { if (World.curLev == LEVEL_CYBERSPACE) CycleCyberSpaceItem(1); else GrenadeCycle(Sys_Settings.InvertInventoryCycling ? -1 : 1); } if (GetKeyPressed(32)/*Grenade cycle-*/){ if (World.curLev == LEVEL_CYBERSPACE) CycleCyberSpaceItem(-1); else GrenadeCycle(Sys_Settings.InvertInventoryCycling ? 1 : -1); }
     if (GetKeyPressed(14)/*Play recent log*/ && (World.invP1.hasHardware & HW_ERD)) {
         if (World.invP1.lastAddedIndex>=0) { int temp=World.invP1.lastAddedIndex; PlayLog(temp); World.invP1.lastAddedIndex=FindNextUnreadLog(); if(World.invP1.lastAddedIndex==temp)World.invP1.lastAddedIndex=-1; CheckForUnreadLogs(); }
         else { int temp=World.invP1.lastAddedIndex; World.invP1.lastAddedIndex=FindNextUnreadLog(); if(World.invP1.lastAddedIndex==temp){World.invP1.lastAddedIndex=-1;} CheckForUnreadLogs(); CenterStatusPrint("%s",Sys_Text.stringTable[1019]);/*Log playback stopped.*/ }
     }
-    if (GetKeyPressed(34)/*Patch use*/) { if (World.invP1.patchCur >= 0 && World.invP1.patchCur < 7 && World.invP1.patchCounts[World.invP1.patchCur] > 0){PatchUse(World.invP1.patchCur);} else {CenterStatusPrint("%s",Sys_Text.stringTable[324]);/*Out of patches.*/} }
+    if (GetKeyPressed(34)/*Patch use*/) { if (World.invP1.patchCur < 7 && World.invP1.patchCounts[World.invP1.patchCur] > 0){PatchUse(World.invP1.patchCur);} else {CenterStatusPrint("%s",Sys_Text.stringTable[324]);/*Out of patches.*/} }
     if (GetKeyPressed(35)/*Patch cycle+*/){PatchCycle(Sys_Settings.InvertInventoryCycling ? -1 : 1);} else if (GetKeyPressed(36)/*Patch cycle-*/){PatchCycle(Sys_Settings.InvertInventoryCycling ? 1 : -1);}
 }
 void AddItemFail(int index) { DropHeldItem(); CenterStatusPrint("%s%s%s", Sys_Text.stringTable[32],Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[318]);/*Inventory full.*/ }
 void AddItemToInventory(int index, int custIdx) {
-    if (IdxIsGenericItem(index)) { if(!AddGeneralObjectToInventory(index,custIdx)){AddItemFail(index);} } else if (IdxIsAudioLog(index)) { AddAudioLogToInventory(World.invP1.heldObjectCustIdx); } 
+    if (IdxIsGenericItem(index)) { if(!AddGeneralObjectToInventory(index,custIdx)){AddItemFail(index);} } else if (IdxIsAudioLog(index)) { AddAudioLogToInventory(custIdx); } 
     else if (IdxIsWeapon(index)) { int ci = index + 307; if (ci < 343 || ci > 358) ci = index; if (!AddWeaponToInventory(ci)) { AddItemFail(index); } } else if (IdxIsAccessCard(index)) AddAccessCardToInventory(UseableFromConst(index));
     else if (IdxIsHardware(index)) AddHardwareToInventory(index-328,custIdx);
     else {
@@ -229,7 +229,7 @@ static __attribute__((noinline)) void UIBlockedBySecurity(V3 tetherPoint) { Worl
 static __attribute__((noinline)) void EntitySetLocked(Entity* e, bool locked) { flag_set(&e->entflags,EF_LOCKED,locked); }
 u8 GetCurrentLevelSecurity() { return (World.diffMis < 1 || Cheats.superoverride) ? 0u : World.levelSecurity[World.curLev]; }
 void ButtonSwitchUse(u16 self, u16 activator) {
-    Entity* e = &World.instances[self]; if (Cheats.superoverride || World.diffMis == 0) { EntitySetLocked(e,false); } else if (GetCurrentLevelSecurity() > UsableOrDef((float)e->securityThreshold,100.0f)) { UIBlockedBySecurity(World.position[self]); return;  }
+    Entity* e = &World.instances[self]; if (Cheats.superoverride || World.diffMis == 0) { EntitySetLocked(e,false); } else if (GetCurrentLevelSecurity() > UsableOrDef((float)e->secThreshold,100.0f)) { UIBlockedBySecurity(World.position[self]); return;  }
     if ((e->entflags & EF_LOCKED) != 0) { if (e->lockedMessageLingdex < T_LOGSTR_CNT) { CenterStatusPrint("%s",Sys_Text.stringTable[e->lockedMessageLingdex]); } play_wav("buttons/locked_deny",AppliedFXVol(1.0f),World.position[self],true); return; }
     static const char* buttonSwitchSFX[] = {"buttons/button_lswitch","buttons/button_chonk","buttons/button_lswitch","buttons/button_chuck","buttons/button_chuck","","buttons/button_swipe","buttons/button_chonk"}; play_wav(buttonSwitchSFX[World.instances[self].index - 688],AppliedFXVol(1.0f),World.position[self],true);
     if (e->messageIndex < T_LOGSTR_CNT) CenterStatusPrint("%s",Sys_Text.stringTable[e->messageIndex]); if (e->delay > 0.0f) { e->recentMostActivator = activator; e->delayFinished = World.pauseRelativeTime + e->delay; } else ButtonSwitchUseTargets(self);
@@ -237,7 +237,10 @@ void ButtonSwitchUse(u16 self, u16 activator) {
 void ButtonSwitchUpdate(u16 self) { float t = World.pauseRelativeTime; Entity* e = &World.instances[self]; if (e->switchAnimFinished > 0.0f && e->switchAnimFinished <= t) { ButtonSwitchHoldPose(e); } if (e->delayFinished > 0.0f && e->delayFinished < t) { e->delayFinished = 0.0f; ButtonSwitchUseTargets(self); } if (e->index == 689 && e->active && e->tickFinished < t) { TextureChangerToggle(self); e->tickFinished = t +1.5f; } }
 void HealingBedUse(u16 self, u16 owner) { Entity* e=&World.instances[self]; if (GetCurrentLevelSecurity() <= UsableOrDef(e->minSecurityLevel,100.0f)) { if(!e->broken){HealthManagerHealingBed(PLAYER1,UsableOrDef(e->amount,170.0f)); healFlashFinished = World.pauseRelativeTime + 0.10f; World.instances[PLAYER1].radiation=0.0f; World.invP1.radiationArea=false; CenterStatusPrint("%s",Sys_Text.stringTable[23],owner); play_wav("misc/healstation",AppliedFXVol(1.0f),World.position[self],false);} else {CenterStatusPrint("%s",Sys_Text.stringTable[24],owner);} } else UIBlockedBySecurity(World.position[self]); }
 int GeneralInvItem(int slot) { if (slot<0 || slot>=14) return -1; if (!slot) return 81; int item=World.invP1.genInvIdxRef[slot]; if (item<0) return -1; item=UseableFromConst(item); return IdxIsGenericItem(item + 307) ? item : -1; }
-void CyborgConversionToggleTargetted() {bool active=(World.ressurectionActiveLevels>>World.curLev)&1u; flag_setu16(&World.ressurectionActiveLevels,(1u<<World.curLev),!active); if(World.curLev==6)flag_setu16(&World.ressurectionActiveLevels,(1u<<10|1u<<11|1u<<12),!active);/*Set groves 10,11,12 when 6 toggled, shared*/ active=!active; play_wav(active ? "vox/vox_cybconvcancelled" : "vox/vox_cybconvenabled",AppliedFXVol(1.0f),(V3){0},false); CenterStatusPrint("%s",Sys_Text.stringTable[active ? 591 : 592]);}
+void CyborgConversionToggleTargetted() {
+    bool active = (World.ressurectionActiveLevels >> World.curLev) & 1u; flag_setu16(&World.ressurectionActiveLevels,(1u << World.curLev),!active); if (World.curLev == 6) flag_setu16(&World.ressurectionActiveLevels,(1u<<10|1u<<11|1u<<12),!active);/*Set groves 10,11,12 when 6 toggled, shared*/ active=!active; play_wav(active ? "vox/vox_cybconvcancelled" : "vox/vox_cybconvenabled",AppliedFXVol(1.0f),(V3){0},false);
+    CenterStatusPrint("%s",Sys_Text.stringTable[active ? 591 : 592]);
+}
 extern u16 elevatorDestinations[MAX_LEVELS][MAX_ELEV_DESTS_PER_LEVEL]; extern u8 elevatorDestCounts[MAX_LEVELS];
 typedef struct { i8 label; bool darkened; } ElevBtnDef;
 static const ElevBtnDef elevLayouts[12][8] = {{{1,0},{2,0},{3,1},{6,1},{7,1},{8,1},{-1,0},{-1,0}},/*0: 1 to 2*/ {{0,0},{1,1},{2,0},{3,0},{6,1},{7,1},{8,1},{-1,0}},/*1: 2 to 3*/ {{3,0},{4,0},{5,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*2: 3 to 4*/ {{1,1},{2,1},{3,0},{6,0},{7,1},{8,1},{-1,0},{-1,0}},/*3: 3 to 6*/ {{5,0},{6,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*4: 5 to 6*/ {{6,0},{10,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*5: 6 to G1*/
@@ -276,8 +279,8 @@ void CreateTargetIDInstance(float damage,u16 hitIdx,float tranq) {
 static const float  hwDrain[12][4] = {[3]={0.0921f,0.20478f,0.15354f,0.0f},[5]={0.24576f,0.61434f,0.28333f,0.30714f},[6]={0.010236f,0.0f,0.0f,0.0f},[7]={0.15354f,0.25596f,0.30714f,0.0f},[9]={0.0f,0.28333f,0.2125f,0.0f},[11]={0.51198f,0.51198f,0.51198f,0.51198f},};
 static const u16 hwDrainJPM[12][4] = {[3]={9,20,15,0},[5]={24,60,105,30},[6]={1,0,0,0},[7]={15,25,30,0},[9]={0,16,12,0},[11]={50,50,50,50},};
 static void DeactivateHardwareOnEnergyDepleted() { World.invP1.hardwareIsActive = 0; }
-void TakeEnergy(float take) { if (World.invP1.energy <= 0.0f || Cheats.redbull) {return;} World.invP1.energy -= take; if (World.invP1.energy <= 0.0f) { World.invP1.energy = 0.0f; play_wav("hud/energy_gone",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);/*energy_gone*/ CenterStatusPrint("%s",Sys_Text.stringTable[314]); /*Power supply exhausted.*/ DeactivateHardwareOnEnergyDepleted(); } }
-void GiveEnergy(float give, EnerTyp type) { World.invP1.energy += give; if (World.invP1.energy > 255.0f) {World.invP1.energy = 255.0f;} if (type == EnerTyp_Battery){play_wav("hud/batteryuse",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);/*batteryuse*/ } else if (type == EnerTyp_ChargeStation){play_wav("misc/chargingstation",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);/*chargingstation*/} }
+void TakeEnergy(float take) { if (World.invP1.energy <= 0.0f || Cheats.redbull) {return;} World.invP1.energy -= take; if (World.invP1.energy <= 0.0f) { World.invP1.energy = 0.0f; play_wav("hud/energy_gone",AppliedFXVol(1.0f),(V3){0},false);/*energy_gone*/ CenterStatusPrint("%s",Sys_Text.stringTable[314]); /*Power supply exhausted.*/ DeactivateHardwareOnEnergyDepleted(); } }
+void GiveEnergy(float give, EnerTyp type) { World.invP1.energy += give; if (World.invP1.energy > 255.0f) {World.invP1.energy = 255.0f;} if (type == EnerTyp_Battery){play_wav("hud/batteryuse",AppliedFXVol(1.0f),(V3){0},false);/*batteryuse*/ } else if (type == EnerTyp_ChargeStation){play_wav("misc/chargingstation",AppliedFXVol(1.0f),(V3){0},false);/*chargingstation*/} }
 bool PlayerIsMoving() { return V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1]) > 0.1f; }
 void PlayerEnergyUpdate() {
     if (World.invP1.energyDrainTickFinished > World.pauseRelativeTime) return; World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1f; bool anyDrain = false; u8 ver; World.invP1.drainJPM = 0;
@@ -324,12 +327,19 @@ void GrenadeExplode(u16 self) {
         case 9:          snd = "destroy/hit2";            explosionType =  4;                    break; /*emp*/
         case 12:         snd = "destroy/attack1_explode"; World.fogFac +=  6; explosionType = 2; break; /*nitro*/
         case 13:         snd = "destroy/explode_minor";   World.fogFac += 10; explosionType = 3; break; /*gas*/
-    }
-    play_wav(snd, AppliedFXVol(1.0f), World.position[self], true); SpawnExplosionEffect(World.position[self],explosionType); ScreenShake(); DeleteInstance(self);
+    } play_wav(snd, AppliedFXVol(1.0f), World.position[self], true); SpawnExplosionEffect(World.position[self],explosionType); ScreenShake(); DeleteInstance(self);
 }
-void GrenadeUpdate(u16 self) { Entity* e = &World.instances[self]; i16 idx=GrenadeTypeFromConst(e->index); if(idx == 14){GrenadeExplode(self); return;} /*Plastique*/ if((idx == 10 || idx == 12) && e->timerFinished <= World.pauseRelativeTime) { GrenadeExplode(self); return; } if (idx == 11) { V3 origin = World.position[self]; float pr=1.451f;  bool npcMine = GrenadeIsNPCMine(self);  for (u16 i = PLAYER1; i < World.instCount; i++) { Entity* o = &World.instances[i]; if (i == self || !(o->entflags & EF_ACTIVE) || (o->entflags & EF_DEAD)) continue; if (npcMine ? (i != PLAYER1) : (i == PLAYER1 || !IdxIsNPC(o->index))) continue; float rr = pr + ((World.col[i] == CT_CAP || World.col[i] == CT_SPH) ? World.colliderSize[i].x : 0.0f); if (V3_SqDist(World.position[i], origin) < (rr * rr)) { GrenadeExplode(self); return; } } } }
+void GrenadeUpdate(u16 self) {
+    Entity* e = &World.instances[self]; i16 idx=GrenadeTypeFromConst(e->index);
+    if(idx == 14){GrenadeExplode(self); return;} /*Plastique*/
+    if((idx == 10 || idx == 12) && e->timerFinished <= World.pauseRelativeTime) { GrenadeExplode(self); return; }
+    if (idx == 11) {
+        V3 origin = World.position[self]; float pr=1.451f; bool npcMine = GrenadeIsNPCMine(self);
+        for (u16 i = PLAYER1; i < World.instCount; i++) { Entity* o = &World.instances[i]; if (i == self || !(o->entflags & EF_ACTIVE) || (o->entflags & EF_DEAD)) continue; if (npcMine ? (i != PLAYER1) : (i == PLAYER1 || !IdxIsNPC(o->index))) continue; float rr = pr + ((World.col[i] == CT_CAP || World.col[i] == CT_SPH) ? World.colliderSize[i].x : 0.0f); if (V3_SqDist(World.position[i], origin) < (rr * rr)) { GrenadeExplode(self); return; } }
+    }
+}
 void GrenadeOnCollision(u16 self) { i16 idx=GrenadeTypeFromConst(World.instances[self].index); if ((idx >= 7 && idx <= 9) || idx == 13) GrenadeExplode(self); }
-float GetDamageTakeAmount(DamageData* dd) { float take = dd->damage; if (!dd || take <= 0.0f) { return 0.0f; } if (dd->isOtherNPC) { float crit = dd->offense - dd->defense; if (crit > 0.0f && random_range(0.0f, 1.0f) < (crit / 6.0f) && random_range(0.0f, 1.0f) < 0.2f) { take *= (1.0f + crit); } } take *= random_range(0.9f, 1.1f); if (dd->berserkActive) { take *= 4.0f/*Quad Damage!*/; } if (take < 0.0f) { take = 0.0f; } return take; }
+float GetDamageTakeAmount(DamageData* dd) { if (!dd) { return 0.0f; } float take = dd->damage; if (take <= 0.0f) { return 0.0f; } if (dd->isOtherNPC) { float crit = dd->offense - dd->defense; if (crit > 0.0f && random_range(0.0f, 1.0f) < (crit / 6.0f) && random_range(0.0f, 1.0f) < 0.2f) { take *= (1.0f + crit); } } take *= random_range(0.9f, 1.1f); if (dd->berserkActive) { take *= 4.0f/*Quad Damage!*/; } if (take < 0.0f) { take = 0.0f; } return take; }
 void SpawnImpactEffect(u16 impactType, V3 pos) { if (impactType == 0 || impactType == U16_MAX) return; u16 fx = SpawnDynamicObject(impactType); if (!EntIdxIsValid(fx)) return; World.position[fx] = pos; Entity* e = &World.instances[fx]; flag_set(&e->entflags, EF_ACTIVE, true); if (e->itemLifeTime <= 0.0f) e->itemLifeTime = 1.0f; e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
 void ReduceCurrentLevelSecurity(SecurityType stype) {
     static const u32 score[3]={4u,10u,27u}; u8 lev = World.curLev; if (lev >= MAX_LEVELS || stype == SecurityType_None) return;
@@ -340,10 +350,7 @@ void ReduceCurrentLevelSecurity(SecurityType stype) {
     u8 before = World.levelSecurity[lev], after; after = dead >= total ? 0u : (u8)(((total - dead)*100u + total - 1u) / total); if (after > 100u) after = 100u; if (after >= before && before) after = before > 1u ? (u8)(before - 1u) : before; World.levelSecurity[lev] = after;
     CenterStatusPrint("%s%d%s", Sys_Text.stringTable[306], (int)World.levelSecurity[lev], Sys_Text.stringTable[307]);
 }
-static void CodeScreensSetForLevel(u8 lev) {
-    if (lev < 1 || lev > 6) { return; } i8 *code = &World.lev1SecCode; if (code[lev - 1] < 0) { code[lev - 1] = (i8)random_range_u8(0u,9u); } u8 digit = (u8)code[lev-1], entryLevel = World.curLev; 
-    for (u8 l=0;l<MAX_LEVELS;++l) { if (l != World.curLev) SetLevelPointers(l); for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { Entity* s = &World.instances[i]; if (s->index != 551 || !s->codeScreen) { continue; } Entity* e = &World.instances[i]; e->textureAnimating = false; e->texAnimRandom = false; e->texIndex = textureAnimClips[41].frames[digit%10u]; } } if (World.curLev != entryLevel) { SetLevelPointers(entryLevel); }
-}
+static void CodeScreensSetForLevel(u8 l) { if (l < 1 || l > 6) { return; } i8 *code = &World.lev1SecCode; if (code[l - 1] < 0) { code[l - 1] = (i8)random_range_u8(0u,9u); } u8 digit = (u8)code[l - 1]; for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { Entity *e = &World.instances[i]; if (e->index != 551 || !e->codeScreen) { continue; } e->textureAnimating = false; e->texAnimRandom = false; e->texIndex = textureAnimClips[41].frames[digit % 10u]; } }
 static bool CPUNodesRemainOnLevel() { for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { const Entity* n = &World.instances[i]; if ((n->index == 478 || n->index == 479) && !(n->entflags & EF_DEAD_CHECKS_DONE)) return true; } return false; }
 void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNormal) {
     if(self>=World.instCount||hitIdx>=World.instCount)return; Entity* e = &World.instances[self]; if (hitIdx == e->recentMostActivator) return; e->counter++;
@@ -411,7 +418,7 @@ static void Death(u16 self,bool energyVaporized) {
     else if (self == PLAYER1) {
         World.deaths++;
         if (((World.ressurectionActiveLevels >> World.curLev) & 1u)) {
-            V3 spot=(V3){0.0f,0.0f,0.0f}; if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) { spot=ressurectionLocations[6]; spot.y -= (1.0f - PLYR_CAM_OFS_Y); LoadLevel(6, spot); } else if (World.curLev < 13) { spot=ressurectionLocations[World.curLev]; spot.y -= (1.0f - PLYR_CAM_OFS_Y); World.position[PLAYER1] = spot; }
+            V3 spot=(V3){0}; if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) { spot=ressurectionLocations[6]; spot.y -= (1.0f - PLYR_CAM_OFS_Y); LoadLevel(6, spot); } else if (World.curLev < 13) { spot=ressurectionLocations[World.curLev]; spot.y -= (1.0f - PLYR_CAM_OFS_Y); World.position[PLAYER1] = spot; }
             PlayTrack(TT_Revive, MT_Override); World.invP1.ressurectingFinished = World.pauseRelativeTime + 5.0f; World.instances[PLAYER1].health = 211.0f; World.ressurections++; World.invP1.fatigue = 0.0f; World.instances[PLAYER1].radiation = 0.0f; World.invP1.radiationArea = false;
         } else { e->health = 211.0f; World.paused = true; World.menuActive = true; returnToPause = false; SndClearAll(); ChangeMenuPage(MPG_DEATH); }
     }
@@ -519,7 +526,7 @@ void DoorActuate(u16 self) {
     }
 }
 void DoorUse(u16 self, u16 activator) {
-    if (activator == WORLD) return; Entity* e = &World.instances[self]; if (GetCurrentLevelSecurity() > UsableOrDef((float)e->securityThreshold,100.0f)) { UIBlockedBySecurity(World.position[self]); return; } if (Cheats.superoverride || World.diffMis <= 0) { EntitySetLocked(e,false); e->requiredAccessCard = ACC_None; }
+    if (activator == WORLD) return; Entity* e = &World.instances[self]; if (GetCurrentLevelSecurity() > UsableOrDef((float)e->secThreshold,100.0f)) { UIBlockedBySecurity(World.position[self]); return; } if (Cheats.superoverride || World.diffMis <= 0) { EntitySetLocked(e,false); e->requiredAccessCard = ACC_None; }
     if (World.diffMis <= 1) { e->requiredAccessCard = ACC_None; } if (e->useFinished >= World.pauseRelativeTime) return; e->useFinished = World.pauseRelativeTime + 0.15f;
     if (e->requiredAccessCard != ACC_None) { if (!DoorInventoryHasAccessCard(e->requiredAccessCard)) {CenterStatusPrint("%s%s",AccessCardCodeForType(e->requiredAccessCard),Sys_Text.stringTable[2]); play_wav("buttons/locked_deny",AppliedFXVol(0.7f),World.position[self],true); return;} else {e->requiredAccessCard = ACC_None;}}
     if ((e->entflags & EF_LOCKED) != 0) { CenterStatusPrint("%s",Sys_Text.stringTable[e->lockedMessageLingdex]); play_wav("buttons/locked_deny",AppliedFXVol(0.55f),World.position[self],true); return; }  if ((e->onlyTargetOnce && !e->targetAlreadyDone) || !e->onlyTargetOnce) { e->targetAlreadyDone = true; UseTargets(self,e->targetIdx); } if (e->ajar) e->ajar = false; DoorActuate(self);
@@ -589,7 +596,7 @@ void UseTargets(u16 activator, u16 targetIdx) {
     if (World.curLev != entryLevel) {SetLevelPointers(entryLevel);} if (!succeeded) {DualLogWarn("No target found: %s\n",targetname);} if (targetIdx < (u16)MAX_IO_NAMES) tioTargetInFlight[targetIdx]=false; tioNestDepth--; if (!wasActive) {World.targetIOActive=false;}
 }
 // Frob/Use
-void MFD_OpenData(bool,u8),MFD_OpenPaperLog(int,V3),UI_KeycodeClose(bool),UI_ElevClose(bool),UI_WireClose();
+void MFD_OpenData(bool,u8),MFD_OpenPaperLog(int,V3),UI_KeycodeClose(),UI_ElevClose(),UI_WireClose();
 static void PaperLogUse(u16 self) { ForceInventoryMode(); MFD_OpenPaperLog((int)World.instances[self].logIndex, World.position[self]); }
 static bool IsPuzzleGridPanel(u16 index) { return index>=609&&index<=613; }
 static bool IsPuzzleWirePanel(u16 index) { return index>=741&&index<=745; }
@@ -615,14 +622,14 @@ static const GridPuzzleDef gridPuzzleDefs[] = {/*0 R.ReactorLevel     teal  levR
 static const GridPuzzleDef* GridPuzzleDefFor(V3 pos) { for (u32 i=0;i<sizeof(gridPuzzleDefs)/sizeof(gridPuzzleDefs[0]);++i) { const GridPuzzleDef* d=&gridPuzzleDefs[i]; if (vabs(pos.x-d->pos.x)<0.05f && vabs(pos.y-d->pos.y)<0.05f && vabs(pos.z-d->pos.z)<0.05f) return d; } return NULL; }
 static void GridLoadInstance(u16 self) {
     Entity* e=&World.instances[self]; const GridPuzzleDef* def=GridPuzzleDefFor(World.position[self]); World.Sys_UI.pg_width=7; World.Sys_UI.pg_height=5; World.Sys_UI.pg_source=14; World.Sys_UI.pg_output=20;
-    if (def) { if (def->target) e->targetIdx=IOInternName(def->target); e->securityThreshold=def->security; }
+    if (def) { if (def->target) e->targetIdx=IOInternName(def->target); e->secThreshold=def->security; }
     if (def) { World.Sys_UI.pg_gridType=(PuzzleGridType)def->gridType; World.Sys_UI.pg_theme=def->theme; mcpy(World.Sys_UI.pg_type,def->cellType,sizeof(def->cellType)); }
     else     { World.Sys_UI.pg_gridType=PuzzleGridType_King; World.Sys_UI.pg_theme=HUDColor_Gray; mset(World.Sys_UI.pg_type,PuzzleCellType_Standard,sizeof(World.Sys_UI.pg_type)); }
     for (int k=0;k<35;++k) World.Sys_UI.pg_cell[k]=Entity_GetGridCell(e,k);
     World.Sys_UI.pg_solved=e->puzzleSolved; World.Sys_UI.pg_fired=e->puzzleFired; PGEvalPuzzle();
 }
 static void PuzzlePanelUse(u16 i) {
-    Entity* e = &World.instances[i]; if (GetCurrentLevelSecurity() > UsableOrDef((float)e->securityThreshold,100.0f)) { UIBlockedBySecurity(World.position[i]); return; } if (e->entflags & EF_LOCKED) { CenterStatusPrint("%s",Sys_Text.stringTable[302]); return; }
+    Entity* e = &World.instances[i]; if (GetCurrentLevelSecurity() > UsableOrDef((float)e->secThreshold,100.0f)) { UIBlockedBySecurity(World.position[i]); return; } if (e->entflags & EF_LOCKED) { CenterStatusPrint("%s",Sys_Text.stringTable[302]); return; }
     World.Sys_UI.objectInUsePos=World.position[i]; ForceInventoryMode();
     if (IsPuzzleGridPanel(e->index)) { if (!e->panelOpen) { e->panelOpen = true; ChangeAnim(e,A_OPENING); play_wav("hud/searchsound",AppliedFXVol(1.0f),World.position[i],true); } bool initialize = World.Sys_UI.tetheredPGP != i || World.Sys_UI.pg_width == 0 || World.Sys_UI.pg_height == 0; World.Sys_UI.tetheredPGP = i; if (initialize) { GridLoadInstance(i); } MFD_OpenData(World.Sys_UI.lastDataSideRH,3); }
     else {
@@ -631,7 +638,7 @@ static void PuzzlePanelUse(u16 i) {
     } CenterStatusPrint("%s",Sys_Text.stringTable[190]);
 }
 static bool PanelUseAllowed(u16 i) {
-    Entity* e = &World.instances[i]; if (GetCurrentLevelSecurity() > UsableOrDef((float)e->securityThreshold,100.0f)) { UIBlockedBySecurity(World.position[i]); return false; } 
+    Entity* e = &World.instances[i]; if (GetCurrentLevelSecurity() > UsableOrDef((float)e->secThreshold,100.0f)) { UIBlockedBySecurity(World.position[i]); return false; } 
     if(e->entflags & EF_LOCKED) { u16 msg = (u16)e->lockedMessageLingdex; if (msg < T_LOGSTR_CNT&&msg!=0)CenterStatusPrint("%s",Sys_Text.stringTable[msg]);else CenterStatusPrint("%s",Sys_Text.stringTable[302]); if(e->lockedTargetIdx!=IO_NONE)UseTargets(i,e->lockedTargetIdx); return false; }
     return true;
 }
@@ -652,7 +659,7 @@ static void RelayPanelMsg(u16 msg) { if (msg>0 && msg<T_LOGSTR_CNT) CenterStatus
 static void RelayPanelUse(u16 self) {
     Entity* e = &World.instances[self]; if (!PanelUseAllowed(self)) { return; }
     const RelayPanelScript* sc = RelayPanelScriptFor(e);
-    i16 held = (World.invP1.holdingObject && World.invP1.heldObjectIndex>=INSTS_1ST_IDX) ? (i16)(World.invP1.heldObjectIndex-307) : -1;
+    i16 held = (World.invP1.holdingObject && World.invP1.heldObjIdx>=INSTS_1ST_IDX) ? (i16)(World.invP1.heldObjIdx-307) : -1;
     if (!e->panelOpen) { e->panelOpen=true; ChangeAnim(e,A_OPENING); play_wav(sc?sc->sfxOpen:"hud/searchsound",AppliedFXVol(1.0f),World.position[self],true); RelayPanelMsg(sc?sc->msgOpen:0); return; }
     if (e->panelInstalled && held<0) { RelayPanelMsg(sc?sc->msgAlready:0); return; }
     if (sc && held==(i16)sc->item) {
@@ -676,13 +683,13 @@ static void RelayPanelUpdate(u16 self) {
 static bool HeldItemIsFrobUser(i16 item) { return item==54||item==56||item==57||item==61||item==64||item==92||item==93||item==94; }
 bool FrobHeldItemIntoPanel(V3 p, V3 f, V3 r) {
     if (!World.invP1.holdingObject) return false;
-    i16 item=(i16)(World.invP1.heldObjectIndex-307); if (!HeldItemIsFrobUser(item)) return false;
+    i16 item=(i16)(World.invP1.heldObjIdx-307); if (!HeldItemIsFrobUser(item)) return false;
     RaycastHit h=Raycast(p,ScreenPointToRayOffset(f,r,0,0),FROB_DISTANCE,LMASK_PLAYER_FROB);
     if (!h.hit || h.hitInstanceIndex>=World.instCount) return false;
     u16 idx=h.hitInstanceIndex; u16 pidx=World.instances[idx].index;
     if (item==54 && (IsPuzzleGridPanel(pidx) || IsPuzzleWirePanel(pidx))) {
         Entity* e=&World.instances[idx];
-        bool gated = (GetCurrentLevelSecurity() > UsableOrDef((float)e->securityThreshold,100.0f)) || (e->entflags & EF_LOCKED);
+        bool gated = (GetCurrentLevelSecurity() > UsableOrDef((float)e->secThreshold,100.0f)) || (e->entflags & EF_LOCKED);
         PuzzlePanelUse(idx);
         if (gated) { return true; }
         if (IsPuzzleGridPanel(pidx)) {
@@ -713,14 +720,14 @@ static void ElevatorPanelUse(u16 i) {
     { V3 kp=World.position[i]; float best=1000000000000000000000000000000.0f; for (u32 d=INSTS_1ST_IDX;d<World.instCount;++d) { Entity* de=&World.instances[d]; if(!IdxIsDoor(de->index)||!(de->entflags&EF_ACTIVE)) continue; V3 dd=V3_AsubB(World.position[d],kp); float dist2=V3_dot(dd,dd); if(dist2<best){best=dist2; World.Sys_UI.linkedElevatorDoor=(u16)d;} } }
     int layout=-1; V3 pp=World.position[i]; for (u32 m=0;m<sizeof(elevPanelMap)/sizeof(elevPanelMap[0]);++m) { if (elevPanelMap[m].level==World.curLev) { float dx=elevPanelMap[m].x-pp.x,dz=elevPanelMap[m].z-pp.z; if (dx*dx+dz*dz<4.0f) { layout=elevPanelMap[m].layout; break; } } }
     if (layout<0) layout=1;/*fallback: 2 to 3 strip*/ for (int b=0;b<8;++b) { World.Sys_UI.elevButtonLabelIdx[b]=elevLayouts[layout][b].label; World.Sys_UI.buttonsDarkened[b]=elevLayouts[layout][b].darkened; World.Sys_UI.buttonsEnabled[b]=elevLayouts[layout][b].label>=0; World.Sys_UI.elevButtonLevelIdx[b]=ElevLabelToLevel(elevLayouts[layout][b].label); }
-    ForceInventoryMode(); play_wav("hud/searchsound",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); MFD_OpenData(World.Sys_UI.lastDataSideRH,1);
+    ForceInventoryMode(); play_wav("hud/searchsound",AppliedFXVol(1.0f),(V3){0},false); MFD_OpenData(World.Sys_UI.lastDataSideRH,1);
 }
 static void KeycodePanelUse(u16 i) {
     if(!PanelUseAllowed(i))return;
     Entity* e=&World.instances[i];
     if(e->useQuestKeycode1||e->useQuestKeycode2){ const i8 *c=&World.lev1SecCode; int off=e->useQuestKeycode1?0:3; u16 msg=e->useQuestKeycode1?289:290; if(c[off]<0||c[off+1]<0||c[off+2]<0){UIBlockedBySecurity(World.position[i]);CenterStatusPrint("%s",Sys_Text.stringTable[msg]);return;} e->keycode=(u16)(c[off]*100 + c[off+1]*10 + c[off+2]); }
     SystemUI* s = &World.Sys_UI; s->tetheredKeypadKeycode = i; s->keycodeValue = e->keycode; s->keycodeValid = true; s->keycodeSolved = false; s->keycodeHuns=s->keycodeTens=s->keycodeOnes=-1; s->keycodeEntry=-1; s->objectInUsePos=World.position[i];
-    ForceInventoryMode(); play_wav("hud/searchsound",AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); MFD_OpenData(World.Sys_UI.lastDataSideRH,2);
+    ForceInventoryMode(); play_wav("hud/searchsound",AppliedFXVol(1.0f),(V3){0},false); MFD_OpenData(World.Sys_UI.lastDataSideRH,2);
 }
 void CloseSearch() {
     u16 s = World.Sys_UI.tetheredSearchable; if (s>=INSTS_1ST_IDX && s<World.instCount) World.instances[s].srchInUse = false; World.Sys_UI.tetheredSearchable = U16_MAX; World.Sys_UI.searchFXActive[0] = World.Sys_UI.searchFXActive[1] = false;
@@ -730,8 +737,8 @@ void UpdateSearchTether() { u16 s = World.Sys_UI.tetheredSearchable; if (s==U16_
 bool SearchTakeSlot(u8 slot) {
     UpdateSearchTether(); u16 s = World.Sys_UI.tetheredSearchable; if (s==U16_MAX || slot>=4 || World.invP1.holdingObject) return false;
     Entity* e=&World.instances[s]; i16 item=e->contents[slot]; if (item<0 || item>110 || !IdxIsUsableObject((u16)(item+307))) return false;
-    ResetHeldItem(); World.invP1.heldObjectIndex=(u16)(item+307); World.invP1.heldObjectCustIdx=(u16)e->custIdx[slot]; World.invP1.holdingObject=true; e->contents[slot]=e->custIdx[slot]=-1;
-    if (Sys_Settings.QuickItemPickup) AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx),ResetHeldItem(); else ForceInventoryMode(),CenterStatusPrint("%s%s",Sys_Text.stringTable[item+326],Sys_Text.stringTable[319]);/*Inventory mode is turned on when picking something up*/
+    ResetHeldItem(); World.invP1.heldObjIdx=(u16)(item+307); World.invP1.heldObjCustIdx=(u16)e->custIdx[slot]; World.invP1.holdingObject=true; e->contents[slot]=e->custIdx[slot]=-1;
+    if (Sys_Settings.QuickItemPickup) AddItemToInventory(World.invP1.heldObjIdx,World.invP1.heldObjCustIdx),ResetHeldItem(); else ForceInventoryMode(),CenterStatusPrint("%s%s",Sys_Text.stringTable[item+326],Sys_Text.stringTable[319]);/*Inventory mode is turned on when picking something up*/
     for (u8 i=0;i<4;++i) { if (e->contents[i]>=0) return true; }    CloseSearch(); return true;
 }
 void SearchObject(int searchable) {
@@ -794,8 +801,8 @@ void UseEntity(u16 i) {
     else if (ent->index==603) { PaperLogUse(i); }
     else if (IdxIsGeometry(ent->index)) { int t = UseNameTableIndex(ent->index); const char* sec = UseSecretText(ent->index,i); CenterStatusPrint("%s%s", Sys_Text.stringTable[29], sec ? sec : (t >= 0 ? Sys_Text.stringTable[t] : "")); }
     else if (IdxIsUsableObject(ent->index)) {
-        World.invP1.holdingObject = true; World.invP1.heldObjectIndex = ent->index; World.invP1.heldObjectCustIdx = ent->customIndex; World.invP1.heldAmmo = ent->ammo; World.invP1.heldAmmo2 = ent->ammo2; World.invP1.heldObjectLoadedAlternate = ent->heldObjectLoadedAlternate;
-        if (Sys_Settings.QuickItemPickup) { AddItemToInventory(ent->index,ent->customIndex); ResetHeldItem(); } else { CenterStatusPrint("%s%s", Sys_Text.stringTable[World.invP1.heldObjectIndex - 307 + 326], Sys_Text.stringTable[319]); /* picked up.*/ ForceInventoryMode(); }
+        World.invP1.holdingObject = true; World.invP1.heldObjIdx = ent->index; World.invP1.heldObjCustIdx = ent->customIndex; World.invP1.heldAmmo = ent->ammo; World.invP1.heldAmmo2 = ent->ammo2; World.invP1.heldObjectLoadedAlternate = ent->heldObjectLoadedAlternate;
+        if (Sys_Settings.QuickItemPickup) { AddItemToInventory(ent->index,ent->customIndex); ResetHeldItem(); } else { CenterStatusPrint("%s%s", Sys_Text.stringTable[World.invP1.heldObjIdx - 307 + 326], Sys_Text.stringTable[319]); /* picked up.*/ ForceInventoryMode(); }
         DeleteInstance(i);
     } else { int t = UseNameTableIndex(ent->index); const char* sec = UseSecretText(ent->index,i); CenterStatusPrint("%s%s",Sys_Text.stringTable[29],sec ? sec : (t >= 0 ? Sys_Text.stringTable[t] : "")); }
 }
@@ -824,7 +831,7 @@ static void Frob(V3 p,V3 f,V3 r){
 }
 // Update
 void DrawAIDebug(u16 i) {
-    if ((!IdxIsNPC(World.instances[i].index)) || !Cheats.showNPC) return; World.layer[i] = L_NPC; World.layer[PLAYER1] = L_Player; Quaternion r = World.rotation[i]; float x=r.x,y=r.y,z=r.z,w=r.w; V3 fwd = V3_Normalize((V3){2.0f*(x*z + w*y), 0.0f, 1.0f - 2.0f*(x*x + y*y)}); u16 npcIdx = World.instances[i].index - 419;
+    if ((!IdxIsNPC(World.instances[i].index)) || !Cheats.showNPC) return; Quaternion r = World.rotation[i]; float x=r.x,y=r.y,z=r.z,w=r.w; V3 fwd = V3_Normalize((V3){2.0f*(x*z + w*y), 0.0f, 1.0f - 2.0f*(x*x + y*y)}); u16 npcIdx = World.instances[i].index - 419;
     V3 sightPt = V3Add(World.position[i],quat_rot_v3(World.rotation[i],sightPointOffsets[npcIdx])); DrawLine(sightPt,V3Add(sightPt,V3_ScaleByF(fwd,0.6f)),(Color){1.0f,1.0f,0.0f,1.0f}); V3 enemPt = World.position[PLAYER1]; enemPt.y -= 0.24f;
     RaycastHit hit = Raycast(sightPt,V3_AsubB(enemPt,sightPt),20.0f,LMASK_NPC_SIGHT); if (hit.hit && hit.hitInstanceIndex == PLAYER1) { DrawLine(sightPt,hit.point,(Color){1.0f,0.0f,0.0f,1.0f}); } else {DrawLine(sightPt,enemPt,(Color){0.0f,1.0f,1.0f,1.0f});} Entity* e = &World.instances[i]; Color dbgCol;
     if (e->currentState == AIState_Idle) dbgCol = (Color){0.0f,1.0f,0.0f,1.0f}; else if (e->currentState == AIState_Walk || e->currentState == AIState_Run) { if (e->entflags & EF_ENEM_IN_SIGHT) dbgCol = (Color){1.0f,0.0f,0.0f,1.0f}; else dbgCol = (Color){1.0f,1.0f,0.0f,1.0f}; }
@@ -868,7 +875,7 @@ void ModUpdate() {
     }
     if (World.invP1.painSoundFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f && !(World.invP1.radSoundFinished < World.pauseRelativeTime)) { World.invP1.painSoundFinished = World.pauseRelativeTime + random_range(2.5f,4.0f); play_wav("player/playerpain1",AppliedFXVol(0.2f),(V3){0},false); }
     if (!Cheats.god && World.invP1.radBleedFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f) { /*Radiation damage pulse*/ World.invP1.radBleedFinished = World.pauseRelativeTime + 1.8f; float take = World.instances[PLAYER1].radiation * 0.2f; World.instances[PLAYER1].health -= take; World.painStaticAlpha = take > 15.0f ? 1.0f : take > 10.0f ? 0.8f : 0.3f; }
-    if (World.invP1.radSoundFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f) { float minT = World.instances[PLAYER1].radiation > 50.0f ? 0.5f : 1.0f; World.invP1.radSoundFinished = World.pauseRelativeTime + minT + random_range(0.0f,2.0f); play_wav("hud/radiation", AppliedFXVol(0.18f),(V3){0.0f,0.0f,0.0f},false); }
-    if (PanelTetherBroken(World.Sys_UI.tetheredPGP)) UI_PuzzleGridClose();    if (PanelTetherBroken(World.Sys_UI.tetheredKeypadKeycode)) UI_KeycodeClose(false);        if (PanelTetherBroken(World.Sys_UI.tetheredKeypadElevator)) UI_ElevClose(false);    if (PanelTetherBroken(World.Sys_UI.tetheredPWP)) UI_WireClose();
+    if (World.invP1.radSoundFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f) { float minT = World.instances[PLAYER1].radiation > 50.0f ? 0.5f : 1.0f; World.invP1.radSoundFinished = World.pauseRelativeTime + minT + random_range(0.0f,2.0f); play_wav("hud/radiation", AppliedFXVol(0.18f),(V3){0},false); }
+    if (PanelTetherBroken(World.Sys_UI.tetheredPGP)) UI_PuzzleGridClose();    if (PanelTetherBroken(World.Sys_UI.tetheredKeypadKeycode)) UI_KeycodeClose();        if (PanelTetherBroken(World.Sys_UI.tetheredKeypadElevator)) UI_ElevClose();    if (PanelTetherBroken(World.Sys_UI.tetheredPWP)) UI_WireClose();
     if (World.Sys_UI.MFD_Data == 8 && V3_SqDist(World.position[PLAYER1],World.Sys_UI.objectInUsePos) > 64.0f) UI_BlockedClose();
 }
