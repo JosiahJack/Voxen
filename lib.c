@@ -61,7 +61,7 @@ static void DualLogMain(bool writeToFileToo, const char *prefix, const char *fmt
     #if defined(_WIN32)
         FHandle out = GetStdHandle(color ? (u32)-12 : (u32)-11);
     #else
-        FHandle out=color ? 2/*stderr*/ : 1/*stdout*/;
+        FHandle out = color ? 2/*stderr*/ : 1/*stdout*/;
     #endif
     if (prefix) { OS_RawWrite(out,prefix,prefixLen); OS_RawWrite(out,"\033[0m ",5); }
     OS_RawWrite(out,buf,len);

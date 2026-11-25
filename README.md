@@ -95,26 +95,27 @@ Exit with zero cleanup, let the OS handle it; does immediate fastest exit as use
 
 ```
 ❯ ls *.* ./Shaders/*.glsl ./Shaders/*.compute | grep -vE 'README.md|builds.csv|*.patch|voxen.exe|voxen.log|*.sh|Citadel.pdb|*.bin' | xargs perl -MList::Util=max -lne '$first{$ARGV} //= $_; $count{$ARGV} = $.; if(eof){$total += $.; $. = 0;} END { $max = max map {length} keys %first; printf "99999999 %7d total\n", $total; printf "%8d %-${max}s  %s\n", $count{$_}, $_, $first{$_} for keys %first }' 2>/dev/null | sort -nr | head -n 51 | sed 's/^99999999 //'
-  11699 total
-    1988 voxen.c                            // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake.  Main translation unit.  Main loop.  Core rendering engine.  OS Shim Layer.  Windowing and Input.  Config.  Cheats Console.  Core systems init.
-    1261 ui.c                               // ui.c - User Interface(UI) aka HUD
-     910 citadel.c                          // citadel.c - Game logic.
-     891 models.c                           // models.c - 3D Models Loading System, Animation, Convex Edge Adjacency, Mesh Optimization
-     843 entity.c                           // entity.c - Entity Definitions and Save Load System for levels and savegames
-     823 physics.c                          // physics.c - The Jack Physics Engine, By W. Josiah Jack MIT-0 -- full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
-     698 audio.c                            // audio.c - Audio System supporting .mp3 + .wav filetypes only, uses Windows WASAPI or Linux ALSA("default" to work on PulseAudio and PipeWire or ALSA + dmix).  Mixes synthesized sounds/music.
-     592 ai.c                               // ai.c - NPC logic
-     547 common.h                           // common.h - Shared items between engine and gamecode (e.g. enums)
-     529 textures.c                         // textures.c - 2D Texture Loading System and Texture Animations
+  10553 total
+    1957 voxen.c                            // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake.  Main translation unit.  Main loop.  Core rendering engine.  OS Shim Layer.  Windowing and Input.  Config.  Cheats Console.  Core systems init.
+    1179 ui.c                               // ui.c - User Interface(UI) aka HUD
+     881 citadel.c                          // citadel.c - Game logic
+     876 models.c                           // models.c - 3D Models Loading System, Animation, Convex Edge Adjacency, Mesh Optimization
+     723 physics.c                          // physics.c - The Jack Physics Engine, By W. Josiah Jack MIT-0 -- full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
+     716 entity.c                           // entity.c - Entity Definitions and Save Load System for levels and savegames
+     542 audio.c                            // audio.c - Audio System supporting .mp3 + .wav filetypes only, uses Windows WASAPI or Linux ALSA("default" to work on PulseAudio and PipeWire or ALSA + dmix).  Mixes synthesized sounds/music.
+     410 ai.c                               // ai.c - NPC logic
+     390 text.c                             // text.c - Text and Font Rendering/Loading System
      383 credits.h                          // credits.h - Credits for Citadel: The System Shock Fan Remake, salt the fries!
-     349 particles.c                        // particles.c - CPU-simulated, GPU-instanced particle system for Voxen
-     345 text.c                             // text.c - Text and Font Rendering/Loading System
-     287 weapons.c                          // weapons.c - Weapon System
-     232 ./Shaders/rt.compute               // rt.compute
-     182 culling.c                          // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
+     371 common.h                           // common.h - Shared items between engine and gamecode (e.g. enums)
+     341 particles.c                        // particles.c - CPU-simulated, GPU-instanced particle system for Voxen
+     278 textures.c                         // textures.c - 2D Texture Loading System and Texture Animations
+     240 weapons.c                          // weapons.c - Weapon System
+     179 culling.c                          // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
      173 ./Shaders/chunk_frag.glsl          // chunk_frag.glsl: Generic shader for all world objects
-     147 ./Shaders/composite_frag.glsl      // composite.glsl - Composite rendered view + UI overlay, custom AA, VHS blur (subtle, magic!), SSR with tapped blur, Procedural skybox w/ stars + saturn + sun + station shield (if on!) that rotate, berserk color hallucinations, EMP screen rolling, fog, infrared grayscale.
-     140 lib.c                              // lib.c - LibC replacement functions and other misc helpers.
+     155 ./Shaders/composite_frag.glsl      // composite.glsl - Composite rendered view + UI overlay, custom AA, VHS blur (subtle, magic!), SSR with tapped blur, Procedural skybox w/ stars + saturn + sun + station shield (if on!) that rotate, berserk color hallucinations, EMP screen rolling, fog, infrared grayscale.
+     131 minigames.c                        // minigames.c - HUD Minigames rendering and logic.
+     126 ./Shaders/rt.compute               // rt.compute
+     123 lib.c                              // lib.c - LibC replacement functions and other misc helpers.
       88 ./Shaders/voxels.compute           // voxels.compute - Compute shader for determining light lists for voxels and updating voxel tables 
       56 ./Shaders/ssr.compute              // ssr.compute - Compute shader for Screen Space Reflections 
       32 ./Shaders/depth_prepass.glsl       // depth_prepass.glsl: Renders all opaque + cutout objects prior to main forward+ pass
@@ -270,32 +271,39 @@ MIT-0
 
 Log ouput from standard run (all settings maxed):
 ```
-Compiling voxen, total iterations today 98 (2026-11-11)...
-Built engine as game in 4643 ms
+Compiling voxen, total iterations today 8 (2026-11-24)...
+Built engine as game in 1642 ms
 =========== Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed ===========
 Game: Citadel, the System Shock (1994) Fan Remake                                1/03/2013 - 11/5/2026
 OpenGL 4.3+, libc 2.7(Linux) / none(Windows), depdendencies: ALSA/WASAPI, X11/GDI, dlopen+dlsym / none
-Window creation and GL context......................................................took 0.169706 secs
-GL shaders and buffer setup.........................................................took 0.056797 secs
-SSBO and shadow buffer setup........................................................took 0.000942 secs
-Loading textures (3967 pngs) total palette colors: 38154, total pixels: 40202776....took 0.190721 secs
-Parsing   models ( 903) ... total verts: 13582566, tris: 12059144...................took 0.124541 secs
-Automap and biomonitor buffers......................................................took 0.000805 secs
-Loading new game prep...............................................................took 0.000606 secs
-Load all levels.....................................................................took 0.129937 secs
-Loading   models ( 778 persistent)  vertices: 912446, tris: 709741..................took 0.149912 secs
-Loading models for lev 1, count 1859 ...............................................took 0.206403 secs
-Culling found 1178 open cells.......................................................took 0.014758 secs
-Convex mesh and automap init........................................................took 0.000062 secs
-Raytraced reflections upload........................................................took 0.098004 secs
-Audio and Menu init.................................................................took 0.238817 secs
-Scratch arena total peak: 91 MB, Peak: 534284KB|521.76MB.......Game Initialization TOTAL 1.397995 secs
-Mem at init: Heap 0b(0KB|0.00MB), USS 339582976b(331624KB|323.85MB), MMAP 135451KB|132.28MB
-Frm    4 timings:::GPU ms::All:0.00 Shad:0.00 Pre:0.00 Main:0.00 SSR:0.00 Comp:0.00 | CPU ms::Shad:1.657 Phys:5.492 Subs:2 Rend:0.327 PrePhys:0.040 Logic:0.197 Raycasts:0.000(0) | Shadmap draws:6588
-Frm  100 timings:::GPU ms::All:11.05 Shad:2.97 Pre:0.60 Main:2.32 SSR:4.57 Comp:0.60 | CPU ms::Shad:1.664 Phys:1.668 Subs:2 Rend:0.297 PrePhys:0.044 Logic:0.246 Raycasts:0.000(0) | Shadmap draws:6588
-Frm  200 timings:::GPU ms::All:12.22 Shad:2.68 Pre:0.58 Main:2.48 SSR:5.88 Comp:0.60 | CPU ms::Shad:1.605 Phys:1.362 Subs:2 Rend:0.392 PrePhys:0.049 Logic:0.272 Raycasts:0.000(0) | Shadmap draws:6588
-Frm  500 timings:::GPU ms::All:11.89 Shad:2.59 Pre:0.64 Main:2.33 SSR:5.72 Comp:0.60 | CPU ms::Shad:1.585 Phys:1.448 Subs:2 Rend:0.296 PrePhys:0.042 Logic:0.274 Raycasts:0.000(0) | Shadmap draws:6588
-Frm 1000 timings:::GPU ms::All:11.08 Shad:2.97 Pre:0.61 Main:2.35 SSR:4.55 Comp:0.60 | CPU ms::Shad:1.626 Phys:1.418 Subs:2 Rend:0.293 PrePhys:0.041 Logic:0.285 Raycasts:0.000(0) | Shadmap draws:6588
+Window creation and GL context......................................................took 0.116385 secs
+GL shaders and buffer setup.........................................................took 0.118933 secs
+SSBO and shadow buffer setup........................................................took 0.001375 secs
+Loading textures (3967 pngs) total palette colors: 37486, total pixels: 40202776....took 0.173125 secs
+Parsing   models ( 903) ... total verts: 13582566, tris: 12059144...................took 0.116105 secs
+Automap and biomonitor buffers......................................................took 0.000572 secs
+Loading new game prep...............................................................took 0.000533 secs
+Load all levels.....................................................................took 0.113463 secs
+Loading   models ( 777 persistent)  vertices: 912446, tris: 709741..................took 0.139916 secs
+Loading models for lev 1, count 1859 ...............................................took 0.204712 secs
+Culling found 1178 open cells.......................................................took 0.017370 secs
+Convex mesh and automap init........................................................took 0.000050 secs
+Raytraced reflections upload........................................................took 0.099848 secs
+Audio and Menu init.................................................................took 0.241076 secs
+Scratch arena total peak: 90 MB, Peak: 533676KB|521.17MB.......Game Initialization TOTAL 1.362811 secs
+Mem at init: Heap 0b(0KB|0.00MB), USS 337784832b(329868KB|322.14MB), MMAP 135463KB|132.29MB
+Loading new game prep...............................................................took 0.001310 secs
+Load all levels.....................................................................took 0.079630 secs
+Culling found 1178 open cells.......................................................took 0.026016 secs
+Convex mesh and automap init........................................................took 0.000040 secs
+Player named "" started the game!
+Entity counts::0:3836|1:6041|2:5122|3:3285|4:3401|5:4316|6:5791|7:6122|8:4777|9:4574|10:8638|11:5521|12:6183|13:8418
+ Light counts::0:1229|1:1024|2:1107|3: 456|4: 867|5:1048|6:1131|7:1830|8: 887|9:1417|10: 700|11: 503|12: 463|13:   3
+Frm    4 timings:::GPU ms::All:1.05 Shad:0.00 Pre:0.57 Main:0.00 SSR:0.01 Comp:0.47 | CPU ms::Shad:0.785 Phys:6.086 Subs:2 Rend:0.343 PrePhys:0.064 Logic:0.159 Raycasts:0.000(0) | Shadmap draws:1361
+Frm  100 timings:::GPU ms::All:12.02 Shad:0.17 Pre:0.63 Main:2.45 SSR:8.17 Comp:0.61 | CPU ms::Shad:0.636 Phys:1.125 Subs:1 Rend:0.306 PrePhys:0.086 Logic:0.302 Raycasts:0.000(0) | Shadmap draws:646
+Frm  200 timings:::GPU ms::All:10.26 Shad:0.00 Pre:0.59 Main:2.49 SSR:6.58 Comp:0.60 | CPU ms::Shad:0.543 Phys:0.895 Subs:1 Rend:0.287 PrePhys:0.048 Logic:0.363 Raycasts:0.000(0) | Shadmap draws:0
+Frm  500 timings:::GPU ms::All:9.24 Shad:0.00 Pre:0.64 Main:2.68 SSR:5.31 Comp:0.59 | CPU ms::Shad:0.501 Phys:0.852 Subs:1 Rend:0.300 PrePhys:0.047 Logic:0.372 Raycasts:0.000(0) | Shadmap draws:0
+Frm 1000 timings:::GPU ms::All:9.14 Shad:0.00 Pre:0.59 Main:2.70 SSR:5.24 Comp:0.60 | CPU ms::Shad:0.518 Phys:1.468 Subs:2 Rend:0.324 PrePhys:0.053 Logic:0.467 Raycasts:0.082(1) | Shadmap draws:0
 ```
 
 Binary size eval (when the strip line in build.sh is commented out, else it prints 0's):

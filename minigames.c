@@ -1,3 +1,4 @@
+// minigames.c - HUD Minigames rendering and logic.
 #include "common.h"
 static float mgSlideX,mgSlideY,mgSlideToX,mgSlideToY,mgSlideDirX,mgSlideDirY,mgSlideTick;
 static u32 mgTexId, mgFBO;
