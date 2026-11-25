@@ -7,7 +7,7 @@ void DrawSphereContact(V3,float),BiomonitorEnergyPulse(float),DrawBoxColliderCol
 float TakeDamage(u16,DamageData);
 typedef struct { V3 v[4]; V3 wA[4]; i32 n; } Simplex3D;    typedef struct { V3 point; float pen; } ManifoldPt;    typedef struct { V3 normal; ManifoldPt p[MANI_MAX]; i32 n; float maxPen; } Manifold;    typedef struct { u16 a,b; Manifold m; V3 rA[MANI_MAX],rB[MANI_MAX]; float targetVn[MANI_MAX],accumN[MANI_MAX],accumT[MANI_MAX],invSumN[MANI_MAX]; float Ka[3][3],Kb[3][3]; float invMassA,invMassB; bool bStatic,canRotateA,canRotateB; } SolverContact;
 typedef struct { u16 a,b; u8 n; V3 pt[MANI_MAX],normal; float accumN[MANI_MAX],accumT[MANI_MAX],pen[MANI_MAX],dt; u8 votes; V3 challN,posA,posB; u32 frame; } WarmPair;
-static SolverContact gContacts[MAX_GLOBAL_CONTACTS]; static u32 gContactCount; static float posBudget[INSTANCE_CNT]; static u16 dynamicEntities[512],dynamicEntityCount; static u8 grenadeImpactQueued[INSTANCE_CNT],projImpQueued[INSTANCE_CNT],projectileContactThisFrame[INSTANCE_CNT]; static u16 projImpTarg[INSTANCE_CNT]; static V3 projImpPt[INSTANCE_CNT],projImpNor[INSTANCE_CNT]; static float nextCapacityWarn[5]; static u16 gravityLiftWasInside[INSTANCE_CNT],gravityLiftTouched[INSTANCE_CNT],gravityLiftTopSupport[INSTANCE_CNT],teleportWasTouching,teleportTouched; static u8 gravityLiftOverlapLevel=255;
+static SolverContact gContacts[MAX_GLOBAL_CONTACTS]; static u32 gContactCount; static float posBudget[INSTANCE_CNT]; static V3 prevPos[INSTANCE_CNT]; static u16 dynamicEntities[512],dynamicEntityCount; static u8 grenadeImpactQueued[INSTANCE_CNT],projImpQueued[INSTANCE_CNT],projectileContactThisFrame[INSTANCE_CNT]; static u16 projImpTarg[INSTANCE_CNT]; static V3 projImpPt[INSTANCE_CNT],projImpNor[INSTANCE_CNT]; static float nextCapacityWarn[5]; static u16 gravityLiftWasInside[INSTANCE_CNT],gravityLiftTouched[INSTANCE_CNT],gravityLiftTopSupport[INSTANCE_CNT],teleportWasTouching,teleportTouched; static u8 gravityLiftOverlapLevel=255;
 static WarmPair gWarmPairs[2048]; static u8 gWarmPairLevel=255;
 void WarmPairsClear() { mset(gWarmPairs,0,sizeof(gWarmPairs)); gWarmPairLevel = World.curLev; }
 INLINE u32 WarmPairHash(u16 a,u16 b) { return ((u32)a*40503u ^ (u32)b*69621u) & (2047u); }
@@ -348,10 +348,20 @@ void BvhWalkAABB_CvxTri(u16 triMesh, const float* triMx, AABB3 hb, CvxMshCtx* ct
     }
 }
 static AABB3 g_hullLocalAABB[MAX_MDLS]; static u8 g_hullLocalAABBInit[MAX_MDLS] = {0};
+static AABB3 HullLocalAABB(u16 mesh) {
+    AABB3 z = {{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f}};
+    if (mesh >= MAX_MDLS || !modelVertexCounts[mesh]) return z;
+    if (!g_hullLocalAABBInit[mesh]) { AABB3 la={{1000000000.0f,1000000000.0f,1000000000.0f},{-1000000000.0f,-1000000000.0f,-1000000000.0f}}; u32 hn=modelVertexCounts[mesh]; for (u32 i=0;i<hn;++i){ V3 v=MeshVert(mesh,i); la.mn.x=vmin(la.mn.x,v.x); la.mn.y=vmin(la.mn.y,v.y); la.mn.z=vmin(la.mn.z,v.z); la.mx.x=vmax(la.mx.x,v.x); la.mx.y=vmax(la.mx.y,v.y); la.mx.z=vmax(la.mx.z,v.z); } g_hullLocalAABB[mesh]=la; g_hullLocalAABBInit[mesh]=1; }
+    return g_hullLocalAABB[mesh];
+}
+static float HullMinLocalDim(u16 mesh) {
+    AABB3 la = HullLocalAABB(mesh);
+    return vmin(la.mx.x - la.mn.x, vmin(la.mx.y - la.mn.y, la.mx.z - la.mn.z));
+}
 Manifold CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const float* triMx, u16 adjHull) {
     Manifold z={0}; if(hullMesh>=MAX_MDLS||adjHull>=MAX_MDLS||triMesh>=MAX_MDLS)return z; u32 hn=modelVertexCounts[hullMesh]; if(!hn)return z; CvxMshCtx ctx={0}; ctx.hullMesh=hullMesh; ctx.hullMx=hullMx; ctx.adjHull=adjHull; AABB3 hb;
-    if (!g_hullLocalAABBInit[hullMesh]) { AABB3 la={{1000000000.0f,1000000000.0f,1000000000.0f},{-1000000000.0f,-1000000000.0f,-1000000000.0f}}; for (u32 i=0;i<hn;++i){ V3 v=MeshVert(hullMesh,i); la.mn.x=vmin(la.mn.x,v.x); la.mn.y=vmin(la.mn.y,v.y); la.mn.z=vmin(la.mn.z,v.z); la.mx.x=vmax(la.mx.x,v.x); la.mx.y=vmax(la.mx.y,v.y); la.mx.z=vmax(la.mx.z,v.z); } g_hullLocalAABB[hullMesh]=la; g_hullLocalAABBInit[hullMesh]=1; }
-    TransformAABB(g_hullLocalAABB[hullMesh].mn,g_hullLocalAABB[hullMesh].mx,hullMx,&hb.mn,&hb.mx);
+    AABB3 la = HullLocalAABB(hullMesh);
+    TransformAABB(la.mn,la.mx,hullMx,&hb.mn,&hb.mx);
     ctx.hb=hb; ctx.hullCenter = V3_ScaleByF(V3Add(hb.mn, hb.mx), 0.5f); ctx.hullRadius = V3_Mag(V3_AsubB(hb.mx, hb.mn)) * 0.5f; V3 hext=V3_AsubB(hb.mx,hb.mn); ctx.spreadEps=vmax(0.02f,vmax(hext.x,vmax(hext.y,hext.z))*0.15f); float wscaleH=V3_Mag((V3){hullMx[0],hullMx[1],hullMx[2]}); ctx.thicknessTolerance=vclamp(modelBounds[hullMesh]*wscaleH*0.06f,0.003f,0.02f);
     u32 triCount=modelTriangleCounts[triMesh]; if(!triCount)return ctx.best; if (BvhHasBVH(triMesh)) { BvhWalkAABB_CvxTri(triMesh, triMx, hb, &ctx); } else { for (u32 ti=0;ti<triCount;++ti) { V3 ta,tb,tc; MeshTri(triMesh,ti,triMx,&ta,&tb,&tc); CvxTriTest(&ctx,ta,tb,tc); } } CvxMshFillExtraPoints(&ctx); return ctx.best;
 }
@@ -458,6 +468,25 @@ INLINE int V3_IsSane(V3 v) { union { float f; u32 i; } ux,uy,uz; ux.f = v.x; uy.
 static bool reverbZoneActive; static u16 activeReverbPreset;
 void AppendTextWarning(i32 sidx, i32 sidx2, i32 sidx3, i32 col, i32 id) { World.Sys_UI.tWrnTextIdx[id] = sidx; World.Sys_UI.tWrnTextIdx2[id] = sidx2; World.Sys_UI.tWrnTextIdx3[id] = sidx3; World.Sys_UI.tWrnFinished[id] = World.Sys_UI.tWrnFinished[id] < World.pauseRelativeTime ? World.pauseRelativeTime + 0.1f : World.Sys_UI.tWrnFinished[id] + 0.1f; World.Sys_UI.tWrnColorIdx[id] = col; }
 u32 PosGetCellCoordsP(i32 cx, i32 cz) { cx=vclampi(cx,0,(WORLDX - 1)); cz=vclampi(cz,0,(WORLDX - 1)); return (u32)cz * WORLDX + (u32)cx; }
+static Manifold SweptMshManifold(u16 a, u16 b, ShapeBox boxA, ShapeCapsule capA, ShapeSphere sphA, const float *mxA, const float *mxB, bool dblSide) {
+    Manifold z={0}; u8 colA=World.col[a]; u16 triMesh=World.instances[b].modelIndex;
+    if (colA != CT_CAP && colA != CT_SPH && colA != CT_BOX && colA != CT_CVX) return OverlapToManifold(SphSph(World.position[a],World.colliderSize[a].x,World.position[b],World.colliderSize[b].x));
+    V3 move=V3_AsubB(World.position[a],prevPos[a]); float dist=V3_Mag(move); float step=0.0f;
+    if (colA == CT_SPH) step=sphA.rad;
+    else if (colA == CT_CAP) step=capA.rad;
+    else if (colA == CT_BOX) step=vmin(boxA.hExt.x,vmin(boxA.hExt.y,boxA.hExt.z));
+    else if (colA == CT_CVX) step=0.5f*HullMinLocalDim(World.instances[a].colMeshIndex);
+    int steps=1; if (dist > PHY_EPSILON && step > PHY_EPSILON) { steps=(int)(dist/step)+1; if (steps > 16) steps=16; }
+    for (int k=1;k<=steps;++k) {
+        float t=(float)k/(float)steps; V3 off=V3_ScaleByF(move,t-1.0f); Manifold mf={0};
+        if (colA == CT_SPH) { ShapeSphere s=sphA; s.ctr=V3Add(sphA.ctr,off); mf=OverlapToManifold(SphMsh(s.ctr,s.rad,triMesh,mxB,dblSide)); }
+        else if (colA == CT_CAP) { ShapeCapsule c=capA; c.tip=V3Add(capA.tip,off); c.base=V3Add(capA.base,off); mf=OverlapToManifold(CapMsh(c,triMesh,mxB,dblSide)); }
+        else if (colA == CT_BOX) { ShapeBox bx=boxA; bx.ctr=V3Add(boxA.ctr,off); mf=BoxMsh(bx,triMesh,mxB); }
+        else if (colA == CT_CVX) { float mxi[16]; mcpy(mxi,mxA,sizeof(mxi)); mxi[12]=World.position[a].x+off.x; mxi[13]=World.position[a].y+off.y; mxi[14]=World.position[a].z+off.z; mf=CvxMsh(World.instances[a].colMeshIndex,mxi,triMesh,mxB,World.instances[a].adjacencyIdx); }
+        if (mf.n) return mf;
+    }
+    return z;
+}
 void Physics(float dt) {
     if (gravityLiftOverlapLevel!=World.curLev) { mset(gravityLiftWasInside,0,sizeof(gravityLiftWasInside)); mset(gravityLiftTopSupport,0,sizeof(gravityLiftTopSupport)); teleportWasTouching = 0; World.ladderSFXFinished = 0.0f; gravityLiftOverlapLevel = World.curLev; }
     if (gWarmPairLevel != World.curLev) { mset(gWarmPairs,0,sizeof(gWarmPairs));gWarmPairLevel=World.curLev; mset(World.physQuiet,0,sizeof(u8)*INSTANCE_CNT); }
@@ -478,7 +507,7 @@ void Physics(float dt) {
         if (!World.invP1.radiationArea) { float bleed = (World.invP1.patchActive & PATCH_DETOX) ? 2.0f : (World.invP1.hasHardware & HW_ENV ? 0.5f : 1.0f); World.instances[PLAYER1].radiation = vmax(0.0f, World.instances[PLAYER1].radiation - dtsub * bleed); }/*Radiation bleedoff / detox / envirosuit handling*/ else { World.instances[PLAYER1].radiation = vmin(100.0f, World.instances[PLAYER1].radiation); }
         mset(cellCounts,0,sizeof(cellCounts)); numTriggers=0;
         for (u16 i=0;i<World.instCount;++i) { // 0. Broadphase cell lists
-            posBudget[i] = 0.64f; World.instances[i].cellX=(i16)PosGetCellCoordX(World.position[i].x); World.instances[i].cellZ=(i16)PosGetCellCoordZ(World.position[i].z); World.instances[i].cellIndex = PosGetCellCoordsP(World.instances[i].cellX,World.instances[i].cellZ);
+            prevPos[i] = World.position[i]; posBudget[i] = 0.64f; World.instances[i].cellX=(i16)PosGetCellCoordX(World.position[i].x); World.instances[i].cellZ=(i16)PosGetCellCoordZ(World.position[i].z); World.instances[i].cellIndex = PosGetCellCoordsP(World.instances[i].cellX,World.instances[i].cellZ);
             u32 cell=(u32)World.instances[i].cellIndex; if(World.col[i] != CT_NONE){if(cellCounts[cell]<128){cellLists[cell][cellCounts[cell]++]=i;}else{WarnPhysicsCapacity(2,"Reached the 128 bodies-per-cell limit; additional bodies in this cell are skipped.");}} u16 idx=World.instances[i].index; bool isTrigger=((idx>=595&&idx<=601)||idx==703||idx==706||idx==746); if(isTrigger&&(World.instances[i].entflags&EF_ACTIVE)){if(numTriggers<128){triggerVolumes[numTriggers++]=i;}else{WarnPhysicsCapacity(3,"Reached the 128 trigger-volume limit; additional triggers are skipped.");}}
         }
         gContactCount=0;
@@ -523,10 +552,7 @@ void Physics(float dt) {
                         else if (World.col[a] == CT_SPH && World.col[b] == CT_BOX) { ShapeSphere sa = sphA; mf = OverlapToManifold(SphBox(sa.ctr,sa.rad,boxB)); }
                         else if (World.col[a] == CT_BOX && World.col[b] == CT_SPH) { ShapeSphere sa = sphB; Overlap r = SphBox(sa.ctr,sa.rad,boxA); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.0f); mf=OverlapToManifold(r); }
                         else if (World.col[a] == CT_SPH && World.col[b] == CT_SPH) { ShapeSphere sa = sphA, sb = sphB; mf = OverlapToManifold(SphSph(sa.ctr,sa.rad,sb.ctr,sb.rad)); }
-                        else if (World.col[a] == CT_CAP && World.col[b] == CT_MSH) { mf = OverlapToManifold(CapMsh(capA,World.instances[b].modelIndex,mxB,doubleSidedTexture[World.instances[b].texIndex])); }
-                        else if (World.col[a] == CT_SPH && World.col[b] == CT_MSH) { ShapeSphere sa = sphA; mf = OverlapToManifold(SphMsh(sa.ctr,sa.rad,World.instances[b].modelIndex,mxB,doubleSidedTexture[World.instances[b].texIndex])); }
-                        else if (World.col[a] == CT_BOX && World.col[b] == CT_MSH) { mf = BoxMsh(boxA,World.instances[b].modelIndex,mxB); }
-                        else if (World.col[a] == CT_CVX && World.col[b] == CT_MSH) { mf = CvxMsh(World.instances[a].colMeshIndex,mxA,World.instances[b].modelIndex,mxB,World.instances[a].adjacencyIdx); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (World.col[b] == CT_MSH) { mf = SweptMshManifold(a,b,boxA,capA,sphA,mxA,mxB,doubleSidedTexture[World.instances[b].texIndex]); if (colA == CT_CVX && mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
                         else if ((colA==CT_CVX && (colB==CT_CAP || colB==CT_SPH || colB==CT_BOX)) || (colB==CT_CVX && (colA==CT_CAP || colA==CT_SPH || colA==CT_BOX))) {
                             bool hullA=colA==CT_CVX; u16 hull=hullA ? a : b;
                             mf=PrimitiveCvx(hullA ? b : a,World.instances[hull].colMeshIndex,hullA ? mxA : mxB,World.instances[hull].adjacencyIdx);

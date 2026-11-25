@@ -120,7 +120,7 @@ void DrawAngularVelocity(u16 i) {
                 if (action == INPUT_RELEASE && w == 0x10) { InputKey(win->keys,KEY_LEFT_SHIFT,action); InputKey(win->keys,KEY_RIGHT_SHIFT,action); } else if (w == 0x2C) { InputKey(win->keys,key,INPUT_PRESS); InputKey(win->keys,key,INPUT_RELEASE); } else InputKey(win->keys,key,action);
                 break; }
             case 0x201: case 0x204: case 0x207: case 0x20B: case 0x202: case 0x205: case 0x208: case 0x20C: {
-                int i,action,button = (m==0x201 || m == 0x202) ? MOUSE_BUTTON_LEFT : ((m == 0x204 || m == 0x205) ? MOUSE_BUTTON_RIGHT : ((m == 0x207 || m == 0x208) ? MOUSE_BUTTON_MIDDLE : (((((u16)((((u64)(w))>>16)&0xFFFF))) == 0x1) ? MOUSE_BUTTON_4 : MOUSE_BUTTON_5))); action=(m == 0x201 || m == 0x204 || m == 0x207 || m == 0x20B) ? INPUT_PRESS : INPUT_RELEASE;
+                int i,action,button = (m==0x201 || m == 0x202) ? LMB : ((m == 0x204 || m == 0x205) ? RMB : ((m == 0x207 || m == 0x208) ? MOUSE_BUTTON_MIDDLE : (((((u16)((((u64)(w))>>16)&0xFFFF))) == 0x1) ? MOUSE_BUTTON_4 : MOUSE_BUTTON_5))); action=(m == 0x201 || m == 0x204 || m == 0x207 || m == 0x20B) ? INPUT_PRESS : INPUT_RELEASE;
                 i=0; while(i<8 && win->mouseButtons[i]!=INPUT_PRESS) i++; if (i>7) SetCapture(h); InputMouseClick(win->mouseButtons,button,action); i=0; while(i<8 && win->mouseButtons[i]!=INPUT_PRESS) i++; if (i>7) ReleaseCapture(); if (m == 0x20B || m == 0x20C) return 1; return 0; }
             case 0x200: {const int x=((int)(i16)(l & 0xFFFF)), y=((int)(i16)(l >> 16)); const int dx=x-win->win32.lastCurX,dy=y-win->win32.lastCurY; if (WinSys.win32.disabledCursorWindow!=win) break; InputCursorPos(&win->virtualCursorPosX,&win->virtualCursorPosY,win->virtualCursorPosX+dx,win->virtualCursorPosY+dy); win->win32.lastCurX=x; win->win32.lastCurY=y; return 0; }
             case 0x20A: Sys_Input.scrollDelta += (i16)(((u16)((((u64)(w))>>16)&0xFFFF)))/(double)120; return 0;
@@ -287,7 +287,7 @@ void DrawAngularVelocity(u16 i) {
             case 4: case 5: {
                 const int b = e->xbutton.button; const int a = (e->type == 4) ? INPUT_PRESS : INPUT_RELEASE;
                 if (a == INPUT_PRESS && WinSys.x11.disabledCursorWindow != w) { disableCursor(w); } // Explicitly require a click to lock the mouse
-                if (b == 1) InputMouseClick(w->mouseButtons,MOUSE_BUTTON_LEFT,a); else if (b == 2) InputMouseClick(w->mouseButtons,MOUSE_BUTTON_MIDDLE,a); else if (b == 3) InputMouseClick(w->mouseButtons,MOUSE_BUTTON_RIGHT,a); else if (a == INPUT_PRESS && b == 4) Sys_Input.scrollDelta += 1.0; else if (a == INPUT_PRESS && b == 5) Sys_Input.scrollDelta -= 1.0; else if (b > 7) InputMouseClick(w->mouseButtons,b - 5,a); return; }
+                if (b == 1) InputMouseClick(w->mouseButtons,LMB,a); else if (b == 2) InputMouseClick(w->mouseButtons,MOUSE_BUTTON_MIDDLE,a); else if (b == 3) InputMouseClick(w->mouseButtons,RMB,a); else if (a == INPUT_PRESS && b == 4) Sys_Input.scrollDelta += 1.0; else if (a == INPUT_PRESS && b == 5) Sys_Input.scrollDelta -= 1.0; else if (b > 7) InputMouseClick(w->mouseButtons,b - 5,a); return; }
             case 7: { const int x=e->xcrossing.x,y=e->xcrossing.y; InputCursorPos(&w->virtualCursorPosX,&w->virtualCursorPosY,x,y); w->x11.lastCurX=x; w->x11.lastCurY=y; return; }
             case 6/*MotionNotify*/: { 
                 const int x=e->xmotion.x, y=e->xmotion.y;
@@ -1523,7 +1523,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         glMemoryBarrier(0x20/*GL_SHADER_IMAGE_ACCESS_BARRIER_BIT*/ | 0x8/*GL_TEXTURE_FETCH_BARRIER_BIT*/); /*Compat: SSR/RT wrote outputImage via imageStore; the composite pass samples it as a texture right after - undefined without a barrier per GL4.3/ES3.1*/
     }
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);  /*DIAG: RT pass ends here*/ glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][4]);
-    glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glClearColor(0,0,0,0); glClear(GL_COLOR_BUFFER_BIT); glViewport(0,0,UI_W,UI_H); glDisable(GL_CULL_FACE); glEnable(GL_BLEND);
+    glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glClearColor(0,0,0,0); glClear(GL_COLOR_BUFFER_BIT); glViewport(0,0,UI_W,UI_H); glDisable(GL_CULL_FACE); glEnable(GL_BLEND); glBlendFuncSeparate(0x302/*GL_SRC_ALPHA*/,0x303/*GL_ONE_MINUS_SRC_ALPHA*/,1,0x303/*GL_ONE_MINUS_SRC_ALPHA*/);
     renderTime = get_timed() - rendStart; 
     RenderUI();
     glBindFramebuffer(GL_FRAMEBUFFER,0); glViewport(0,0,swidth,sheight);

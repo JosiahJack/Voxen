@@ -19,6 +19,8 @@ enum{UI_ID_NONE, /*Menu*/ UI_ID_MENU_SINGLEPLAYER, UI_ID_MENU_MULTIPLAYER, UI_ID
     /*In-Game Editor*/ UI_ID_CMFD_EDIT_PANEL, UI_ID_CMFD_EDIT_ROW_0, UI_ID_CMFD_EDIT_ROW_14 = UI_ID_CMFD_EDIT_ROW_0 + 14, UI_ID_CMFD_EDIT_LIGHT_TYPE, UI_ID_CMFD_EDIT_LIGHT_DIR_N, UI_ID_CMFD_EDIT_LIGHT_DIR_E, UI_ID_CMFD_EDIT_LIGHT_DIR_S, UI_ID_CMFD_EDIT_LIGHT_DIR_W, UI_ID_CMFD_EDIT_LIGHT_DIR_UP, UI_ID_CMFD_EDIT_LIGHT_DIR_DN, UI_ID_COUNT};
 #define MID(rh, n) ((u32)UI_ID_LMFD_##n + ((rh) ? (u32)(UI_ID_RMFD_TAB_WEAPON-UI_ID_LMFD_TAB_WEAPON) : 0u))/*Mirror an LMFD id onto whichever side we are drawing*/
 #define UIC(i) World.uiComponents[i]
+static u32 sensaroundVAO=0,sensaroundVBO=0;    static double introVidStart = 0.0, creditsVidStart = 0.0, deathVidStart = 0.0;
+static const float introTextAt[15] = {0.0f,6.7f,9.9f,19.2f,30.7f,37.9f,43.7f,48.1f,59.3f,69.1f,74.5f,81.2f,89.2f,98.4f,105.0f},outroTextAt[3] = {0.0f,7.0f,11.0f}/*CreditsScroll swaps to card 2 at 7s, card 3 at 11s, then hides all cards at 14s*/,deathTextAt[2] = {0.0f,5.53f};    static bool vidSkipArmedMouse[MAX_MOUSE_BUTTONS],vidSkipArmedEsc,vidSkipArmedEnter,vidSkipArmedSpace;
 INLINE bool CursorIsOverBounds(float x0, float x1, float y0, float y1) { return World.cursorPos_x >= x0 && World.cursorPos_x <= x1 && World.cursorPos_y >= y0 && World.cursorPos_y <= y1;/*0,0=top left*/ }
 INLINE bool WorldToScreenPoint(V3 d, float* sx, float* sy) {
     V3 f = World.instances[PLAYER1].forward, rt = World.instances[PLAYER1].right, ff = (V3){-f.x,-f.y,-f.z}, up = V3_Normalize(V3_Cross(rt,ff)); float bz = V3_dot(d,f); if (bz <= 0.01f) { return false; }
@@ -47,11 +49,11 @@ __attribute__((noinline)) bool MenuEnter() { return !Cheats.consoleActive && (Sy
 static void UiClickGate() { bool anyDown = false; for (u8 b = 0; b < MAX_MOUSE_BUTTONS; ++b) anyDown |= Sys_Input.mouseButtons[b].down; uiClickBlocked = false; if (uiClickLock) { if (!anyDown) uiClickLock = false; else uiClickBlocked = true; } }
 __attribute__((noinline)) u8 UI_MenuInteractable(u32 id, i16 x, i16 y, float w, float h, bool* cursorOver, i8 this, bool held) {
     UIR(id,x,(i16)((float)y-h),(i16)w,(i16)h); bool cursorIsOver = CursorIsOverBounds(x, x + w, (float)y - h, (float)y); if (cursorIsOver && mouseMovementThisFrame && !resDropdownOpen) { curMenuIt = this; if (cursorOver != NULL) {*cursorOver = cursorIsOver;} } if (uiClickBlocked) return 0u;
-    if ((held ? Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].down : Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].pressed) && cursorIsOver) { uiClickBlocked = true; uiClickLock = true; return 1u; }
-    if ((held ? Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down : Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) && cursorIsOver) { uiClickBlocked = true; uiClickLock = true; return 2u; } return 0u;
+    if ((held ? Sys_Input.mouseButtons[LMB ].down : Sys_Input.mouseButtons[LMB ].pressed) && cursorIsOver) { uiClickBlocked = true; uiClickLock = true; return 1u; }
+    if ((held ? Sys_Input.mouseButtons[RMB].down : Sys_Input.mouseButtons[RMB].pressed) && cursorIsOver) { uiClickBlocked = true; uiClickLock = true; return 2u; } return 0u;
 }
 __attribute__((noinline)) u8 UI_Button(u32 id, i16 x, i16 y, float w, float h, bool* cursorOver, i8 this) { return UI_MenuInteractable(id,x,y,w,h,cursorOver,this,false); }
-__attribute__((noinline)) bool AnyLeftRightMouseDown() { return (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down); }
+__attribute__((noinline)) bool AnyLeftRightMouseDown() { return (Sys_Input.mouseButtons[LMB].down || Sys_Input.mouseButtons[RMB].down); }
 bool UI_Slider(u32 id, i16 x, i16 y, i16 w, i16 h, i16 sliderPos, i16 xPosForLabel, u8* out, bool* sliderActive, u8 min, u8 max, u8 step, u8 mindex, u16 lingdex) {
     bool over=false,changed=false; u8 currentValue=*out; RenderUIImage(x,y, w,h, 1079);/*Slider background*/ RenderUIImage(x + sliderPos,y, h,h,1078);/*Slider handle*/ if (UI_MenuInteractable(id,xPosForLabel,y,(float)((x + w) - xPosForLabel),(float)h,&over,mindex,true)) *sliderActive = true; if(*sliderActive && World.currentMouse_dx!=0){i32 new=(i32)currentValue+vmin(vmax(World.currentMouse_dx,-1),1); *out=(u8)vmin(vmax(new,min),max); if(*out!=currentValue){changed=true;}}
     if (!AnyLeftRightMouseDown()) { if (*sliderActive) { *sliderActive = false; SaveConfig(); } } if (MenuEnter() && curMenuIt == mindex) {bool shiftHeld = Sys_Input.keyStates[KEY_LEFT_SHIFT].down || Sys_Input.keyStates[KEY_RIGHT_SHIFT].down; if (shiftHeld)*out=*out<=((min+step)-1) ? max : *out-step; else *out=*out >=((max-step)+1) ?  min : *out+step; changed=true;}
@@ -68,12 +70,6 @@ __attribute__((noinline)) void MenuGoBack() {
     if (leavingClipPage) { curMenuIt = curMenuTab = 0; if (toPause) { videoPageClip = NULL; mp3_clear(); } else { PlayMenuMusic(); } }
 }
 static void CreateShadowBuffers() { shadowMapSSBO = MakeSSBO(&shadowMapSSBO, 5, (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32), NULL, GL_STATIC_DRAW); shadowMapsIndirectionID = MakeSSBO(&shadowMapsIndirectionID, 6, LIGHT_CNT * sizeof(u32), NULL, GL_STATIC_DRAW);  shadowBuffersCreated = true; }
-// Menu Video Playback
-static double introVidStart = 0.0, creditsVidStart = 0.0, deathVidStart = 0.0;
-static const float introTextAt[15] = {0.0f,6.7f,9.9f,19.2f,30.7f,37.9f,43.7f,48.1f,59.3f,69.1f,74.5f,81.2f,89.2f,98.4f,105.0f};
-static const float outroTextAt[3] = {0.0f,7.0f,11.0f};/*CreditsScroll swaps to card 2 at 7s, card 3 at 11s, then hides all cards at 14s*/
-static const float deathTextAt[2] = {0.0f,5.53f};
-static bool vidSkipArmedMouse[MAX_MOUSE_BUTTONS],vidSkipArmedEsc,vidSkipArmedEnter,vidSkipArmedSpace;
 static bool VidSkipPressed() {
     bool press = false;
     for (int b=0;b<MAX_MOUSE_BUTTONS;++b) { if (!Sys_Input.mouseButtons[b].down) vidSkipArmedMouse[b] = true; else if (Sys_Input.mouseButtons[b].pressed && vidSkipArmedMouse[b]) press = true; }
@@ -121,12 +117,12 @@ void RenderMenu() {
         for (i8 t=2;t>=0;--t) { RenderUIImage(cfgTabX[t],196,160,30,curMenuTab==t ? 920 : 921); if (UI_Button(cfgTabId[t],cfgTabX[t],196+30,160,30,NULL,t)) curMenuTab=(u8)t; RenderTextL(cfgTabTx[t],202,curMenuTab==t ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,Sys_Text.stringTable[cfgTabStr[t]]); }
         if (curMenuTab == 0) {
             bool overRes = false, overFull = false, overChgM = false, overApply = false; menuItemCount = 14;/*Graphics*/
-            if(resDropdownOpen){ bool lmb=Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed, rmb=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed;
+            if(resDropdownOpen){ bool lmb=Sys_Input.mouseButtons[LMB].pressed, rmb=Sys_Input.mouseButtons[RMB].pressed;
                 if(lmb||rmb){ int rlh=resDropdownCount*16; bool inList=resDropdownCount>0 && World.cursorPos_x>=336 && World.cursorPos_x<=496 && World.cursorPos_y>=710-rlh && World.cursorPos_y<=710;
                     bool inHeader=World.cursorPos_x>=190 && World.cursorPos_x<=518 && World.cursorPos_y>710 && World.cursorPos_y<=726;
                     if(inList){ int row=(World.cursorPos_y-(710-rlh))/16; if(row>=0 && row<resDropdownCount){resSelectedIdx=row;} }
                     resDropdownOpen=false;
-                    if(inList||inHeader){ Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed=false; World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; } } }
+                    if(inList||inHeader){ Sys_Input.mouseButtons[LMB].pressed=Sys_Input.mouseButtons[RMB].pressed=false; World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; } } }
             bool overGI=false;
             RenderUIImage(200,470, 16,16, 910);
             if (UI_Button(UI_ID_MENU_GI,200,486, 210,16, &overGI, 1) || (MenuEnter() && curMenuIt == 1)) { Sys_Settings.GI = Sys_Settings.GI ? 0u : 1u; SaveConfig(); }
@@ -136,11 +132,11 @@ void RenderMenu() {
             if (UI_Checkbox(UI_ID_MENU_FXAA,200,530,3,/*"FXAA"*/780,Sys_Settings.FXAA)) { Sys_Settings.FXAA = Sys_Settings.FXAA ? 0u : 1u; SaveConfig(); }
             if (UI_Checkbox(UI_ID_MENU_SHADOWS,200,560,4,Sys_Settings.Shadows ?/*Soft*/787 :/*No Shadows*/785,Sys_Settings.Shadows)) { Sys_Settings.Shadows = Sys_Settings.Shadows ? 0u : 1u; if (!shadowBuffersCreated) {CreateShadowBuffers();} SaveConfig(); }
             if (reflDropdownOpen) {
-                bool lmb=Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed, rmb=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed;
+                bool lmb=Sys_Input.mouseButtons[LMB].pressed, rmb=Sys_Input.mouseButtons[RMB].pressed;
                 if (lmb||rmb) { int rlh=3*16; bool inList = World.cursorPos_x>=336 && World.cursorPos_x<=496 && World.cursorPos_y>=590-rlh && World.cursorPos_y<=590;
                     if (inList) { int row=(World.cursorPos_y-(590-rlh))/16; if (row>=0 && row<3) { Sys_Settings.Reflections=(u8)row; SaveConfig(); EnsureReflectionResources(); } }
                     reflDropdownOpen=false;
-                    if (inList) { Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed=false; World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; }
+                    if (inList) { Sys_Input.mouseButtons[LMB].pressed=Sys_Input.mouseButtons[RMB].pressed=false; World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; }
                 }
             }
             bool overRefl=false;
@@ -638,29 +634,24 @@ void RenderSearch(bool isRH) {
     if (!any) RenderTextL(dx+24,633,T_YELLOW,FONT_NORMAL,0.8f,Sys_Text.stringTable[891]);
     UIRImg(MID(isRH,SEARCH_CLOSE),dx+291,508,29,29,899); RenderTextL(dx+300,518,T_STOPD_RED,FONT_NORMAL,0.8,"X");
 }
-static const i16 elevBtnY[4]={578,620,663,705};
-static const i16 keyBtnX[3]={86,127,169},keyBtnY[4]={577,620,663,706}; static const u8 keyBtnK[12]={1,2,3,4,5,6,7,8,9,10,0,11}; static const char* keyBtnLabel[12]={"1","2","3","4","5","6","7","8","9","-","0","C"};
-static const i16 puzCellX[7]={51,80,109,138,166,195,224},puzCellY[5]={565,594,622,651,680};
-static const i16 wireNodeY[7]={566,594,623,651,679,707,736};
-static const i16 mgX[9]={32,32,32,32,156,156,156,156,32},mgY[9]={540,575,610,646,540,575,610,646,681};/*mgName is defined with the UI row handlers*/
-static const i16 sysRowY[11]={547,566,585,605,624,643,662,681,701,720,739};
-static void SystemStatusValue(int r, char* out, size_t n) {
+static const i16 elevBtnY[4]={578,620,663,705},keyBtnX[3]={86,127,169},keyBtnY[4]={577,620,663,706},puzCellX[7]={51,80,109,138,166,195,224},puzCellY[5]={565,594,622,651,680},wireNodeY[7]={566,594,623,651,679,707,736},mgX[9]={32,32,32,32,156,156,156,156,32},mgY[9]={540,575,610,646,540,575,610,646,681},sysRowY[11]={547,566,585,605,624,643,662,681,701,720,739};
+static const u8 keyBtnK[12]={1,2,3,4,5,6,7,8,9,10,0,11}; static const char* keyBtnLabel[12]={"1","2","3","4","5","6","7","8","9","-","0","C"};
+static void SystemStatusValue(i32 r, char* out, size_t n) {
     bool laser=QuestBitIsSet(QB_LaserDestroyed), destruct=QuestBitIsSet(QB_SelfDestructActivated);
     switch(r){
-        case 0: sFormat(out,n,"%d%s",(int)GetCurrentLevelSecurity(),Sys_Text.stringTable[307]); break;
-        case 1: sFormat(out,n,"%s",Sys_Text.stringTable[laser?486:485]); break;
-        case 2: sFormat(out,n,"%s",Sys_Text.stringTable[destruct?488:487]); break;
-        case 3: sFormat(out,n,"%s",Sys_Text.stringTable[QuestBitIsSet(QB_ShieldActivated)?490:489]); break;
-        case 4: sFormat(out,n,"%s",Sys_Text.stringTable[destruct?491:492]); break;
-        case 5: { int nodes=0; for(int i=0;i<MAX_LEVELS;++i) nodes+=(int)World.levelSmallNodeCount[i]+(int)World.levelLargeNodeCount[i]-(int)World.levSmNodeDestroyedCnt[i]-(int)World.levNodeDestroyedCnt[i]; sFormat(out,n,"%d",nodes); break; }
-        case 6: sFormat(out,n,"%s",Sys_Text.stringTable[!laser?494:!QuestBitIsSet(QB_BetaGroveJettisoned)?495:!(QuestBitIsSet(QB_AntennaNorthDestroyed)&&QuestBitIsSet(QB_AntennaSouthDestroyed)&&QuestBitIsSet(QB_AntennaWestDestroyed)&&QuestBitIsSet(QB_AntennaEastDestroyed))?496:!QuestBitIsSet(QB_BridgeSeparated)?497:498]); break;
+        case 0: sFormat(out,n,"%d%s",(i32)GetCurrentLevelSecurity(),Sys_Text.stringTable[307]); break;
+        case 1: sFormat(out,n,"%s",Sys_Text.stringTable[laser ? 486 : 485]); break;
+        case 2: sFormat(out,n,"%s",Sys_Text.stringTable[destruct ? 488 : 487]); break;
+        case 3: sFormat(out,n,"%s",Sys_Text.stringTable[QuestBitIsSet(QB_ShieldActivated) ? 490 : 489]); break;
+        case 4: sFormat(out,n,"%s",Sys_Text.stringTable[destruct ? 491 : 492]); break;
+        case 5: { i32 nodes = 0; for(i32 i=0;i<MAX_LEVELS;++i) nodes += (i32)World.levelSmallNodeCount[i] + (i32)World.levelLargeNodeCount[i] - (i32)World.levSmNodeDestroyedCnt[i] - (i32)World.levNodeDestroyedCnt[i]; sFormat(out,n,"%d",nodes); break; }
+        case 6: sFormat(out,n,"%s",Sys_Text.stringTable[!laser ? 494 : !QuestBitIsSet(QB_BetaGroveJettisoned) ? 495 : !(QuestBitIsSet(QB_AntennaNorthDestroyed) && QuestBitIsSet(QB_AntennaSouthDestroyed) && QuestBitIsSet(QB_AntennaWestDestroyed) && QuestBitIsSet(QB_AntennaEastDestroyed)) ? 496 : !QuestBitIsSet(QB_BridgeSeparated) ? 497 : 498]); break;
         case 7: sFormat(out,n,"%s",Sys_Text.stringTable[492]); break;
-        case 8: sFormat(out,n,"%s",Sys_Text.stringTable[QuestBitIsSet(QB_BetaGroveJettisoned)?493:492]); break;
+        case 8: sFormat(out,n,"%s",Sys_Text.stringTable[QuestBitIsSet(QB_BetaGroveJettisoned) ? 493 : 492]); break;
         case 9: sFormat(out,n,"%s",Sys_Text.stringTable[493]); break;
         default: sFormat(out,n,"%s",Sys_Text.stringTable[492]); break;
     }
 }
-static u32 sensaroundVAO=0,sensaroundVBO=0;
 void DrawSensaroundQuad(i16 x, i16 y, i16 w, i16 h, u8 camViewIdx) {// Draw the rendered sensaround cam view texture as a HUD quad at the exact pixel rect used by the UIR call.  Uses the chunk shader's useCamView path (uniforms 28/29/30) like the in-world camera screens.  The quad only spans [0,1]^2 in world space so the shader's voxel lighting lookup stays in-bounds; the projection bakes in the stretch to the target UI rectangle.
     if (camViewIdx >= camViewCount || w <= 0 || h <= 0) return;
     if (!sensaroundVAO) {
@@ -955,7 +946,7 @@ void CenterMFD() { //640x240
 }
 static void UI_WeaponEnergySliderSet(bool rh) { if (!CurrentWeaponUsesEnergy()) { return; } int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); if (wep16 < 0 || wep16 >= 16) return; float value = ((float)World.cursorPos_x - UIC(MID(rh,WEAPON_ENERGY_SLIDER)).min.x) / 164.0f; World.invP1.weaponEnergySetting[wep16] = vclamp(value*100.0f,0.0f,100.0f); World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true; }
 static void UI_DragRegions() {
-    if (!Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down) { return; }
+    if (!Sys_Input.mouseButtons[LMB].down) { return; }
     for (u8 s=0;s<2;++s) {
         u32 id = MID(s,ITEM_TIMER_SLIDER); if (UIOver(id)) { World.Sys_UI.lastItemSideRH = s != 0; ConsumableSetTimer(((float)World.cursorPos_x - UIC(id).min.x) / 224.0f); World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true; } id = MID(s,PUZZLE_SLIDER); if (UIOver(id)) { World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true; } id = MID(s,WIRE_SLIDER); if (UIOver(id)) { World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true; }
         id = MID(s,WEAPON_ENERGY_SLIDER); if (UIOver(id)) UI_WeaponEnergySliderSet(s != 0);
@@ -1002,56 +993,35 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_CMFD_GENERAL_USE_0 ... UI_ID_CMFD_GENERAL_USE_13: { u8 s=(u8)(id - UI_ID_CMFD_GENERAL_USE_0); World.Sys_UI.genClickSlot = -1; GenInvClick(s); GenInvApply(s); return; }
         case UI_ID_CMFD_GENERAL_ROW_0 ... UI_ID_CMFD_GENERAL_ROW_13: { u8 s = (u8)(id - UI_ID_CMFD_GENERAL_ROW_0); int item = GeneralInvItem(s); if (item<0) { return; } if (!left) { World.Sys_UI.genClickSlot = -1; if (s) GenInvTake(s,item); return; }
             World.Sys_UI.genClickSlot = -1; GenInvClick(s); if (dbl && World.Sys_UI.genClickSlot == (i8)s && World.Sys_UI.genClickItem == (i16)item && World.Sys_UI.genClickCustom == World.invP1.genInvCustIdx[s]) GenInvApply(s); else { World.Sys_UI.genClickSlot = (i8)s; World.Sys_UI.genClickItem = (i16)item; World.Sys_UI.genClickCustom = World.invP1.genInvCustIdx[s]; World.Sys_UI.genClickTime = World.pauseRelativeTime; } return; }
-        case UI_ID_CMFD_LOG_TABLE_0 ... UI_ID_CMFD_LOG_TABLE_9: UI_LogTableClick((int)(id - UI_ID_CMFD_LOG_TABLE_0)); return;
-        case UI_ID_CMFD_LOG_ENTRY_0 ... UI_ID_CMFD_LOG_ENTRY_14: UI_LogEntryClick((int)(id - UI_ID_CMFD_LOG_ENTRY_0)); return;
-        case UI_ID_CMFD_LOG_MORE: UI_LogMore(); return;
-        case UI_ID_CMFD_LOG_BACK: UI_LogBack(); return;
-        case UI_ID_CMFD_EMAIL_ENTRY_0 ... UI_ID_CMFD_EMAIL_ENTRY_14: UI_EmailEntryClick((int)(id - UI_ID_CMFD_EMAIL_ENTRY_0)); return;
-        case UI_ID_CMFD_DATA_ENTRY_0 ... UI_ID_CMFD_DATA_ENTRY_12: UI_DataEntryClick((int)(id - UI_ID_CMFD_DATA_ENTRY_0)); return;
-        case UI_ID_CMFD_NOTE_TOGGLE_0 ... UI_ID_CMFD_NOTE_TOGGLE_17: UI_NoteToggleClick((int)(id - UI_ID_CMFD_NOTE_TOGGLE_0)); return;
+        case UI_ID_CMFD_LOG_TABLE_0 ... UI_ID_CMFD_LOG_TABLE_9: UI_LogTableClick((int)(id - UI_ID_CMFD_LOG_TABLE_0)); return;          case UI_ID_CMFD_LOG_ENTRY_0 ... UI_ID_CMFD_LOG_ENTRY_14: UI_LogEntryClick((int)(id - UI_ID_CMFD_LOG_ENTRY_0)); return;
+        case UI_ID_CMFD_LOG_MORE: UI_LogMore(); return;                             case UI_ID_CMFD_LOG_BACK: UI_LogBack(); return;                             case UI_ID_CMFD_EMAIL_ENTRY_0 ... UI_ID_CMFD_EMAIL_ENTRY_14: UI_EmailEntryClick((int)(id - UI_ID_CMFD_EMAIL_ENTRY_0)); return;
+        case UI_ID_CMFD_DATA_ENTRY_0 ... UI_ID_CMFD_DATA_ENTRY_12: UI_DataEntryClick((int)(id - UI_ID_CMFD_DATA_ENTRY_0)); return;                              case UI_ID_CMFD_NOTE_TOGGLE_0 ... UI_ID_CMFD_NOTE_TOGGLE_17: UI_NoteToggleClick((int)(id - UI_ID_CMFD_NOTE_TOGGLE_0)); return;
         case UI_ID_CMFD_EDIT_ROW_0 ... UI_ID_CMFD_EDIT_ROW_14: { u8 slot = (u8)(id - UI_ID_CMFD_EDIT_ROW_0); if (EditLightSelIsActive()) { if (slot>=LF_LAST) return; LightFieldValueText(slot,editModeLightSelection,editFieldBuffer,40); editFieldSlot=slot; editFieldEditing=true; return; } if (!EditSelIsActive()) return; EditFieldValueText(slot,editModeSelection,editFieldBuffer,40); editFieldSlot = slot; editFieldEditing = true; return; }
-        case UI_ID_CMFD_EDIT_LIGHT_TYPE: LightTypeCycle(); return;
-        case UI_ID_CMFD_EDIT_LIGHT_DIR_N ... UI_ID_CMFD_EDIT_LIGHT_DIR_DN: LightDirSet((u8)(id-UI_ID_CMFD_EDIT_LIGHT_DIR_N)); return;
-        case UI_ID_LMFD_TAB_WEAPON ... UI_ID_LMFD_TAB_DATA: MFD_SelectTab((u8)(rh?2:1),(u8)(id-UI_ID_LMFD_TAB_WEAPON+1),true); return;
-        case UI_ID_LMFD_AUTOMAP_ZOOM_IN: UI_AutomapClick(rh,UI_AUTOMAP_ZOOM_IN); return;
-        case UI_ID_LMFD_AUTOMAP_ZOOM_OUT: UI_AutomapClick(rh,UI_AUTOMAP_ZOOM_OUT); return;
-        case UI_ID_LMFD_AUTOMAP_FULL: UI_AutomapClick(rh,UI_AUTOMAP_FULL); return;
-        case UI_ID_LMFD_AUTOMAP_SIDE: UI_AutomapClick(rh,UI_AUTOMAP_SIDE); return;
-        case UI_ID_FULLMAP_CLOSE: CloseFullmap(); return;
+        case UI_ID_CMFD_EDIT_LIGHT_TYPE: LightTypeCycle(); return;                  case UI_ID_CMFD_EDIT_LIGHT_DIR_N ... UI_ID_CMFD_EDIT_LIGHT_DIR_DN: LightDirSet((u8)(id-UI_ID_CMFD_EDIT_LIGHT_DIR_N)); return;
+        case UI_ID_FULLMAP_CLOSE: CloseFullmap(); return;                           case UI_ID_LMFD_TAB_WEAPON ... UI_ID_LMFD_TAB_DATA: MFD_SelectTab((u8)(rh?2:1),(u8)(id-UI_ID_LMFD_TAB_WEAPON+1),true); return;
+        case UI_ID_LMFD_AUTOMAP_FULL: UI_AutomapClick(rh,UI_AUTOMAP_FULL); return;  case UI_ID_LMFD_AUTOMAP_ZOOM_IN: UI_AutomapClick(rh,UI_AUTOMAP_ZOOM_IN); return;
+        case UI_ID_LMFD_AUTOMAP_SIDE: UI_AutomapClick(rh,UI_AUTOMAP_SIDE); return;  case UI_ID_LMFD_AUTOMAP_ZOOM_OUT: UI_AutomapClick(rh,UI_AUTOMAP_ZOOM_OUT); return;
         case UI_ID_LMFD_MEDIA_TAB_0 ... UI_ID_LMFD_MEDIA_TAB_3: { u8 sec = (u8)(id - UI_ID_LMFD_MEDIA_TAB_0); if (sec == MM_NOTES && !World.diffMis) { return; } World.Sys_UI.mfdTab[0] = 5; World.Sys_UI.MFD_MediaTab = World.Sys_UI.lastMultiMediaTabOpened = sec; World.Sys_UI.MFD_ReaderView = MFD_READER_CONTENTS; if (sec >= MM_DATA_TABLE) { World.Sys_UI.highlightStatus[sec] = false; } play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0},false); return; }
         case UI_ID_LMFD_ITEM_USE: { World.Sys_UI.lastItemSideRH=rh; if (World.Sys_UI.mfdConsumable) { int row=ConsumableSelectedRow(); ConsumableUse(World.Sys_UI.mfdConsumable==2,row); } else { int s=World.invP1.genInvCur; World.Sys_UI.genClickSlot = -1; if (GeneralInvCanUse(s)) GenInvApply(s); } return; }
         case UI_ID_LMFD_ITEM_VAPORIZE: World.Sys_UI.lastItemSideRH=rh; World.Sys_UI.genClickSlot = -1; int slot = World.invP1.genInvCur; if (GeneralInvCanVaporize(slot)) { GeneralInvRemove(slot); play_wav("hud/patchuse",AppliedFXVol(1.0f),(V3){0},false); } return;
         case UI_ID_LMFD_ITEM_SKATE: World.Sys_UI.lastItemSideRH = rh; if (World.invP1.hasHardware & HW_BST) { World.invP1.hwVersSetting[HW_BST_IDX] = 0; play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0},false); } return;
         case UI_ID_LMFD_ITEM_BOOST: World.Sys_UI.lastItemSideRH = rh; if (World.invP1.hasHardware & HW_BST) { World.invP1.hwVersSetting[HW_BST_IDX] = (u8)vmax(1,(i32)World.invP1.hwVers[HW_BST_IDX]-1); play_wav("hud/tab",AppliedFXVol(1.0f),(V3){0},false); } return;
         case UI_ID_LMFD_ITEM_TIMER_SLIDER: World.Sys_UI.lastItemSideRH=rh; ConsumableSetTimer(((float)World.cursorPos_x-UIC(MID(rh,ITEM_TIMER_SLIDER)).min.x)/224.0f); return;
-        case UI_ID_LMFD_WEAPON_ICON: UI_WeaponIconClick(); return;
-        case UI_ID_LMFD_WEAPON_RELOAD: ReloadSecret(false); return;
-        case UI_ID_LMFD_WEAPON_UNLOAD: Unload(false); return;
-        case UI_ID_LMFD_WEAPON_OVERLOAD: UI_WeaponIconClick(); return;
-        case UI_ID_LMFD_WEAPON_ENERGY_SLIDER: UI_WeaponEnergySliderSet(rh); return;
-        case UI_ID_LMFD_ELEV_BUTTON_0 ... UI_ID_LMFD_ELEV_BUTTON_7: UI_ElevFloorClick((int)(id-UI_ID_LMFD_ELEV_BUTTON_0)); return;
-        case UI_ID_LMFD_ELEV_CLOSE: UI_ElevClose(); return;
-        case UI_ID_LMFD_KEYCODE_0 ... UI_ID_LMFD_KEYCODE_11: { int k = (int)(id-UI_ID_LMFD_KEYCODE_0); World.Sys_UI.mouseClickHeldOverGUI=true; if (k<0||k>11) return; KeycodeKeypress(k); return; }
-        case UI_ID_LMFD_KEYCODE_CLOSE: UI_KeycodeClose(); return;
-        case UI_ID_LMFD_AUDIOLOG_IMAGE: UI_AudioLogClick(); return;
-        case UI_ID_LMFD_PUZZLE_CELL_0 ... UI_ID_LMFD_PUZZLE_CELL_34: UI_PuzzleGridCell((int)(id-UI_ID_LMFD_PUZZLE_CELL_0)); return;
-        case UI_ID_LMFD_PUZZLE_CLOSE: UI_PuzzleGridClose(); return;
-        case UI_ID_LMFD_WIRE_NODE_0 ... UI_ID_LMFD_WIRE_NODE_13: UI_WireNodeClick((int)(id-UI_ID_LMFD_WIRE_NODE_0)); return;
-        case UI_ID_LMFD_WIRE_CLOSE: UI_WireClose(); return;
-        case UI_ID_LMFD_SYS_CLOSE: UI_SysAnalyzerClose(); return;
-        case UI_ID_LMFD_MINIGAME_0 ... UI_ID_LMFD_MINIGAME_8: UI_MinigameStart(rh,(int)(id-UI_ID_LMFD_MINIGAME_0)); return;
+        case UI_ID_LMFD_WEAPON_ICON: UI_WeaponIconClick(); return;                  case UI_ID_LMFD_WEAPON_RELOAD: ReloadSecret(false); return;                 case UI_ID_LMFD_WEAPON_UNLOAD: Unload(false); return;
+        case UI_ID_LMFD_WEAPON_OVERLOAD: UI_WeaponIconClick(); return;              case UI_ID_LMFD_WEAPON_ENERGY_SLIDER: UI_WeaponEnergySliderSet(rh); return; case UI_ID_LMFD_ELEV_BUTTON_0 ... UI_ID_LMFD_ELEV_BUTTON_7: UI_ElevFloorClick((int)(id-UI_ID_LMFD_ELEV_BUTTON_0)); return;
+        case UI_ID_LMFD_ELEV_CLOSE: UI_ElevClose(); return;                         case UI_ID_LMFD_WIRE_CLOSE: UI_WireClose(); return;                         case UI_ID_LMFD_KEYCODE_0 ... UI_ID_LMFD_KEYCODE_11: { int k = (int)(id-UI_ID_LMFD_KEYCODE_0); World.Sys_UI.mouseClickHeldOverGUI=true; if (k<0||k>11) return; KeycodeKeypress(k); return; }
+        case UI_ID_LMFD_KEYCODE_CLOSE: UI_KeycodeClose(); return;                   case UI_ID_LMFD_AUDIOLOG_IMAGE: UI_AudioLogClick(); return;                 case UI_ID_LMFD_PUZZLE_CELL_0 ... UI_ID_LMFD_PUZZLE_CELL_34: UI_PuzzleGridCell((int)(id-UI_ID_LMFD_PUZZLE_CELL_0)); return;
+        case UI_ID_LMFD_PUZZLE_CLOSE: UI_PuzzleGridClose(); return;                 case UI_ID_LMFD_SYS_CLOSE: UI_SysAnalyzerClose(); return;                   case UI_ID_LMFD_WIRE_NODE_0 ... UI_ID_LMFD_WIRE_NODE_13: UI_WireNodeClick((int)(id-UI_ID_LMFD_WIRE_NODE_0)); return;
+        case UI_ID_LMFD_MINIGAME_BACK: UI_MinigameBack(rh); return;                 case UI_ID_LMFD_SEARCH_CLOSE: CloseSearch(); return;                        case UI_ID_LMFD_MINIGAME_0 ... UI_ID_LMFD_MINIGAME_8: UI_MinigameStart(rh,(int)(id-UI_ID_LMFD_MINIGAME_0)); return;
         case UI_ID_LMFD_MINIGAME_VIEW: UI_MinigameInput(rh,World.cursorPos_x,World.cursorPos_y); return;
-        case UI_ID_LMFD_MINIGAME_BACK: UI_MinigameBack(rh); return;
         case UI_ID_LMFD_MINIGAME_CLOSE: World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.mg_running[rh?1:0]) World.Sys_UI.mg_running[rh?1:0]=false; World.Sys_UI.mg_current=-1; MFD_CloseData(); return;
-        case UI_ID_LMFD_SEARCH_ICON_0 ... UI_ID_LMFD_SEARCH_ICON_3: World.Sys_UI.lastSearchSideRH=rh; SearchTakeSlot((u8)(id-UI_ID_LMFD_SEARCH_ICON_0)); return;
-        case UI_ID_LMFD_SEARCH_CLOSE: CloseSearch(); return;
-        default: return; /*Decoration, labels and panel backdrops: they block the pointer but have no action*/
+        case UI_ID_LMFD_SEARCH_ICON_0 ... UI_ID_LMFD_SEARCH_ICON_3: World.Sys_UI.lastSearchSideRH=rh; SearchTakeSlot((u8)(id-UI_ID_LMFD_SEARCH_ICON_0)); return;    default: return; /*Decoration, labels and panel backdrops: they block the pointer but have no action*/
     }
 }
 static bool UI_DispatchRegions() {
     for (u32 id=UI_ID_NONE+1;id<UI_ID_COUNT;++id) {
-        if (!UIC(id).active) continue; u8 c = 0u; if (id >= UI_ID_COUNT || id == 0) continue; if (!UIOver(id)) continue; bool l = Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed, r=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed; if (!l && !r) continue;
-        Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed = Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed = false; World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true; float* t = l ? &World.uiComponents[id].lastLMB : &World.uiComponents[id].lastRMB; u8 dbl = (*t > 0.0f && (World.pauseRelativeTime - *t) <= 0.5f) ? 4u : 0u; *t = dbl ? 0.0f : World.pauseRelativeTime; c = (u8)((l ? 1u : 2u) | dbl); if (!c) continue;
+        if (!UIC(id).active) continue; u8 c = 0u; if (id >= UI_ID_COUNT || id == 0) continue; if (!UIOver(id)) continue; bool l = Sys_Input.mouseButtons[LMB].pressed, r=Sys_Input.mouseButtons[RMB].pressed; if (!l && !r) continue;
+        Sys_Input.mouseButtons[LMB].pressed = Sys_Input.mouseButtons[RMB].pressed = false; World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true; float* t = l ? &World.uiComponents[id].lastLMB : &World.uiComponents[id].lastRMB; u8 dbl = (*t > 0.0f && (World.pauseRelativeTime - *t) <= 0.5f) ? 4u : 0u; *t = dbl ? 0.0f : World.pauseRelativeTime; c = (u8)((l ? 1u : 2u) | dbl); if (!c) continue;
         UI_OnRegionClick(id,c); return true;
     } return false;
 }
@@ -1075,16 +1045,15 @@ u16 GetItemFrobTexture(u16 index) {
                                      [388]=762,[389]=850,[390]=610,[391]=621,[392]=609,[393]=610,[394]=635,[395]=760,[396]=632,[397]=608,[398]=624,[399]=872,[400]=862,[401]=872,[402]=860,[403]=861,[404]=859,[417]=760};
     return index < 418 ? frobTex[index] : MAXTEX;
 }
-static u16 CursorClickTexture() { return (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down) ? 2147 : 1261; }
-u16 GetCursorTexture() { if (World.paused || World.menuActive) { return CursorClickTexture(); } if (World.invP1.holdingObject) { u16 t = GetItemFrobTexture(World.invP1.heldObjIdx); return t < MAXTEX ? t : 1250; } if (World.uiIsBlocking || World.Sys_UI.mouseClickHeldOverGUI) { return CursorClickTexture(); } return GetCrosshairTexture(); }
+u16 GetCursorTexture() { if (World.paused || World.menuActive) { return (Sys_Input.mouseButtons[LMB].down || Sys_Input.mouseButtons[RMB].down) ? 2147 : 1261; } if (World.invP1.holdingObject) { u16 t = GetItemFrobTexture(World.invP1.heldObjIdx); return t < MAXTEX ? t : 1250; } if (World.uiIsBlocking || World.Sys_UI.mouseClickHeldOverGUI) { return (Sys_Input.mouseButtons[LMB].down || Sys_Input.mouseButtons[RMB].down) ? 2147 : 1261; } return GetCrosshairTexture(); }
 static void RenderUI() {
     drawCallsNormal = drawCalls; UiClickGate(); for (u32 i=1;i<UI_ID_COUNT;++i) { UIC(i).active = false; }
     if (!EditSelIsActive() && !EditLightSelIsActive()) { editFieldEditing = false; }
     if (World.creditsActive) {
         RenderUIImage(0,0, 1366,768, 0);/*Video blackground*/
         if (Sys_Input.keyStates[KEY_ESCAPE].pressed) { World.creditsActive=false; PlayMenuMusic(); }
-        else if (!uiClickBlocked && Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed && World.creditsPageIndex < 22) { uiClickBlocked = uiClickLock = true; ++World.creditsPageIndex; if (World.creditsPageIndex == 1 && !World.gameFinished) { ++World.creditsPageIndex; } }
-        else if (!uiClickBlocked && Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed && World.creditsPageIndex>0) { uiClickBlocked = uiClickLock = true; --World.creditsPageIndex; }
+        else if (!uiClickBlocked && Sys_Input.mouseButtons[LMB].pressed && World.creditsPageIndex < 22) { uiClickBlocked = uiClickLock = true; ++World.creditsPageIndex; if (World.creditsPageIndex == 1 && !World.gameFinished) { ++World.creditsPageIndex; } }
+        else if (!uiClickBlocked && Sys_Input.mouseButtons[RMB].pressed && World.creditsPageIndex>0) { uiClickBlocked = uiClickLock = true; --World.creditsPageIndex; }
         if (World.creditsPageIndex>=22) { World.creditsActive=false; MenuGoBack(); return; } if (World.creditsPageIndex==1) { CreditsStats(); RenderTextL(208,72,T_WHITE,FONT_NORMAL,1.0f,(const char*)&creditStats); } else { RenderTextL(208,72,T_WHITE,FONT_NORMAL,1.0f,creditPages[World.creditsPageIndex]); } return;
     }
     if (World.menuActive) { RenderMenu(); }
@@ -1158,7 +1127,7 @@ static void RenderUI() {
                         if (World.invP1.patchActive & PATCH_BERSERK) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[524]:" "); px += 42; first = false; }
                         if (World.invP1.patchActive & PATCH_REFLEX) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[525]:" "); px += 36; first = false; }
                         if (World.invP1.patchActive & PATCH_DETOX) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[530]:" "); px += 36; first = false; }
-                        y+=16;
+                        y += 16;
                     }
                     RenderTextL(4,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[531]); /*Fatigue:*/
                     if (World.invP1.fatigue >= 80.0f) RenderTextL(120,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[532]); /*High!*/
@@ -1173,17 +1142,17 @@ static void RenderUI() {
             RenderUIImage(966,84,400,600,1025); RenderTextL(982,104,T_YELLOW,FONT_NORMAL,1.0f,isObj ? "EDIT OBJECT #%u" : "EDIT LIGHT #%u",sel); char v[40];
             if (isObj) { Entity* e = &World.instances[sel]; sFormat(v,40,"%u",e->index); RenderTextL(982,132,T_GREEN,FONT_NORMAL,1.0f,"const index"); } else { Light* L = &World.lights[sel]; sFormat(v,40,"0x%x %s",L->lflags,(L->lflags & LIGHTON) ? "on" : "off"); RenderTextL(982,132,T_GREEN,FONT_NORMAL,1.0f,"flags"); }
             RenderTextL(1108,132,T_GREEN,FONT_NORMAL,1.0f,"%s",v);
-            bool caretOn = ((u32)(get_time() * 2.0f) & 1) != 0; const int last = isObj ? EF_LAST : LF_LAST;
-            for (int i = 0; i < last; ++i) {
+            bool caretOn = ((u32)(get_time() * 2.0f) & 1) != 0; const i32 last = isObj ? EF_LAST : LF_LAST;
+            for (i32 i = 0; i < last; ++i) {
                 u8 slot = (u8)i; i16 y = efRowY[i]; char v2[40]; if (isObj) { EditFieldValueText(slot,sel,v2,40); } else { LightFieldValueText(slot,sel,v2,40); }
                 bool editingThis = editFieldEditing && editFieldSlot == slot; RenderTextL(982, y, editingThis ? T_RED : T_GREEN, FONT_NORMAL, 1.0f, "%s", isObj ? efRowLabel[i] : lfRowLabel[i]);
                 if (editingThis) { char buf[44]; sFormat(buf,44,"%s%s",editFieldBuffer,caretOn ? "|" : ""); RenderTextL(1108,y,T_RED,FONT_NORMAL,1.0f,"%s",buf); } else { float w = MeasureLineAdvance(v,FONT_NORMAL); UIR(UI_ID_CMFD_EDIT_ROW_0 + i,1108,y,(i16)w,26); bool h = UIOver(UI_ID_CMFD_EDIT_ROW_0 + i); u32 c = h ? T_YELLOW : (isObj ? (i < EF_TEX ? T_WHITE : T_GREEN) : T_WHITE); RenderTextL(1108,y,c,FONT_NORMAL,1.0f,"%s",v); }
             }
             if (editFieldEditing && Sys_Input.scrollDelta != 0.0) { EditFieldStep((float)Sys_Input.scrollDelta); Sys_Input.scrollDelta = 0.0; } 
-            if (isObj) { if (sel == World.weaponVModelIndex) { Entity* e = &World.instances[sel]; int wep16 = Get16WeaponIndexFromConstIndex(e->index); if (wep16 >= 0 && wep16 < 16) { V3 offs = vWepOfs[wep16]; offs.y += wfx.reloadContainerPos.y; RenderTextL(982,580,T_GREEN,FONT_NORMAL,1.0f,"vm offset"); RenderTextL(1108,580,T_YELLOW,FONT_NORMAL,1.0f,"%.5f %.5f %.5f",(double)offs.x,(double)offs.y,(double)offs.z); } } }
+            if (isObj) { if (sel == World.weaponVModelIndex) { Entity* e = &World.instances[sel]; i32 wep16 = Get16WeaponIndexFromConstIndex(e->index); if (wep16 >= 0 && wep16 < 16) { V3 offs = vWepOfs[wep16]; offs.y += wfx.reloadContainerPos.y; RenderTextL(982,580,T_GREEN,FONT_NORMAL,1.0f,"vm offset"); RenderTextL(1108,580,T_YELLOW,FONT_NORMAL,1.0f,"%.5f %.5f %.5f",(double)offs.x,(double)offs.y,(double)offs.z); } } }
             else {
                 Light* L = &World.lights[sel]; RenderTextL(982,596,T_GREEN,FONT_NORMAL,1.0f,"type"); UIRImg(UI_ID_CMFD_EDIT_LIGHT_TYPE,1108,596,120,28,1087); bool hov = UIOver(UI_ID_CMFD_EDIT_LIGHT_TYPE); RenderTextC(1108 + 60,602,hov ? T_YELLOW : T_GREEN,FONT_NORMAL,0.8f,"%s",(L->lflags & LSPOT) ? "spot" : "point"); static const char* lfDirLbl[6] = {"N","E","S","W","Up","Dn"};
-                for (int d = 0; d < 6; ++d) { i16 bx = (i16)(982 + d * 36); u32 bid = UI_ID_CMFD_EDIT_LIGHT_DIR_N + d; UIRImg(bid,bx,644,28,28,1087); hov = UIOver(bid); RenderTextC(bx + 14,650,hov ? T_YELLOW : (LightDirIs((u8)d) ? T_YELLOW : T_GREEN),FONT_NORMAL,0.8f,"%s",lfDirLbl[d]); }
+                for (i32 d = 0; d < 6; ++d) { i16 bx = (i16)(982 + d * 36); u32 bid = UI_ID_CMFD_EDIT_LIGHT_DIR_N + d; UIRImg(bid,bx,644,28,28,1087); hov = UIOver(bid); RenderTextC(bx + 14,650,hov ? T_YELLOW : (LightDirIs((u8)d) ? T_YELLOW : T_GREEN),FONT_NORMAL,0.8f,"%s",lfDirLbl[d]); }
             }
         }
     }

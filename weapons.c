@@ -59,6 +59,7 @@ static const struct { u16 prefab; u8 type; } impactEffectTypes[] = { { 721, 13 }
                                                                      { 740, 24 }, { 740, 25 }, { 740, 26 }, { 740, 27 }, { 740, 28 },/*ionhit: Shockwave,CenterSpatter,root,BlueSparksSmall,CenterSpatter2*/ };
 bool SpawnImpPart(u16 prefab, V3 pos, V3 normal) {
     u16 type = ImpactParticleType(prefab); const PSysDef* preset = PSysTypeGet(type); if (!preset) { return false; }
+    if (V3_dot(normal,V3_AsubB(pos,World.position[PLAYER1])) > 0.0f) { normal = V3_ScaleByF(normal,-1.0f); }
     PSysDef def = *preset; def.pos = V3Add(pos,V3_ScaleByF(normal,wfx.hitOffset)); def.rotation = QuatFromToRotation((V3){0,1,0},normal); PSysAddInternal(&def,U16_MAX,U16_MAX);
     for (u32 i=0;i<sizeof(impactEffectTypes)/sizeof(*impactEffectTypes);++i) { if (impactEffectTypes[i].prefab != prefab || impactEffectTypes[i].type == type) { continue; } const PSysDef* cd = PSysTypeGet(impactEffectTypes[i].type); if (!cd) { continue; } PSysDef cdef = *cd; cdef.pos = def.pos; cdef.rotation = def.rotation; PSysAddInternal(&cdef,U16_MAX,U16_MAX); }
     return true;
@@ -77,6 +78,7 @@ static const struct { u16 proj; u8 type; } projectileImpactTypes[] = { { 481, 17
 static u16 ProjectileImpactParticleType(u16 projectile) { for (u32 i = 0; i < sizeof(projectileImpactTypes)/sizeof(*projectileImpactTypes); ++i) { if (projectileImpactTypes[i].proj == projectile) return projectileImpactTypes[i].type; } return U16_MAX; }
 void SpawnProjectileImpactParticles(u16 projectile,V3 pos,V3 normal) {
     u16 type = ProjectileImpactParticleType(projectile); const PSysDef* preset = PSysTypeGet(type); if(!preset)return;
+    if (V3_dot(normal,V3_AsubB(pos,World.position[PLAYER1])) > 0.0f) { normal = V3_ScaleByF(normal,-1.0f); }
     PSysDef def = *preset; def.pos = V3Add(pos,V3_ScaleByF(normal,wfx.hitOffset)); def.rotation = QuatFromToRotation((V3){0,1,0},normal); PSysAddInternal(&def,U16_MAX,U16_MAX);
     for (u32 i=0;i<sizeof(projectileImpactTypes)/sizeof(*projectileImpactTypes);++i) { if (projectileImpactTypes[i].proj == projectile && projectileImpactTypes[i].type != type) { const PSysDef* cd=PSysTypeGet(projectileImpactTypes[i].type); if (cd) { PSysDef cdef = *cd; cdef.pos = def.pos; cdef.rotation = def.rotation; PSysAddInternal(&cdef,U16_MAX,U16_MAX); } } }
 }
@@ -92,8 +94,8 @@ void CreateStandardImpactMarks(i32 wep16) {
     World.rotation[markInst] = quat_multiply(QuatFromToRotation((V3){0.0f,1.0f,0.0f},V3_ScaleByF(wfx.tempHit.normal,-1.0f)),QuatEulerZ((float)random_range_u32(0u,3u) * 90.0f));
     if (hole >= 518 && hole <= 523) World.scale[markInst] = V3_ScaleByF((V3){1.0f,1.0f,1.0f}, bulletHoleSize[hole - 518] / 1.28f);
 }
-void CreateStandardImpactEffects(){if(wfx.tempHitEnt==0xFFFF)return;u16 ent=wfx.tempHitEnt;if(ent>=World.instCount)return;u16 prefab=GetImpactType(ent);if(prefab==0||prefab>=MAX_ENTS)prefab=731;V3 pos=wfx.tempHit.hit?V3Add(wfx.tempHit.point,V3_ScaleByF(wfx.tempHit.normal,wfx.hitOffset)):World.position[ent];V3 n=wfx.tempHit.hit?wfx.tempHit.normal:(V3){0,1,0};if(SpawnImpPart(prefab,pos,n))return;u16 fx=SpawnDynamicObject(prefab);if(EntIdxIsValid(fx)){World.position[fx]=pos;World.rotation[fx]=QuatFromToRotation((V3){0,1,0},n);}}
-static void CreateBeamImpactEffects(i32 wep16) { u16 imp = 731u;/*Cyan sparq*/ if (wep16 == 1) { imp = 739u;/*Red laser (blaster)*/ } else if (wep16 == 4) { imp = 740u;/*Yellow laser (ion)*/ } SpawnImpPart(imp,wfx.tempHit.point,wfx.tempHit.normal); u16 fx = SpawnDynamicObject(imp); World.position[fx] = wfx.tempHit.point; World.rotation[fx] = QuatFromToRotation((V3){0,1,0},wfx.tempHit.normal); }
+void CreateStandardImpactEffects(){if(wfx.tempHitEnt==0xFFFF)return;u16 ent=wfx.tempHitEnt;if(ent>=World.instCount)return;u16 prefab=GetImpactType(ent);if(prefab==0||prefab>=MAX_ENTS)prefab=731;V3 n=wfx.tempHit.hit?wfx.tempHit.normal:(V3){0,1,0};V3 hp=wfx.tempHit.hit?wfx.tempHit.point:World.position[ent];if(V3_dot(n,V3_AsubB(hp,World.position[PLAYER1]))>0.0f){n=V3_ScaleByF(n,-1.0f);}V3 pos=V3Add(hp,V3_ScaleByF(n,wfx.hitOffset));if(SpawnImpPart(prefab,pos,n))return;u16 fx=SpawnDynamicObject(prefab);if(EntIdxIsValid(fx)){World.position[fx]=pos;World.rotation[fx]=QuatFromToRotation((V3){0,1,0},n);}}
+static void CreateBeamImpactEffects(i32 wep16) { u16 imp = 731u;/*Cyan sparq*/ if (wep16 == 1) { imp = 739u;/*Red laser (blaster)*/ } else if (wep16 == 4) { imp = 740u;/*Yellow laser (ion)*/ } V3 n = wfx.tempHit.normal; if (V3_dot(n,V3_AsubB(wfx.tempHit.point,World.position[PLAYER1])) > 0.0f) { n = V3_ScaleByF(n,-1.0f); } SpawnImpPart(imp,wfx.tempHit.point,n); u16 fx = SpawnDynamicObject(imp); World.position[fx] = wfx.tempHit.point; World.rotation[fx] = QuatFromToRotation((V3){0,1,0},n); }
 static void CreateBeamEffects(i32 wep16) { Color c = (wep16 == 1) ? (Color){1.f,0.18f,0.12f,1.f} : (wep16 == 4) ? (Color){1.f,0.9f,0.15f,1.f} : (Color){0.3f,1.f,1.f,1.f}; V3 p = World.position[PLAYER1]; p.y -= 0.2f; SpawnBeamTrail(166,p,wfx.tempHit.point,c); }
 static float DamageForPower(i32 w) { if (World.invP1.overloadEnabled) { return damageOverloadForWeapon[w]; } float d = dmgForWep[w],D = dmgForWep2[w],e = energyDrainLowForWeapon[w],E = energyDrainHiForWeapon[w]; float pct = World.invP1.weaponEnergySetting[w]*0.01f; return (pct*(D/E - d/e) + 3.0f)*(pct*(E - e) + e); } // Slope-of-slopes curve: interpolates damage/energy ratio across energy setting, then scales by interpolated energy drain itself.
 void HitScanFire(i32 wep16) {
@@ -112,12 +114,12 @@ void MeleeHitUpdate() {
     if (wfx.pendingMeleeIsRapier) { dd.attackType = Att_MlEg; if (World.invP1.energy < 4.0f) dd.damage = dmgForWep[6]; /*low-energy rapier same dmg as a lead pipe*/}
     dd.damage = GetDamageTakeAmount(&dd); wfx.tempHitEnt = targ;
     CreateStandardImpactEffects(); if (IdxIsGeometry(World.instances[targ].index)) CreateStandardImpactMarks(wep16);
+    dd.impactVelocity = 80.0f + dd.damage;
+    if ((!dd.isOtherNPC || wep16==12) && (!wfx.pendingMeleeIsRapier || World.invP1.energy >= 4.0f)) { ApplyImpactForceWithSound(targ,dd.impactVelocity,dd.attacknormal,wfx.tempHit.hit ? wfx.tempHit.point : World.position[targ]); }
     if(!IsDamageable(&World.instances[targ])){
         if (!wfx.pendingMeleeSilent) { if (!wfx.pendingMeleeIsRapier) { FootStepType fstp = GetFootstepTypeForPrefab(World.instances[targ].index); play_wav(FsSound(fstp,FSK_LAND),AppliedFXVol(1.0f),World.position[PLAYER1],false); play_wav(wfx.pendingMeleeHitSnd,AppliedFXVol(0.65f),World.position[PLAYER1],false); }
         else { play_wav(wfx.pendingMeleeHitSnd,AppliedFXVol(1.0f),World.position[PLAYER1],false); } World.invP1.makingNoise = true; World.invP1.noiseFinished = World.pauseRelativeTime + 0.5f; } return;
     }
-    dd.impactVelocity = 80.0f + dd.damage;
-    if ((!dd.isOtherNPC || wep16==12) && (!wfx.pendingMeleeIsRapier || World.invP1.energy >= 4.0f)) { ApplyImpactForceWithSound(targ,dd.impactVelocity,dd.attacknormal,World.position[targ]); }
     float dmgFinal = TakeDamage(targ,dd); if (dmgFinal < 0.0f) {dmgFinal = 0.0f;} CreateTargetIDInstance(dmgFinal,targ,-1.0f);
     if (!wfx.pendingMeleeSilent) {
         World.invP1.makingNoise = true; World.invP1.noiseFinished=World.pauseRelativeTime + 0.5f; BloodType bt = World.instances[targ].bloodType;

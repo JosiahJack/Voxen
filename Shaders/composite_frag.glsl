@@ -124,6 +124,7 @@ void main() {
             } if (grayscaleEnabled > 0){skyColor = Grayscale(skyColor);} vec4 uiSkySample = texture(uiImage,texCoordUsed); FragColor = vec4(mix((color.rgb * max(0.1,color.a)) + skyColor, uiSkySample.rgb, uiSkySample.a), 1.0); // Add window alpha weighted color tint, then the UI on top (sky pixels returned here before ever reaching the UI mix at the end of main, so the UI vanished over the skybox)
             if (healFlashAlpha > 0.9) FragColor.rgb += vec3(0.98823535*.75,0.5803922*.75,0.5647059*.75);
             else if (healFlashAlpha > 0.1) FragColor.rgb += vec3(0.1,0.1,0.46);
+            return;
         }
     }
     vec2 ssRatio = vec2(screenWidth/SSR_RES, screenHeight/SSR_RES); ivec2 pixel = ivec2(texCoordUsed * ssRatio);
