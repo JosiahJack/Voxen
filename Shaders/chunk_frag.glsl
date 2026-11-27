@@ -1,18 +1,16 @@
 // chunk_frag.glsl: Generic shader for all world objects
 #extension GL_EXT_gpu_shader5 : require
 in vec2 TexCoord; in vec3 Normal; in vec3 FragPos;
-layout(location=0) uniform uint instanceIndex; // start vert shader uniforms
+layout(location=0) uniform uint instanceIndex; /*Used by vert shader*/
 layout(location=1) uniform uint normInstanceIndex;
 layout(location=2) uniform mat4 viewProjection; /* Used by vert shader
 layout(location=3) some weird
 layout(location=4) padding apparently, so say some docs anyhow
 layout(location=5) */
-layout(location=6) uniform uint screenWidth;
-layout(location=7) uniform uint screenHeight;
 layout(location=8) uniform vec2 worldMin;
 layout(location=9) uniform float heat;
 layout(location=10) uniform vec3 camPos;
-layout(location=11) uniform uint shadSizeSqd;
+layout(location=11) uniform uint shadSizeSqd; // SHADOW_MAP_SIZE * SHADOW_MAP_SIZE constant
 layout(location=12) uniform vec3 fogColor;
 layout(location=13) uniform uint useStrengthMod;
 layout(location=14) uniform uint reflectionsEnabled;
@@ -23,8 +21,8 @@ layout(location=19) uniform uint glowIndex;
 layout(location=20) uniform uint specIndex;
 layout(location=21) uniform uint shadowMapSize;
 layout(location=22) uniform float shadowMapSizeF;
-layout(location=23) uniform uint lightCount;
-layout(location=24) uniform uint maxLightsPerVoxel;
+layout(location=23) uniform uint lightCount; // LIGHT_CNT constant
+layout(location=24) uniform uint maxLightsPerVoxel; // MAX_LIGHTS_PER_VOXEL constant
 layout(location=25) uniform uint constIndex;
 layout(location=26) uniform uint grayscaleEnabled;
 layout(location=27) uniform float volume;

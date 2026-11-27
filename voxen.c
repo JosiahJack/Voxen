@@ -30,10 +30,9 @@ SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on f
     .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,.CurrentMonitor=0u, .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,.Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u,.InvCybLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=4u};/*Ratio is (1 / SSR_RES) * res*/
 InputSystem Sys_Input; TextSystem Sys_Text; CheatsSystem Cheats = {.god=false, .noclip=false, .showLocation=true, .showFPS=true, .editMode=false, .showPhys=false, .stepmode=false};
 u16 editModeSelection = U16_MAX, editModeLightSelection = U16_MAX, editModeTestEntityDefinition = 343, lastSpawned = U16_MAX;
-Color textColors[] = {{1.000000000f,1.000000000f,1.000000000f,1.0f}, /* 0 White T_WHITE*/                             {0.890196078f,0.874509804f,0.000000000f,1.0f}, /* 1 Yellow T_YELLOW*/                              {0.623529412f,0.611764706f,0.000000000f,1.0f}, /* 2 Dark Yellow (Yellow * 0.7f) T_DARK_YELLOW*/ {0.372549020f,0.654901961f,0.168627451f,1.0f}, /* 3 Green T_GREEN*/ {0.917647059f,0.137254902f,0.168627451f,1.0f}, /* 4 Red T_RED*/
-                      {1.000000000f,0.498039216f,0.000000000f,1.0f}, /* 5 Orange T_ORANGE*/                           {0.674509804f,0.058823529f,0.070588235f,1.0f}, /* 6 StopD Red T_STOPD_RED*/                        {0.941176471f,0.282352941f,0.298039216f,1.0f}, /* 7 StopD Red Highlight T_STOPD_RED_HIGHLIGHT*/ {0.909803922f,0.203921569f,0.219607843f,1.0f}, /* 8 StopD Red Pause Title T_STOPD_RED_PAUSETITLE*/
-                      {0.470588235f,0.721568627f,0.172549020f,1.0f}, /* 9 Green Menu Title T_GREEN_MENU*/             {0.137254902f,0.356862745f,0.109803922f,1.0f}, /* 10 Green Menu Title Shadow T_GREEN_MENU_SHADOW*/ {0.239215686f,0.466666667f,0.129411765f,1.0f}, /* 11 Green Menu Title Glow T_GREEN_MENU_GLOW*/  {0.392156863f,0.031372549f,0.039215686f,1.0f}, /* 12 Red Menu Text Dark T_RED_MENU*/
-                      {0.594339600f,0.232689545f,0.232689545f,1.0f}, /* 13 Intro/Outro Subtitle #973B3B T_VIDEOTEXT*/ {0.000000000f,0.039215688f,0.835294200f,1.0f}, /* 14 PuzzleWire actualColorBlue T_BLUE*/           {0.546864600f,0.152723400f,0.830188700f,1.0f}  /* 15 PuzzleWire actualColorPurple T_PURPLE*/ };
+Color textColors[] = {{1.0f,1.0f,1.0f,1.0f}/*0 White*/,{0.890196078f,0.874509804f,0.0f,1.0f}/*1 Yellow*/,{0.623529412f,0.611764706f,0.0f,1.0f}/*2 Dk Yellow*/,{0.372549020f,0.654901961f,0.168627451f,1.0f}/*3 Green*/,{0.917647059f,0.137254902f,0.168627451f,1.0f}/*4 Red*/,{1.0f,0.498039216f,0.0f,1.0f}/*5 Orange*/,{0.674509804f,0.058823529f,0.070588235f,1.0f}/*6 Red*/,{0.941176471f,0.282352941f,0.298039216f,1.0f}/*7 Red Highlight*/,
+                      {0.909803922f,0.203921569f,0.219607843f,1.0f}/*8 Red Pause Title*/,{0.470588235f,0.721568627f,0.172549020f,1.0f}/*9 Green Menu Title*/,{0.137254902f,0.356862745f,0.109803922f,1.0f}/*10 Green Menu Title Shadow*/,{0.239215686f,0.466666667f,0.129411765f,1.0f}/*11 Green Menu Title Glow*/,{0.392156863f,0.031372549f,0.039215686f,1.0f}/*12 Red Menu Text Dark0*/,{0.594339600f,0.232689545f,0.232689545f,1.0f}/*13 Intro/Outro Subtitle*/,
+                      {0.000000000f,0.039215688f,0.835294200f,1.0f}/*14 Blue*/,{0.546864600f,0.152723400f,0.830188700f,1.0f}/* 15 Purple*/ };
 // Wireline Rendering
 typedef struct { float x,y,z,r,g,b,a; } WireVrt; static WireVrt* lineVerts; static WireVrt* wireVerts;
 static void EmitWireQuad(V3 c0, V3 c1, V3 c2, V3 c3, Color c) { const V3 p[6] = {c0,c1,c2, c0,c2,c3}; for (int v = 0; v < 6; ++v) { WireVrt* w = &wireVerts[wireVertCount++]; w->x = p[v].x; w->y = p[v].y; w->z = p[v].z; w->r = c.r; w->g = c.g; w->b = c.b; w->a = c.a; } }
@@ -884,7 +883,6 @@ void UpdateScreenSize(i32 width, i32 height) {
     u16 w = Sys_Settings.ScreenWidth = vmax(vmin((u16)width,7680u),320u), h = Sys_Settings.ScreenHeight = vmax(vmin((u16)height,4320u),200u); /*Cap at minimum Quake resolution and maximum 8k.*/
     glViewport(0,0,w,h);
     glUseProgram(imageBlitSP); glUniform1ui(2,w); glUniform1ui(3,h); glUniform1i(26,Sys_Settings.SSR_RES);
-    glUseProgram(chunkSP);     glUniform1ui(6,w); glUniform1ui(7,h);
     glUseProgram(ssrSP);       glUniform1ui(0,w / Sys_Settings.SSR_RES); glUniform1ui(1,h / Sys_Settings.SSR_RES); glUniform1i(2,Sys_Settings.SSR_RES);
     glUseProgram(rtSP);        glUniform1ui(0,w / Sys_Settings.SSR_RES); glUniform1ui(1,h / Sys_Settings.SSR_RES); glUniform1i(2,Sys_Settings.SSR_RES);
     GenerateAndBindTexture(&inputImageID,                       GL_RGBA8,                       w,                       h,                     GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL); /*Lit Raster*/
@@ -1113,7 +1111,7 @@ INLINE bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &World.insta
 static u32 curIboDrawOfs = 0; static bool mdlFallbackLogged[MAX_MDLS];
 static u16 MdlBind(u16 modelType) {
     if (modelType >= mdlsCnt || mdlVboOfs[modelType] == 0xFFFFFFFFu) { if (modelType < mdlsCnt && (modelVertexCounts[modelType] == 0)) { curIboDrawOfs = 0; return modelType; } if (modelType < MAX_MDLS && !mdlFallbackLogged[modelType]) { mdlFallbackLogged[modelType] = true; DualLogError("Model %u not resident!\n",modelType); } modelType = 178; if (modelType >= mdlsCnt || mdlVboOfs[modelType] == 0xFFFFFFFFu) { curIboDrawOfs = 0; return modelType; } }
-    curIboDrawOfs = mdlIboOfs[modelType]; glBindVertexBuffer(0, modelVBO, (intptr_t)mdlVboOfs[modelType], VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, modelIBO);
+    curIboDrawOfs = mdlIboOfs[modelType]; glBindVertexBuffer(0,modelVBO,(intptr_t)mdlVboOfs[modelType],VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,modelIBO);
     return modelType;
 }
 INLINE u16 GetAndBindModel(u16 i, u16 currentModelType) { glUniform1ui(0,i); u16 modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && World.instances[i].lodIndex < mdlsCnt ? World.instances[i].lodIndex : World.instances[i].modelIndex; if (currentModelType == modelType) return currentModelType; return MdlBind(modelType); }
@@ -1255,7 +1253,6 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps() {
                 u16 faceCasters = 0;
                 for (u16 j=0;j<nearbyMeshCount;++j) { if (localMeshes[j].faceMask & faceBit) { ++faceCasters; } }
                 if (faceCasters == 0) { continue; }
-                glUniform1ui(2, face);
                 glUniformMatrix4fv(1, 1, GL_FALSE, (float*)lightViewProj[slot][face]);
                 glUniform1ui(7, slotOff + (face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE));
                 for (u16 j=0;j<nearbyMeshCount;++j) {
@@ -1346,7 +1343,7 @@ void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT,
         if(e->camView < camViewCount) { glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D,camViewTextures[e->camView]); glUniform2ui(28,camViews[e->camView].width,camViews[e->camView].height); }
         if((*curN) != (norm)) { *curN=norm; glUniform1ui( 1,(u32)norm); }
         if((*curT) != ( tex)) { *curT= tex; glUniform1ui(18,(u32)tex ); }
-        if((*curG) != (glow) || glow == 0) { *curG=glow; glUniform1ui(19,(u32)glow); }
+        if((*curG) != (glow)) { *curG=glow; glUniform1ui(19,(u32)glow); }
         if((*curS) != (spec)) { *curS=spec; glUniform1ui(20,(u32)spec); }
         *curM = GetAndBindModel(i,*curM); u32 vc = modelTriangleCounts[*curM]*3;
         glDrawElements(0x4,vc,GL_UNSIGNED_SHORT,(void*)(uintptr_t)curIboDrawOfs); drawCalls++; vertsRendered += vc;
@@ -1427,10 +1424,10 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         u16 i = visibleInstances[visibleIndex].index;
         Entity* e = &World.instances[i];
         u16 tex = e->texIndex;
-             if (unlikely(doubleSidedTexture[tex] || World.scale[i].x<0.0f || World.scale[i].y<0.0f || World.scale[i].z<0.0f)) { glDisable(GL_CULL_FACE);  glEnable(GL_BLEND); } /*Doublesided (incl. transparent doublesided, e.g. cyberspace panels)*/
-        else if (unlikely(transparentTexture[tex]))                                                                            {  glEnable(GL_CULL_FACE);  glEnable(GL_BLEND); } /*Transparents (with sort)*/
-        else                                                                                                                   {  glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } /*Opaque*/
-        currentModelType=GetAndBindModel(i,currentModelType); if (tex != currentTexIndex) { currentTexIndex=tex; glUniform1ui(3,(u32)tex); } u32 vertCount = modelTriangleCounts[currentModelType] * 3; glDrawElements(0x4/*GL_TRIANGLES*/,(i32)vertCount,GL_UNSIGNED_SHORT,(void*)(uintptr_t)curIboDrawOfs); drawCalls++; vertsRendered += vertCount;
+             if (unlikely(doubleSidedTexture[tex] || World.scale[i].x<0.0f || World.scale[i].y<0.0f || World.scale[i].z<0.0f)) { glDisable(GL_CULL_FACE); } /*Doublesided (incl. transparent doublesided, e.g. cyberspace panels)*/
+        else if (unlikely(transparentTexture[tex]))                                                                            {  glEnable(GL_CULL_FACE); } /*Transparents (with sort)*/
+        else                                                                                                                   {  glEnable(GL_CULL_FACE); } /*Opaque*/
+        currentModelType = GetAndBindModel(i,currentModelType); if (tex != currentTexIndex) { currentTexIndex=tex; glUniform1ui(3,(u32)tex); } u32 vertCount = modelTriangleCounts[currentModelType] * 3; glDrawElements(0x4/*GL_TRIANGLES*/,(i32)vertCount,GL_UNSIGNED_SHORT,(void*)(uintptr_t)curIboDrawOfs); drawCalls++; vertsRendered += vertCount;
     }
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
     glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][2]);
@@ -1470,14 +1467,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glDepthMask(1);
     glUniform1ui(32,1);
     glDepthFunc(0x203/*GL_LEQUAL*/);
-    glUniform1ui(1, 0u);
-    glUniform1ui(17, 0u);
-    glUniform1ui(19, 0u);
-    glUniform1ui(20, 0u);
-    glUniform1ui(13, 0u);
-    glUniform1ui(30, 0u);
-    glUniform2f(33, 0.0f, 0.0f);
-    glUniform1f(27, 0.0f);
+    glUniform1ui(1,0u); glUniform1ui(17,0u); glUniform1ui(19,0u); glUniform1ui(20,0u); glUniform1ui(13,0u); glUniform1ui(30,0u); glUniform2f(33,0.0f,0.0f); glUniform1f(27,0.0f);
     glActiveTexture(0x84C9/*GL_TEXTURE9*/);
     u8 tdLev = World.curLev;
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { // 3D text decals 592 text_decal, 593 text_decalStopDSS1
@@ -1486,15 +1476,15 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         if (!(World.instances[i].entflags & EF_ACTIVE)) { continue; }
         if (!((gridCellStates[World.instances[i].cellIndex] & CELL_VISIBLE) || ((gridCellStates[World.instances[i].cellIndex] & CELL_OPEN) == CELL_OPEN))) { continue; }
         if (cullBlendState != 2) { /*Double-sided*/ glDisable(GL_CULL_FACE); glEnable(GL_BLEND); cullBlendState = 2; }
-        glUniform1ui(0, (u32)i);
-        glUniform1ui(18, (u32)World.instances[i].texIndex);
-        glUniform1ui(25, (u32)cIdx);
-        glBindTexture(GL_TEXTURE_2D, (cIdx == 593) ? fontAtlasTexStopD : fontAtlasTex);
+        glUniform1ui(0,(u32)i);
+        glUniform1ui(18,(u32)World.instances[i].texIndex);
+        glUniform1ui(25,(u32)cIdx);
+        glBindTexture(GL_TEXTURE_2D,(cIdx == 593) ? fontAtlasTexStopD : fontAtlasTex);
         glBindVertexBuffer(0, textDecalVBO[tdLev][i], 0, 16/*VRT_ATT_SZ*/);
-        glDrawArrays(0x4/*GL_TRIANGLES*/, 0, (i32)textDecalVertexCount[tdLev][i]); drawCalls++; vertsRendered += textDecalVertexCount[tdLev][i];
+        glDrawArrays(0x4/*GL_TRIANGLES*/,0,(i32)textDecalVertexCount[tdLev][i]); drawCalls++; vertsRendered += textDecalVertexCount[tdLev][i];
     }
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glUniform1ui(32, 0u); /* restore chunkSP font-atlas off for subsequent draws */
+    glBindTexture(GL_TEXTURE_2D,0);
+    glUniform1ui(32,0u); /* restore chunkSP font-atlas off for subsequent draws */
     u16 wvi = World.weaponVModelIndex;
     if (wvi > 0 && wvi < INSTANCE_CNT) {
         int wep16 = Get16WeaponIndexFromConstIndex(World.instances[wvi].index);
@@ -1895,7 +1885,7 @@ void InitalizeEnvironment() {
     textureOffsetsID      = MakeSSBO(&textureOffsetsID,14,MAXTEX * sizeof(u32),NULL,GL_STATIC_DRAW);
     textureSizesID        = MakeSSBO(&textureSizesID,15,MAXTEX*2*sizeof(i32),NULL,GL_STATIC_DRAW);
     glUseProgram(shadowmapsSP); glUniform1ui( 9, SHADOW_MAP_SIZE); // Set permanent uniforms on shaders (keeps c in sync with glsl for constants)
-    glUseProgram(chunkSP);      glUniform1ui(21, SHADOW_MAP_SIZE); glUniform1f(22, (float)SHADOW_MAP_SIZE); glUniform1ui(23, LIGHT_CNT); glUniform1ui(24, (u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11, SHADOW_MAP_SIZE * SHADOW_MAP_SIZE); glUniform1i(29,6); glUniform1i(31,9); glUniform1i(36,10);
+    glUseProgram(chunkSP);      glUniform1ui(21, SHADOW_MAP_SIZE); glUniform1f(22, (float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_CNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE * SHADOW_MAP_SIZE); glUniform1i(29,6); glUniform1i(31,9); glUniform1i(36,10);
     glUseProgram(ssrSP);        glUniform1i(5,3); glUseProgram(rtSP); glUniform1i(5,3);
     for (int q=0;q<5;++q) { glGenQueries(5,gpuQ[q]); }
     DualLog("SSBO and shadow buffer setup........................................................took %.6f secs\n",get_timed() - initSSBOStart);

@@ -2,7 +2,6 @@
 in vec3 FragPos;
 in vec2 TexCoord;
 layout(std430,binding=5) buffer ShadowMaps { uint depthData[]; };
-layout(location=2) uniform uint face;
 layout(location=3) uniform vec3 lightPos;
 layout(location=6) uniform uint texIndex;
 layout(location=7) uniform uint offsetIntoSSBO;
@@ -26,8 +25,5 @@ void main() {
         if ((color >> 24) < 252u) discard;
     }
     ivec2 texelCoord = ivec2(gl_FragCoord.xy);
-    vec3 toLight = lightPos - FragPos;
-    float dist = length(toLight) + 0.02; // Slight pre-bias
-    uint distInt = uint(dist * 100000.0 + 0.5);
-    atomicMin(depthData[offsetIntoSSBO + texelCoord.y * shadowMapSize + texelCoord.x],distInt);
+    atomicMin(depthData[offsetIntoSSBO + texelCoord.y * shadowMapSize + texelCoord.x],uint((length(lightPos - FragPos) + 0.02) * 100000.0 + 0.5));
 }
